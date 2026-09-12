@@ -1,15 +1,16 @@
-# multiplayer (Quick Play)
+# multiplayer (Quick Play + Pulse)
 
-Status: built. Server-authoritative networked Quick Play — the only mode with a
-DB, server state, or a second client. Pulse and 24hr Battle are untouched.
+Status: built. Server-authoritative networked Quick Play and Pulse. Both modes
+share matchmaking, presence, polling, and lazy settlement.
 
 ## Shape
 
-- One `matches` row = one round, single source of truth (`db/schema.ts:20`).
+- One `matches` row = one round, single source of truth (`db/schema.ts:20`). Pulse
+  positions, realized P&L, and final P&L live in the same row.
 - Identity: anonymous per-browser UUID in `localStorage.playerId` (`app/lib/playerId.ts:20`). Not Clerk; sign-in stays optional and unrelated.
 - Sync: ~1s polling (`app/duel/[market]/match/[matchId]/page.tsx:14`), no WebSocket registry. Lobby list polls at 3s (`app/page.tsx:17`), the queue at 1s (`app/page.tsx:22`).
 - Nobody sits in a room alone: an `open` match is waited out on the lobby page (`app/page.tsx:389-407`); the room is entered only once `status` leaves `open`. The queued state exposes a shareable invite URL (`app/page.tsx:192-198`) that auto-joins a friend as player 2 (`app/duel/[market]/match/[matchId]/page.tsx:65-97`).
-- No balance deduction. `wager` is stored and displayed only.
+- Quick Play has no balance deduction; its `wager` is stored and displayed only. Pulse reserves each entry's stake from the player's round bankroll and returns that stake when the position closes.
 
 ## Status machine
 
@@ -23,9 +24,9 @@ open --(p2 joins)--> predict --(both locked)------> countdown --(deadline)--> se
 
 - Maps 1:1 onto the client `Phase` names in [game-loop.md](game-loop.md); only the owner changed.
 - `open` — auto-joinable by matching `(market, mode, wager, timerSeconds)` exactly, or by id from the lobby list.
-- `predict` — hard 15s window: `LOCK_SECONDS` (`lib/match.ts:34`) from `predictStartAt`, stamped when p2 joins (`db/schema.ts:39`). Predictions stay hidden from each other for its whole length (`lib/match.ts:181`).
+- `predict` — Quick Play has a hard 15s lock window; Pulse has a 5s automatic pre-round countdown (`PULSE_START_SECONDS`, `lib/match.ts`) from `predictStartAt`. Pulse starts even if neither player has entered yet.
 - Expiry is lazy, like settlement: `expireLocksIfDue` (`lib/match.ts:81`) forfeits to whoever locked, or voids the round as a tie if neither did. Both leave `finalPrice` null, which is how the client tells a forfeit from a priced result (`app/duel/[market]/match/[matchId]/page.tsx:229`).
-- `countdown` — deadline = `roundStartAt + timerSeconds` (`lib/match.ts:25`). Needs nobody online; the two stored predictions are enough. Both predictions go public here, not at settle: they are already frozen, so there is nothing left to game (`lib/match.ts:181`).
+- `countdown` — deadline = `roundStartAt + timerSeconds` (`lib/match.ts:25`). Needs nobody online; Quick Play predictions or any Pulse positions are enough. Pulse supports server-priced entries up to the player's available bankroll and independent closes during this phase.
 - `settled` — final price + winner written once, idempotently.
 
 ## Concurrency (no transactions)
@@ -37,7 +38,8 @@ multi-statement transactions or row locks. Every transition is a single guarded
 | Transition | Guard | Loser does |
 | --- | --- | --- |
 | join | `status='open' AND player2_id IS NULL` | try next candidate, else create (`app/api/match/find-or-create/route.ts:75-93`) |
-| lock | `status='predict' AND prediction{N} IS NULL` | re-read, return current view (`app/api/match/[id]/lock/route.ts:63-69`) |
+| lock | `status='predict' AND prediction{N} IS NULL` | re-read, return current view |
+| Pulse action | `status='countdown' AND the caller's position JSON is unchanged` | re-read, return current view |
 | start countdown | `status='predict'` | nothing — only the 2nd locker sees both non-null (`app/api/match/[id]/lock/route.ts:71-80`) |
 | expire lock window | `status='predict'`, plus `prediction{N} IS NULL` re-asserted for every slot read empty | re-read; a lock that beat it owns the row (`lib/match.ts:90-115`) |
 | settle | `status='countdown'` | re-read, use the winner's values (`lib/match.ts:138-145`) |
@@ -62,15 +64,19 @@ multi-statement transactions or row locks. Every transition is a single guarded
 | `GET /api/match/[id]?playerId=` | role-scoped view + heartbeat + lock-window expiry + lazy settlement (`app/api/match/[id]/route.ts:38`). Polled by the room, and by the lobby while queued |
 | `POST /api/match/[id]/join` | take a specific fresh open match (lobby list or invite link path) |
 | `POST /api/match/[id]/lock` | write this player's prediction, start countdown on the 2nd; 409 once the 15s window has closed (`app/api/match/[id]/lock/route.ts:39`) |
+| `POST /api/match/[id]/action` | Pulse server-priced `enter` actions up to available bankroll and per-position `close` actions |
 | `POST /api/match/[id]/leave` | delete while `open`/`predict`; 409 once counting down |
 | `GET /api/match/open?market=&mode=&playerId=` | joinable matches with a fresh host heartbeat |
 
 Validation on entry: market must price (`lib/spotPrice.ts:12`), mode must be
-`quick-play`, wager integer 1..1,000,000, timer 10..3600s.
+`quick-play` or `pulse`, wager integer 1..1,000,000, timer 10..3600s. Pulse
+actions additionally validate side, stake ≤ $100 and available bankroll, leverage,
+and position id.
 
 ## Client
 
-- `app/duel/[market]/match/[matchId]/page.tsx` — the room. Renders by `status`; one prediction column plus an opponent column. Stops polling on `settled` or 404.
+- `app/duel/[market]/match/[matchId]/page.tsx` — Quick Play room.
+- `app/duel/[market]/pulse/[matchId]/page.tsx` — multiplayer Pulse room; renders positions and live P&L, stops polling on `settled` or 404.
 - One ticker drives both deadlines — the lock window in `predict`, the round in `countdown` (`app/duel/[market]/match/[matchId]/page.tsx:116-133`).
 - `<PriceChart>` still reads the browser's own `usePriceFeed()` — the chart stays client-direct to Coinbase, no server round trip. Only `roundStart`/lock-marker times come from the poll.
 - Settlement freezes the series with the final point pinned to the deadline, not to whenever the tab noticed (`app/duel/[market]/match/[matchId]/page.tsx:135-144`). A forfeit has no final price, so nothing freezes.

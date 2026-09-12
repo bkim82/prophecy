@@ -1,9 +1,9 @@
 # game-loop
 
-Quick Play's loop is server-owned: a `matches` row holds the phase and the
+Quick Play and multiplayer Pulse loops are server-owned: a `matches` row holds the phase and the
 `/api/match/*` routes move it; clients poll and render what they are told (see
 [multiplayer-plan.md](multiplayer-plan.md) for the routes, guards and presence).
-Pulse still runs its whole loop in `app/duel/btc/pulse/page.tsx`.
+The solo Pulse route still runs its own client-only loop in `app/duel/btc/pulse/page.tsx`.
 
 The phase vocabulary below is unchanged — only the owner moved. `settling` is
 the one client-only phase left: server-side it is still `countdown`, shown while
@@ -12,7 +12,7 @@ a poll past the deadline has not yet come back with a result.
 ## Phases
 
 ```
-open --(opponent joins)--> predict --(both locked)--> countdown --(deadline)--> settled
+open --(opponent joins)--> predict --(lock window / 5s Pulse start)--> countdown --(deadline)--> settled
  |                             |   \--(15s window)--------------------------------^
  (cancel/expire)               (either leaves)                   (settling: client-only,
  v                             v                                  poll in flight)
@@ -28,18 +28,18 @@ server-side. There is no loop back: "play again" is a new row, not a reset.
 | Phase | State |
 | --- | --- |
 | `open` | waiting for an opponent, Cancel available, chart live |
-| `predict` | your input enabled, opponent's value hidden, 15s lock timer visible, Leave available |
-| `countdown` | both predictions locked+immutable+revealed, timer visible, chart shaded from `roundStartAt`, Leave refused |
+| `predict` | Quick Play input enabled with a 15s lock timer; Pulse shows a 5s pre-round timer, Leave available |
+| `countdown` | Quick Play predictions are locked+revealed; Pulse trading is live, timer visible, chart shaded from `roundStartAt`, Leave refused |
 | `settling` | client-only: deadline passed, the settling poll has not returned (`app/duel/[market]/match/[matchId]/page.tsx:234`). `locking` is its twin for the lock window (`:235`) |
 | `settled` | winner shown, both predictions revealed, chart frozen, per-player breakdown |
 | `settled` (forfeit) | `finalPrice` null: the lock window closed on an unlocked player. Its own panel, no chart freeze, no diffs (`app/duel/[market]/match/[matchId]/page.tsx:229`,`:531-557`) |
 
 ## Lock window
 
-- 15s, fixed for every match: `LOCK_SECONDS` (`lib/match.ts:34`) from `predictStartAt`, stamped by whichever join route took the seat (`app/api/match/find-or-create/route.ts:86`, `app/api/match/[id]/join/route.ts:31`).
+- Quick Play uses 15s; Pulse uses a 5s automatic start countdown: `LOCK_SECONDS` / `PULSE_START_SECONDS` (`lib/match.ts`) from `predictStartAt`, stamped by whichever join route took the seat (`app/api/match/find-or-create/route.ts:86`, `app/api/match/[id]/join/route.ts:31`).
 - Sent as `lockDeadlineAt`, non-null only in `predict` (`lib/match.ts:213`), and run by the same skew-corrected ticker as the round countdown (`app/duel/[market]/match/[matchId]/page.tsx:116-133`).
-- Both locked before it runs out → the countdown starts on the 2nd lock, not at the deadline. The window is a floor on nothing, a ceiling on waiting.
-- `expireLocksIfDue` (`lib/match.ts:81`) closes it on whichever poll first arrives past the deadline: one locked → that player wins by forfeit; neither → `winner: "tie"`, void. Both write `finalPrice` null. A row that somehow has both predictions at expiry starts the countdown dated to the deadline (`:94`).
+- Quick Play requires both locks before it runs out. Pulse always starts at the 5s deadline, even when neither player has traded; entries become available for the full round afterward.
+- `expireLocksIfDue` (`lib/match.ts:81`) closes Quick Play's window with the existing forfeit rules. For Pulse, the same lazy poll always starts the round dated to the 5s deadline, regardless of entries.
 - Guards re-assert every slot read empty (`:103-111`), so a lock landing in the same instant either wins the seat or loses to the expiry — never both.
 
 ## lock — `app/api/match/[id]/lock/route.ts:17`
@@ -73,7 +73,14 @@ Ties only occur on exact-match input (abs diff, floats) (`lib/match.ts:136`) —
 
 ## Play again
 
-There is no in-place reset: a round is a row, so "Play Again" is a link back to
+Multiplayer Pulse uses the same new-row play-again flow. Both players enter a
+server-priced long/short position during `predict`; `POST /api/match/[id]/action`
+guards close/reverse mutations during `countdown`, and `settleIfDue` compares
+the two final leveraged P&Ls at the server settlement price.
+
+Multiplayer Pulse allows unlimited long/short entries during `countdown`. Each
+entry is an independent position; closing one realizes its P&L without changing
+the others. There is no in-place reset: a round is a row, so "Play Again" is a link back to
 the lobby (`app/duel/[market]/match/[matchId]/page.tsx:571-577`) and the next match is a new row. The client
 freezes its chart snapshot once, on first seeing a priced `settled`, with the
 final point pinned to the deadline rather than to whenever the tab noticed

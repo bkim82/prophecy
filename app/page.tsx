@@ -67,6 +67,7 @@ function MiniChart({ points }: { points: { t: number; p: number }[] }) {
 type Queue = {
   matchId: string;
   market: MarketId;
+  mode: string;
   wager: number;
   timerSeconds: number;
   since: number;
@@ -103,7 +104,7 @@ const MARKETS: Record<MarketId, { label: string; symbol: string; name: string }>
 const MODES_BY_MARKET: Record<MarketId, { id: ModeId; label: string; meta: string; href?: string; matched?: boolean }[]> = {
   btc: [
     { id: "quick-play", label: "Quick Play", meta: "BTC · head to head · online", matched: true },
-    { id: "pulse", label: "Pulse", meta: "BTC · solo · trade live for 60 seconds", href: "/duel/btc/pulse" },
+    { id: "pulse", label: "Pulse", meta: "BTC · head to head · trade live", matched: true },
     { id: "battle-24h", label: "24hr Battle", meta: "BTC · one call · settled in 24 hours" },
   ],
   eth: [
@@ -149,12 +150,12 @@ export default function Page() {
   const change = currentPrice !== null && firstPrice ? ((currentPrice - firstPrice) / firstPrice) * 100 : null;
   const activeMode = modes.find((option) => option.id === mode) ?? modes[0];
   const isPlayable = Boolean(activeMode.href || activeMode.matched);
-  // Only Quick Play settles a single call; Pulse takes its stake and leverage
-  // on its own page, so it gets a bare href and leaves these controls inert.
-  const takesCall = mode === "quick-play";
+  const takesCall = mode === "quick-play" || mode === "pulse";
+  const matchMode = mode === "pulse" ? "pulse" : "quick-play";
   const playHref = activeMode.href ?? "/";
   const wagerValue = Math.floor(Number(wager));
   const wagerIsValid = Number.isFinite(wagerValue) && wagerValue > 0;
+  const canPlay = matchMode === "pulse" || wagerIsValid;
 
   useEffect(() => setPlayerId(getPlayerId()), []);
 
@@ -166,7 +167,7 @@ export default function Page() {
 
     const poll = async () => {
       try {
-        const query = new URLSearchParams({ market, mode: "quick-play" });
+        const query = new URLSearchParams({ market, mode: matchMode });
         if (playerId) query.set("playerId", playerId);
         const res = await fetch(`/api/match/open?${query}`, { cache: "no-store" });
         if (!cancelled && res.ok) {
@@ -184,10 +185,12 @@ export default function Page() {
       cancelled = true;
       clearTimeout(timerId);
     };
-  }, [market, takesCall, playerId]);
+  }, [market, takesCall, matchMode, playerId]);
 
-  const matchHref = (matchMarket: string, matchId: string) =>
-    `/duel/${matchMarket}/match/${matchId}`;
+  const matchHref = (matchMarket: string, matchId: string, matchMode = "quick-play") =>
+    matchMode === "pulse"
+      ? `/duel/${matchMarket}/pulse/${matchId}`
+      : `/duel/${matchMarket}/match/${matchId}`;
 
   const inviteHref = queue
     ? `${matchHref(queue.market, queue.matchId)}?invite=1`
@@ -219,22 +222,30 @@ export default function Page() {
   };
 
   const enterMatch = useCallback(
-    (matchMarket: string, matchId: string) =>
-      router.push(matchHref(matchMarket, matchId)),
+    (matchMarket: string, matchId: string, matchMode = "quick-play") =>
+      router.push(matchHref(matchMarket, matchId, matchMode)),
     [router],
   );
 
   // Pressing Play either takes a seat someone was holding — straight into the
   // room — or opens a match and waits here. Nobody enters a room alone.
   const play = async () => {
-    if (!playerId || pending || queue || !wagerIsValid) return;
+    if (!playerId || pending || queue || !canPlay) return;
     setPending("play");
     setMatchError(null);
     try {
       const res = await fetch("/api/match/find-or-create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ playerId, market, mode: "quick-play", wager: wagerValue, timerSeconds: timer }),
+        body: JSON.stringify({
+          playerId,
+          market,
+          mode: matchMode,
+          // Pulse chooses its position stake in the room; this value only
+          // keeps its lobby rows compatible with the shared match schema.
+          wager: matchMode === "pulse" ? 100 : wagerValue,
+          timerSeconds: timer,
+        }),
       });
       if (!res.ok) throw new Error("no match");
       const { matchId, status: matchStatus } = (await res.json()) as {
@@ -242,12 +253,12 @@ export default function Page() {
         status: string;
       };
       if (matchStatus === "open") {
-        setQueue({ matchId, market, wager: wagerValue, timerSeconds: timer, since: Date.now() });
+        setQueue({ matchId, market, mode: matchMode, wager: matchMode === "pulse" ? 100 : wagerValue, timerSeconds: timer, since: Date.now() });
         setQueuedFor(0);
         setPending(null);
         return;
       }
-      enterMatch(market, matchId);
+      enterMatch(market, matchId, matchMode);
     } catch {
       setMatchError("Could not reach the lobby. Try again.");
       setPending(null);
@@ -263,7 +274,7 @@ export default function Page() {
 
     // The 15s lock window starts the moment the opponent joins, so the room is
     // warmed here rather than paid for out of that budget.
-    router.prefetch(matchHref(queue.market, queue.matchId));
+    router.prefetch(matchHref(queue.market, queue.matchId, queue.mode));
 
     const tick = () => setQueuedFor(Math.round((Date.now() - queue.since) / 1000));
 
@@ -286,7 +297,7 @@ export default function Page() {
           // Anything but `open` means someone took the seat — go play.
           if (view.status !== "open") {
             setQueue(null);
-            enterMatch(queue.market, queue.matchId);
+            enterMatch(queue.market, queue.matchId, queue.mode);
             return;
           }
         }
@@ -334,7 +345,7 @@ export default function Page() {
         body: JSON.stringify({ playerId }),
       });
       if (!res.ok) throw new Error("taken");
-      enterMatch(match.market, match.id);
+      enterMatch(match.market, match.id, match.mode);
     } catch {
       setMatchError("That match was taken. Pick another, or press Play.");
       setPending(null);
@@ -392,7 +403,7 @@ export default function Page() {
             <span className="field-label">In queue</span>
             <strong>Waiting for an opponent…</strong>
             <span className="muted">
-              {MARKETS[queue.market].label} Quick Play · {queue.wager} coins · {queue.timerSeconds}s round
+              {MARKETS[queue.market].label} {queue.mode === "pulse" ? "Pulse" : "Quick Play"} · {queue.timerSeconds}s round
             </span>
           </div>
           <span className="queue-elapsed">{queuedFor}s</span>
@@ -407,16 +418,24 @@ export default function Page() {
       ) : (
       <section className="quick-play panel">
         <div className="quick-play-market"><span className={`market-symbol ${SYMBOL_CLASS[market]}`}>{activeMarket.symbol}</span><div><strong>{activeMarket.label} / USD</strong><span className="muted">{isPlayable ? "Current round" : "Not open yet"}</span></div></div>
-        <div className="control-group">
-          <span className="field-label">Wager</span>
-          <div className="segmented-control" role="group" aria-label="Choose wager">
-            {WAGER_PRESETS.map((preset) => (
-              <button key={preset} type="button" disabled={!takesCall} className={!isCustomWager && wager === String(preset) ? "is-selected" : ""} onClick={() => { setWager(String(preset)); setIsCustomWager(false); }}>{preset}</button>
-            ))}
-            <button type="button" disabled={!takesCall} className={isCustomWager ? "is-selected" : ""} onClick={() => setIsCustomWager(true)}>Custom</button>
+        {mode === "pulse" ? (
+          <div className="control-group">
+            <span className="field-label">Pulse format</span>
+            <strong className="muted">$100 bankroll</strong>
+            <span className="muted">Stake + leverage in room</span>
           </div>
-          {isCustomWager && <span className="entry-input-wrap"><input value={wager} onChange={(event) => setWager(event.target.value)} disabled={!takesCall} inputMode="decimal" aria-label="Custom wager amount" /><span>coins</span></span>}
-        </div>
+        ) : (
+          <div className="control-group">
+            <span className="field-label">Wager</span>
+            <div className="segmented-control" role="group" aria-label="Choose wager">
+              {WAGER_PRESETS.map((preset) => (
+                <button key={preset} type="button" disabled={!takesCall} className={!isCustomWager && wager === String(preset) ? "is-selected" : ""} onClick={() => { setWager(String(preset)); setIsCustomWager(false); }}>{preset}</button>
+              ))}
+              <button type="button" disabled={!takesCall} className={isCustomWager ? "is-selected" : ""} onClick={() => setIsCustomWager(true)}>Custom</button>
+            </div>
+            {isCustomWager && <span className="entry-input-wrap"><input value={wager} onChange={(event) => setWager(event.target.value)} disabled={!takesCall} inputMode="decimal" aria-label="Custom wager amount" /><span>coins</span></span>}
+          </div>
+        )}
         <div className="control-group">
           <span className="field-label">Timer</span>
           <div className="segmented-control" role="group" aria-label="Choose round length">
@@ -425,9 +444,9 @@ export default function Page() {
             ))}
           </div>
         </div>
-        <div className="opponent-status"><span className="field-label">Opponent</span><strong><span className={`status-dot ${isPlayable ? "is-online" : ""}`} /> {takesCall ? "Open lobby" : isPlayable ? "Solo · NOVA AI" : "Unavailable"}</strong><span className="muted">{takesCall ? `${openMatches.length} match${openMatches.length === 1 ? "" : "es"} waiting` : isPlayable ? "Stake and leverage set in-round" : "Mode in development"}</span></div>
+        <div className="opponent-status"><span className="field-label">Opponent</span><strong><span className={`status-dot ${isPlayable ? "is-online" : ""}`} /> {takesCall ? "Open lobby" : isPlayable ? "Solo · NOVA AI" : "Unavailable"}</strong><span className="muted">{takesCall ? `${openMatches.length} ${mode === "pulse" ? "Pulse match" : "match"}${openMatches.length === 1 ? "" : "es"} waiting` : isPlayable ? "Stake and leverage set in-round" : "Mode in development"}</span></div>
         {activeMode.matched
-          ? <button type="button" className="play-button" onClick={play} disabled={!playerId || pending !== null || queue !== null || !wagerIsValid}>{pending === "play" ? "Finding a match…" : <>Play <span aria-hidden="true">→</span></>}</button>
+          ? <button type="button" className="play-button" onClick={play} disabled={!playerId || pending !== null || queue !== null || !canPlay}>{pending === "play" ? "Finding a match…" : <>Play <span aria-hidden="true">→</span></>}</button>
           : isPlayable
             ? <Link href={playHref} className="play-button">Play <span aria-hidden="true">→</span></Link>
             : <button type="button" className="play-button" disabled>Soon</button>}
@@ -437,15 +456,15 @@ export default function Page() {
 
       <section className="lower-grid">
         <div><div className="list-heading"><h2>Open matches</h2><span className="muted">Live lobby</span></div><div className="data-list panel">
-          {!takesCall && <div className="data-row"><span className="muted">Quick Play only</span></div>}
+          {!takesCall && <div className="data-row"><span className="muted">Choose Quick Play or Pulse</span></div>}
           {takesCall && openMatches.length === 0 && <div className="data-row"><span className="muted">No one is waiting — press Play to open one.</span></div>}
           {takesCall && openMatches.map((match) => {
             const label = MARKETS[match.market as MarketId]?.label ?? match.market.toUpperCase();
             return (
               <button type="button" className="data-row" key={match.id} onClick={() => join(match)} disabled={pending !== null || queue !== null || match.isYours}>
-                <div className="row-market"><span className={`market-symbol ${match.market === "btc" ? "btc-symbol" : "eth-symbol"}`}>{match.market === "btc" ? "₿" : "Ξ"}</span><span><strong>{label}</strong><span className="muted">{match.timerSeconds}s · {match.isYours ? "yours" : "Quick Play"}</span></span></div>
+                <div className="row-market"><span className={`market-symbol ${match.market === "btc" ? "btc-symbol" : "eth-symbol"}`}>{match.market === "btc" ? "₿" : "Ξ"}</span><span><strong>{label}</strong><span className="muted">{match.timerSeconds}s · {match.isYours ? "yours" : match.mode === "pulse" ? "Pulse" : "Quick Play"}</span></span></div>
                 <span className="row-detail">1 / 2</span>
-                <span className="row-detail">{match.wager} coins</span>
+                <span className="row-detail">{match.mode === "pulse" ? "live trade" : `${match.wager} coins`}</span>
                 <span className="row-age">{pending === match.id ? "joining…" : age(match.createdAt)}</span>
               </button>
             );
