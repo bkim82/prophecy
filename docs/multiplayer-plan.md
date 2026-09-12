@@ -9,7 +9,7 @@ share matchmaking, presence, polling, and lazy settlement.
   positions, realized P&L, and final P&L live in the same row.
 - Identity: anonymous per-browser UUID in `localStorage.playerId` (`app/lib/playerId.ts:20`). Not Clerk; sign-in stays optional and unrelated.
 - Sync: ~1s polling (`app/duel/[market]/match/[matchId]/page.tsx:14`), no WebSocket registry. Lobby list polls at 3s (`app/page.tsx:17`), the queue at 1s (`app/page.tsx:22`).
-- Nobody sits in a room alone: an `open` match is waited out on the lobby page (`app/page.tsx:389-407`); the room is entered only once `status` leaves `open`. The queued state exposes a shareable invite URL (`app/page.tsx:192-198`) that auto-joins a friend as player 2 (`app/duel/[market]/match/[matchId]/page.tsx:65-97`).
+- Nobody sits in a room alone: an `open` match is waited out on the lobby page (`app/page.tsx:389-407`); the room is entered only once `status` leaves `open`. The queued state exposes a mode-specific shareable invite URL (`app/page.tsx:192-198`) that auto-joins a friend as player 2 (`app/duel/[market]/match/[matchId]/page.tsx:65-97`, `app/duel/[market]/pulse/[matchId]/page.tsx:57-84`).
 - Quick Play has no balance deduction; its `wager` is stored and displayed only. Pulse reserves each entry's stake from the player's round bankroll and returns that stake when the position closes.
 
 ## Status machine
@@ -80,7 +80,7 @@ and position id.
 - One ticker drives both deadlines — the lock window in `predict`, the round in `countdown` (`app/duel/[market]/match/[matchId]/page.tsx:116-133`).
 - `<PriceChart>` still reads the browser's own `usePriceFeed()` — the chart stays client-direct to Coinbase, no server round trip. Only `roundStart`/lock-marker times come from the poll.
 - Settlement freezes the series with the final point pinned to the deadline, not to whenever the tab noticed (`app/duel/[market]/match/[matchId]/page.tsx:135-144`). A forfeit has no final price, so nothing freezes.
-- Lobby Play button for Quick Play is an async matchmaker, not a `Link` (`app/page.tsx:186-217`); Open Matches rows are join buttons (`app/page.tsx:388-399`), inert for your own row while you hold it. While queued, Share invite uses native sharing when available and clipboard copy otherwise (`app/page.tsx:192-219`, `app/page.tsx:389-407`).
+- Lobby Play button for Quick Play is an async matchmaker, not a `Link` (`app/page.tsx:186-217`); Open Matches rows are join buttons (`app/page.tsx:388-399`), inert for your own row while you hold it. While queued, Share invite uses native sharing when available and clipboard copy otherwise, preserving the queued mode in the URL (`app/page.tsx:192-219`, `app/page.tsx:389-407`).
 - Queueing replaces the whole Quick Play control panel rather than disabling it — the criteria are already committed to a row (`app/page.tsx:340-352`). Cancel deletes the row via `leave` (`app/page.tsx:263-277`); the room is prefetched while waiting so navigation does not eat into the 15s (`app/page.tsx:223`).
 
 ## Verified
