@@ -36,6 +36,9 @@ export default function Page() {
   const [input2, setInput2] = useState("");
   const [locked1, setLocked1] = useState<number | null>(null);
   const [locked2, setLocked2] = useState<number | null>(null);
+  // When each player locked — the chart marks the moment, not just the price.
+  const [lockedAt1, setLockedAt1] = useState<number | null>(null);
+  const [lockedAt2, setLockedAt2] = useState<number | null>(null);
 
   const [roundStart, setRoundStart] = useState<number | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(ROUND_SECONDS);
@@ -108,13 +111,19 @@ export default function Page() {
     const value = Number(raw);
     if (!Number.isFinite(value) || value <= 0) return;
 
+    const at = Date.now();
     const next1 = player === 1 ? value : locked1;
     const next2 = player === 2 ? value : locked2;
-    if (player === 1) setLocked1(value);
-    else setLocked2(value);
+    if (player === 1) {
+      setLocked1(value);
+      setLockedAt1(at);
+    } else {
+      setLocked2(value);
+      setLockedAt2(at);
+    }
 
     if (next1 !== null && next2 !== null) {
-      setRoundStart(Date.now());
+      setRoundStart(at);
       setPhase("countdown");
     }
   };
@@ -125,6 +134,8 @@ export default function Page() {
     setInput2("");
     setLocked1(null);
     setLocked2(null);
+    setLockedAt1(null);
+    setLockedAt2(null);
     setRoundStart(null);
     setSecondsLeft(ROUND_SECONDS);
     setOutcome(null);
@@ -136,10 +147,10 @@ export default function Page() {
 
   const predictionLines: PredictionLine[] = [
     ...(locked1 !== null
-      ? [{ label: "P1", value: locked1, color: P1_COLOR }]
+      ? [{ label: "P1", value: locked1, color: P1_COLOR, at: lockedAt1 }]
       : []),
     ...(locked2 !== null
-      ? [{ label: "P2", value: locked2, color: P2_COLOR }]
+      ? [{ label: "P2", value: locked2, color: P2_COLOR, at: lockedAt2 }]
       : []),
   ];
 

@@ -1,63 +1,56 @@
-# Game loop
+# game-loop
 
-All of it lives in `app/page.tsx`. There is no reducer and no state library — the round is a `phase` string plus a handful of `useState` values.
+All in `app/page.tsx`. No reducer, no state lib — `phase` string + `useState` values.
 
 ## Phases
 
 ```
-predict ──(both players locked)──> countdown ──(0s)──> settling ──> result
-   ▲                                                       │           │
-   │                                                  (error: retry)   │
-   └──────────────────── play again ───────────────────────────────────┘
+predict --(both locked)--> countdown --(0s)--> settling --> result
+   ^                                             |(err: retry)   |
+   +--------------------- play again ------------------------------+
 ```
 
-`type Phase = "predict" | "countdown" | "settling" | "result"` (`app/page.tsx:12`).
+`type Phase = "predict" | "countdown" | "settling" | "result"` (`app/page.tsx:12`)
 
-| Phase | What is true |
+| Phase | State |
 | --- | --- |
-| `predict` | Inputs enabled, no round running, chart is live |
-| `countdown` | Both predictions locked and immutable, timer visible, chart shaded from `roundStart` |
-| `settling` | Fetching the final price; a failure here shows a retry button rather than losing the round |
-| `result` | Winner shown, chart frozen, per-player breakdown rendered |
+| `predict` | inputs enabled, chart live |
+| `countdown` | predictions locked+immutable, timer visible, chart shaded from `roundStart` |
+| `settling` | fetching final price; failure → retry button, round not lost |
+| `result` | winner shown, chart frozen, per-player breakdown |
 
-## Locking
+## lock(player) — `app/page.tsx:107-129`
 
-`lock(player)` (`app/page.tsx:104-120`) only acts during `predict`. It rejects anything that is not a finite number greater than zero, so blanks and negatives cannot be locked.
-
-It computes what *both* predictions would be after this lock, rather than reading state it just set, and only starts the round when both are non-null (`app/page.tsx:111-119`). That avoids a stale-state read on the second player's lock.
-
-Locking stamps `roundStart = Date.now()`, which the chart uses to shade the live round.
-
-Either player can lock first; order does not matter. A locked input becomes disabled and displays the locked value (`app/page.tsx:252`, `:257`). Enter in the input locks, same as the button (`app/page.tsx:254-256`).
+- Active only in `predict`.
+- Rejects non-finite or ≤0 values.
+- Computes both predictions' post-lock state (not stale reads) before starting round (`:115-127`) — avoids stale-state bug on 2nd lock.
+- One `at = Date.now()` per call (`:114`) feeds both `lockedAt{1,2}` and `roundStart`, so the 2nd lock's chart marker sits exactly on the round-band edge.
+- `lockedAt1` / `lockedAt2` (`:40-41`) → `PredictionLine.at`, drawn as vertical lock markers (`:150-154`, see chart.md).
+- Stamps `roundStart = at` (chart shading anchor).
+- Either player may lock first, order irrelevant. Locked input disabled+shows value (`:263`, `:268`). Enter key = lock (`:265-267`).
 
 ## Countdown
 
-`ROUND_SECONDS` is 60 (`app/page.tsx:7`).
+- `ROUND_SECONDS = 60` (`app/page.tsx:7`).
+- Fixed deadline computed once at effect start, not decremented — recomputes `ceil((deadline-now)/1000)` every 200ms (`:92-102`). Immune to tab throttling/missed ticks.
+- At 0 → clear interval, call `settle()` exactly once.
 
-The timer runs against a **fixed deadline** computed once when the effect starts, not by decrementing a counter (`app/page.tsx:89`). The interval fires every 200ms and recomputes `ceil((deadline - now) / 1000)` (`app/page.tsx:90-99`). This means the display stays accurate even if the tab is throttled or a tick is missed — a decrementing counter would silently drift.
+## settle(p1, p2) — `app/page.tsx:53-86`
 
-At zero the interval is cleared and `settle()` fires exactly once.
+1. `getLivePrice()` if fresh (<5s), else `fetch(/api/price)` (throws on non-ok).
+2. `diff1`, `diff2` = abs distance from settled price.
+3. Freeze chart: snapshot series + final point (`:68-71`).
+4. Winner = smaller diff; equal → tie (`:78`).
+5. On failure: phase stays `settling`, `settleError` set, Retry button re-runs `settle` with same locked values (`:209-216`).
+6. Chart reads from ref (not render-time `points`) so snapshot has latest series despite `settle` being memoized (`:50-51`).
 
-## Settlement
+Ties only occur on exact-match input (abs diff, floats) (`:78`) — matches UI copy "Tie — identical predictions."
 
-`settle(p1, p2)` (`app/page.tsx:50-83`):
+## playAgain() — `app/page.tsx:131-144`
 
-1. Prefer the live socket tick via `getLivePrice()` — but only if it is fresher than 5s.
-2. If that returns `null`, fetch `/api/price`. A non-ok response throws.
-3. Compute `diff1` and `diff2` as absolute distances from the final price.
-4. Freeze the chart by snapshotting the current series plus a final point at the settled price (`app/page.tsx:65-68`).
-5. Winner is whoever has the smaller diff; equal diffs are a tie (`app/page.tsx:75`).
+Clears all round state (12 fields). Feed/socket untouched — chart history persists across rounds.
 
-Because the diffs are absolute values, a tie can only happen when both players entered the same number — which is why the UI says "Tie — identical predictions" (`app/page.tsx:304-306`).
+## Known non-behaviors (see roadmap.md for detail)
 
-On failure the phase stays `settling`, `settleError` is set, and a **Retry** button re-runs `settle` with the same locked predictions (`app/page.tsx:198-205`). The round is never lost to a transient network error.
-
-The chart reads from a ref rather than the render-time `points`, so the snapshot captures the latest series even though `settle` is a memoized callback (`app/page.tsx:47-48`).
-
-## Reset
-
-`playAgain()` (`app/page.tsx:122-133`) clears all ten pieces of round state. The price feed is untouched — the socket stays connected and the chart keeps its history across rounds, so a new round starts with a populated chart.
-
-## What the game does not do
-
-Both players use the same keyboard, so predictions are visible to each other and nothing stops one player from editing before locking. There is no score across rounds, no stake, and no record of past duels. See the [roadmap](roadmap.md).
+- Both players share one keyboard/input — no hidden entry.
+- No cross-round score, stake, or history.

@@ -1,56 +1,48 @@
-# Architecture
+# architecture
 
-## Shape
+- No routing, no server state, no persistence. Game logic = client React state in one component.
+- 2 API routes = stateless proxies to public exchange APIs. No decisions, no data held.
 
-The app is a single page with no routing, no server state, and no persistence. All game logic is client-side React state inside one component. The two API routes are thin proxies to public exchange endpoints — they hold no state and make no decisions about the game.
+## Graph
 
 ```
-Browser
-┌───────────────────────────────────────────────────────────┐
-│  app/page.tsx            phase machine, predictions,      │
-│      │                   countdown, settlement, winner    │
-│      ├── usePriceFeed()  price + sampled series + status  │
-│      └── <PriceChart />  pure SVG rendering               │
-└───────────────────────────────────────────────────────────┘
-      │ seed on mount      │ live ticks          │ settle fallback
-      ▼                    ▼                     ▼
-  /api/history     wss://ws-feed.exchange    /api/price
-   (route)          .coinbase.com             (route)
-      │             (browser connects              │
-      ▼              directly)                     ▼
- api.exchange.coinbase.com               api.coinbase.com  ->
-   trades  ->  candles                     api.binance.com
+app/page.tsx (phase machine, predictions, countdown, settlement, winner)
+  ├─ usePriceFeed() → price, sampled series, status
+  └─ <PriceChart /> → pure SVG render
+
+usePriceFeed() on mount  → GET /api/history        (seed)
+usePriceFeed() ongoing   → wss://ws-feed.exchange.coinbase.com (live ticks, browser-direct)
+page.tsx settle()        → GET /api/price          (fallback if socket stale)
+
+/api/history → api.exchange.coinbase.com (trades → candles fallback)
+/api/price   → api.coinbase.com → api.binance.com fallback chain
 ```
 
 ## Modules
 
 | File | Responsibility |
 | --- | --- |
-| `app/page.tsx` | The whole game: phase machine, both players' inputs, countdown, settlement, winner, and layout |
-| `app/usePriceFeed.ts` | Owns the websocket, the history seed, reconnection, and the sampled series |
-| `app/PriceChart.tsx` | Pure function of props to SVG. No data fetching, no state |
-| `app/feedConfig.ts` | `WINDOW_MS` and `SAMPLE_MS`, imported by both the client hook and the server seed route |
-| `app/api/price/route.ts` | REST spot price with a two-source fallback chain |
-| `app/api/history/route.ts` | Chart seed, bucketed to the same resolution the socket produces |
-| `app/layout.tsx` | Root HTML, metadata, Tailwind import |
+| `app/page.tsx` | phase machine, both players' inputs, countdown, settlement, winner, layout |
+| `app/usePriceFeed.ts` | websocket, history seed, reconnection, sampled series |
+| `app/PriceChart.tsx` | pure props→SVG, no fetch, no state |
+| `app/feedConfig.ts` | `WINDOW_MS`, `SAMPLE_MS` — shared by client hook + server seed route |
+| `app/api/price/route.ts` | REST spot price, 2-source fallback chain |
+| `app/api/history/route.ts` | chart seed, bucketed to same resolution as socket |
+| `app/layout.tsx` | root HTML, metadata, Tailwind import |
 
-## Why the pieces sit where they do
+## Invariants (do not violate silently)
 
-**The websocket runs in the browser, not on the server.** Coinbase's public ticker feed needs no key, so there is nothing to hide and no reason to pay for a server relay. It also means ticks reach the UI with no extra hop.
+- Websocket stays client-side (no key needed, no relay hop). Do not move to server without reason.
+- `feedConfig.ts` constants must stay shared, not duplicated (`app/feedConfig.ts:3-4`) — divergence = visible seam between seeded and live chart segments.
+- Both API routes: `export const dynamic = "force-dynamic"`, `Cache-Control: no-store` (`app/api/price/route.ts:1`, `app/api/history/route.ts:3`). Never cache a price.
+- All fetch paths degrade, never throw to the user: history → trades → candles → `[]` (`app/api/history/route.ts:59-69`); price → Coinbase → Binance → 502 (`app/api/price/route.ts:23-39`); settle → live tick → REST (`app/page.tsx:59-64`).
+- `PriceChart` must stay a pure function of props. Round/freeze logic belongs in `page.tsx` (`app/page.tsx:221-226`), not the chart. Same for lock timestamps: `page.tsx` stamps `lockedAt{1,2}`, the chart just draws whatever `PredictionLine.at` it gets.
 
-**`feedConfig.ts` is shared rather than duplicated.** The seed endpoint buckets trades into `SAMPLE_MS` slots and the live hook commits one point per `SAMPLE_MS`. If those two numbers drifted apart, the seeded portion of the chart would have a visibly different density from the live portion. Sharing the constants makes that impossible (`app/feedConfig.ts:3-4`).
+## Round data flow (sequence)
 
-**Both API routes are `force-dynamic` and `no-store`.** A cached price is a wrong price. Every route sets `export const dynamic = "force-dynamic"` and returns `Cache-Control: no-store` (`app/api/price/route.ts:1`, `app/api/history/route.ts:3`).
-
-**Every fetch path degrades instead of failing.** The history route tries trades, then candles, then returns an empty array, because the chart fills itself from the socket within seconds anyway (`app/api/history/route.ts:59-69`). The price route tries Coinbase, then Binance, and only then returns 502 (`app/api/price/route.ts:23-39`). Settlement prefers the live tick and falls back to REST (`app/page.tsx:56-61`).
-
-**The chart component is deliberately dumb.** It takes points and prediction lines and returns SVG. Freezing the chart at settlement is done by the page passing a frozen array (`app/page.tsx:211`), not by the chart knowing what a round is.
-
-## Data flow for one round
-
-1. On mount, `usePriceFeed` fetches `/api/history` and seeds the series, then opens the websocket.
-2. Every ticker message updates the headline price; one point per 5s is committed to the plotted series.
-3. Each player types a number and locks it. When both are locked, the phase flips to `countdown` and `roundStart` is stamped.
-4. A 200ms interval counts down against a fixed deadline. At zero, `settle()` runs.
-5. `settle()` takes the live tick if it is fresher than 5s, otherwise fetches `/api/price`. It computes both absolute differences, freezes the chart series, and sets the winner.
-6. "Play Again" resets every piece of round state; the feed is never torn down.
+1. mount → `usePriceFeed` fetches `/api/history`, seeds series, opens socket
+2. every ticker msg → updates headline price; 1 point/5s committed to series
+3. both players lock → phase → `countdown`; each lock stamps `lockedAt{1,2}` (chart marker), 2nd also stamps `roundStart` (band edge)
+4. 200ms interval counts down to fixed deadline → 0 → `settle()`
+5. `settle()`: live tick if <5s old, else `/api/price` → diff1/diff2 → freeze chart snapshot → set winner
+6. "Play Again" resets round state only; feed/socket persists

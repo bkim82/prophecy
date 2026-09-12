@@ -1,47 +1,59 @@
-# Chart
+# chart
 
-`app/PriceChart.tsx` is a pure component: points in, SVG out. No fetching, no state, no chart library.
-
-## Why hand-rolled
-
-The chart needs three things that are awkward to bolt onto a general-purpose library: a price axis that zooms tight enough for a $5 move to read as a real swing, horizontal prediction levels that turn into edge chips when they fall outside the visible range, and a shaded band marking the live round. At roughly 200 lines of SVG, writing it directly was smaller than configuring a dependency to do the same.
+`app/PriceChart.tsx`. Pure: points→SVG. No fetch, no state, no chart lib (hand-rolled, ~337 lines — cheaper than configuring a lib for tight-zoom axis + edge-pinned prediction labels + round-band shading + wall-clock tick axis).
 
 ## Geometry
 
-A fixed `viewBox` of 880×260 scaled by CSS (`className="h-auto w-full"`), so it is resolution-independent and responsive without measuring the DOM (`app/PriceChart.tsx:14-18`, `:73-78`). The right padding of 74px reserves room for price labels.
+- `viewBox` 880×400, scaled via CSS `h-auto w-full` (`:20-21`, `:100-105`) — resolution-independent, no DOM measurement.
+- `PAD` top 20 / right 78 / bottom 44 / left 12 (`:22`). Right reserves price-label space; bottom reserves the time axis (ticks + clock labels).
+- `x()` maps ts→horizontal over actual data range; `y()` maps price→vertical (`:75-76`).
 
-`x()` maps timestamp to horizontal position across the actual data range; `y()` maps price to vertical position (`app/PriceChart.tsx:57-58`).
+## Scaling
 
-## Scaling: the tight-range decision
+- Visible range = actual high-to-low `span`, padded 6% each side (`:70-72`). Not zero-anchored — a $5 BTC move must read as a real swing.
+- Flat-price edge case: `span` falls back to `rawHigh * 0.0002` (avoids div/0).
+- Price labels switch to 2 decimals when visible span < $25 (`:34-38`).
 
-A naive chart anchored at zero, or padded generously, renders a minute of BTC as a flat line — the moves that decide a round are a few dollars against a five-figure price.
+## Time axis
 
-So the visible range tracks the actual swing: `span` is the real high-to-low distance, and the axis is padded by only 6% on each side (`app/PriceChart.tsx:52-54`). When the price is genuinely flat, `span` falls back to `rawHigh * 0.0002` to avoid a divide-by-zero and a degenerate axis.
+- `TICK_MS = 5000`, `LABEL_MS = 10000`, `MIN_LABEL_GAP = 42` (`:29-31`).
+- Ticks snap to wall-clock 5s boundaries (`Math.ceil(t0/TICK_MS)*TICK_MS`, `:90-93`), not to `t0` — labels read as round times.
+- Labelled tick = `t % labelEvery === 0`; label = `HH:MM:SS` local, `hour12: false` (`:40-46`, `:147`).
+- `labelEvery` thins to a multiple of 10s if 10s labels would sit closer than `MIN_LABEL_GAP` (`:96-98`). At `WINDOW_MS` 3min → 43.9px apart → stays at 10s.
+- Labelled ticks: 8px mark (`#a3a3a3`) + faint full-height gridline (`#f7f7f7`); unlabelled: 5px mark (`#d4d4d4`) (`:144-179`).
+- A label is dropped when its tick sits `<22px` from the left edge — centred text would hang off the viewBox (`:147`).
+- SSR-safe: `toLocaleTimeString` never runs on the server — <2 points on first render hits the placeholder.
 
-Because the range is that tight, axis labels switch to two decimal places when the visible span is under $25 (`app/PriceChart.tsx:24-28`). At that zoom, whole-dollar labels would show the same number three times.
+## Layers (back→front)
 
-## Layers
+1. Price gridlines + right-edge price labels: high/mid/low (`:87`, `:115-134`)
+2. Time axis: baseline, 5s ticks, 10s clock labels (`:136-179`)
+3. Round band: translucent indigo rect `roundStart`→right edge, "round" label pinned top-right of the band; drawn only if `roundStart` in visible window (`:181-215`)
+4. Area fill: vertical gradient 22%→0 opacity (`:108-113`, `:217`)
+5. Price line: polyline, green if last≥first else rose (`:84-86`, `:218-225`)
+6. Lock markers (vertical) — see below
+7. Prediction levels (horizontal) — see below
+8. Current price marker: 2 concentric circles, outer pings while live, static once frozen (`:308-321`)
+9. `settled` chip, top-right above the plot, only when `frozen` (`:323-333`)
 
-Drawn in order, back to front:
+## Lock markers (vertical)
 
-1. **Gridlines and price axis** — three values: high, midpoint, low (`app/PriceChart.tsx:69`, `:87-105`).
-2. **Round band** — a translucent indigo rect from `roundStart` to the right edge, with a dashed boundary line and a "locked" label. Only drawn when `roundStart` falls inside the visible window (`app/PriceChart.tsx:108-135`).
-3. **Area fill** — a vertical gradient from 22% opacity to transparent, built from the same point list as the line (`app/PriceChart.tsx:80-83`, `:137`).
-4. **Price line** — a polyline, green when the last point is at or above the first, rose when below (`app/PriceChart.tsx:66-68`, `:138-145`).
-5. **Prediction levels** — see below.
-6. **Current price marker** — two concentric circles; the outer one pings while live and sits still once frozen (`app/PriceChart.tsx:184-196`).
-7. **Time labels** — "Ns ago"/"Nm ago" on the left, "now" or "settled" on the right (`app/PriceChart.tsx:198-211`).
+- `PredictionLine.at` = ms timestamp the player locked (`:10`); omit/null → no marker.
+- Full-height dashed line in the player's color + a `"P1 locked"` chip (`:227-270`).
+- Chips stagger 19px by array index so near-simultaneous locks don't overlap (`:233`).
+- Chip flips to the left of its line near the right edge (`:235-238`).
+- Skipped when `at` falls outside `[t0, t1]` — the 3min window can scroll a lock off-screen (`:230`).
+- The round band's own dashed boundary is suppressed when a lock marker sits within 750ms of `roundStart` (`:192-195`) — the 2nd lock *is* `roundStart`, so drawing both stacked two dashed lines of different colors.
 
-## Prediction levels
+## Prediction levels (horizontal)
 
-Each locked prediction draws as a dashed horizontal line in that player's colour — blue for P1, amber for P2 (`app/page.tsx:9-10`).
-
-The interesting case is a prediction far outside the current price range, which is common since the axis is zoomed tight. Rather than rescaling the whole chart to fit it (which would flatten the price line back out) or clipping it away, the component pins the label to the top or bottom edge and adds an arrow indicating which way it lies (`app/PriceChart.tsx:148-181`). The dashed line is drawn only when the value is actually in view.
+- Dashed horizontal line per locked prediction, P1=blue, P2=amber (`app/page.tsx:9-10`).
+- Out-of-range value (common — axis is tight): pin label to top/bottom edge + arrow, don't rescale chart or clip (`:272-306`). Dashed line only drawn if value in view.
 
 ## Freezing
 
-At settlement the page passes a frozen snapshot instead of the live series, plus `frozen={true}` (`app/page.tsx:211-214`). The chart responds by stopping the marker's ping animation and relabelling the right edge from "now" to "settled". The chart itself has no concept of a round — it just renders what it is handed.
+Settlement passes frozen snapshot + `frozen={true}` (`app/page.tsx:221-226`). Chart response: stop marker ping, show `settled` chip. Chart has no round concept — renders whatever it's given.
 
 ## Empty state
 
-Fewer than two points renders a fixed-height placeholder reading "Waiting for price data…", which keeps the layout from jumping when data arrives (`app/PriceChart.tsx:36-42`).
+<2 points → fixed 400px placeholder "Waiting for price data…" (matches rendered chart height, prevents layout jump) (`:54-60`).

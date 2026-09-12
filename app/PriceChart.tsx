@@ -2,7 +2,13 @@
 
 import type { PricePoint } from "./usePriceFeed";
 
-export type PredictionLine = { label: string; value: number; color: string };
+export type PredictionLine = {
+  label: string;
+  value: number;
+  color: string;
+  /** When the player locked in — drawn as a vertical marker. */
+  at?: number | null;
+};
 
 type Props = {
   points: PricePoint[];
@@ -12,19 +18,31 @@ type Props = {
 };
 
 const W = 880;
-const H = 260;
-const PAD = { top: 18, right: 74, bottom: 22, left: 10 };
+const H = 400;
+const PAD = { top: 20, right: 78, bottom: 44, left: 12 };
 const INNER_W = W - PAD.left - PAD.right;
 const INNER_H = H - PAD.top - PAD.bottom;
 
 const UP = "#10b981";
 const DOWN = "#f43f5e";
 
+const TICK_MS = 5000; // a mark every 5s
+const LABEL_MS = 10000; // an exact time every 10s
+const MIN_LABEL_GAP = 42; // px between clock labels before thinning
+
 // Zoomed in far enough that a $5 move matters, so the labels need decimals.
 const axisLabel = (n: number, span = Infinity) =>
   n.toLocaleString("en-US", {
     minimumFractionDigits: span < 25 ? 2 : 0,
     maximumFractionDigits: span < 25 ? 2 : 0,
+  });
+
+const clockLabel = (t: number) =>
+  new Date(t).toLocaleTimeString("en-US", {
+    hour12: false,
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
   });
 
 export default function PriceChart({
@@ -35,7 +53,7 @@ export default function PriceChart({
 }: Props) {
   if (points.length < 2) {
     return (
-      <div className="flex h-[260px] items-center justify-center rounded-xl border border-neutral-200 bg-white text-sm text-neutral-400">
+      <div className="flex h-[400px] items-center justify-center rounded-xl border border-neutral-200 bg-white text-sm text-neutral-400">
         Waiting for price data…
       </div>
     );
@@ -67,6 +85,17 @@ export default function PriceChart({
   const rising = last.p >= points[0].p;
   const stroke = rising ? UP : DOWN;
   const gridValues = [high, (high + low) / 2, low];
+
+  // Ticks land on wall-clock 5s boundaries, so the labels read as round times.
+  const ticks: number[] = [];
+  for (let t = Math.ceil(t0 / TICK_MS) * TICK_MS; t <= t1; t += TICK_MS) {
+    ticks.push(t);
+  }
+  // A wider window would collide the 10s labels, so thin them to whatever
+  // multiple of 10s still fits.
+  const pxPerLabel = (LABEL_MS / (t1 - t0)) * INNER_W;
+  const labelEvery =
+    LABEL_MS * Math.max(1, Math.ceil(MIN_LABEL_GAP / Math.max(1, pxPerLabel)));
 
   return (
     <div className="rounded-xl border border-neutral-200 bg-white p-2">
@@ -104,6 +133,51 @@ export default function PriceChart({
           </g>
         ))}
 
+        {/* Time axis: a mark every 5s, an exact clock time every 10s */}
+        <line
+          x1={PAD.left}
+          x2={PAD.left + INNER_W}
+          y1={baseline}
+          y2={baseline}
+          stroke="#e5e5e5"
+        />
+        {ticks.map((t) => {
+          const tx = x(t);
+          // A label centred on the first tick can hang off the viewBox.
+          const labelled = t % labelEvery === 0 && tx > 22;
+          return (
+            <g key={t}>
+              {labelled && (
+                <line
+                  x1={tx}
+                  x2={tx}
+                  y1={PAD.top}
+                  y2={baseline}
+                  stroke="#f7f7f7"
+                />
+              )}
+              <line
+                x1={tx}
+                x2={tx}
+                y1={baseline}
+                y2={baseline + (labelled ? 8 : 5)}
+                stroke={labelled ? "#a3a3a3" : "#d4d4d4"}
+              />
+              {labelled && (
+                <text
+                  x={tx}
+                  y={baseline + 21}
+                  fill="#a3a3a3"
+                  fontSize="10"
+                  textAnchor="middle"
+                >
+                  {clockLabel(t)}
+                </text>
+              )}
+            </g>
+          );
+        })}
+
         {/* The locked round, shaded from the moment both players locked in */}
         {roundStart !== null && roundStart > t0 && (
           <>
@@ -115,21 +189,27 @@ export default function PriceChart({
               fill="#6366f1"
               fillOpacity="0.05"
             />
-            <line
-              x1={x(roundStart)}
-              x2={x(roundStart)}
-              y1={PAD.top}
-              y2={baseline}
-              stroke="#a5b4fc"
-              strokeDasharray="3 3"
-            />
+            {/* The second lock marker already draws this edge; skip the double line. */}
+            {!predictions.some(
+              (p) => p.at != null && Math.abs(p.at - roundStart) < 750,
+            ) && (
+              <line
+                x1={x(roundStart)}
+                x2={x(roundStart)}
+                y1={PAD.top}
+                y2={baseline}
+                stroke="#a5b4fc"
+                strokeDasharray="3 3"
+              />
+            )}
             <text
-              x={x(roundStart) + 5}
-              y={PAD.top + 11}
+              x={PAD.left + INNER_W - 4}
+              y={PAD.top + 12}
               fill="#818cf8"
               fontSize="11"
+              textAnchor="end"
             >
-              locked
+              round
             </text>
           </>
         )}
@@ -143,6 +223,51 @@ export default function PriceChart({
           strokeLinejoin="round"
           strokeLinecap="round"
         />
+
+        {/* The moment each player locked, marked where it happened */}
+        {predictions.map((prediction, i) => {
+          if (prediction.at == null) return null;
+          if (prediction.at < t0 || prediction.at > t1) return null;
+          const lx = x(prediction.at);
+          // Locks seconds apart would stack their chips, so offset by slot.
+          const chipY = PAD.top + 3 + i * 19;
+          const chipW = 62;
+          // Near the right edge, flip the chip to the left of the line.
+          const flip = lx + 2 + chipW > PAD.left + INNER_W;
+          const chipX = flip ? lx - 2 - chipW : lx + 2;
+          return (
+            <g key={`${prediction.label}-at`}>
+              <line
+                x1={lx}
+                x2={lx}
+                y1={PAD.top}
+                y2={baseline}
+                stroke={prediction.color}
+                strokeWidth="1.5"
+                strokeDasharray="4 4"
+                opacity="0.75"
+              />
+              <rect
+                x={chipX}
+                y={chipY}
+                width={chipW}
+                height={16}
+                rx="3"
+                fill={prediction.color}
+                fillOpacity="0.12"
+              />
+              <text
+                x={chipX + 5}
+                y={chipY + 12}
+                fill={prediction.color}
+                fontSize="11"
+                fontWeight="600"
+              >
+                {prediction.label} locked
+              </text>
+            </g>
+          );
+        })}
 
         {/* Prediction levels: a dashed line when in view, an edge chip when not */}
         {predictions.map((prediction) => {
@@ -195,20 +320,17 @@ export default function PriceChart({
         />
         <circle cx={x(last.t)} cy={y(last.p)} r="3.5" fill={stroke} />
 
-        <text x={PAD.left} y={H - 6} fill="#a3a3a3" fontSize="11">
-          {t1 - t0 < 90000
-            ? `${Math.max(1, Math.round((t1 - t0) / 1000))}s ago`
-            : `${Math.round((t1 - t0) / 60000)}m ago`}
-        </text>
-        <text
-          x={PAD.left + INNER_W}
-          y={H - 6}
-          fill="#a3a3a3"
-          fontSize="11"
-          textAnchor="end"
-        >
-          {frozen ? "settled" : "now"}
-        </text>
+        {frozen && (
+          <text
+            x={PAD.left + INNER_W}
+            y={PAD.top - 7}
+            fill="#a3a3a3"
+            fontSize="11"
+            textAnchor="end"
+          >
+            settled
+          </text>
+        )}
       </svg>
     </div>
   );

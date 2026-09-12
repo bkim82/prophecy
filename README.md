@@ -21,16 +21,6 @@ No API key and no `.env` required — every price source is public and key-less.
 
 Next.js 16 (App Router) · React 19 · TypeScript 7 · Tailwind v4. The chart is hand-rolled SVG; there is no charting library.
 
-## Docs
-
-| Document | What's in it |
-| --- | --- |
-| [Architecture](docs/architecture.md) | Module map, data flow, and the decisions behind the shape |
-| [Price feed](docs/price-feed.md) | The websocket, the history seed, the REST fallback, and sampling |
-| [Game loop](docs/game-loop.md) | Phase machine, locking, countdown, and settlement |
-| [Chart](docs/chart.md) | The SVG renderer, scaling, and overlays |
-| [Roadmap](docs/roadmap.md) | What is deliberately missing and what it would take to add |
-
 ## Layout
 
 ```
