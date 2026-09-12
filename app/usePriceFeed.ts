@@ -9,6 +9,10 @@ export type FeedStatus = "connecting" | "live" | "reconnecting";
 const FEED_URL = "wss://ws-feed.exchange.coinbase.com";
 const FRESH_MS = 5000; // a tick older than this is not trusted for settlement
 const CLOCK_MS = 100; // ~3px of chart travel per tick at the tightest zoom
+// Must stay below SAMPLE_MS — if the two ever coincide, the tick that
+// crosses the sample threshold always has edge.t === last.t, which makes
+// the live-edge branch below unreachable and freezes the chart between commits.
+const EDGE_MS = 500;
 
 // One sample of slack past the window so the chart can interpolate the point
 // where the line crosses its left edge instead of starting in mid-air.
@@ -158,7 +162,7 @@ export function usePriceFeed(product: string = "BTC-USD") {
     const edge = { t: tickAtRef.current || Date.now(), p: price };
     const last = samples[samples.length - 1];
     if (!last) return [edge];
-    if (edge.t - last.t < SAMPLE_MS) return samples;
+    if (edge.t - last.t < EDGE_MS) return samples;
     return [...samples, edge];
   }, [samples, price]);
 

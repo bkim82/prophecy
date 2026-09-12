@@ -7,9 +7,9 @@ import { usePriceFeed, type PricePoint } from "../../../usePriceFeed";
 
 const ROUND_SECONDS = 60;
 const STARTING_CASH = 100;
-const DEFAULT_LEVERAGE = 25;
-const LEVERAGE_OPTIONS = [1, 10, 25, 50, 75, 100];
-const STAKE_OPTIONS = [10, 25, 50, 100];
+const DEFAULT_LEVERAGE = 100;
+const LEVERAGE_OPTIONS = [100, 1000, 10000];
+const FIXED_STAKE_OPTIONS = [10, 25, 50];
 
 // Long/short share the chart's own up/down tokens, so a marker on the plot is
 // the same colour as the control that placed it.
@@ -17,7 +17,7 @@ const LONG_COLOR = "var(--chart-up)";
 const SHORT_COLOR = "var(--chart-down)";
 
 type Side = "long" | "short";
-type Phase = "setup" | "open" | "closed" | "settling" | "result";
+type Phase = "setup" | "open" | "settling" | "result";
 
 type Position = {
   side: Side;
@@ -99,6 +99,7 @@ export default function Page() {
   const [roundStart, setRoundStart] = useState<number | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(ROUND_SECONDS);
   const [realizedPnl, setRealizedPnl] = useState(0);
+  const [bankroll, setBankroll] = useState(STARTING_CASH);
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [settleError, setSettleError] = useState(false);
   const [frozenPoints, setFrozenPoints] = useState<PricePoint[] | null>(null);
@@ -114,6 +115,8 @@ export default function Page() {
   positionRef.current = position;
   const realizedPnlRef = useRef(realizedPnl);
   realizedPnlRef.current = realizedPnl;
+  const bankrollRef = useRef(bankroll);
+  bankrollRef.current = bankroll;
 
   const playFeedback = useCallback((kind: "entry" | "exit" | "reverse") => {
     if (typeof navigator !== "undefined" && "vibrate" in navigator) {
@@ -165,11 +168,14 @@ export default function Page() {
         ? positionPnl(positionRef.current, finalPrice)
         : 0;
       const profit = realizedPnlRef.current + openPnl;
+      const finalValue = Math.max(0, bankrollRef.current + profit);
+      bankrollRef.current = finalValue;
+      setBankroll(finalValue);
       setFrozenPoints([...pointsRef.current, { t: Date.now(), p: finalPrice }]);
       setOutcome({
         finalPrice,
         profit,
-        finalValue: STARTING_CASH + profit,
+        finalValue,
       });
       setPhase("result");
     } catch {
@@ -208,12 +214,13 @@ export default function Page() {
   const enterPosition = (side: Side) => {
     if (phase !== "setup") return;
     const execPrice = getLivePrice();
-    if (execPrice === null || !Number.isFinite(stake) || stake <= 0) return;
+    const availableCash = Math.max(0, bankrollRef.current + realizedPnlRef.current);
+    if (execPrice === null || !Number.isFinite(stake) || stake <= 0 || availableCash <= 0) return;
 
     const nextPosition: Position = {
       side,
       entryPrice: execPrice,
-      stake: Math.min(stake, STARTING_CASH),
+      stake: Math.min(stake, availableCash),
       leverage,
       openedAt: Date.now(),
     };
@@ -239,7 +246,7 @@ export default function Page() {
     setClosedPosition(closed);
     positionRef.current = null;
     setPosition(null);
-    setPhase("closed");
+    setPhase("setup");
     addTrade({ t: Date.now(), side: current.side, action: "exit", price: execPrice, amount: current.stake });
     setPressedAction("close");
     window.setTimeout(() => setPressedAction(null), 240);
@@ -270,20 +277,20 @@ export default function Page() {
     playFeedback("reverse");
   };
 
-  const openNewPosition = () => {
-    if (phase !== "closed") return;
-    setPhase("setup");
-  };
-
   const playAgain = () => {
     const initial = 0;
+    // Only busted players get a fresh $100 — otherwise the bankroll carries
+    // over from the last round so losses actually stick.
+    const nextBankroll = bankrollRef.current <= 0 ? STARTING_CASH : bankrollRef.current;
+    bankrollRef.current = nextBankroll;
+    setBankroll(nextBankroll);
     positionRef.current = null;
     realizedPnlRef.current = initial;
     setPosition(null);
     setClosedPosition(null);
     setRealizedPnl(initial);
     setTrades([]);
-    setStake(STARTING_CASH);
+    setStake(Math.min(STARTING_CASH, nextBankroll));
     setLeverage(DEFAULT_LEVERAGE);
     setRoundStart(null);
     setSecondsLeft(ROUND_SECONDS);
@@ -297,7 +304,7 @@ export default function Page() {
   const livePositionPnl =
     position && price !== null ? positionPnl(position, price) : 0;
   const liveTotalPnl = realizedPnl + livePositionPnl;
-  const liveEquity = STARTING_CASH + liveTotalPnl;
+  const liveEquity = bankroll + liveTotalPnl;
   const rivalPnl =
     rivalEntryPrice !== null && price !== null
       ? positionPnl(
@@ -312,8 +319,16 @@ export default function Page() {
     side: trade.side,
     action: trade.action,
   }));
-  const canEnter = phase === "setup" && getLivePrice() !== null;
+  const availableCash = Math.max(0, bankroll + realizedPnl);
+  const isBusted = phase === "setup" && availableCash <= 0;
+  const canEnter = phase === "setup" && getLivePrice() !== null && availableCash > 0;
   const canManage = phase === "open" && getLivePrice() !== null;
+
+  useEffect(() => {
+    if (stake > availableCash && availableCash > 0) {
+      setStake(availableCash);
+    }
+  }, [availableCash, stake]);
 
   return (
     <main className="mx-auto max-w-4xl px-4 py-10">
@@ -411,15 +426,18 @@ export default function Page() {
         setLeverage={setLeverage}
         position={position}
         closedPosition={closedPosition}
+        livePrice={price}
         livePositionPnl={livePositionPnl}
         realizedPnl={realizedPnl}
+        balance={liveEquity}
+        availableCash={availableCash}
+        isBusted={isBusted}
         canEnter={canEnter}
         canManage={canManage}
         pressedAction={pressedAction}
         onEnter={enterPosition}
         onClose={closePosition}
         onReverse={reversePosition}
-        onOpenNew={openNewPosition}
         onRetry={() => void settle()}
         settleError={settleError}
         outcome={outcome}
@@ -470,15 +488,18 @@ type DockProps = {
   setLeverage: (value: number) => void;
   position: Position | null;
   closedPosition: ClosedPosition | null;
+  livePrice: number | null;
   livePositionPnl: number;
   realizedPnl: number;
+  balance: number;
+  availableCash: number;
+  isBusted: boolean;
   canEnter: boolean;
   canManage: boolean;
   pressedAction: Side | "close" | null;
   onEnter: (side: Side) => void;
   onClose: () => void;
   onReverse: () => void;
-  onOpenNew: () => void;
   onRetry: () => void;
   settleError: boolean;
   outcome: Outcome | null;
@@ -488,8 +509,8 @@ type DockProps = {
 function TradingDock(props: DockProps) {
   const {
     phase, stake, setStake, leverage, setLeverage, position, closedPosition,
-    livePositionPnl, realizedPnl, canEnter, canManage,
-    pressedAction, onEnter, onClose, onReverse, onOpenNew, onRetry,
+    livePrice, livePositionPnl, realizedPnl, balance, availableCash, isBusted, canEnter, canManage,
+    pressedAction, onEnter, onClose, onReverse, onRetry,
     settleError, outcome, onPlayAgain,
   } = props;
   const [pressedSide, setPressedSide] = useState<Side | null>(null);
@@ -507,37 +528,57 @@ function TradingDock(props: DockProps) {
       ? "Choose your move"
       : phase === "open"
         ? "Position in play"
-        : phase === "closed"
-          ? "Position closed"
-          : phase === "result"
-            ? "Round complete"
-            : "Locking result";
+        : phase === "result"
+          ? "Round complete"
+          : "Locking result";
 
   return (
     <section className="mt-4 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5">
-      <div className="flex items-center justify-between gap-4 border-b border-[var(--line)] pb-4">
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 border-b border-[var(--line)] pb-4">
         <div>
           <p className="text-xs uppercase tracking-wider text-[var(--muted)]">
             Trading dock
           </p>
           <h2 className="mt-1 font-medium text-[var(--text)]">{heading}</h2>
         </div>
-        {phase === "open" && position ? (
-          <span
-            className="rounded-md border px-2.5 py-1 text-xs uppercase tracking-wider"
-            style={{ borderColor: sideColor(position.side), color: sideColor(position.side) }}
-          >
-            {position.side} open
-          </span>
-        ) : (
-          <span className="rounded-md border border-[var(--line)] px-2.5 py-1 text-xs uppercase tracking-wider text-[var(--muted)]">
-            {phase === "setup" ? "Setup" : phase === "closed" ? "Flat" : "Settling"}
-          </span>
-        )}
+        <div className="text-center">
+          <p className="text-xs uppercase tracking-wider text-[var(--muted)]">
+            Balance
+          </p>
+          <p className="mt-1 text-xl font-semibold tabular-nums text-[var(--accent-strong)]">
+            {usd(balance)}
+          </p>
+        </div>
+        <div className="flex justify-end">
+          {phase === "open" && position ? (
+            <span
+              className="rounded-md border px-2.5 py-1 text-xs uppercase tracking-wider"
+              style={{ borderColor: sideColor(position.side), color: sideColor(position.side) }}
+            >
+              {position.side} open
+            </span>
+          ) : (
+            <span className="rounded-md border border-[var(--line)] px-2.5 py-1 text-xs uppercase tracking-wider text-[var(--muted)]">
+              {phase === "setup" ? "Setup" : "Settling"}
+            </span>
+          )}
+        </div>
       </div>
 
       {phase === "setup" && (
         <div className="pt-4">
+          {closedPosition && (
+            <p className="mb-4 text-center text-xs text-[var(--muted)]">
+              Last:{" "}
+              <span style={{ color: sideColor(closedPosition.side) }}>
+                {closedPosition.side}
+              </span>{" "}
+              closed @ {usd(closedPosition.exitPrice)} ·{" "}
+              <span style={{ color: pnlColor(closedPosition.pnl) }}>
+                {signedUsd(closedPosition.pnl)}
+              </span>
+            </p>
+          )}
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <div className="flex items-center justify-between">
@@ -545,24 +586,40 @@ function TradingDock(props: DockProps) {
                   Stake
                 </span>
                 <span className="text-xs tabular-nums text-[var(--muted)]">
-                  {usd(stake)}
+                  {usd(Math.min(stake, availableCash))}
                 </span>
               </div>
               <div className="mt-2 grid grid-cols-4 gap-2">
-                {STAKE_OPTIONS.map((option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    onClick={() => setStake(option)}
-                    className={`rounded-md border py-1.5 text-xs font-medium tabular-nums transition ${
-                      stake === option
-                        ? "border-[var(--accent)] bg-[var(--selected-bg)] text-[var(--accent-strong)]"
-                        : "border-[var(--line)] text-[var(--muted)] hover:border-[var(--line-strong)] hover:bg-[var(--surface-hover)]"
-                    }`}
-                  >
-                    {option === 100 ? "All in" : usd(option)}
-                  </button>
-                ))}
+                {FIXED_STAKE_OPTIONS.map((option) => {
+                  const affordable = option <= availableCash;
+                  return (
+                    <button
+                      key={option}
+                      type="button"
+                      disabled={!affordable}
+                      onClick={() => setStake(option)}
+                      className={`rounded-md border py-1.5 text-xs font-medium tabular-nums transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                        stake === option
+                          ? "border-[var(--accent)] bg-[var(--selected-bg)] text-[var(--accent-strong)]"
+                          : "border-[var(--line)] text-[var(--muted)] hover:border-[var(--line-strong)] hover:bg-[var(--surface-hover)]"
+                      }`}
+                    >
+                      {usd(option)}
+                    </button>
+                  );
+                })}
+                <button
+                  type="button"
+                  disabled={availableCash <= 0}
+                  onClick={() => setStake(availableCash)}
+                  className={`rounded-md border py-1.5 text-xs font-medium tabular-nums transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                    stake === availableCash
+                      ? "border-[var(--accent)] bg-[var(--selected-bg)] text-[var(--accent-strong)]"
+                      : "border-[var(--line)] text-[var(--muted)] hover:border-[var(--line-strong)] hover:bg-[var(--surface-hover)]"
+                  }`}
+                >
+                  All in
+                </button>
               </div>
             </div>
             <div>
@@ -574,7 +631,7 @@ function TradingDock(props: DockProps) {
                   {leverage}×
                 </span>
               </div>
-              <div className="mt-2 grid grid-cols-6 gap-1.5">
+              <div className="mt-2 grid grid-cols-3 gap-1.5">
                 {LEVERAGE_OPTIONS.map((option) => (
                   <button
                     key={option}
@@ -625,23 +682,51 @@ function TradingDock(props: DockProps) {
             ))}
           </div>
           <p className="mt-3 text-center text-sm text-[var(--muted)]">
-            {canEnter
-              ? "Press a side to enter at the live market price."
-              : "Waiting for a live market connection…"}
+            {isBusted
+              ? "You're out of funds for this session."
+              : canEnter
+                ? "Press a side to enter at the live market price."
+                : "Waiting for a live market connection…"}
           </p>
+          {isBusted && (
+            <div className="mt-3 flex justify-center">
+              <button
+                type="button"
+                onClick={onPlayAgain}
+                className="rounded-md bg-[var(--btn-bg)] px-5 py-2 text-sm font-medium text-[var(--btn-text)] transition hover:bg-[var(--btn-bg-hover)]"
+              >
+                Reset & play again
+              </button>
+            </div>
+          )}
         </div>
       )}
 
       {phase === "open" && position && (
         <div className="pt-4">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-[0.7fr_1.6fr_0.7fr_1fr] gap-2">
             <Metric
+              compact
               label="Direction"
               value={position.side.toUpperCase()}
               color={sideColor(position.side)}
             />
-            <Metric label="Entry price" value={usd(position.entryPrice)} />
+            <div className="rounded-md border border-[var(--line)] bg-[var(--surface-raised)] px-3 py-2.5">
+              <p className="text-xs uppercase tracking-wider text-[var(--muted)]">
+                Entry / Current
+              </p>
+              <div className="mt-1 flex items-center gap-1.5">
+                <span className="truncate font-medium tabular-nums text-[var(--text)]">
+                  {usd(position.entryPrice)}
+                </span>
+                <span className="text-[var(--muted-dim)]">→</span>
+                <span className="truncate font-medium tabular-nums text-[var(--text)]">
+                  {livePrice !== null ? usd(livePrice) : "—"}
+                </span>
+              </div>
+            </div>
             <Metric
+              compact
               label="Live P&L"
               value={signedUsd(livePositionPnl)}
               color={pnlColor(livePositionPnl)}
@@ -680,35 +765,6 @@ function TradingDock(props: DockProps) {
           <p className="mt-3 text-center text-sm text-[var(--muted)]">
             Your next action executes immediately at the live market price.
           </p>
-        </div>
-      )}
-
-      {phase === "closed" && closedPosition && (
-        <div className="flex flex-col gap-4 pt-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p
-              className="text-xs uppercase tracking-wider"
-              style={{ color: sideColor(closedPosition.side) }}
-            >
-              {closedPosition.side} closed · {usd(closedPosition.exitPrice)}
-            </p>
-            <p
-              className="mt-1 text-2xl font-semibold tabular-nums"
-              style={{ color: pnlColor(closedPosition.pnl) }}
-            >
-              {signedUsd(closedPosition.pnl)}{" "}
-              <span className="text-sm font-normal text-[var(--muted)]">
-                realized
-              </span>
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onOpenNew}
-            className="rounded-md bg-[var(--btn-bg)] px-5 py-2 text-sm font-medium text-[var(--btn-text)] transition hover:bg-[var(--btn-bg-hover)]"
-          >
-            Open another position →
-          </button>
         </div>
       )}
 
@@ -765,14 +821,20 @@ function Metric({
   label,
   value,
   color,
+  compact,
 }: {
   label: string;
   value: string;
   color?: string;
+  compact?: boolean;
 }) {
   return (
-    <div className="rounded-md border border-[var(--line)] bg-[var(--surface-raised)] px-3 py-2.5">
-      <p className="text-xs uppercase tracking-wider text-[var(--muted)]">
+    <div
+      className={`rounded-md border border-[var(--line)] bg-[var(--surface-raised)] ${
+        compact ? "px-2 py-2" : "px-3 py-2.5"
+      }`}
+    >
+      <p className="truncate text-xs uppercase tracking-wider text-[var(--muted)]">
         {label}
       </p>
       <p
