@@ -193,7 +193,7 @@ export default function Page() {
       : `/duel/${matchMarket}/match/${matchId}`;
 
   const inviteHref = queue
-    ? `${matchHref(queue.market, queue.matchId)}?invite=1`
+    ? `${matchHref(queue.market, queue.matchId, queue.mode)}?invite=1`
     : null;
 
   const shareInvite = async () => {
@@ -204,7 +204,7 @@ export default function Page() {
       if (navigator.share) {
         await navigator.share({
           title: "Join my Prophecy duel",
-          text: `Tap to play a ${MARKETS[queue.market].label} prediction duel against me.`,
+          text: `Tap to play a ${MARKETS[queue.market].label} ${queue.mode === "pulse" ? "Pulse" : "Quick Play"} duel against me.`,
           url,
         });
         setInviteState("shared");

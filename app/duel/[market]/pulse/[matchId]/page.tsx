@@ -47,11 +47,15 @@ export default function Page({ params }: { params: Promise<{ market: string; mat
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
   const [trades, setTrades] = useState<LocalTrade[]>([]);
   const [frozenPoints, setFrozenPoints] = useState<typeof points | null>(null);
+  const [inviteJoin, setInviteJoin] = useState(false);
   const pointsRef = useRef(points);
   pointsRef.current = points;
   const skewRef = useRef(0);
 
-  useEffect(() => setPlayerId(getPlayerId()), []);
+  useEffect(() => {
+    setPlayerId(getPlayerId());
+    setInviteJoin(new URLSearchParams(window.location.search).get("invite") === "1");
+  }, []);
   const applyView = useCallback((next: MatchView) => {
     skewRef.current = next.serverNow - Date.now();
     setView(next);
@@ -66,7 +70,18 @@ export default function Page({ params }: { params: Promise<{ market: string; mat
         const res = await fetch(`/api/match/${encodeURIComponent(matchId)}?playerId=${encodeURIComponent(playerId)}`, { cache: "no-store" });
         if (cancelled) return;
         if (res.status === 404) return setGone("ended");
-        if (res.status === 403) return setGone("forbidden");
+        if (res.status === 403) {
+          if (!inviteJoin) return setGone("forbidden");
+          const joinRes = await fetch(`/api/match/${encodeURIComponent(matchId)}/join`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ playerId }),
+          });
+          if (cancelled) return;
+          if (joinRes.status === 404) return setGone("ended");
+          if (joinRes.status === 409) return setGone("forbidden");
+          if (!joinRes.ok) throw new Error("join failed");
+        }
         if (res.ok) {
           const next = (await res.json()) as MatchView;
           if (next.mode !== "pulse") return setGone("ended");
@@ -80,7 +95,7 @@ export default function Page({ params }: { params: Promise<{ market: string; mat
     };
     poll();
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [matchId, playerId, applyView]);
+  }, [matchId, playerId, inviteJoin, applyView]);
 
   const phase = view?.status;
   const toLocal = useCallback((serverMs: number | null) => serverMs === null ? null : serverMs - skewRef.current, []);
