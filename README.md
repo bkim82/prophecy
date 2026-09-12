@@ -1,14 +1,45 @@
-# BTC Duel (prototype)
+# BTC Duel
 
-1v1 Bitcoin price prediction duel on a single screen. Both players play in the same browser; there is no networking, auth, or persistence.
+A 1v1 Bitcoin price prediction duel that runs entirely on one screen. Two players share the same browser, each locks a guess for what BTC/USD will be 60 seconds from now, and the closest guess wins.
 
-Loop: live BTC price -> two predictions -> lock -> 60s countdown -> final price -> winner -> play again.
+There is no networking, no auth, and no persistence. This is a prototype of the core loop, not a product.
+
+```
+live price -> both players lock -> 60s countdown -> final price -> winner -> play again
+```
+
+## Quick start
 
 ```bash
 npm install
 npm run dev   # http://localhost:3000
 ```
 
-Price comes from Coinbase: the browser subscribes to the public `ws-feed.exchange.coinbase.com` ticker socket for live ticks, `/api/history` seeds the chart by bucketing ~1000 recent trades at the same 5s resolution (falling back to one-minute candles), and `/api/price` is the REST fallback used to settle a round if the socket drops. No API key needed.
+No API key and no `.env` required — every price source is public and key-less.
 
-The chart is hand-rolled SVG (no chart library): a 3-minute rolling window committing one point every 5 seconds (`app/feedConfig.ts`), dashed lines for each locked prediction, and a shaded band marking the live round. Every trade still updates the headline price and the leading point; only the plotted series is sampled, because tick-dense data draws as a flat band.
+## Stack
+
+Next.js 16 (App Router) · React 19 · TypeScript 7 · Tailwind v4. The chart is hand-rolled SVG; there is no charting library.
+
+## Docs
+
+| Document | What's in it |
+| --- | --- |
+| [Architecture](docs/architecture.md) | Module map, data flow, and the decisions behind the shape |
+| [Price feed](docs/price-feed.md) | The websocket, the history seed, the REST fallback, and sampling |
+| [Game loop](docs/game-loop.md) | Phase machine, locking, countdown, and settlement |
+| [Chart](docs/chart.md) | The SVG renderer, scaling, and overlays |
+| [Roadmap](docs/roadmap.md) | What is deliberately missing and what it would take to add |
+
+## Layout
+
+```
+app/
+  page.tsx            round state machine + UI
+  usePriceFeed.ts     live BTC feed (socket, seed, sampling)
+  PriceChart.tsx      SVG chart
+  feedConfig.ts       window/resolution shared by client and server
+  api/price/route.ts    REST spot price, used to settle
+  api/history/route.ts  chart seed from recent trades
+docs/                 this documentation
+```
