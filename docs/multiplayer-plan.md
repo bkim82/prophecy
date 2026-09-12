@@ -1,204 +1,92 @@
-# Multiplayer implementation plan — Quick Play
+# multiplayer (Quick Play)
 
-Status: planned, not yet built. This is a forward-looking implementation
-plan (narrative, unlike the fact-sheet docs it sits next to) — update or
-replace it as the design changes, and fold the settled parts into
-`architecture.md`/`game-loop.md`/`roadmap.md` once shipped, per the docs
-orchestration rule in `AGENTS.md`.
+Status: built. Server-authoritative networked Quick Play — the only mode with a
+DB, server state, or a second client. Pulse and 24hr Battle are untouched.
 
-## Context
+## Shape
 
-Quick Play (`app/duel/btc/quick-play/page.tsx`) is currently a same-browser
-hot-seat demo: one page, two input boxes, no networking. `roadmap.md` calls
-this out explicitly as "the next fork" — real multiplayer needs server-held
-round state, and everything else (stakes, balance) should wait until that
-exists. This plan builds that fork: the lobby's wager/timer controls
-(`app/page.tsx`) start matching players over the network instead of handing
-both inputs to one keyboard.
+- One `matches` row = one round, single source of truth (`db/schema.ts:20`).
+- Identity: anonymous per-browser UUID in `localStorage.playerId` (`app/lib/playerId.ts:20`). Not Clerk; sign-in stays optional and unrelated.
+- Sync: ~1s polling (`app/duel/[market]/match/[matchId]/page.tsx:14`), no WebSocket registry. Lobby list polls at 3s (`app/page.tsx:17`), the queue at 1s (`app/page.tsx:22`).
+- Nobody sits in a room alone: an `open` match is waited out on the lobby page (`app/page.tsx:340-352`); the room is entered only once `status` leaves `open`.
+- No balance deduction. `wager` is stored and displayed only.
 
-Scope: no balance deduction, no required sign-in (anonymous per-browser
-identity), and Quick Play's hot-seat page is **replaced** — it becomes the
-real networked mode, not an alternate option. Persistence should be the
-cheapest option available: the app already has a provisioned Neon Postgres
-database (`db/index.ts`, `db/schema.ts`) — reuse it instead of adding
-Redis/KV. Sync is via short-interval polling (~1s) against that DB, reusing
-the fixed-deadline countdown pattern the app already uses in
-`quick-play/page.tsx:107-123`, rather than building a WebSocket connection
-registry for an MVP.
-
-## Match lifecycle
-
-A `matches` row is the single source of truth. Status mirrors the existing
-`Phase` vocabulary from `game-loop.md` so the mental model doesn't change,
-just who's authoritative for it:
+## Status machine
 
 ```
-open --(player2 joins)--> predict --(both locked)--> countdown --(deadline)--> settled
- |                            |
- (creator leaves/expires)     (either player leaves)
- |                            |
- v                            v
-(row deleted)              (row deleted)
+open --(p2 joins)--> predict --(both locked)------> countdown --(deadline)--> settled
+ |                       |  \--(15s window expires)-> settled (forfeit / void)
+ (creator leaves)        (either leaves)
+ v                       v
+(row deleted)         (row deleted)
 ```
 
-- **open** — player1 created it, waiting for an opponent. Matches with the
-  same `(market, mode, wager, timerSeconds)` can auto-join here; anyone can
-  also join a specific one from the lobby's Open Matches list.
-- **predict** — both players present, neither prediction locked yet. No
-  timer — mirrors today's untimed "type your guess" phase. Either player can
-  bail via Leave, which deletes the match (the other player's next poll gets
-  "not found" and returns to lobby).
-- **countdown** — both predictions locked (hidden from each other), timer
-  running from `roundStartAt` for `timerSeconds`. Once both players have
-  locked, the match no longer depends on anyone staying online — settlement
-  only needs the two stored predictions plus a spot price at the deadline.
-- **settled** — final price + both predictions (now revealed) + winner
-  stored once, idempotently, by whichever poll request first notices
-  `now() >= deadline`.
+- Maps 1:1 onto the client `Phase` names in [game-loop.md](game-loop.md); only the owner changed.
+- `open` — auto-joinable by matching `(market, mode, wager, timerSeconds)` exactly, or by id from the lobby list.
+- `predict` — hard 15s window: `LOCK_SECONDS` (`lib/match.ts:34`) from `predictStartAt`, stamped when p2 joins (`db/schema.ts:39`). Predictions stay hidden from each other for its whole length (`lib/match.ts:181`).
+- Expiry is lazy, like settlement: `expireLocksIfDue` (`lib/match.ts:81`) forfeits to whoever locked, or voids the round as a tie if neither did. Both leave `finalPrice` null, which is how the client tells a forfeit from a priced result (`app/duel/[market]/match/[matchId]/page.tsx:229`).
+- `countdown` — deadline = `roundStartAt + timerSeconds` (`lib/match.ts:25`). Needs nobody online; the two stored predictions are enough. Both predictions go public here, not at settle: they are already frozen, so there is nothing left to game (`lib/match.ts:181`).
+- `settled` — final price + winner written once, idempotently.
 
-**Presence** only matters pre-lock, which is also the only place "persist
-only while online" applies: an `open` match is excluded from
-matching/listing once its creator's heartbeat is older than 8s (no cron, no
-cleanup job — a dead row is just invisible and gets naturally replaced by the
-next player's own `open` insert). During `predict`, both players heartbeat so
-the UI can show "opponent disconnected" and offer Leave, but there's no
-auto-timeout — that's an accepted MVP gap, to be noted in `roadmap.md` like
-its other documented gaps.
+## Concurrency (no transactions)
 
-## Data model
+`db/index.ts` uses `drizzle-orm/neon-http` — one HTTP request per statement, no
+multi-statement transactions or row locks. Every transition is a single guarded
+`UPDATE ... WHERE <guard> RETURNING *`; 0 rows back = someone else won the race.
 
-Add to `db/schema.ts` (integer wager mirrors `users.balance`'s style):
+| Transition | Guard | Loser does |
+| --- | --- | --- |
+| join | `status='open' AND player2_id IS NULL` | try next candidate, else create (`app/api/match/find-or-create/route.ts:75-93`) |
+| lock | `status='predict' AND prediction{N} IS NULL` | re-read, return current view (`app/api/match/[id]/lock/route.ts:63-69`) |
+| start countdown | `status='predict'` | nothing — only the 2nd locker sees both non-null (`app/api/match/[id]/lock/route.ts:71-80`) |
+| expire lock window | `status='predict'`, plus `prediction{N} IS NULL` re-asserted for every slot read empty | re-read; a lock that beat it owns the row (`lib/match.ts:90-115`) |
+| settle | `status='countdown'` | re-read, use the winner's values (`lib/match.ts:138-145`) |
 
-```ts
-export const matches = pgTable("matches", {
-  id: text("id").primaryKey(),
-  market: text("market").notNull(),           // "btc" | "eth"
-  mode: text("mode").notNull(),                // "quick-play" for MVP
-  wager: integer("wager").notNull(),
-  timerSeconds: integer("timer_seconds").notNull(),
-  status: text("status").notNull().default("open"), // open|predict|countdown|settled
-  player1Id: text("player1_id").notNull(),
-  player2Id: text("player2_id"),
-  player1LastSeen: timestamp("player1_last_seen").notNull().defaultNow(),
-  player2LastSeen: timestamp("player2_last_seen"),
-  prediction1: doublePrecision("prediction1"),
-  prediction2: doublePrecision("prediction2"),
-  lockedAt1: timestamp("locked_at1"),
-  lockedAt2: timestamp("locked_at2"),
-  roundStartAt: timestamp("round_start_at"),
-  finalPrice: doublePrecision("final_price"),
-  winner: text("winner"),                      // "1" | "2" | "tie"
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
-```
+## Presence
 
-Run `drizzle-kit push` (or generate+migrate, matching however `users` was set
-up) to apply it.
+- `PRESENCE_MS = 8000` (`lib/match.ts:14`). Stale `open` rows are filtered out of listing and matchmaking, never deleted — a dead row is just invisible, so there is no cleanup cron.
+- Heartbeat is folded into the poll: `touchAndRead` stamps the caller's `last_seen` and reads the row in one statement via a `CASE` (`lib/match.ts:52`). No separate heartbeat endpoint.
+- A queued lobby therefore polls at room speed, not lobby speed (`app/page.tsx:22`): a 3s beat would age its own row out of the very list it is waiting to be found in.
+- Only matters pre-lock. During `predict` it drives "opponent disconnected"; the 15s window, not presence, is what ends an abandoned match.
 
-## Concurrency without transactions
+## Timestamps
 
-`db/index.ts` uses `drizzle-orm/neon-http`, which sends one HTTP request per
-statement — no multi-statement transactions or row locks. Every state
-transition is instead a single atomic `UPDATE ... WHERE <guard> RETURNING *`,
-which Postgres already makes race-safe on its own:
+- `matches` timestamps are `timestamptz`, unlike `users.createdAt` (`db/schema.ts:35-47`). Bare `timestamp` columns store whatever local time the writer was in — a row written from a laptop and read on a UTC server lands hours out, which reads as "that player went offline".
+- Server sends `serverNow` with every view (`lib/match.ts:218`); the client subtracts the skew before running the lock window, the countdown, or chart markers (`app/duel/[market]/match/[matchId]/page.tsx:52-56`).
 
-- Auto-match: `SELECT` a candidate `open` row, then
-  `UPDATE matches SET player2_id=$id, status='predict' WHERE id=$id AND status='open' AND player2_id IS NULL RETURNING *`.
-  0 rows back = someone else grabbed it first → retry the search once, then
-  fall back to creating a new `open` row.
-- Lock: `UPDATE matches SET prediction{N}=$v, locked_at{N}=now() WHERE id=$id AND status='predict' AND prediction{N} IS NULL RETURNING *`;
-  if the returned row now has both predictions non-null, a second guarded
-  `UPDATE ... SET status='countdown', round_start_at=now() WHERE id=$id AND status='predict'`
-  makes the transition exactly once (only the request that completed the 2nd
-  lock sees both non-null).
-- Settle: `UPDATE matches SET status='settled', final_price=$p, winner=$w WHERE id=$id AND status='countdown' RETURNING *` —
-  safe even if both players' polls race to trigger it.
+## Routes
 
-## New files
+| Route | Does |
+| --- | --- |
+| `POST /api/match/find-or-create` | join oldest live `open` match with identical criteria, else create one. Returns `status`, which is how the lobby decides between entering the room and queueing (`app/api/match/find-or-create/route.ts:74`,`:97`,`:117`) |
+| `GET /api/match/[id]?playerId=` | role-scoped view + heartbeat + lock-window expiry + lazy settlement (`app/api/match/[id]/route.ts:38`). Polled by the room, and by the lobby while queued |
+| `POST /api/match/[id]/join` | take a specific open match (lobby list path) |
+| `POST /api/match/[id]/lock` | write this player's prediction, start countdown on the 2nd; 409 once the 15s window has closed (`app/api/match/[id]/lock/route.ts:39`) |
+| `POST /api/match/[id]/leave` | delete while `open`/`predict`; 409 once counting down |
+| `GET /api/match/open?market=&mode=&playerId=` | joinable matches with a fresh host heartbeat |
 
-- `lib/spotPrice.ts` — extract the Coinbase→Binance fallback chain out of
-  `app/api/price/route.ts:13-24,33-46` into `getSpotPrice(product: string): Promise<number>`.
-  Reused by the existing route (unchanged behavior) and by match settlement,
-  so there's one source of truth for "how do we get a settlement price."
-- `app/lib/playerId.ts` — client-only helper: read `localStorage.playerId`,
-  generate+store `crypto.randomUUID()` if absent. No server session route.
-- `app/api/match/find-or-create/route.ts` — POST, body
-  `{ playerId, market, mode, wager, timerSeconds }` → `{ matchId }`.
-- `app/api/match/[id]/join/route.ts` — POST `{ playerId }`, same atomic-update
-  helper as above but targeted at a specific id (the "browse list" path).
-- `app/api/match/[id]/route.ts` — GET `?playerId=` → role-scoped state
-  (opponent's prediction/value withheld until `settled`); performs lazy
-  settlement inline when `status==='countdown'` and the deadline has passed.
-- `app/api/match/[id]/lock/route.ts` — POST `{ playerId, prediction }`.
-- `app/api/match/[id]/heartbeat/route.ts` — POST `{ playerId }`.
-- `app/api/match/[id]/leave/route.ts` — POST `{ playerId }`; deletes the row
-  if status is `open` or `predict` (no-op / 409 once `countdown` has started).
-- `app/api/match/open/route.ts` — GET `?market=&mode=` → list of joinable
-  `open` matches (id, market, mode, wager, timerSeconds, createdAt) with a
-  fresh creator heartbeat, for the lobby's Open Matches panel.
-- `app/duel/[market]/match/[matchId]/page.tsx` — the match room. Replaces
-  `app/duel/btc/quick-play/page.tsx` (deleted). Polls `GET /api/match/[matchId]`
-  every ~1s and renders by `status`:
-  - `open` (you're player1): "Waiting for an opponent…" + Cancel (→ leave).
-  - `predict`: single-sided prediction input + Lock button (reuses the
-    existing input/nudge markup from the old page, one column instead of
-    two); shows "opponent disconnected" + Leave when `opponentPresent` is
-    false.
-  - `countdown`: existing fixed-deadline countdown UI, driven by
-    `roundStartAt`/`timerSeconds` from the server instead of local state;
-    shows "Locked at $X — waiting on opponent" with the opponent's value
-    still hidden.
-  - `settled`: existing result panel, now fed from server data (both
-    predictions revealed, diffs, winner). "Play Again" routes back to `/`.
-  - `<PriceChart>` keeps using the browser's own `usePriceFeed()` exactly as
-    today (chart stays client-direct to Coinbase, no server round-trip) —
-    only `roundStart`/lock-marker timestamps now come from the poll instead
-    of local `lock()` state.
+Validation on entry: market must price (`lib/spotPrice.ts:12`), mode must be
+`quick-play`, wager integer 1..1,000,000, timer 10..3600s.
 
-## Changed files
+## Client
 
-- `app/page.tsx`:
-  - Quick Play's Play button (`playHref`/`isPlayable` block around
-    `app/page.tsx:103-105,171-173`) becomes an async `onClick` for
-    `mode==='quick-play'`: POST `find-or-create` with the player id, wager,
-    timer, market, then `router.push` to the new match route. Pulse and the
-    24hr Battle placeholder are untouched.
-  - The hardcoded `openMatches` array (`app/page.tsx:51-55`) is replaced by
-    data from `GET /api/match/open`, polled every few seconds while Quick
-    Play is selected; each row's existing markup gains a join action that
-    posts to `.../join` then routes the same way.
+- `app/duel/[market]/match/[matchId]/page.tsx` — the room. Renders by `status`; one prediction column plus an opponent column. Stops polling on `settled` or 404.
+- One ticker drives both deadlines — the lock window in `predict`, the round in `countdown` (`app/duel/[market]/match/[matchId]/page.tsx:116-133`).
+- `<PriceChart>` still reads the browser's own `usePriceFeed()` — the chart stays client-direct to Coinbase, no server round trip. Only `roundStart`/lock-marker times come from the poll.
+- Settlement freezes the series with the final point pinned to the deadline, not to whenever the tab noticed (`app/duel/[market]/match/[matchId]/page.tsx:135-144`). A forfeit has no final price, so nothing freezes.
+- Lobby Play button for Quick Play is an async matchmaker, not a `Link` (`app/page.tsx:186-217`); Open Matches rows are join buttons (`app/page.tsx:388-399`), inert for your own row while you hold it.
+- Queueing replaces the whole Quick Play control panel rather than disabling it — the criteria are already committed to a row (`app/page.tsx:340-352`). Cancel deletes the row via `leave` (`app/page.tsx:263-277`); the room is prefetched while waiting so navigation does not eat into the 15s (`app/page.tsx:223`).
 
-## Docs follow-up (per AGENTS.md orchestration rule)
+## Verified
 
-After the code lands, targeted edits (not rewrites):
-- `roadmap.md` — remove/close the "No networking" and "Same-browser 2P"
-  rows; add rows for what's still genuinely open: no auto-timeout on an
-  abandoned `predict` match, no stakes/balance deduction, no cleanup cron for
-  the (self-filtering but ever-growing) `matches` table.
-- `architecture.md` — module map gains the new API routes and match page,
-  drops the retired quick-play hot-seat page, updates the "No DB, no
-  server-side game state" line in `README.md:12` (now false for Quick Play
-  specifically).
-- `game-loop.md` — phase machine is now server-authoritative for Quick Play;
-  note the `open`/`predict`/`countdown`/`settled` statuses map onto the same
-  phases, just owned by `matches` rows instead of `page.tsx` state.
+Two-player round end to end: auto-match on identical criteria, browse-join by
+id, the creator held on the lobby until someone joins, a ~15s lock window
+opening on join, predictions hidden through `predict` and both revealed at
+`countdown`, countdown starting only on the 2nd lock, settlement idempotent
+under two simultaneous polls, 3-way join race yielding exactly one winner,
+`predict`-phase leave 404-ing the opponent, and an abandoned `open` match
+dropping out of listing/matchmaking after ~9s.
 
-## Verification
-
-1. `npm run dev`, open two separate browser identities (e.g. one normal
-   window + one incognito — identity is per-`localStorage`).
-2. Both pick BTC Quick Play with the same wager/timer and press Play: first
-   creates an `open` match (visible in the other's Open Matches list within
-   one poll cycle); second auto-matches into it, both land in the match room.
-3. Confirm predictions stay hidden from the opponent until settle, the
-   countdown only starts after both lock, the winner/diff calc matches
-   today's logic, and the chart's round-band/lock markers render correctly.
-4. Manual path: a third browser browses Open Matches and joins a specific
-   row instead of matching by criteria — confirm it lands in that exact
-   match.
-5. Abandonment: create an `open` match, close that tab, confirm it drops out
-   of Open Matches / stops being auto-matchable after ~8-10s, and a fresh
-   browser with the same criteria creates its own match instead of joining
-   the dead one.
-6. `predict`-phase leave: one player leaves before locking — confirm the
-   other's next poll reports the match gone and returns them to the lobby.
+Lock-window expiry, over the API: one player locked → the other forfeits
+(`winner` set, `finalPrice` null, both role-scoped views agreeing); neither
+locked → `winner: "tie"`, void; a lock arriving after either → 409.
