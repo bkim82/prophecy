@@ -20,13 +20,14 @@ const trim = (points: PricePoint[]) => {
 };
 
 /**
- * Live BTC/USD from Coinbase's public ticker socket (no key, no auth).
+ * Live price from Coinbase's public ticker socket (no key, no auth), for a
+ * given product (e.g. "BTC-USD", "ETH-USD").
  *
  * Every trade updates the headline price, but the plotted series commits one
  * point per SAMPLE_MS — dense tick noise draws as a flat band, while a point
  * every few seconds draws the actual peaks and dips.
  */
-export function usePriceFeed() {
+export function usePriceFeed(product: string = "BTC-USD") {
   const [samples, setSamples] = useState<PricePoint[]>([]);
   const [price, setPrice] = useState<number | null>(null);
   const [status, setStatus] = useState<FeedStatus>("connecting");
@@ -53,7 +54,15 @@ export function usePriceFeed() {
   useEffect(() => {
     let cancelled = false;
 
-    fetch("/api/history", { cache: "no-store" })
+    // Switching product invalidates whatever was seeded/ticking for the old one.
+    setSamples([]);
+    setPrice(null);
+    priceRef.current = null;
+    tickAtRef.current = 0;
+    lastSampleAtRef.current = 0;
+    setStatus("connecting");
+
+    fetch(`/api/history?symbol=${encodeURIComponent(product)}`, { cache: "no-store" })
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error())))
       .then(({ points: seed }: { points: PricePoint[] }) => {
         if (cancelled || seed.length === 0) return;
@@ -70,7 +79,7 @@ export function usePriceFeed() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [product]);
 
   useEffect(() => {
     let socket: WebSocket | null = null;
@@ -88,7 +97,7 @@ export function usePriceFeed() {
         socket?.send(
           JSON.stringify({
             type: "subscribe",
-            product_ids: ["BTC-USD"],
+            product_ids: [product],
             channels: ["ticker"],
           }),
         );
@@ -140,7 +149,7 @@ export function usePriceFeed() {
         socket.close();
       }
     };
-  }, []);
+  }, [product]);
 
   // Committed samples plus a one-second live edge, so the leading point moves
   // at the same cadence as the rest of the line while the headline stays live.

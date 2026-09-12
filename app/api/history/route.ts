@@ -11,15 +11,16 @@ type Point = { t: number; p: number };
 
 const HEADERS = { "User-Agent": "btc-duel" };
 const NO_STORE = { "Cache-Control": "no-store" };
+const SUPPORTED_PRODUCTS = new Set(["BTC-USD", "ETH-USD"]);
 
 /**
  * Seeds the chart at the same resolution the live socket produces, by bucketing
  * recent trades into SAMPLE_MS slots. ~1000 trades is usually a few minutes, but
  * on a busy tape it can be well under one — hence the candle backfill below.
  */
-async function fromTrades(cutoff: number): Promise<Point[]> {
+async function fromTrades(product: string, cutoff: number): Promise<Point[]> {
   const res = await fetch(
-    "https://api.exchange.coinbase.com/products/BTC-USD/trades?limit=1000",
+    `https://api.exchange.coinbase.com/products/${product}/trades?limit=1000`,
     { cache: "no-store", headers: HEADERS },
   );
   if (!res.ok) throw new Error("trades unavailable");
@@ -50,12 +51,12 @@ async function fromTrades(cutoff: number): Promise<Point[]> {
  * candles that trail ~3 minutes behind now, which is exactly the stretch the
  * backfill exists to cover.
  */
-async function fromCandles(cutoff: number, now: number): Promise<Point[]> {
+async function fromCandles(product: string, cutoff: number, now: number): Promise<Point[]> {
   const range = `start=${new Date(cutoff).toISOString()}&end=${new Date(
     now,
   ).toISOString()}`;
   const res = await fetch(
-    `https://api.exchange.coinbase.com/products/BTC-USD/candles?granularity=60&${range}`,
+    `https://api.exchange.coinbase.com/products/${product}/candles?granularity=60&${range}`,
     { cache: "no-store", headers: HEADERS },
   );
   if (!res.ok) throw new Error("candles unavailable");
@@ -85,7 +86,13 @@ async function fromCandles(cutoff: number, now: number): Promise<Point[]> {
     .sort((a, b) => a.t - b.t);
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const product = searchParams.get("symbol") ?? "BTC-USD";
+  if (!SUPPORTED_PRODUCTS.has(product)) {
+    return Response.json({ error: "Unsupported symbol" }, { status: 400 });
+  }
+
   const now = Date.now();
   // One sample of slack past the window, matching the hook: the chart needs a
   // point just outside the left edge to interpolate the crossing from.
@@ -95,8 +102,8 @@ export async function GET() {
   // only covers the last 40 seconds would leave most of the axis empty. 1000
   // trades is ~5min of a quiet tape but under a minute of a busy one.
   const [trades, candles] = await Promise.all([
-    fromTrades(cutoff).catch(() => [] as Point[]),
-    fromCandles(cutoff, now).catch(() => [] as Point[]),
+    fromTrades(product, cutoff).catch(() => [] as Point[]),
+    fromCandles(product, cutoff, now).catch(() => [] as Point[]),
   ]);
 
   // Trades win wherever they exist; candles only fill the stretch before them.

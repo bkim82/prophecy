@@ -26,6 +26,15 @@
   --p1: #2f6ba1; --p2: #6b7784;
   --btn-bg: #2c6390; --btn-bg-hover: #1f4e75; --btn-text: #ffffff; --btn-disabled-bg: #dfe5ec; --btn-disabled-text: #98a3af;
 }
+/* Market-scoped accent: the lobby's chart line/dot, live indicator, play button,
+   and selected segmented-control text all resolve through --accent, so retinting
+   it here per data-market recolors them without touching the shared theme tokens. */
+.lobby-shell[data-market="btc"] {
+  --accent: #f7931a; --accent-strong: #ffab3d; --accent-contrast: #1c1200;
+}
+.lobby-shell[data-market="eth"] {
+  --accent: #627eea; --accent-strong: #8296ef; --accent-contrast: #ffffff;
+}
 * { box-sizing: border-box; }
 html { background: var(--bg); }
 body { min-height: 100vh; margin: 0; background: var(--bg); color: var(--text); font-family: Arial, Helvetica, sans-serif; }
@@ -74,7 +83,7 @@ button { cursor: pointer; }
 .section-heading { display: flex; justify-content: space-between; align-items: end; gap: 18px; margin: 30px 2px 11px; }
 .section-heading h1 { margin: 4px 0 0; font-size: 30px; line-height: 1; }
 .round-meta { display: block; margin-top: 7px; color: var(--muted); font-size: 12px; }
-.quick-play { display: grid; grid-template-columns: 1.2fr 1.1fr .9fr .65fr 1.2fr auto; align-items: center; gap: 18px; padding: 19px 20px; }
+.quick-play { display: grid; grid-template-columns: 1.2fr 1.3fr 1fr 1.2fr auto; align-items: center; gap: 18px; padding: 19px 20px; }
 .quick-play-market, .row-market { display: flex; align-items: center; gap: 10px; }
 .quick-play-market strong, .row-market strong { display: block; font-size: 13px; }
 .quick-play-market .muted, .row-market .muted, .opponent-status .muted { display: block; margin-top: 3px; font-size: 11px; }
@@ -83,7 +92,7 @@ button { cursor: pointer; }
 .eth-symbol { color: var(--muted); }
 .control-group { display: grid; gap: 7px; min-width: 0; }
 .field-label { color: var(--muted); font-size: 10px; letter-spacing: .09em; text-transform: uppercase; }
-.segmented-control { display: grid; grid-template-columns: 1fr 1fr; overflow: hidden; border: 1px solid var(--line); border-radius: 6px; }
+.segmented-control { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; overflow: hidden; border: 1px solid var(--line); border-radius: 6px; }
 .segmented-control button { border: 0; background: transparent; color: var(--muted); padding: 8px 10px; font-size: 12px; }
 .segmented-control button + button { border-left: 1px solid var(--line); }
 .segmented-control button.is-selected { background: var(--selected-bg); color: var(--accent-strong); }

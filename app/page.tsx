@@ -4,7 +4,12 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { usePriceFeed } from "./usePriceFeed";
 
-type Direction = "UP" | "DOWN";
+const WAGER_PRESETS = [10, 100, 1000];
+const TIMER_PRESETS = [
+  { label: "60s", value: 60 },
+  { label: "120s", value: 120 },
+  { label: "300s", value: 300 },
+];
 
 const usd = (value: number | null) =>
   value === null
@@ -56,44 +61,63 @@ const recentResults = [
 ];
 
 type ModeId = "quick-play" | "pulse" | "battle-24h";
+type MarketId = "btc" | "eth";
 
-const MODES: { id: ModeId; label: string; meta: string; href?: string }[] = [
-  { id: "quick-play", label: "Quick Play", meta: "BTC · 60 seconds · head to head", href: "/duel/btc/quick-play" },
-  { id: "pulse", label: "Pulse", meta: "BTC · solo · trade live for 60 seconds", href: "/duel/btc/pulse" },
-  { id: "battle-24h", label: "24hr Battle", meta: "BTC · one call · settled in 24 hours" },
-];
+const MARKETS: Record<MarketId, { label: string; symbol: string; name: string }> = {
+  btc: { label: "BTC", symbol: "₿", name: "BTC-USD" },
+  eth: { label: "ETH", symbol: "Ξ", name: "ETH-USD" },
+};
+
+// Games are only built out for BTC so far; ETH gets the same mode list with
+// no href, which the panel below renders as "soon" and leaves inert.
+const MODES_BY_MARKET: Record<MarketId, { id: ModeId; label: string; meta: string; href?: string }[]> = {
+  btc: [
+    { id: "quick-play", label: "Quick Play", meta: "BTC · 60 seconds · head to head", href: "/duel/btc/quick-play" },
+    { id: "pulse", label: "Pulse", meta: "BTC · solo · trade live for 60 seconds", href: "/duel/btc/pulse" },
+    { id: "battle-24h", label: "24hr Battle", meta: "BTC · one call · settled in 24 hours" },
+  ],
+  eth: [
+    { id: "quick-play", label: "Quick Play", meta: "ETH · 60 seconds · head to head" },
+    { id: "pulse", label: "Pulse", meta: "ETH · solo · trade live for 60 seconds" },
+    { id: "battle-24h", label: "24hr Battle", meta: "ETH · one call · settled in 24 hours" },
+  ],
+};
 
 export default function Page() {
-  const { price, points, status } = usePriceFeed();
-  const [direction, setDirection] = useState<Direction>("UP");
-  const [entry, setEntry] = useState("0.25");
+  const [market, setMarket] = useState<MarketId>("btc");
+  const activeMarket = MARKETS[market];
+  const { price, points, status } = usePriceFeed(activeMarket.name);
+  const [wager, setWager] = useState("10");
+  const [isCustomWager, setIsCustomWager] = useState(false);
+  const [timer, setTimer] = useState(60);
   const [mode, setMode] = useState<ModeId>("quick-play");
+  const modes = MODES_BY_MARKET[market];
   const currentPrice = price ?? points.at(-1)?.p ?? null;
   const firstPrice = points[0]?.p ?? currentPrice;
   const change = currentPrice !== null && firstPrice ? ((currentPrice - firstPrice) / firstPrice) * 100 : null;
-  const activeMode = MODES.find((option) => option.id === mode) ?? MODES[0];
+  const activeMode = modes.find((option) => option.id === mode) ?? modes[0];
   const isPlayable = Boolean(activeMode.href);
   // Only Quick Play settles a single call; Pulse takes its stake and leverage
   // on its own page, so it gets a bare href and leaves these controls inert.
   const takesCall = mode === "quick-play";
   const playHref = takesCall
-    ? `${activeMode.href}?direction=${direction.toLowerCase()}&entry=${entry}`
+    ? `${activeMode.href}?wager=${wager}&timer=${timer}`
     : (activeMode.href as string);
 
   return (
-    <main className="lobby-shell">
+    <main className="lobby-shell" data-market={market}>
       <nav className="market-nav" aria-label="Market switcher">
         <div className="market-switcher">
           <span className="field-label">Markets</span>
-          <button className="active" type="button"><span className="market-symbol btc-symbol">₿</span> BTC</button>
-          <button type="button"><span className="market-symbol eth-symbol">Ξ</span> ETH <small>soon</small></button>
+          <button className={market === "btc" ? "active" : ""} type="button" onClick={() => setMarket("btc")}><span className="market-symbol btc-symbol">₿</span> BTC</button>
+          <button className={market === "eth" ? "active" : ""} type="button" onClick={() => setMarket("eth")}><span className="market-symbol eth-symbol">Ξ</span> ETH</button>
         </div>
       </nav>
 
       <section className="market-overview panel">
         <div className="ticker-copy">
           <div className="eyebrow-row">
-            <span className="eyebrow">BTC / USD</span>
+            <span className="eyebrow">{activeMarket.label} / USD</span>
             <span className={`feed-status ${status === "live" ? "is-live" : ""}`}><span className="status-dot" /> {status === "live" ? "Live" : status}</span>
           </div>
           <div className="ticker-price display-font">{usd(currentPrice)}</div>
@@ -115,7 +139,7 @@ export default function Page() {
         </div>
         <div className="mode-switcher" role="group" aria-label="Choose a mode">
           <span className="field-label">Modes</span>
-          {MODES.map((option) => (
+          {modes.map((option) => (
             <button key={option.id} type="button" className={option.id === mode ? "active" : ""} aria-pressed={option.id === mode} onClick={() => setMode(option.id)}>
               {option.label}
               {option.href ? null : <small>soon</small>}
@@ -125,10 +149,25 @@ export default function Page() {
       </div>
 
       <section className="quick-play panel">
-        <div className="quick-play-market"><span className="market-symbol btc-symbol">₿</span><div><strong>BTC / USD</strong><span className="muted">{isPlayable ? "Current round" : "Not open yet"}</span></div></div>
-        <div className="control-group"><span className="field-label">Direction</span><div className="segmented-control" role="group" aria-label="Choose direction">{(["UP", "DOWN"] as const).map((option) => <button key={option} type="button" disabled={!takesCall} className={direction === option ? "is-selected" : ""} onClick={() => setDirection(option)}>{option}</button>)}</div></div>
-        <label className="control-group"><span className="field-label">Entry</span><span className="entry-input-wrap"><input value={entry} onChange={(event) => setEntry(event.target.value)} disabled={!takesCall} inputMode="decimal" aria-label="Entry amount" /><span>coins</span></span></label>
-        <div className="control-group timer-control"><span className="field-label">Timer</span><strong className="timer-value display-font">{isPlayable ? "01:00" : "—"}</strong></div>
+        <div className="quick-play-market"><span className={`market-symbol ${market === "btc" ? "btc-symbol" : "eth-symbol"}`}>{activeMarket.symbol}</span><div><strong>{activeMarket.label} / USD</strong><span className="muted">{isPlayable ? "Current round" : "Not open yet"}</span></div></div>
+        <div className="control-group">
+          <span className="field-label">Wager</span>
+          <div className="segmented-control" role="group" aria-label="Choose wager">
+            {WAGER_PRESETS.map((preset) => (
+              <button key={preset} type="button" disabled={!takesCall} className={!isCustomWager && wager === String(preset) ? "is-selected" : ""} onClick={() => { setWager(String(preset)); setIsCustomWager(false); }}>{preset}</button>
+            ))}
+            <button type="button" disabled={!takesCall} className={isCustomWager ? "is-selected" : ""} onClick={() => setIsCustomWager(true)}>Custom</button>
+          </div>
+          {isCustomWager && <span className="entry-input-wrap"><input value={wager} onChange={(event) => setWager(event.target.value)} disabled={!takesCall} inputMode="decimal" aria-label="Custom wager amount" /><span>coins</span></span>}
+        </div>
+        <div className="control-group">
+          <span className="field-label">Timer</span>
+          <div className="segmented-control" role="group" aria-label="Choose round length">
+            {TIMER_PRESETS.map((preset) => (
+              <button key={preset.value} type="button" disabled={!takesCall} className={timer === preset.value ? "is-selected" : ""} onClick={() => setTimer(preset.value)}>{preset.label}</button>
+            ))}
+          </div>
+        </div>
         <div className="opponent-status"><span className="field-label">Opponent</span><strong><span className={`status-dot ${isPlayable ? "is-online" : ""}`} /> {takesCall ? "Open lobby" : isPlayable ? "Solo · NOVA AI" : "Unavailable"}</strong><span className="muted">{takesCall ? "2,486 players online" : isPlayable ? "Stake and leverage set in-round" : "Mode in development"}</span></div>
         {isPlayable
           ? <Link href={playHref} className="play-button">Play <span aria-hidden="true">→</span></Link>
