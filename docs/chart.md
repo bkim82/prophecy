@@ -11,7 +11,7 @@
 ## Time window (fixed width, scrolling)
 
 - `t1` = `max(now, last point)`, `t0` = `t1 - viewMs` (`:147-152`). The domain width is constant from the first frame, so the axis scrolls left instead of compressing as points accumulate. `viewMs` is `windowMs` unless the wheel has zoomed in — see Zoom.
-- `now` comes in as a prop from `usePriceFeed` (`app/duel/btc/quick-play/page.tsx:261`), which ticks it every `CLOCK_MS`=100ms (`app/usePriceFeed.ts:11`, `:48-51`) — ~1px of travel per tick at the default window. A silent socket scrolls the axis past the last point rather than freezing the chart.
+- `now` comes in as a prop from `usePriceFeed` (`app/duel/[market]/match/[matchId]/page.tsx:327`), which ticks it every `CLOCK_MS`=100ms (`app/usePriceFeed.ts:11`, `:48-51`) — ~1px of travel per tick at the default window. A silent socket scrolls the axis past the last point rather than freezing the chart.
 - `frozen` pins `t1` to the last point so a settled chart stops scrolling (`:147-151`).
 - `windowSlice()` clips to `[t0, …]` and **interpolates** the price where the line crosses the left edge (`:104-112`), so a scrolled-past segment ends on the axis instead of floating in. Needs one sample of slack outside the window — supplied by `trim()` and `/api/history`, both cutting at `WINDOW_MS + SAMPLE_MS`.
 - Every point older than the window → `windowSlice` returns `[]` → placeholder. That is the dead-feed rendering.
@@ -90,7 +90,7 @@ Props, defaulting to `app/feedConfig.ts` (`:115-125`). A future settings UI over
 
 ## Prediction levels (horizontal)
 
-- Dashed horizontal line per locked prediction, P1=blue, P2=amber (`app/duel/btc/quick-play/page.tsx:10-11`).
+- Dashed horizontal line per locked prediction. The match room is single-perspective: your line is `--p1` (blue), the opponent's `--p2` (amber), so both players see themselves in blue (`app/duel/[market]/match/[matchId]/page.tsx:17-18`). The opponent's line only exists once the round settles — before that the server withholds the value (`lib/match.ts:146`).
 - Out-of-range value (common — axis is tight): pin label to top/bottom edge + arrow, don't rescale chart or clip (`:455-487`). Dashed line only drawn if value in view.
 
 ## Trade markers
@@ -101,7 +101,7 @@ Props, defaulting to `app/feedConfig.ts` (`:115-125`). A future settings UI over
 
 ## Freezing
 
-Settlement passes frozen snapshot + `frozen={true}` (`app/duel/btc/quick-play/page.tsx:255-263`). Chart response: pin `t1` to the last point, stop marker ping, show `settled` chip. Chart has no round concept — renders whatever it's given.
+Settlement passes frozen snapshot + `frozen={true}` (`app/duel/[market]/match/[matchId]/page.tsx:128-137`, `:321-327`). Chart response: pin `t1` to the last point, stop marker ping, show `settled` chip. Chart has no round concept — renders whatever it's given.
 
 ## Empty state
 

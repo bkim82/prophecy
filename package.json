@@ -4,7 +4,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "db:push": "dotenv -e .env.local -- drizzle-kit push"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.3",

@@ -39,7 +39,7 @@ it — a seed covering only the last 40s would leave most of the axis empty.
 ## Freshness / settlement guard
 
 - `getLivePrice()` returns last tick only if age < `FRESH_MS`=5s, else `null` (`app/usePriceFeed.ts:41-46`).
-- `/api/price`: Coinbase spot → Binance fallback, each validated finite+positive before accept (`app/api/price/route.ts:23-37`). Both fail → 502 → UI retry button.
+- `/api/price`: Coinbase spot → Binance fallback, each validated finite+positive before accept (`lib/spotPrice.ts:39-52`). Both fail → 502 (`app/api/price/route.ts:17`). The same chain settles a match (`lib/match.ts:72`).
 
 ## Reconnection
 
@@ -55,4 +55,4 @@ it — a seed covering only the last 40s would leave most of the axis empty.
 
 ## Status values
 
-`"connecting" | "live" | "reconnecting"` → dot color in UI (`app/duel/btc/quick-play/page.tsx:158-169`).
+`"connecting" | "live" | "reconnecting"` → dot color in UI (`app/duel/[market]/match/[matchId]/page.tsx:252-264`).
