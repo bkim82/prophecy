@@ -7,7 +7,9 @@
 
 ```
 app/page.tsx (menu: duel types × modes, links out — no game state)
-  └─ app/duel/btc/quick-play/page.tsx (phase machine, predictions, countdown, settlement, winner)
+  ├─ app/duel/btc/quick-play/page.tsx (phase machine, predictions, countdown, settlement, winner)
+  ├─ app/duel/btc/pulse/page.tsx (solo trades, countdown, leveraged P&L, settlement)
+  └─ both modes
        ├─ usePriceFeed() → price, sampled series, status, now (250ms clock)
        └─ <PriceChart /> → pure SVG render, fixed-width scrolling window
 
@@ -19,9 +21,8 @@ quick-play/page.tsx settle() → GET /api/price      (fallback if socket stale)
 /api/price   → api.coinbase.com → api.binance.com fallback chain
 ```
 
-Only BTC Duel / Quick Play is wired up. Other duel types (ETH) and other
-modes (Pulse Mode, 24hr Battle) are menu-only placeholders with no `href` —
-see `docs/roadmap.md`.
+BTC Duel / Quick Play and Pulse Mode are wired up. ETH and 24hr Battle remain
+menu-only placeholders with no `href` — see `docs/roadmap.md`.
 
 ## Modules
 
@@ -29,6 +30,8 @@ see `docs/roadmap.md`.
 | --- | --- |
 | `app/page.tsx` | menu: duel types × modes grid, links to implemented modes only |
 | `app/duel/btc/quick-play/page.tsx` | phase machine, both players' inputs, countdown, settlement, winner, layout |
+| `app/duel/btc/pulse/page.tsx` | solo trading state, countdown, leveraged P&L, settlement, layout |
+| `app/duel/btc/pulse/trading.ts` | pure buy/sell portfolio accounting and full-position clamping |
 | `app/usePriceFeed.ts` | websocket, history seed, reconnection, sampled series |
 | `app/PriceChart.tsx` | pure props→SVG, no fetch, no state |
 | `app/feedConfig.ts` | `WINDOW_MS`, `SAMPLE_MS` + axis interval defaults — shared by hook, seed route, chart |

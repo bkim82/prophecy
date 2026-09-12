@@ -16,9 +16,17 @@ export type PredictionLine = {
   at?: number | null;
 };
 
+export type TradeMarker = {
+  t: number;
+  p: number;
+  side: "long" | "short";
+  action?: "entry" | "exit" | "reverse";
+};
+
 type Props = {
   points: PricePoint[];
   predictions?: PredictionLine[];
+  trades?: TradeMarker[];
   roundStart?: number | null;
   frozen?: boolean;
   /** Wall clock driving the right edge; ticks so the window scrolls on its own. */
@@ -86,6 +94,7 @@ function windowSlice(points: PricePoint[], t0: number): PricePoint[] {
 export default function PriceChart({
   points,
   predictions = [],
+  trades = [],
   roundStart = null,
   frozen = false,
   now,
@@ -368,6 +377,45 @@ export default function PriceChart({
                 {prediction.label}
                 {inView ? "" : prediction.value > high ? " ↑" : " ↓"}{" "}
                 {axisLabel(prediction.value, visibleSpan)}
+              </text>
+            </g>
+          );
+        })}
+
+        {/* Each directional entry, exit, and reversal, marked where it happened */}
+        {trades.map((trade, i) => {
+          if (trade.t < t0 || trade.t > t1) return null;
+          const tx = x(trade.t);
+          const ty = y(Math.min(Math.max(trade.p, low), high));
+          const color = trade.side === "long" ? UP : DOWN;
+          const action = trade.action ?? "entry";
+          return (
+            <g key={i}>
+              {action === "exit" ? (
+                <rect
+                  x={tx - 5}
+                  y={ty - 5}
+                  width="10"
+                  height="10"
+                  rx="2"
+                  fill="white"
+                  stroke={color}
+                  strokeWidth="2"
+                />
+              ) : action === "reverse" ? (
+                <path d={`M ${tx} ${ty - 7} L ${tx + 7} ${ty} L ${tx} ${ty + 7} L ${tx - 7} ${ty} Z`} fill="white" stroke={color} strokeWidth="2" />
+              ) : (
+                <circle cx={tx} cy={ty} r="6" fill="white" stroke={color} strokeWidth="2" />
+              )}
+              <text
+                x={tx}
+                y={ty + 3.5}
+                fill={color}
+                fontSize="7.5"
+                fontWeight="700"
+                textAnchor="middle"
+              >
+                {action === "entry" ? (trade.side === "long" ? "L" : "S") : action === "exit" ? "×" : "R"}
               </text>
             </g>
           );

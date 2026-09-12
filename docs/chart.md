@@ -55,7 +55,7 @@ Props, defaulting to `app/feedConfig.ts` (`:88-95`). A future settings UI overri
 5. Price line: polyline, green if last≥first else rose (`:141-142`, `:286-293`)
 6. Lock markers (vertical) — see below
 7. Prediction levels (horizontal) — see below
-8. Current price marker: 2 concentric circles, outer pings while live, static once frozen (`:376-389`)
+8. Current price marker: 2 concentric circles, outer pings while live, static once frozen (`:424-437`)
 9. `settled` chip, top-right above the plot, only when `frozen` (`:391-401`)
 
 ## Round band
@@ -75,6 +75,11 @@ Props, defaulting to `app/feedConfig.ts` (`:88-95`). A future settings UI overri
 
 - Dashed horizontal line per locked prediction, P1=blue, P2=amber (`app/page.tsx:9-10`).
 - Out-of-range value (common — axis is tight): pin label to top/bottom edge + arrow, don't rescale chart or clip (`:341-374`). Dashed line only drawn if value in view.
+
+## Trade markers
+
+- `TradeMarker` uses `side: long|short` and `action: entry|exit|reverse` (`:16-21`).
+- Entries render as colored circles with `L`/`S`, exits as squares with `x`, and reversals as diamonds with `R` (`:354-399`).
 
 ## Freezing
 

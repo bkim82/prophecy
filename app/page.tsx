@@ -23,7 +23,7 @@ const MODES: Omit<Mode, "href">[] = [
   {
     key: "pulse",
     name: "Pulse Mode",
-    description: "Rapid-fire rounds back to back for a fast score streak.",
+    description: "Solo. Buy and sell live BTC for 60 seconds — maximize profit.",
   },
   {
     key: "24hr",
@@ -37,9 +37,11 @@ const DUEL_TYPES: DuelType[] = [
     key: "btc",
     name: "BTC Duel",
     description: "Predict where Bitcoin / USD lands.",
-    modes: MODES.map((mode) =>
-      mode.key === "quick" ? { ...mode, href: "/duel/btc/quick-play" } : mode,
-    ),
+    modes: MODES.map((mode) => {
+      if (mode.key === "quick") return { ...mode, href: "/duel/btc/quick-play" };
+      if (mode.key === "pulse") return { ...mode, href: "/duel/btc/pulse" };
+      return mode;
+    }),
   },
   {
     key: "eth",

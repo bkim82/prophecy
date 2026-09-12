@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Duel Menu",
-  description: "Pick a duel type and mode",
+  title: "Pulse Arena | BTC-USD",
+  description: "A tactile live BTC trading duel",
 };
 
 export default function RootLayout({

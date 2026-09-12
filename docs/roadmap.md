@@ -6,7 +6,7 @@ Deliberate gaps in a prototype scoped to the core loop. Not bugs.
 
 | Gap | Detail |
 | --- | --- |
-| Pulse Mode | Menu placeholder only (`app/page.tsx` `MODES`, no `href`) — rapid-fire back-to-back rounds, no implementation |
+| Pulse leverage control | Leverage choices are currently limited to the built-in 1x–100x options (`app/duel/btc/pulse/page.tsx:11`); no custom multiplier |
 | 24hr Battle | Menu placeholder only (`app/page.tsx` `MODES`, no `href`) — single prediction settled a day later, no implementation |
 | ETH Duel | Menu placeholder only (`app/page.tsx` `DUEL_TYPES`) — no price feed, routes, or settlement |
 | Same-browser 2P | Both predictions typed on one keyboard — no hidden input/commit step, either player sees the other's guess pre-lock |
