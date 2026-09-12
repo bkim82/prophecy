@@ -10,4 +10,4 @@ Agent-readable fact sheets, not prose. Format: flat bullets, `file:line` refs, n
 - [roadmap.md](roadmap.md) — unbuilt features, known gaps
 - [multiplayer-plan.md](multiplayer-plan.md) — server-authoritative Quick Play: match lifecycle, guarded updates, presence
 
-Quick Play is server-authoritative (Neon Postgres `matches` table, 6 API routes, anonymous per-browser ids). Pulse, the chart and the price feed stay client-side; `/api/price` and `/api/history` stay stateless proxies. No auth required to play.
+Quick Play and multiplayer Pulse are server-authoritative (Neon Postgres `matches` table, anonymous per-browser ids); the chart and price feed stay client-side. Solo Pulse remains client-only. `/api/price` and `/api/history` stay stateless proxies. No auth required to play.

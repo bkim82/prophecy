@@ -1,10 +1,11 @@
 # pulse-mode
 
-- Client-only BTC duel route: `app/duel/btc/pulse/page.tsx`. Reached from the lobby mode switcher (`app/page.tsx:62`).
+- Solo BTC duel route: `app/duel/btc/pulse/page.tsx`; multiplayer Pulse route: `app/duel/[market]/pulse/[matchId]/page.tsx`. Both are reached from the lobby mode switcher (`app/page.tsx`).
+- Multiplayer Pulse uses the shared match row and polling lifecycle. A 5-second pre-round countdown starts automatically after the second player joins; during the round each player can add server-priced long/short positions until their available cash is exhausted, with each open stake reserved until close, through `POST /api/match/[id]/action`; the higher final leveraged P&L wins (`lib/match.ts`, `lib/pulse.ts`).
 - State machine: `setup` before entry (also re-entered immediately after a close, pre-loaded with the prior stake/leverage), `open` while a directional position is live, `settling` during final-price fetch, `result` after the 60-second round (`app/duel/btc/pulse/page.tsx:20`, `:187-203`).
 - Round starts on the first Long/Short press; duration is 60 seconds; starting bankroll is $100 (`app/duel/btc/pulse/page.tsx:8-12`, `:199-204`).
 - Bankroll persists across rounds: `settle()` commits each round's P&L into `bankroll` (floored at 0), and Play Again carries it forward — only a busted ($0) bankroll resets to $100 (`app/duel/btc/pulse/page.tsx:102`, `:153-183`, `:285-307`). Stake entry is clamped to `bankroll + realizedPnl` so a player can never bet more than they actually have, and stake presets/"All in" disable above that amount (`app/duel/btc/pulse/page.tsx:208-220`, `:327-329`, `:558-596`).
-- Trading dock header shows a centered, highlighted live Balance (equity incl. open-position P&L) between the dock title and the phase/position badge (`app/duel/btc/pulse/page.tsx:538-558`).
+- Multiplayer trading dock Balance shows available cash after realized P&L and open-stake reservations; the scoreboard continues to show live equity including open-position P&L (`app/duel/[market]/pulse/[matchId]/page.tsx:109`, `:161`).
 - Setup dock exposes stake presets, a dynamic "All in" (= current available cash), and 100×/1000×/10000× leverage chips (default 100×), then Long/Short entry; stake and leverage lock into the opened position. A closed position leaves a small "Last: side closed @ price · P&L" note above the controls (`app/duel/btc/pulse/page.tsx:568-580`).
 - Open-position dock exposes direction, a combined entry/current price readout, live P&L, size, Close, and Reverse only (`app/duel/btc/pulse/page.tsx:705-750`).
 - Directional P&L = stake × price move percentage × position leverage; Long benefits from an increase and Short from a decrease (`app/duel/btc/pulse/page.tsx:61-67`).

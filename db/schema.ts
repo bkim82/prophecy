@@ -2,9 +2,12 @@ import {
   pgTable,
   text,
   integer,
+  boolean,
   timestamp,
   doublePrecision,
+  jsonb,
 } from "drizzle-orm/pg-core";
+import type { PulsePosition } from "@/lib/pulse";
 
 export const users = pgTable("users", {
   id: text("id").primaryKey(), // Clerk user id
@@ -12,15 +15,16 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-// One row per Quick Play match — the single source of truth for a networked
+// One row per networked match — the single source of truth for Quick Play and
+// Pulse rounds.
 // round. `status` mirrors the client-side `Phase` vocabulary in docs/game-loop.md
 // so the mental model is unchanged, only who owns it.
-//   open --(p2 joins)--> predict --(both locked | 15s lock window)--> countdown --(deadline)--> settled
+//   open --(p2 joins)--> predict --(both ready | 15s lock window)--> countdown --(deadline)--> settled
 // Player ids are anonymous per-browser UUIDs (app/lib/playerId.ts), not Clerk ids.
 export const matches = pgTable("matches", {
   id: text("id").primaryKey(),
   market: text("market").notNull(), // "btc" | "eth"
-  mode: text("mode").notNull(), // "quick-play" for now
+  mode: text("mode").notNull(), // "quick-play" | "pulse"
   wager: integer("wager").notNull(),
   timerSeconds: integer("timer_seconds").notNull(),
   status: text("status").notNull().default("open"),
@@ -41,6 +45,24 @@ export const matches = pgTable("matches", {
   prediction2: doublePrecision("prediction2"),
   lockedAt1: timestamp("locked_at1", { withTimezone: true }),
   lockedAt2: timestamp("locked_at2", { withTimezone: true }),
+  // Pulse keeps each player's position set and realized P&L in the match row
+  // so a reload or a second tab cannot invent a different position.
+  pulseReady1: boolean("pulse_ready1").notNull().default(false),
+  pulseReady2: boolean("pulse_ready2").notNull().default(false),
+  pulseSide1: text("pulse_side1"), // "long" | "short"
+  pulseSide2: text("pulse_side2"),
+  pulseEntryPrice1: doublePrecision("pulse_entry_price1"),
+  pulseEntryPrice2: doublePrecision("pulse_entry_price2"),
+  pulseStake1: doublePrecision("pulse_stake1"),
+  pulseStake2: doublePrecision("pulse_stake2"),
+  pulseLeverage1: integer("pulse_leverage1"),
+  pulseLeverage2: integer("pulse_leverage2"),
+  pulseRealizedPnl1: doublePrecision("pulse_realized_pnl1"),
+  pulseRealizedPnl2: doublePrecision("pulse_realized_pnl2"),
+  pulsePositions1: jsonb("pulse_positions1").$type<PulsePosition[]>(),
+  pulsePositions2: jsonb("pulse_positions2").$type<PulsePosition[]>(),
+  pulseProfit1: doublePrecision("pulse_profit1"),
+  pulseProfit2: doublePrecision("pulse_profit2"),
   roundStartAt: timestamp("round_start_at", { withTimezone: true }),
   finalPrice: doublePrecision("final_price"),
   winner: text("winner"), // "1" | "2" | "tie"

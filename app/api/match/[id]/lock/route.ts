@@ -34,6 +34,9 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
   if (!role) {
     return Response.json({ error: "Not in this match" }, { status: 403 });
   }
+  if (found.mode !== "quick-play") {
+    return Response.json({ error: "Pulse matches use position actions" }, { status: 409 });
+  }
   // A lock that arrives after the 15s window closes must not land: close the
   // window here rather than trusting the opponent's poll to have done it.
   const row = await expireLocksIfDue(found);

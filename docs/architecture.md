@@ -1,7 +1,7 @@
 # architecture
 
 - Root shell = compact market lobby. Live home ticker reads the client-side BTC feed.
-- Quick Play is server-authoritative: a `matches` row owns the round (`db/schema.ts:20`), 6 `/api/match/*` routes own the transitions, clients poll. See [multiplayer-plan.md](multiplayer-plan.md).
+- Quick Play and multiplayer Pulse are server-authoritative: a `matches` row owns the round (`db/schema.ts:20`), `/api/match/*` routes own the transitions, clients poll. See [multiplayer-plan.md](multiplayer-plan.md).
 - `/api/price` and `/api/history` remain stateless proxies to public exchange APIs. The price feed and chart stay client-side in every mode.
 
 ## Graph
@@ -10,45 +10,48 @@
 app/layout.tsx (root shell: DUEL, balance, profile)
   └── app/page.tsx (live lobby: BTC ticker, mini-chart, quick-play controls, match rows)
         └── usePriceFeed() → price, sampled series, status, now
-app/duel/[market]/match/[matchId]/page.tsx (polls server round state, one-sided prediction, countdown, result)
+app/duel/[market]/match/[matchId]/page.tsx (Quick Play prediction room)
+app/duel/[market]/pulse/[matchId]/page.tsx (multiplayer Pulse positions, countdown, result)
 app/duel/btc/pulse/page.tsx (solo trades, countdown, leveraged P&L, settlement)
   ├── usePriceFeed() → price, sampled series, status, now
   └── <PriceChart /> → pure SVG render, fixed-width scrolling window
 
 usePriceFeed() on mount → GET /api/history (seed)
 usePriceFeed() ongoing → wss://ws-feed.exchange.coinbase.com (live ticks, browser-direct)
-pulse/page.tsx settle() → GET /api/price → fallback if socket stale
+multiplayer Pulse room → POST /api/match/[id]/action → server multi-position entry/close + settlement
+pulse/page.tsx settle() → GET /api/price → fallback if socket stale (solo route)
 
-page.tsx Play → POST /api/match/find-or-create → /duel/[market]/match/[id]
+page.tsx Play → POST /api/match/find-or-create → mode-specific match room
 page.tsx lobby list → GET /api/match/open (3s poll) → POST .../join
 match room → GET /api/match/[id] (1s poll: view + heartbeat + lazy settle)
-match room → POST /api/match/[id]/{lock,leave}
+match room → POST /api/match/[id]/{lock,action,leave}
 /api/match/* → Neon Postgres (matches); settlement → lib/spotPrice.ts
 
 /api/history → api.exchange.coinbase.com (trades + candles, both, merged)
 /api/price   → lib/spotPrice.ts → api.coinbase.com → api.binance.com fallback chain
 ```
 
-BTC Quick Play and Pulse are wired up. ETH and 24hr Battle are lobby-only
+BTC Quick Play and multiplayer Pulse are wired up. ETH and 24hr Battle are lobby-only
 placeholders — selectable in the mode switcher, which locks the play panel when
 the chosen mode has neither `href` nor `matched` (`app/page.tsx:89-103`, `:120`).
 `matched` marks a mode with no fixed URL: Play posts to `find-or-create` and
-routes to whatever room comes back (`app/page.tsx:164-181`). Wager/Timer are
-Quick Play's controls only — Pulse takes its stake and leverage in-round, so
-`takesCall` greys them out (`app/page.tsx:123`).
+routes to the mode-specific room (`app/page.tsx`). Pulse takes its stake and
+leverage in-round.
 
 ## Modules
 
 | File | Responsibility |
 | --- | --- |
 | `app/page.tsx` | live lobby, BTC ticker/chart, mode switcher, quick-play controls, matchmaking + open-match list |
-| `app/duel/[market]/match/[matchId]/page.tsx` | match room: 1s poll, clock-skew correction, one prediction input, countdown, result, layout |
+| `app/duel/[market]/match/[matchId]/page.tsx` | Quick Play room: 1s poll, prediction lock, countdown, result |
+| `app/duel/[market]/pulse/[matchId]/page.tsx` | multiplayer Pulse room: position actions, live P&L, countdown, result |
 | `app/lib/playerId.ts` | anonymous per-browser id in `localStorage` |
 | `lib/match.ts` | `MatchView` role-scoping, presence, guarded settlement — shared by every `/api/match/*` route |
 | `lib/spotPrice.ts` | Coinbase→Binance fallback chain + `productForMarket`; shared by `/api/price` and settlement |
 | `app/api/match/*` | match lifecycle: find-or-create, view/heartbeat/settle, join, lock, leave, open list |
-| `db/schema.ts` | `users` (Clerk id, balance) and `matches` (one row per Quick Play round) |
+| `db/schema.ts` | `users` (Clerk id, balance) and `matches` (one row per networked round) |
 | `app/duel/btc/pulse/page.tsx` | solo trading state, countdown, leveraged P&L, settlement, layout |
+| `app/api/match/[id]/action/route.ts` | server-priced Pulse entry, close, and reverse actions |
 | `app/duel/btc/pulse/trading.ts` | pure buy/sell portfolio accounting and full-position clamping — **no importers yet**, the page tracks a single leveraged position instead |
 | `app/usePriceFeed.ts` | websocket, history seed, reconnection, sampled series |
 | `app/PriceChart.tsx` | pure props→SVG, no fetch, no state |

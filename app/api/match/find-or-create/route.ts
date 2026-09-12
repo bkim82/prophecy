@@ -36,7 +36,7 @@ export async function POST(request: Request) {
   if (!productForMarket(market)) {
     return Response.json({ error: "Unsupported market" }, { status: 400 });
   }
-  if (mode !== "quick-play") {
+  if (mode !== "quick-play" && mode !== "pulse") {
     return Response.json({ error: "Unsupported mode" }, { status: 400 });
   }
   if (!Number.isInteger(wager) || wager <= 0 || wager > MAX_WAGER) {
