@@ -8,10 +8,14 @@ export type FeedStatus = "connecting" | "live" | "reconnecting";
 
 const FEED_URL = "wss://ws-feed.exchange.coinbase.com";
 const FRESH_MS = 5000; // a tick older than this is not trusted for settlement
+const CLOCK_MS = 250; // ~1px of chart travel per tick at the default window
 
+// One sample of slack past the window so the chart can interpolate the point
+// where the line crosses its left edge instead of starting in mid-air.
 const trim = (points: PricePoint[]) => {
-  const cutoff = Date.now() - WINDOW_MS;
+  const cutoff = Date.now() - WINDOW_MS - SAMPLE_MS;
   const first = points.findIndex((point) => point.t >= cutoff);
+  if (first === -1) return [];
   return first <= 0 ? points : points.slice(first);
 };
 
@@ -26,6 +30,9 @@ export function usePriceFeed() {
   const [samples, setSamples] = useState<PricePoint[]>([]);
   const [price, setPrice] = useState<number | null>(null);
   const [status, setStatus] = useState<FeedStatus>("connecting");
+  // The chart draws a window ending *now*, so it needs a clock of its own:
+  // a silent socket should scroll the axis past the last point, not freeze it.
+  const [now, setNow] = useState(() => Date.now());
 
   const priceRef = useRef<number | null>(null);
   const tickAtRef = useRef(0);
@@ -36,6 +43,11 @@ export function usePriceFeed() {
     if (priceRef.current === null) return null;
     if (Date.now() - tickAtRef.current > FRESH_MS) return null;
     return priceRef.current;
+  }, []);
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), CLOCK_MS);
+    return () => clearInterval(id);
   }, []);
 
   useEffect(() => {
@@ -141,5 +153,5 @@ export function usePriceFeed() {
     return [...samples, edge];
   }, [samples, price]);
 
-  return { price, points, status, getLivePrice };
+  return { price, points, status, now, getLivePrice };
 }

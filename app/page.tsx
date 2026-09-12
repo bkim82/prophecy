@@ -29,7 +29,7 @@ const usd = (n: number) =>
   });
 
 export default function Page() {
-  const { price, points, status, getLivePrice } = usePriceFeed();
+  const { price, points, status, now, getLivePrice } = usePriceFeed();
 
   const [phase, setPhase] = useState<Phase>("predict");
   const [input1, setInput1] = useState("");
@@ -39,6 +39,11 @@ export default function Page() {
   // When each player locked — the chart marks the moment, not just the price.
   const [lockedAt1, setLockedAt1] = useState<number | null>(null);
   const [lockedAt2, setLockedAt2] = useState<number | null>(null);
+
+  // Seed each input from the live price once, so the number spinner's
+  // arrows step from the current price instead of from 0.
+  const seeded1 = useRef(false);
+  const seeded2 = useRef(false);
 
   const [roundStart, setRoundStart] = useState<number | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(ROUND_SECONDS);
@@ -84,6 +89,18 @@ export default function Page() {
     },
     [getLivePrice],
   );
+
+  useEffect(() => {
+    if (price === null) return;
+    if (!seeded1.current && input1 === "") setInput1(price.toFixed(2));
+    seeded1.current = true;
+  }, [price, input1]);
+
+  useEffect(() => {
+    if (price === null) return;
+    if (!seeded2.current && input2 === "") setInput2(price.toFixed(2));
+    seeded2.current = true;
+  }, [price, input2]);
 
   // Run the countdown off a fixed deadline so it stays accurate.
   useEffect(() => {
@@ -141,6 +158,16 @@ export default function Page() {
     setOutcome(null);
     setSettleError(false);
     setFrozenPoints(null);
+    seeded1.current = false;
+    seeded2.current = false;
+  };
+
+  const nudge = (player: 1 | 2, pct: number) => {
+    if (price === null || (player === 1 ? locked1 : locked2) !== null) return;
+    const setInput = player === 1 ? setInput1 : setInput2;
+    const current = Number(player === 1 ? input1 : input2);
+    const base = Number.isFinite(current) && current > 0 ? current : price;
+    setInput((base * (1 + pct)).toFixed(2));
   };
 
   const headlinePrice = outcome ? outcome.finalPrice : price;
@@ -223,6 +250,7 @@ export default function Page() {
           predictions={predictionLines}
           roundStart={roundStart}
           frozen={frozenPoints !== null}
+          now={now}
         />
       </section>
 
@@ -269,6 +297,27 @@ export default function Page() {
                 placeholder={price !== null ? price.toFixed(2) : "0.00"}
                 className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-lg tabular-nums outline-none focus:border-neutral-900 disabled:bg-neutral-100 disabled:text-neutral-500"
               />
+
+              {locked === null && (
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => nudge(player, -0.001)}
+                    disabled={price === null}
+                    className="rounded-md border border-neutral-300 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-100 disabled:opacity-50"
+                  >
+                    -0.1%
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => nudge(player, 0.001)}
+                    disabled={price === null}
+                    className="rounded-md border border-neutral-300 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-100 disabled:opacity-50"
+                  >
+                    +0.1%
+                  </button>
+                </div>
+              )}
 
               {locked === null ? (
                 <button
