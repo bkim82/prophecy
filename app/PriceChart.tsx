@@ -36,8 +36,8 @@ const PAD = { top: 20, right: 78, bottom: 44, left: 12 };
 const INNER_W = W - PAD.left - PAD.right;
 const INNER_H = H - PAD.top - PAD.bottom;
 
-const UP = "#10b981";
-const DOWN = "#f43f5e";
+const UP = "#91b7d8";
+const DOWN = "#a4adb9";
 
 const MIN_LABEL_GAP = 42; // px between clock labels before thinning
 
@@ -111,7 +111,7 @@ export default function PriceChart({
 
   if (visible.length < 2) {
     return (
-      <div className="flex h-[400px] items-center justify-center rounded-xl border border-neutral-200 bg-white text-sm text-neutral-400">
+      <div className="flex h-[400px] items-center justify-center rounded-xl border border-[#2b3b4d] bg-[#131e2a] text-sm text-[#718195]">
         Waiting for price data…
       </div>
     );
@@ -164,7 +164,7 @@ export default function PriceChart({
   const bandX = bandVisible ? x(Math.max(roundStart, t0)) : 0;
 
   return (
-    <div className="rounded-xl border border-neutral-200 bg-white p-2">
+    <div className="rounded-xl border border-[#2b3b4d] bg-[#131e2a] p-2">
       <svg
         viewBox={`0 0 ${W} ${H}`}
         className="h-auto w-full"
@@ -186,12 +186,12 @@ export default function PriceChart({
               x2={PAD.left + INNER_W}
               y1={y(value)}
               y2={y(value)}
-              stroke="#f1f1f1"
+              stroke="#263646"
             />
             <text
               x={PAD.left + INNER_W + 8}
               y={y(value) + 4}
-              fill="#a3a3a3"
+              fill="#8493a3"
               fontSize="12"
             >
               {axisLabel(value, visibleSpan)}
@@ -205,7 +205,7 @@ export default function PriceChart({
           x2={PAD.left + INNER_W}
           y1={baseline}
           y2={baseline}
-          stroke="#e5e5e5"
+          stroke="#344658"
         />
         {ticks.map((t) => {
           const tx = x(t);
@@ -219,7 +219,7 @@ export default function PriceChart({
                   x2={tx}
                   y1={PAD.top}
                   y2={baseline}
-                  stroke="#f7f7f7"
+                  stroke="#263646"
                 />
               )}
               <line
@@ -227,13 +227,13 @@ export default function PriceChart({
                 x2={tx}
                 y1={baseline}
                 y2={baseline + (labelled ? 8 : 5)}
-                stroke={labelled ? "#a3a3a3" : "#d4d4d4"}
+                stroke={labelled ? "#8493a3" : "#506173"}
               />
               {labelled && (
                 <text
                   x={tx}
                   y={baseline + 21}
-                  fill="#a3a3a3"
+                  fill="#8493a3"
                   fontSize="10"
                   textAnchor="middle"
                 >
@@ -252,8 +252,8 @@ export default function PriceChart({
               y={PAD.top}
               width={Math.max(0, PAD.left + INNER_W - bandX)}
               height={INNER_H}
-              fill="#6366f1"
-              fillOpacity="0.05"
+              fill="#6e89a4"
+              fillOpacity="0.08"
             />
             {/* Only once the start itself is in view, and only if a lock marker
                 isn't already drawing that same edge. */}
@@ -266,14 +266,14 @@ export default function PriceChart({
                   x2={bandX}
                   y1={PAD.top}
                   y2={baseline}
-                  stroke="#a5b4fc"
+                  stroke="#7897b6"
                   strokeDasharray="3 3"
                 />
               )}
             <text
               x={PAD.left + INNER_W - 4}
               y={PAD.top + 12}
-              fill="#818cf8"
+              fill="#9ab5cf"
               fontSize="11"
               textAnchor="end"
             >
@@ -392,7 +392,7 @@ export default function PriceChart({
           <text
             x={PAD.left + INNER_W}
             y={PAD.top - 7}
-            fill="#a3a3a3"
+            fill="#8493a3"
             fontSize="11"
             textAnchor="end"
           >

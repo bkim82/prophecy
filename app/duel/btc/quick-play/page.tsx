@@ -7,8 +7,8 @@ import { usePriceFeed, type PricePoint } from "../../../usePriceFeed";
 
 const ROUND_SECONDS = 60;
 
-const P1_COLOR = "#2563eb";
-const P2_COLOR = "#d97706";
+const P1_COLOR = "#8eafd0";
+const P2_COLOR = "#9caaba";
 
 type Phase = "predict" | "countdown" | "settling" | "result";
 
@@ -186,47 +186,47 @@ export default function Page() {
     <main className="mx-auto max-w-4xl px-4 py-10">
       <Link
         href="/"
-        className="text-xs uppercase tracking-wider text-neutral-500 hover:text-neutral-900"
+        className="text-xs uppercase tracking-wider text-[#718195] transition hover:text-[#b7c8d9]"
       >
         ← Menu
       </Link>
 
-      <h1 className="mt-4 text-center text-sm font-medium uppercase tracking-[0.2em] text-neutral-500">
+      <h1 className="mt-4 text-center text-sm font-medium uppercase tracking-[0.2em] text-[#8291a2]">
         BTC Duel · Quick Play
       </h1>
 
       {/* BTC price + countdown, centered */}
       <section className="mt-6 text-center">
         <div className="flex items-center justify-center gap-2">
-          <p className="text-xs uppercase tracking-wider text-neutral-500">
+          <p className="text-xs uppercase tracking-wider text-[#8291a2]">
             {outcome ? "Final BTC / USD" : "BTC / USD"}
           </p>
           {!outcome && (
-            <span className="flex items-center gap-1.5 text-xs text-neutral-400">
+            <span className="flex items-center gap-1.5 text-xs text-[#8291a2]">
               <span
                 className={`h-1.5 w-1.5 rounded-full ${
                   status === "live"
-                    ? "animate-pulse bg-emerald-500"
-                    : "bg-amber-500"
+                    ? "animate-pulse bg-[#8ba9c7]"
+                    : "bg-[#8794a3]"
                 }`}
               />
               {status === "live" ? "live" : status}
             </span>
           )}
         </div>
-        <p className="mt-1 text-5xl font-semibold tabular-nums">
+        <p className="mt-1 text-5xl font-semibold tabular-nums text-[#e7edf4]">
           {headlinePrice === null ? "Loading…" : usd(headlinePrice)}
         </p>
 
         <div className="mt-4 flex min-h-16 flex-col items-center justify-center">
           {phase === "predict" && (
-            <p className="text-sm text-neutral-500">
+            <p className="text-sm text-[#8291a2]">
               Both players lock a prediction to start the 60-second round.
             </p>
           )}
           {phase === "countdown" && (
             <>
-              <p className="text-xs uppercase tracking-wider text-neutral-500">
+              <p className="text-xs uppercase tracking-wider text-[#8291a2]">
                 Time left
               </p>
               <p className="text-4xl font-semibold tabular-nums">
@@ -235,7 +235,7 @@ export default function Page() {
             </>
           )}
           {phase === "settling" && (
-            <p className="text-sm text-neutral-600">
+            <p className="text-sm text-[#8291a2]">
               {settleError
                 ? "Could not fetch the final price."
                 : "Fetching final price…"}
@@ -244,7 +244,7 @@ export default function Page() {
           {settleError && locked1 !== null && locked2 !== null && (
             <button
               onClick={() => settle(locked1, locked2)}
-              className="mt-2 rounded-md border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-100"
+              className="mt-2 rounded-md border border-[#3b4c5f] bg-[#152231] px-3 py-1.5 text-sm text-[#c3d0dc] transition hover:border-[#6e89a4] hover:bg-[#1a2b3d]"
             >
               Retry
             </button>
@@ -274,13 +274,13 @@ export default function Page() {
           return (
             <div
               key={player}
-              className={`rounded-xl border bg-white p-5 ${
+              className={`rounded-xl border bg-[#131e2a] p-5 ${
                 isWinner
-                  ? "border-green-500 ring-1 ring-green-500"
-                  : "border-neutral-200"
+                  ? "border-[#8eafd0] ring-1 ring-[#8eafd0]"
+                  : "border-[#2b3b4d]"
               }`}
             >
-              <h2 className="flex items-center gap-2 font-medium">
+              <h2 className="flex items-center gap-2 font-medium text-[#d7e1eb]">
                 <span
                   className="h-2.5 w-2.5 rounded-full"
                   style={{ backgroundColor: color }}
@@ -288,7 +288,7 @@ export default function Page() {
                 Player {player}
               </h2>
 
-              <label className="mt-4 block text-xs uppercase tracking-wider text-neutral-500">
+              <label className="mt-4 block text-xs uppercase tracking-wider text-[#8291a2]">
                 Prediction after 60s (USD)
               </label>
               <input
@@ -303,7 +303,7 @@ export default function Page() {
                 }}
                 disabled={locked !== null}
                 placeholder={price !== null ? price.toFixed(2) : "0.00"}
-                className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-lg tabular-nums outline-none focus:border-neutral-900 disabled:bg-neutral-100 disabled:text-neutral-500"
+                className="mt-1 w-full rounded-md border border-[#3a4b5e] bg-[#0d1722] px-3 py-2 text-lg text-[#e7edf4] tabular-nums outline-none transition placeholder:text-[#536375] focus:border-[#86a5c4] disabled:bg-[#1a2735] disabled:text-[#718195]"
               />
 
               {locked === null && (
@@ -312,7 +312,7 @@ export default function Page() {
                     type="button"
                     onClick={() => nudge(player, -0.001)}
                     disabled={price === null}
-                    className="rounded-md border border-neutral-300 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-100 disabled:opacity-50"
+                    className="rounded-md border border-[#3a4b5e] py-1 text-xs font-medium text-[#9cabb9] transition hover:border-[#6e89a4] hover:bg-[#1a2b3d] disabled:opacity-50"
                   >
                     -0.1%
                   </button>
@@ -320,7 +320,7 @@ export default function Page() {
                     type="button"
                     onClick={() => nudge(player, 0.001)}
                     disabled={price === null}
-                    className="rounded-md border border-neutral-300 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-100 disabled:opacity-50"
+                    className="rounded-md border border-[#3a4b5e] py-1 text-xs font-medium text-[#9cabb9] transition hover:border-[#6e89a4] hover:bg-[#1a2b3d] disabled:opacity-50"
                   >
                     +0.1%
                   </button>
@@ -331,26 +331,26 @@ export default function Page() {
                 <button
                   onClick={() => lock(player)}
                   disabled={!(Number(input) > 0)}
-                  className="mt-3 w-full rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-700 disabled:bg-neutral-300"
+                  className="mt-3 w-full rounded-md bg-[#334c65] px-3 py-2 text-sm font-medium text-[#edf4fa] transition hover:bg-[#405f7c] disabled:bg-[#293746] disabled:text-[#657486]"
                 >
                   Lock Prediction
                 </button>
               ) : (
-                <p className="mt-3 py-2 text-center text-sm font-medium text-green-700">
+                <p className="mt-3 py-2 text-center text-sm font-medium text-[#a9c4dd]">
                   Locked at {usd(locked)}
                 </p>
               )}
 
               {outcome !== null && (
-                <dl className="mt-4 space-y-1 border-t border-neutral-200 pt-4 text-sm">
+                <dl className="mt-4 space-y-1 border-t border-[#2b3b4d] pt-4 text-sm">
                   <div className="flex justify-between">
-                    <dt className="text-neutral-500">Prediction</dt>
+                    <dt className="text-[#8291a2]">Prediction</dt>
                     <dd className="tabular-nums">
                       {usd(player === 1 ? outcome.p1 : outcome.p2)}
                     </dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt className="text-neutral-500">Off by</dt>
+                    <dt className="text-[#8291a2]">Off by</dt>
                     <dd className="tabular-nums">
                       {usd(player === 1 ? outcome.diff1 : outcome.diff2)}
                     </dd>
@@ -364,8 +364,8 @@ export default function Page() {
 
       {/* Result */}
       {outcome !== null && (
-        <section className="mt-6 rounded-xl border border-neutral-200 bg-white p-6 text-center">
-          <p className="text-xs uppercase tracking-wider text-neutral-500">
+        <section className="mt-6 rounded-xl border border-[#2b3b4d] bg-[#131e2a] p-6 text-center">
+          <p className="text-xs uppercase tracking-wider text-[#8291a2]">
             Winner
           </p>
           <p className="mt-1 text-2xl font-semibold">
@@ -373,13 +373,13 @@ export default function Page() {
               ? "Tie — identical predictions"
               : `Player ${outcome.winner}`}
           </p>
-          <p className="mt-2 text-sm text-neutral-500">
+          <p className="mt-2 text-sm text-[#8291a2]">
             Final price {usd(outcome.finalPrice)} · P1 off by{" "}
             {usd(outcome.diff1)} · P2 off by {usd(outcome.diff2)}
           </p>
           <button
             onClick={playAgain}
-            className="mt-5 rounded-md bg-neutral-900 px-5 py-2 text-sm font-medium text-white hover:bg-neutral-700"
+            className="mt-5 rounded-md bg-[#334c65] px-5 py-2 text-sm font-medium text-[#edf4fa] transition hover:bg-[#405f7c]"
           >
             Play Again
           </button>
