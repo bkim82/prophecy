@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "BTC Duel",
-  description: "1v1 Bitcoin price prediction duel",
+  title: "Duel Menu",
+  description: "Pick a duel type and mode",
 };
 
 export default function RootLayout({

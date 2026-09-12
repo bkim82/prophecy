@@ -6,6 +6,9 @@ Deliberate gaps in a prototype scoped to the core loop. Not bugs.
 
 | Gap | Detail |
 | --- | --- |
+| Pulse Mode | Menu placeholder only (`app/page.tsx` `MODES`, no `href`) — rapid-fire back-to-back rounds, no implementation |
+| 24hr Battle | Menu placeholder only (`app/page.tsx` `MODES`, no `href`) — single prediction settled a day later, no implementation |
+| ETH Duel | Menu placeholder only (`app/page.tsx` `DUEL_TYPES`) — no price feed, routes, or settlement |
 | Same-browser 2P | Both predictions typed on one keyboard — no hidden input/commit step, either player sees the other's guess pre-lock |
 | No networking | No room/matchmaking/2nd client. Real multiplayer needs server-held round state — currently `/api/price`, `/api/history` are stateless proxies by design |
 | No persistence | Reload loses everything. No cross-round score/history/identity |
