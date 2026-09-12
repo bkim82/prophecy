@@ -48,7 +48,7 @@ server-side. There is no loop back: "play again" is a new row, not a reset.
 - Writes under `status='predict' AND prediction{N} IS NULL` (`:46-60`). 0 rows back = already locked; re-read and return the current view rather than erroring (`:63-69`).
 - The countdown transition is a *second* guarded update, run only by the request that sees both predictions non-null (`:71-80`) — so `roundStartAt` is stamped exactly once however the two locks interleave.
 - One `now` per request feeds both `lockedAt{N}` and `roundStartAt` (`:45`), so the 2nd lock's chart marker sits exactly on the round-band edge.
-- Either player may lock first, order irrelevant. Once both are locked, the room shows compact cards with only each player's stored price (`app/duel/[market]/match/[matchId]/page.tsx:238`,`:364-490`). Before then, the input is enabled only for an unlocked player. Enter key = lock (`app/duel/[market]/match/[matchId]/page.tsx:404-406`).
+- Either player may lock first, order irrelevant. Once both are locked, the room shows compact cards with each player's stored price plus call, absolute error, and percentage error metrics (`app/duel/[market]/match/[matchId]/page.tsx:238`,`:364-490`). Before then, the input is enabled only for an unlocked player. Enter key = lock (`app/duel/[market]/match/[matchId]/page.tsx:404-406`).
 - `lockedAt{1,2}` → `PredictionLine.at` after skew correction → vertical lock markers (`app/duel/[market]/match/[matchId]/page.tsx:188-209`, see chart.md). Both lines are drawn from `countdown` on, since the server stops withholding the opponent's there (`lib/match.ts:181`).
 
 ## Countdown

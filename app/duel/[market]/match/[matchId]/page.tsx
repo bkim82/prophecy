@@ -255,6 +255,18 @@ export default function Page({
     yourPrediction !== null &&
     view?.opponentPrediction !== null;
 
+  const metricFor = (prediction: number) => {
+    if (!outcome) {
+      return { call: "—", offBy: "—", error: "—" };
+    }
+    const offBy = Math.abs(outcome.finalPrice - prediction);
+    return {
+      call: prediction >= outcome.finalPrice ? "Above" : "Below",
+      offBy: usd(offBy),
+      error: `${((offBy / outcome.finalPrice) * 100).toFixed(2)}%`,
+    };
+  };
+
   if (gone) {
     return (
       <main className="mx-auto max-w-4xl px-4 py-10 text-center">
@@ -384,18 +396,34 @@ export default function Page({
           }`}
         >
           {compactCards ? (
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="flex items-center gap-2 text-sm font-medium text-[var(--text)]">
-                <span
-                  className="h-2.5 w-2.5 rounded-full"
-                  style={{ backgroundColor: YOU_COLOR }}
-                />
-                You
-              </h2>
-              <p className="text-lg font-semibold tabular-nums text-[var(--text)]">
-                {usd(yourPrediction)}
-              </p>
-            </div>
+            <>
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="flex items-center gap-2 text-sm font-medium text-[var(--text)]">
+                  <span
+                    className="h-2.5 w-2.5 rounded-full"
+                    style={{ backgroundColor: YOU_COLOR }}
+                  />
+                  You
+                </h2>
+                <p className="text-lg font-semibold tabular-nums text-[var(--text)]">
+                  {usd(yourPrediction)}
+                </p>
+              </div>
+              <dl className="mt-3 grid grid-cols-3 gap-2 border-t border-[var(--line)] pt-3 text-xs">
+                <div>
+                  <dt className="text-[var(--muted)]">Call</dt>
+                  <dd className="mt-1 font-medium text-[var(--text)]">{metricFor(yourPrediction).call}</dd>
+                </div>
+                <div>
+                  <dt className="text-[var(--muted)]">Off by</dt>
+                  <dd className="mt-1 font-medium tabular-nums text-[var(--text)]">{metricFor(yourPrediction).offBy}</dd>
+                </div>
+                <div>
+                  <dt className="text-[var(--muted)]">Error</dt>
+                  <dd className="mt-1 font-medium tabular-nums text-[var(--text)]">{metricFor(yourPrediction).error}</dd>
+                </div>
+              </dl>
+            </>
           ) : (
             <>
               <h2 className="flex items-center gap-2 font-medium text-[var(--text)]">
@@ -492,20 +520,38 @@ export default function Page({
           }`}
         >
           {compactCards ? (
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="flex items-center gap-2 text-sm font-medium text-[var(--text)]">
-                <span
-                  className="h-2.5 w-2.5 rounded-full"
-                  style={{ backgroundColor: OPP_COLOR }}
-                />
-                Opponent
-              </h2>
-              <p className="text-lg font-semibold tabular-nums text-[var(--text)]">
-                {view?.opponentPrediction !== null && view?.opponentPrediction !== undefined
-                  ? usd(view.opponentPrediction)
-                  : "—"}
-              </p>
-            </div>
+            <>
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="flex items-center gap-2 text-sm font-medium text-[var(--text)]">
+                  <span
+                    className="h-2.5 w-2.5 rounded-full"
+                    style={{ backgroundColor: OPP_COLOR }}
+                  />
+                  Opponent
+                </h2>
+                <p className="text-lg font-semibold tabular-nums text-[var(--text)]">
+                  {view?.opponentPrediction !== null && view?.opponentPrediction !== undefined
+                    ? usd(view.opponentPrediction)
+                    : "—"}
+                </p>
+              </div>
+              {view?.opponentPrediction !== null && view?.opponentPrediction !== undefined && (
+                <dl className="mt-3 grid grid-cols-3 gap-2 border-t border-[var(--line)] pt-3 text-xs">
+                  <div>
+                    <dt className="text-[var(--muted)]">Call</dt>
+                    <dd className="mt-1 font-medium text-[var(--text)]">{metricFor(view.opponentPrediction).call}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-[var(--muted)]">Off by</dt>
+                    <dd className="mt-1 font-medium tabular-nums text-[var(--text)]">{metricFor(view.opponentPrediction).offBy}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-[var(--muted)]">Error</dt>
+                    <dd className="mt-1 font-medium tabular-nums text-[var(--text)]">{metricFor(view.opponentPrediction).error}</dd>
+                  </div>
+                </dl>
+              )}
+            </>
           ) : (
             <>
               <h2 className="flex items-center justify-between font-medium text-[var(--text)]">
