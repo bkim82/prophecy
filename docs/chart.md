@@ -4,7 +4,9 @@
 
 ## Geometry
 
-- `viewBox` 880×400, scaled via CSS `h-auto w-full` (`:38-39`, `:277-278`) — resolution-independent; DOM measurement is used only to route wheel events between axes.
+- At rendered widths â‰¤560px, the chart switches to a 520Ã—440 viewBox with expanded padding and label sizes (`app/PriceChart.tsx:140-162`, `:308-321`) so the full chart remains visible without shrinking mobile text to desktop scale.
+
+- Desktop `viewBox` is 880×400 and scales via CSS `h-auto w-full`; compact mode uses 520×440 (`app/PriceChart.tsx:156-162`, `:308-309`) — resolution-independent; DOM measurement is used only to route wheel events between axes.
 - `PAD` top 20 / right 78 / bottom 44 / left 12 (`:40`). Right reserves price-label space; bottom reserves the time axis (ticks + clock labels).
 - `x()` maps ts→horizontal over the **fixed window**, not the data extent; `y()` maps price→vertical (`:228-229`).
 

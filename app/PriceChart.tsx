@@ -46,8 +46,6 @@ type Props = {
 const W = 880;
 const H = 400;
 const PAD = { top: 20, right: 78, bottom: 44, left: 12 };
-const INNER_W = W - PAD.left - PAD.right;
-const INNER_H = H - PAD.top - PAD.bottom;
 
 const UP = "var(--chart-up)";
 const DOWN = "var(--chart-down)";
@@ -137,7 +135,29 @@ export default function PriceChart({
   // every caller. Time and price remain independent axes.
   const [zoomMs, setZoomMs] = useState(windowMs);
   const [priceScale, setPriceScale] = useState(1);
+  const [isCompact, setIsCompact] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // A fixed desktop viewBox makes SVG text shrink to a few pixels on phones.
+  // Use a narrower, taller coordinate system at the actual rendered width.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+
+    const update = () => setIsCompact(el.clientWidth <= 560);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  const chartWidth = isCompact ? 520 : W;
+  const chartHeight = isCompact ? 440 : H;
+  const chartPad = isCompact
+    ? { top: 28, right: 92, bottom: 62, left: 18 }
+    : PAD;
+  const chartInnerWidth = chartWidth - chartPad.left - chartPad.right;
+  const chartInnerHeight = chartHeight - chartPad.top - chartPad.bottom;
 
   // Derived rather than corrected in an effect, so a windowMs change takes
   // effect on the same frame it arrives.
@@ -172,7 +192,7 @@ export default function PriceChart({
       const svg = el.querySelector("svg");
       const svgRect = svg?.getBoundingClientRect();
       const plotRight = svgRect
-        ? svgRect.left + ((PAD.left + INNER_W) / W) * svgRect.width
+        ? svgRect.left + ((chartPad.left + chartInnerWidth) / chartWidth) * svgRect.width
         : Infinity;
 
       // The right gutter is the price axis. Scrolling there changes only the
@@ -214,7 +234,7 @@ export default function PriceChart({
     return (
       <div
         ref={containerRef}
-        className="flex h-[400px] items-center justify-center rounded-xl border border-[var(--line)] bg-[var(--surface)] text-sm text-[var(--muted-dim)]"
+        className="flex h-[clamp(280px,75vw,400px)] items-center justify-center rounded-xl border border-[var(--line)] bg-[var(--surface)] text-sm text-[var(--muted-dim)]"
       >
         Waiting for price data…
       </div>
@@ -234,11 +254,11 @@ export default function PriceChart({
   const low = midpoint - visibleSpan / 2;
   const high = midpoint + visibleSpan / 2;
 
-  const x = (t: number) => PAD.left + ((t - t0) / viewMs) * INNER_W;
-  const y = (p: number) => PAD.top + ((high - p) / visibleSpan) * INNER_H;
+  const x = (t: number) => chartPad.left + ((t - t0) / viewMs) * chartInnerWidth;
+  const y = (p: number) => chartPad.top + ((high - p) / visibleSpan) * chartInnerHeight;
 
   const line = visible.map((pt) => `${x(pt.t)},${y(pt.p)}`).join(" ");
-  const baseline = PAD.top + INNER_H;
+  const baseline = chartPad.top + chartInnerHeight;
   const last = visible[visible.length - 1];
   // Keep coincident prediction levels legible. Two players can intentionally
   // choose the same price, so a shared y coordinate would hide whichever line
@@ -279,7 +299,7 @@ export default function PriceChart({
   }
   // A tighter xIntervals would collide the clock labels, so thin them to
   // whatever multiple of the major step still fits.
-  const pxPerMajor = (majorMs / viewMs) * INNER_W;
+  const pxPerMajor = (majorMs / viewMs) * chartInnerWidth;
   const labelEvery =
     majorMs * Math.max(1, Math.ceil(MIN_LABEL_GAP / Math.max(1, pxPerMajor)));
 
@@ -299,7 +319,7 @@ export default function PriceChart({
       className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-2"
     >
       <svg
-        viewBox={`0 0 ${W} ${H}`}
+        viewBox={`0 0 ${chartWidth} ${chartHeight}`}
         className="h-auto w-full"
         role="img"
         aria-label={`BTC/USD price, last ${spanLabel(viewMs)}, price scale ${priceScale.toFixed(1)} times fitted range`}
@@ -312,7 +332,7 @@ export default function PriceChart({
         </defs>
 
         {/* Zoom levels, in the strip above the plot opposite `settled` */}
-        <text x={PAD.left} y={PAD.top - 7} fill="var(--muted)" fontSize="11">
+        <text x={chartPad.left} y={chartPad.top - 9} fill="var(--muted)" fontSize={isCompact ? 14 : 11}>
           {spanLabel(viewMs)} · price{" "}
           {priceScale === 1 ? "auto" : `${priceScale.toFixed(1)}×`}
         </text>
@@ -321,17 +341,17 @@ export default function PriceChart({
         {gridValues.map((value, i) => (
           <g key={i}>
             <line
-              x1={PAD.left}
-              x2={PAD.left + INNER_W}
+              x1={chartPad.left}
+              x2={chartPad.left + chartInnerWidth}
               y1={y(value)}
               y2={y(value)}
               stroke="var(--chart-grid)"
             />
             <text
-              x={PAD.left + INNER_W + 8}
+              x={chartPad.left + chartInnerWidth + 8}
               y={y(value) + 4}
               fill="var(--muted)"
-              fontSize="12"
+              fontSize={isCompact ? 14 : 12}
             >
               {axisLabel(value, visibleSpan)}
             </text>
@@ -340,8 +360,8 @@ export default function PriceChart({
 
         {/* Time axis: a minor mark per subdivision, a clock time per major tick */}
         <line
-          x1={PAD.left}
-          x2={PAD.left + INNER_W}
+          x1={chartPad.left}
+          x2={chartPad.left + chartInnerWidth}
           y1={baseline}
           y2={baseline}
           stroke="var(--chart-axis)"
@@ -356,7 +376,7 @@ export default function PriceChart({
                 <line
                   x1={tx}
                   x2={tx}
-                  y1={PAD.top}
+                  y1={chartPad.top}
                   y2={baseline}
                   stroke="var(--chart-grid)"
                 />
@@ -365,15 +385,15 @@ export default function PriceChart({
                 x1={tx}
                 x2={tx}
                 y1={baseline}
-                y2={baseline + (labelled ? 8 : 5)}
+                y2={baseline + (labelled ? 10 : 6)}
                 stroke={labelled ? "var(--muted)" : "var(--line-strong)"}
               />
               {labelled && (
                 <text
                   x={tx}
-                  y={baseline + 21}
+                  y={baseline + 27}
                   fill="var(--muted)"
-                  fontSize="10"
+                  fontSize={isCompact ? 13 : 10}
                   textAnchor="middle"
                 >
                   {clockLabel(t)}
@@ -388,9 +408,9 @@ export default function PriceChart({
           <>
             <rect
               x={bandX}
-              y={PAD.top}
-              width={Math.max(0, PAD.left + INNER_W - bandX)}
-              height={INNER_H}
+              y={chartPad.top}
+              width={Math.max(0, chartPad.left + chartInnerWidth - bandX)}
+              height={chartInnerHeight}
               fill="var(--line-strong)"
               fillOpacity="0.08"
             />
@@ -403,17 +423,17 @@ export default function PriceChart({
                 <line
                   x1={bandX}
                   x2={bandX}
-                  y1={PAD.top}
+                  y1={chartPad.top}
                   y2={baseline}
                   stroke="var(--accent)"
                   strokeDasharray="3 3"
                 />
               )}
             <text
-              x={PAD.left + INNER_W - 4}
-              y={PAD.top + 12}
+              x={chartPad.left + chartInnerWidth - 4}
+              y={chartPad.top + 15}
               fill="var(--accent-strong)"
-              fontSize="11"
+              fontSize={isCompact ? 14 : 11}
               textAnchor="end"
             >
               round
@@ -437,17 +457,17 @@ export default function PriceChart({
           if (prediction.at < t0 || prediction.at > t1) return null;
           const lx = x(prediction.at);
           // Locks seconds apart would stack their chips, so offset by slot.
-          const chipY = PAD.top + 3 + i * 19;
-          const chipW = 62;
+          const chipY = chartPad.top + 4 + i * (isCompact ? 23 : 19);
+          const chipW = isCompact ? 78 : 62;
           // Near the right edge, flip the chip to the left of the line.
-          const flip = lx + 2 + chipW > PAD.left + INNER_W;
+          const flip = lx + 2 + chipW > chartPad.left + chartInnerWidth;
           const chipX = flip ? lx - 2 - chipW : lx + 2;
           return (
             <g key={`${prediction.label}-at`}>
               <line
                 x1={lx}
                 x2={lx}
-                y1={PAD.top}
+                y1={chartPad.top}
                 y2={baseline}
                 stroke={prediction.color}
                 strokeWidth="1.5"
@@ -458,16 +478,16 @@ export default function PriceChart({
                 x={chipX}
                 y={chipY}
                 width={chipW}
-                height={16}
+                height={isCompact ? 20 : 16}
                 rx="3"
                 fill={prediction.color}
                 fillOpacity="0.12"
               />
               <text
                 x={chipX + 5}
-                y={chipY + 12}
+                y={chipY + (isCompact ? 15 : 12)}
                 fill={prediction.color}
-                fontSize="11"
+                fontSize={isCompact ? 13 : 11}
                 fontWeight="600"
               >
                 {prediction.label} locked
@@ -482,7 +502,7 @@ export default function PriceChart({
           const py = inView
             ? y(prediction.value)
             : prediction.value > high
-              ? PAD.top + 6
+              ? chartPad.top + 6
               : baseline - 6;
           const slot = predictionSlots[i];
           const levelY = py + slot.offset;
@@ -490,8 +510,8 @@ export default function PriceChart({
             <g key={prediction.label}>
               {inView && (
                 <line
-                  x1={PAD.left}
-                  x2={PAD.left + INNER_W}
+                  x1={chartPad.left}
+                  x2={chartPad.left + chartInnerWidth}
                   y1={levelY}
                   y2={levelY}
                   stroke={prediction.color}
@@ -500,10 +520,10 @@ export default function PriceChart({
                 />
               )}
               <text
-                x={PAD.left + 4}
+                x={chartPad.left + 6}
                 y={py - 5 + slot.labelOffset}
                 fill={prediction.color}
-                fontSize="12"
+                fontSize={isCompact ? 14 : 12}
                 fontWeight="500"
               >
                 {prediction.label}
@@ -570,10 +590,10 @@ export default function PriceChart({
 
         {frozen && (
           <text
-            x={PAD.left + INNER_W}
-            y={PAD.top - 7}
+            x={chartPad.left + chartInnerWidth}
+            y={chartPad.top - 9}
             fill="var(--muted)"
-            fontSize="11"
+            fontSize={isCompact ? 14 : 11}
             textAnchor="end"
           >
             settled
@@ -583,10 +603,10 @@ export default function PriceChart({
         {/* A transparent hit area gives the price-axis gesture a visual cursor
             and a focused tooltip without obscuring its labels. */}
         <rect
-          x={PAD.left + INNER_W}
+          x={chartPad.left + chartInnerWidth}
           y={0}
-          width={PAD.right}
-          height={H}
+          width={chartPad.right}
+          height={chartHeight}
           fill="transparent"
           style={{ cursor: "ns-resize" }}
         >
