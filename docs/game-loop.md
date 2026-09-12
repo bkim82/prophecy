@@ -75,8 +75,9 @@ Ties only occur on exact-match input (abs diff, floats) (`lib/match.ts:136`) —
 
 Multiplayer Pulse uses the same new-row play-again flow. Both players enter a
 server-priced long/short position during `predict`; `POST /api/match/[id]/action`
-guards close/reverse mutations during `countdown`, and `settleIfDue` compares
-the two final leveraged P&Ls at the server settlement price.
+guards close/reverse mutations during `countdown`, and `settleIfDue` closes
+remaining positions, realizes their P&L, then compares the two final leveraged
+P&Ls at the server settlement price.
 
 Multiplayer Pulse allows unlimited long/short entries during `countdown`. Each
 entry is an independent position; closing one realizes its P&L without changing

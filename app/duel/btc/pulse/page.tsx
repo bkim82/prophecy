@@ -169,6 +169,24 @@ export default function Page() {
         : 0;
       const profit = realizedPnlRef.current + openPnl;
       const finalValue = Math.max(0, bankrollRef.current + profit);
+      const openPosition = positionRef.current;
+      if (openPosition) {
+        setClosedPosition({
+          side: openPosition.side,
+          entryPrice: openPosition.entryPrice,
+          exitPrice: finalPrice,
+          pnl: openPnl,
+        });
+        addTrade({
+          t: Date.now(),
+          side: openPosition.side,
+          action: "exit",
+          price: finalPrice,
+          amount: openPosition.stake,
+        });
+      }
+      positionRef.current = null;
+      setPosition(null);
       bankrollRef.current = finalValue;
       setBankroll(finalValue);
       setFrozenPoints([...pointsRef.current, { t: Date.now(), p: finalPrice }]);

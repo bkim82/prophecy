@@ -240,6 +240,22 @@ export default function PriceChart({
   const line = visible.map((pt) => `${x(pt.t)},${y(pt.p)}`).join(" ");
   const baseline = PAD.top + INNER_H;
   const last = visible[visible.length - 1];
+  // Keep coincident prediction levels legible. Two players can intentionally
+  // choose the same price, so a shared y coordinate would hide whichever line
+  // is rendered first. Center the lines around the true level and stack their
+  // labels so the chart still communicates both predictions.
+  const predictionSlots = predictions.map((prediction, index) => {
+    const peerCount = predictions.filter(
+      (peer) => peer.value === prediction.value,
+    ).length;
+    const slot = predictions
+      .slice(0, index)
+      .filter((peer) => peer.value === prediction.value).length;
+    return {
+      offset: peerCount > 1 ? (slot - (peerCount - 1) / 2) * 4 : 0,
+      labelOffset: peerCount > 1 ? slot * 14 : 0,
+    };
+  });
   const area = `M ${x(visible[0].t)},${baseline} L ${line.replaceAll(
     " ",
     " L ",
@@ -461,21 +477,23 @@ export default function PriceChart({
         })}
 
         {/* Prediction levels: a dashed line when in view, an edge chip when not */}
-        {predictions.map((prediction) => {
+        {predictions.map((prediction, i) => {
           const inView = prediction.value >= low && prediction.value <= high;
           const py = inView
             ? y(prediction.value)
             : prediction.value > high
               ? PAD.top + 6
               : baseline - 6;
+          const slot = predictionSlots[i];
+          const levelY = py + slot.offset;
           return (
             <g key={prediction.label}>
               {inView && (
                 <line
                   x1={PAD.left}
                   x2={PAD.left + INNER_W}
-                  y1={py}
-                  y2={py}
+                  y1={levelY}
+                  y2={levelY}
                   stroke={prediction.color}
                   strokeWidth="1.5"
                   strokeDasharray="5 4"
@@ -483,7 +501,7 @@ export default function PriceChart({
               )}
               <text
                 x={PAD.left + 4}
-                y={py - 5}
+                y={py - 5 + slot.labelOffset}
                 fill={prediction.color}
                 fontSize="12"
                 fontWeight="500"

@@ -157,6 +157,9 @@ export async function settleIfDue(row: MatchRow): Promise<MatchRow> {
   if (row.mode === "pulse") {
     const positions1 = pulsePositionsFor(row, 1);
     const positions2 = pulsePositionsFor(row, 2);
+    // Treat the round deadline as a market close for every remaining
+    // position. Clearing the arrays releases their reserved stakes, while
+    // carrying the final P&L into realized keeps the balance settled.
     const profit1 = pulseRealizedFor(row, 1) + pulsePositionsPnl(positions1, spot.price);
     const profit2 = pulseRealizedFor(row, 2) + pulsePositionsPnl(positions2, spot.price);
     const winner = profit1 === profit2 ? "tie" : profit1 > profit2 ? "1" : "2";
@@ -166,6 +169,10 @@ export async function settleIfDue(row: MatchRow): Promise<MatchRow> {
         status: "settled",
         finalPrice: spot.price,
         winner,
+        pulsePositions1: [],
+        pulsePositions2: [],
+        pulseRealizedPnl1: profit1,
+        pulseRealizedPnl2: profit2,
         pulseProfit1: profit1,
         pulseProfit2: profit2,
       })

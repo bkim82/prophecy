@@ -91,6 +91,6 @@ leverage in-round.
 3. each poll → one `UPDATE ... RETURNING *` that heartbeats *and* reads; server returns a role-scoped view + `serverNow`
 4. both players lock → the 2nd lock's request flips `status` to `countdown` and stamps `roundStartAt`
 5. client corrects for clock skew, counts down to `roundStartAt + timerSeconds` on a 200ms interval
-6. first poll past the deadline settles server-side: `getSpotPrice()` → diffs → winner, written under a `status='countdown'` guard
+6. first poll past the deadline settles server-side: `getSpotPrice()` → Pulse closes remaining positions and realizes P&L → diffs → winner, written under a `status='countdown'` guard
 7. clients see `settled`, reveal both predictions, freeze the chart with the final point pinned to the deadline, and stop polling
 8. “Play Again” returns to the lobby; a new match is a new row

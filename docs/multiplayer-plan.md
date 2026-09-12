@@ -88,7 +88,9 @@ and position id.
 Two-player round end to end: auto-match on identical criteria, browse-join by
 id, the creator held on the lobby until someone joins, a ~15s lock window
 opening on join, predictions hidden through `predict` and both revealed at
-`countdown`, countdown starting only on the 2nd lock, settlement idempotent
+`countdown`, countdown starting only on the 2nd lock, settlement idempotent;
+Pulse settlement closes remaining positions and releases their reserved stakes
+into realized balance
 under two simultaneous polls, 3-way join race yielding exactly one winner,
 `predict`-phase leave 404-ing the opponent, and an abandoned `open` match
 dropping out of listing/matchmaking after ~9s.

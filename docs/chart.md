@@ -91,6 +91,7 @@ Props, defaulting to `app/feedConfig.ts` (`:115-125`). A future settings UI over
 ## Prediction levels (horizontal)
 
 - Dashed horizontal line per locked prediction. The match room is single-perspective: your line is `--p1` (blue), the opponent's `--p2` (amber), so both players see themselves in blue (`app/duel/[market]/match/[matchId]/page.tsx:17-18`). The opponent's line only exists once the round settles — before that the server withholds the value (`lib/match.ts:146`).
+- Coincident prediction values are rendered as centered, 4px-separated dashed lines with stacked labels so an exact tie does not hide one player's line (`app/PriceChart.tsx:240-253`, `:461-489`).
 - Out-of-range value (common — axis is tight): pin label to top/bottom edge + arrow, don't rescale chart or clip (`:455-487`). Dashed line only drawn if value in view.
 
 ## Trade markers
