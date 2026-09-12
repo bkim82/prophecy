@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import PriceChart, { type TradeMarker } from "../../../PriceChart";
 import { usePriceFeed, type PricePoint } from "../../../usePriceFeed";
+import PulseMovementAlert from "../../../PulseMovementAlert";
 
 const ROUND_SECONDS = 60;
 const STARTING_CASH = 100;
@@ -350,6 +351,7 @@ export default function Page() {
 
   return (
     <main className="mx-auto max-w-4xl px-4 py-10">
+      <PulseMovementAlert total={liveEquity} />
       <Link
         href="/"
         className="text-xs uppercase tracking-wider text-[var(--muted-dim)] transition hover:text-[var(--text)]"

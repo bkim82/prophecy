@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import PriceChart, { type TradeMarker } from "@/app/PriceChart";
+import PulseMovementAlert from "@/app/PulseMovementAlert";
 import { getPlayerId } from "@/app/lib/playerId";
 import { usePriceFeed } from "@/app/usePriceFeed";
 import { type MatchView } from "@/lib/match";
@@ -171,6 +172,7 @@ export default function Page({ params }: { params: Promise<{ market: string; mat
   if (gone) return <main className="mx-auto max-w-4xl px-4 py-10 text-center"><h1 className="text-lg font-medium text-[var(--text)]">{gone === "forbidden" ? "That match is full." : "Match ended"}</h1><p className="mt-2 text-sm text-[var(--muted)]">Start another Pulse round from the lobby.</p><Link href="/" className="mt-6 inline-block rounded-md bg-[var(--btn-bg)] px-5 py-2 text-sm font-medium text-[var(--btn-text)]">Back to lobby</Link></main>;
 
   return <main className="mx-auto max-w-4xl px-4 py-10">
+    <PulseMovementAlert total={PULSE_STARTING_CASH + yourProfit} />
     <Link href="/" className="text-xs uppercase tracking-wider text-[var(--muted-dim)] transition hover:text-[var(--text)]">← Menu</Link>
     <h1 className="mt-4 text-center text-sm font-medium uppercase tracking-[0.2em] text-[var(--muted)]">{market.toUpperCase()} Duel · Pulse {view ? `· ${view.timerSeconds}s` : ""}</h1>
 

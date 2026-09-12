@@ -11,6 +11,7 @@
 - Directional P&L = stake × price move percentage × position leverage; Long benefits from an increase and Short from a decrease (`app/duel/btc/pulse/page.tsx:61-67`).
 - Close realizes the current position P&L and returns straight to the setup dock (same stake/leverage) so the next side can be picked immediately; Reverse realizes it and opens the opposite side at the same live price (`app/duel/btc/pulse/page.tsx:236-278`).
 - Scoreboard shows player and lightweight local AI rival equity/P&L plus remaining match time above the chart (`app/duel/btc/pulse/page.tsx:331-360`).
+- A loud signed percentage alert appears when the player total moves by at least 5% from the last alert, with a brief screen shake for emphasis; this is shared by solo and multiplayer Pulse (`app/PulseMovementAlert.tsx`, both Pulse page routes).
 - Chart markers distinguish directional entry circles, exit squares, and reversal diamonds (`app/PriceChart.tsx:22-27`, `:499-535`).
 - Haptic vibration and a short Web Audio tick are progressive enhancements on entry, exit, and reverse (`app/duel/btc/pulse/page.tsx:118-143`).
 - Settlement uses the freshest live tick with `/api/price` fallback; final chart point is frozen. Solo and multiplayer positions are closed at that final price and the resulting balance is carried into the result (`app/duel/btc/pulse/page.tsx:153-194`, `lib/match.ts:163-180`).
