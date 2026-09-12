@@ -45,6 +45,7 @@ export default function Page({
   const [actionError, setActionError] = useState<string | null>(null);
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
   const [frozenPoints, setFrozenPoints] = useState<PricePoint[] | null>(null);
+  const [inviteJoin, setInviteJoin] = useState(false);
 
   // Server timestamps arrive on the server's clock; everything the UI draws
   // (countdown deadline, chart markers) has to be on the browser's.
@@ -59,7 +60,10 @@ export default function Page({
   const pointsRef = useRef(points);
   pointsRef.current = points;
 
-  useEffect(() => setPlayerId(getPlayerId()), []);
+  useEffect(() => {
+    setPlayerId(getPlayerId());
+    setInviteJoin(new URLSearchParams(window.location.search).get("invite") === "1");
+  }, []);
 
   const applyView = useCallback((next: MatchView) => {
     skewRef.current = next.serverNow - Date.now();
@@ -80,7 +84,18 @@ export default function Page({
         if (cancelled) return;
         // Opponent left, or the match never existed - either way it is over.
         if (res.status === 404) return setGone("ended");
-        if (res.status === 403) return setGone("forbidden");
+        if (res.status === 403) {
+          if (!inviteJoin) return setGone("forbidden");
+          const joinRes = await fetch(`/api/match/${encodeURIComponent(matchId)}/join`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ playerId }),
+          });
+          if (cancelled) return;
+          if (joinRes.status === 404) return setGone("ended");
+          if (joinRes.status === 409) return setGone("forbidden");
+          if (!joinRes.ok) throw new Error("join failed");
+        }
         if (res.ok) {
           const next = (await res.json()) as MatchView;
           if (cancelled) return;
@@ -98,7 +113,7 @@ export default function Page({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [matchId, playerId, applyView]);
+  }, [matchId, playerId, inviteJoin, applyView]);
 
   // Seed the input from the live price once, so the spinner steps from the
   // current price instead of from 0.

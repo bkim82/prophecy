@@ -8,7 +8,7 @@ DB, server state, or a second client. Pulse and 24hr Battle are untouched.
 - One `matches` row = one round, single source of truth (`db/schema.ts:20`).
 - Identity: anonymous per-browser UUID in `localStorage.playerId` (`app/lib/playerId.ts:20`). Not Clerk; sign-in stays optional and unrelated.
 - Sync: ~1s polling (`app/duel/[market]/match/[matchId]/page.tsx:14`), no WebSocket registry. Lobby list polls at 3s (`app/page.tsx:17`), the queue at 1s (`app/page.tsx:22`).
-- Nobody sits in a room alone: an `open` match is waited out on the lobby page (`app/page.tsx:340-352`); the room is entered only once `status` leaves `open`.
+- Nobody sits in a room alone: an `open` match is waited out on the lobby page (`app/page.tsx:389-407`); the room is entered only once `status` leaves `open`. The queued state exposes a shareable invite URL (`app/page.tsx:192-198`) that auto-joins a friend as player 2 (`app/duel/[market]/match/[matchId]/page.tsx:65-97`).
 - No balance deduction. `wager` is stored and displayed only.
 
 ## Status machine
@@ -60,7 +60,7 @@ multi-statement transactions or row locks. Every transition is a single guarded
 | --- | --- |
 | `POST /api/match/find-or-create` | join oldest live `open` match with identical criteria, else create one. Returns `status`, which is how the lobby decides between entering the room and queueing (`app/api/match/find-or-create/route.ts:74`,`:97`,`:117`) |
 | `GET /api/match/[id]?playerId=` | role-scoped view + heartbeat + lock-window expiry + lazy settlement (`app/api/match/[id]/route.ts:38`). Polled by the room, and by the lobby while queued |
-| `POST /api/match/[id]/join` | take a specific open match (lobby list path) |
+| `POST /api/match/[id]/join` | take a specific fresh open match (lobby list or invite link path) |
 | `POST /api/match/[id]/lock` | write this player's prediction, start countdown on the 2nd; 409 once the 15s window has closed (`app/api/match/[id]/lock/route.ts:39`) |
 | `POST /api/match/[id]/leave` | delete while `open`/`predict`; 409 once counting down |
 | `GET /api/match/open?market=&mode=&playerId=` | joinable matches with a fresh host heartbeat |
@@ -74,7 +74,7 @@ Validation on entry: market must price (`lib/spotPrice.ts:12`), mode must be
 - One ticker drives both deadlines — the lock window in `predict`, the round in `countdown` (`app/duel/[market]/match/[matchId]/page.tsx:116-133`).
 - `<PriceChart>` still reads the browser's own `usePriceFeed()` — the chart stays client-direct to Coinbase, no server round trip. Only `roundStart`/lock-marker times come from the poll.
 - Settlement freezes the series with the final point pinned to the deadline, not to whenever the tab noticed (`app/duel/[market]/match/[matchId]/page.tsx:135-144`). A forfeit has no final price, so nothing freezes.
-- Lobby Play button for Quick Play is an async matchmaker, not a `Link` (`app/page.tsx:186-217`); Open Matches rows are join buttons (`app/page.tsx:388-399`), inert for your own row while you hold it.
+- Lobby Play button for Quick Play is an async matchmaker, not a `Link` (`app/page.tsx:186-217`); Open Matches rows are join buttons (`app/page.tsx:388-399`), inert for your own row while you hold it. While queued, Share invite uses native sharing when available and clipboard copy otherwise (`app/page.tsx:192-219`, `app/page.tsx:389-407`).
 - Queueing replaces the whole Quick Play control panel rather than disabling it — the criteria are already committed to a row (`app/page.tsx:340-352`). Cancel deletes the row via `leave` (`app/page.tsx:263-277`); the room is prefetched while waiting so navigation does not eat into the 15s (`app/page.tsx:223`).
 
 ## Verified

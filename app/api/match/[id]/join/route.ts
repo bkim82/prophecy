@@ -1,7 +1,7 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, gt, isNull } from "drizzle-orm";
 import { getDb } from "@/db";
 import { matches } from "@/db/schema";
-import { findMatch, readBody, roleOf } from "@/lib/match";
+import { findMatch, presenceCutoff, readBody, roleOf } from "@/lib/match";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +35,8 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
         eq(matches.id, id),
         eq(matches.status, "open"),
         isNull(matches.player2Id),
+        // A direct invite should only claim a queue the host is still holding.
+        gt(matches.player1LastSeen, presenceCutoff()),
       ),
     )
     .returning();

@@ -142,6 +142,7 @@ export default function Page() {
   // only entered once an opponent takes the seat.
   const [queue, setQueue] = useState<Queue | null>(null);
   const [queuedFor, setQueuedFor] = useState(0);
+  const [inviteState, setInviteState] = useState<"idle" | "shared" | "copied" | "error">("idle");
   const modes = MODES_BY_MARKET[market];
   const currentPrice = price ?? points.at(-1)?.p ?? null;
   const firstPrice = points[0]?.p ?? currentPrice;
@@ -187,6 +188,35 @@ export default function Page() {
 
   const matchHref = (matchMarket: string, matchId: string) =>
     `/duel/${matchMarket}/match/${matchId}`;
+
+  const inviteHref = queue
+    ? `${matchHref(queue.market, queue.matchId)}?invite=1`
+    : null;
+
+  const shareInvite = async () => {
+    if (!inviteHref || !queue) return;
+    const url = `${window.location.origin}${inviteHref}`;
+    setInviteState("idle");
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: "Join my Prophecy duel",
+          text: `Tap to play a ${MARKETS[queue.market].label} prediction duel against me.`,
+          url,
+        });
+        setInviteState("shared");
+      } else if (navigator.clipboard) {
+        await navigator.clipboard.writeText(url);
+        setInviteState("copied");
+      } else {
+        throw new Error("Sharing is not supported");
+      }
+    } catch (error) {
+      // Closing the native share sheet is not an error worth showing.
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      setInviteState("error");
+    }
+  };
 
   const enterMatch = useCallback(
     (matchMarket: string, matchId: string) =>
@@ -272,6 +302,10 @@ export default function Page() {
       clearTimeout(timerId);
     };
   }, [queue, playerId, enterMatch, router]);
+
+  useEffect(() => {
+    setInviteState("idle");
+  }, [queue?.matchId]);
 
   const cancelQueue = async () => {
     if (!queue) return;
@@ -362,6 +396,12 @@ export default function Page() {
             </span>
           </div>
           <span className="queue-elapsed">{queuedFor}s</span>
+          <div className="queue-actions">
+            <button type="button" className="queue-share" onClick={shareInvite}>
+              {inviteState === "shared" ? "Shared" : inviteState === "copied" ? "Copied" : "Share invite"}
+            </button>
+            {inviteState === "error" && <span className="queue-share-error">Copy the link from your browser address bar.</span>}
+          </div>
           <button type="button" className="queue-cancel" onClick={cancelQueue}>Cancel</button>
         </section>
       ) : (
