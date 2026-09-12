@@ -32,7 +32,7 @@ modes (Pulse Mode, 24hr Battle) are lobby-only placeholders with no route.
 | `app/duel/btc/quick-play/page.tsx` | phase machine, both players' inputs, countdown, settlement, winner, layout |
 | `app/usePriceFeed.ts` | websocket, history seed, reconnection, sampled series |
 | `app/PriceChart.tsx` | pure props→SVG, no fetch, no state |
-| `app/feedConfig.ts` | `WINDOW_MS`, `SAMPLE_MS` + axis interval defaults — shared by hook, seed route, chart |
+| `app/feedConfig.ts` | `WINDOW_MS`, `MIN_WINDOW_MS`, `SAMPLE_MS` + axis interval defaults — shared by hook, seed route, chart |
 | `app/api/price/route.ts` | REST spot price, 2-source fallback chain |
 | `app/api/history/route.ts` | chart seed for the full window: trades + candle backfill, merged |
 | `app/layout.tsx` | root HTML, header shell, Clerk provider, metadata, Tailwind import |
@@ -40,13 +40,13 @@ modes (Pulse Mode, 24hr Battle) are lobby-only placeholders with no route.
 ## Invariants (do not violate silently)
 
 - Websocket stays client-side (no key needed, no relay hop). Do not move to server without reason.
-- `feedConfig.ts` constants must stay shared, not duplicated (`app/feedConfig.ts:3-10`) — divergence = visible seam between seeded and live chart.
-- The chart's x-domain is a fixed window ending now, never the extent of the data (`app/PriceChart.tsx:101-108`).
-- `trim()` and `/api/history` must cut at the same `WINDOW_MS + SAMPLE_MS` (`app/usePriceFeed.ts:16`, `app/api/history/route.ts:92`).
-- Both API routes: `export const dynamic = "force-dynamic"`, `Cache-Control: no-store`.
-- All fetch paths degrade, never throw to the user.
-- `PriceChart` stays a pure function of props, including its clock from the `now` prop. Round/freeze logic belongs in quick play.
-- The home lobby may read `usePriceFeed()` for live market display, but settlement logic remains in the quick-play route.
+- `feedConfig.ts` constants must stay shared, not duplicated (`app/feedConfig.ts:3-10`) — divergence = visible seam between seeded and live chart segments.
+- The chart's x-domain is a **fixed window ending now**, never the extent of the data (`app/PriceChart.tsx:101-108`). Deriving it from the data is what made the axis cram as points accumulated.
+- `trim()` and `/api/history` must cut at the same `WINDOW_MS + SAMPLE_MS`, one sample wider than the window (`app/usePriceFeed.ts:16`, `app/api/history/route.ts:92`) — the chart interpolates its left-edge crossing from that extra point.
+- Both API routes: `export const dynamic = "force-dynamic"`, `Cache-Control: no-store` (`app/api/price/route.ts:1`, `app/api/history/route.ts:3`). Never cache a price.
+- All fetch paths degrade, never throw to the user: history → trades ∪ candles → `[]` (`app/api/history/route.ts:88-110`); price → Coinbase → Binance → 502 (`app/api/price/route.ts:23-39`); settle → live tick → REST (`app/duel/btc/quick-play/page.tsx:65-69`).
+- `PriceChart` holds only its time and price wheel zoom levels (`docs/chart.md` → Zoom), and otherwise stays a pure function of props — including its clock, which arrives as the `now` prop rather than a `Date.now()` read or an interval of its own (`app/duel/btc/quick-play/page.tsx:261`). Round/freeze logic belongs in the quick-play page (`app/duel/btc/quick-play/page.tsx:255-263`), not the chart. Same for lock timestamps: that page stamps `lockedAt{1,2}`, the chart just draws whatever `PredictionLine.at` it gets.
+- The home lobby may read `usePriceFeed()` for live market display (`app/page.tsx:59`), but settlement logic remains in the quick-play route.
 
 ## Round data flow (sequence)
 

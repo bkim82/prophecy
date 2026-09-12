@@ -1,6 +1,9 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
+
 import {
+  MIN_WINDOW_MS,
   WINDOW_MS,
   X_INTERVALS,
   X_MINOR_PER_INTERVAL,
@@ -25,6 +28,8 @@ type Props = {
   now?: number;
   /** Axis divisions — defaults live in feedConfig. */
   windowMs?: number;
+  /** Tightest the wheel will zoom to; windowMs is the widest. */
+  minWindowMs?: number;
   xIntervals?: number;
   yIntervals?: number;
   xMinorPerInterval?: number;
@@ -40,6 +45,20 @@ const UP = "#91b7d8";
 const DOWN = "#a4adb9";
 
 const MIN_LABEL_GAP = 42; // px between clock labels before thinning
+
+// Wheel zoom. Multiplicative, so a notch feels the same at either end of the
+// range: ~1.16x per 100px notch, ~5 notches across the full 1min→30s span.
+const ZOOM_RATE = 0.0015;
+// Price zoom starts at the data-fitting range and only expands from there. A
+// generous ceiling lets an off-screen prediction be brought into view without
+// letting the price line collapse all the way to a rounding error.
+const MAX_PRICE_SCALE = 32;
+// deltaY arrives in lines or pages on some browsers/devices; normalise to px so
+// one notch isn't a 300x jump on Firefox.
+const DELTA_PX = [1, 16, 400];
+
+const clamp = (n: number, lo: number, hi: number) =>
+  Math.min(hi, Math.max(lo, n));
 
 // Tick steps that read as round wall-clock times, so any xIntervals lands on
 // something a human recognises rather than on a 25.7s stride.
@@ -58,6 +77,16 @@ const axisLabel = (n: number, span = Infinity) =>
     minimumFractionDigits: span < 25 ? 2 : 0,
     maximumFractionDigits: span < 25 ? 2 : 0,
   });
+
+// The zoom level has to be legible, or the axis just silently means something
+// different than it did a moment ago.
+const spanLabel = (ms: number) => {
+  const total = Math.round(ms / 1000);
+  const minutes = Math.floor(total / 60);
+  const seconds = total % 60;
+  if (minutes === 0) return `${seconds}s`;
+  return seconds === 0 ? `${minutes}m` : `${minutes}m ${seconds}s`;
+};
 
 const clockLabel = (t: number) =>
   new Date(t).toLocaleTimeString("en-US", {
@@ -90,10 +119,25 @@ export default function PriceChart({
   frozen = false,
   now,
   windowMs = WINDOW_MS,
+  minWindowMs = MIN_WINDOW_MS,
   xIntervals = X_INTERVALS,
   yIntervals = Y_INTERVALS,
   xMinorPerInterval = X_MINOR_PER_INTERVAL,
 }: Props) {
+  // Zoom is a view concern, so it lives here rather than being plumbed through
+  // every caller. Time and price remain independent axes.
+  const [zoomMs, setZoomMs] = useState(windowMs);
+  const [priceScale, setPriceScale] = useState(1);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Derived rather than corrected in an effect, so a windowMs change takes
+  // effect on the same frame it arrives.
+  const viewMs = clamp(zoomMs, minWindowMs, windowMs);
+  const viewRef = useRef(viewMs);
+  viewRef.current = viewMs;
+  const priceScaleRef = useRef(priceScale);
+  priceScaleRef.current = priceScale;
+
   const lastSample = points[points.length - 1];
 
   // The window is a fixed span ending now, not the extent of the data: it holds
@@ -105,13 +149,64 @@ export default function PriceChart({
       ? lastSample.t
       : Math.max(clock, lastSample.t)
     : clock;
-  const t0 = t1 - windowMs;
+  const t0 = t1 - viewMs;
 
   const visible = windowSlice(points, t0);
+  const ready = visible.length >= 2;
 
-  if (visible.length < 2) {
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const onWheel = (event: WheelEvent) => {
+      const step = DELTA_PX[event.deltaMode] ?? 1;
+      const svg = el.querySelector("svg");
+      const svgRect = svg?.getBoundingClientRect();
+      const plotRight = svgRect
+        ? svgRect.left + ((PAD.left + INNER_W) / W) * svgRect.width
+        : Infinity;
+
+      // The right gutter is the price axis. Scrolling there changes only the
+      // vertical range; scrolling over the plot retains the time-axis gesture.
+      if (event.clientX >= plotRight) {
+        const next = clamp(
+          priceScaleRef.current *
+            Math.exp(event.deltaY * step * ZOOM_RATE),
+          1,
+          MAX_PRICE_SCALE,
+        );
+        if (next === priceScaleRef.current) return;
+        event.preventDefault();
+        priceScaleRef.current = next;
+        setPriceScale(next);
+        return;
+      }
+
+      const next = clamp(
+        viewRef.current * Math.exp(event.deltaY * step * ZOOM_RATE),
+        minWindowMs,
+        windowMs,
+      );
+      // Already at a limit in this direction: don't swallow the event, or the
+      // chart becomes a 400px hole the page won't scroll past.
+      if (next === viewRef.current) return;
+      event.preventDefault();
+      viewRef.current = next;
+      setZoomMs(next);
+    };
+
+    // React registers onWheel passively, where preventDefault is a no-op.
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+    // `ready` swaps the placeholder for the chart — a different element to bind.
+  }, [windowMs, minWindowMs, ready]);
+
+  if (!ready) {
     return (
-      <div className="flex h-[400px] items-center justify-center rounded-xl border border-[#2b3b4d] bg-[#131e2a] text-sm text-[#718195]">
+      <div
+        ref={containerRef}
+        className="flex h-[400px] items-center justify-center rounded-xl border border-[#2b3b4d] bg-[#131e2a] text-sm text-[#718195]"
+      >
         Waiting for price data…
       </div>
     );
@@ -122,12 +217,15 @@ export default function PriceChart({
   const rawHigh = Math.max(...prices);
   // Tight padding: the visible range tracks the actual swing, so small moves
   // read as real peaks and dips instead of a near-flat line.
-  const span = rawHigh - rawLow || rawHigh * 0.0002;
-  const low = rawLow - span * 0.06;
-  const high = rawHigh + span * 0.06;
-  const visibleSpan = high - low;
+  const dataSpan = rawHigh - rawLow || rawHigh * 0.0002;
+  const fittedLow = rawLow - dataSpan * 0.06;
+  const fittedHigh = rawHigh + dataSpan * 0.06;
+  const midpoint = (fittedLow + fittedHigh) / 2;
+  const visibleSpan = (fittedHigh - fittedLow) * priceScale;
+  const low = midpoint - visibleSpan / 2;
+  const high = midpoint + visibleSpan / 2;
 
-  const x = (t: number) => PAD.left + ((t - t0) / windowMs) * INNER_W;
+  const x = (t: number) => PAD.left + ((t - t0) / viewMs) * INNER_W;
   const y = (p: number) => PAD.top + ((high - p) / visibleSpan) * INNER_H;
 
   const line = visible.map((pt) => `${x(pt.t)},${y(pt.p)}`).join(" ");
@@ -148,7 +246,7 @@ export default function PriceChart({
 
   // Ticks land on wall-clock boundaries of a round step, so every label reads as
   // a real time and the spacing holds as the window slides.
-  const majorMs = niceStep(windowMs / Math.max(1, xIntervals));
+  const majorMs = niceStep(viewMs / Math.max(1, xIntervals));
   const minorMs = majorMs / Math.max(1, xMinorPerInterval);
   const ticks: number[] = [];
   for (let t = Math.ceil(t0 / minorMs) * minorMs; t <= t1; t += minorMs) {
@@ -156,7 +254,7 @@ export default function PriceChart({
   }
   // A tighter xIntervals would collide the clock labels, so thin them to
   // whatever multiple of the major step still fits.
-  const pxPerMajor = (majorMs / windowMs) * INNER_W;
+  const pxPerMajor = (majorMs / viewMs) * INNER_W;
   const labelEvery =
     majorMs * Math.max(1, Math.ceil(MIN_LABEL_GAP / Math.max(1, pxPerMajor)));
 
@@ -164,12 +262,22 @@ export default function PriceChart({
   const bandX = bandVisible ? x(Math.max(roundStart, t0)) : 0;
 
   return (
-    <div className="rounded-xl border border-[#2b3b4d] bg-[#131e2a] p-2">
+    <div
+      ref={containerRef}
+      onDoubleClick={() => {
+        viewRef.current = windowMs;
+        priceScaleRef.current = 1;
+        setZoomMs(windowMs);
+        setPriceScale(1);
+      }}
+      title="Scroll the plot to zoom time; scroll the price axis to zoom price; double-click to reset"
+      className="rounded-xl border border-[#2b3b4d] bg-[#131e2a] p-2"
+    >
       <svg
         viewBox={`0 0 ${W} ${H}`}
         className="h-auto w-full"
         role="img"
-        aria-label="BTC/USD price, last few minutes"
+        aria-label={`BTC/USD price, last ${spanLabel(viewMs)}, price scale ${priceScale.toFixed(1)} times fitted range`}
       >
         <defs>
           <linearGradient id="fill" x1="0" y1="0" x2="0" y2="1">
@@ -177,6 +285,12 @@ export default function PriceChart({
             <stop offset="100%" stopColor={stroke} stopOpacity="0" />
           </linearGradient>
         </defs>
+
+        {/* Zoom levels, in the strip above the plot opposite `settled` */}
+        <text x={PAD.left} y={PAD.top - 7} fill="#a3a3a3" fontSize="11">
+          {spanLabel(viewMs)} · price{" "}
+          {priceScale === 1 ? "auto" : `${priceScale.toFixed(1)}×`}
+        </text>
 
         {/* Gridlines + price axis */}
         {gridValues.map((value, i) => (
@@ -399,6 +513,19 @@ export default function PriceChart({
             settled
           </text>
         )}
+
+        {/* A transparent hit area gives the price-axis gesture a visual cursor
+            and a focused tooltip without obscuring its labels. */}
+        <rect
+          x={PAD.left + INNER_W}
+          y={0}
+          width={PAD.right}
+          height={H}
+          fill="transparent"
+          style={{ cursor: "ns-resize" }}
+        >
+          <title>Scroll to zoom the price axis</title>
+        </rect>
       </svg>
     </div>
   );

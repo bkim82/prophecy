@@ -13,8 +13,8 @@ Deliberate gaps in a prototype scoped to the core loop. Not bugs.
 | No networking | No room/matchmaking/2nd client. Real multiplayer needs server-held round state — currently `/api/price`, `/api/history` are stateless proxies by design |
 | No persistence | Reload loses everything. No cross-round score/history/identity |
 | No stakes | Predictions free, wins pay nothing |
-| Fixed round length | `ROUND_SECONDS=60` hardcoded (`app/duel/btc/quick-play/page.tsx:8`). Configurable is easy but a round > `WINDOW_MS`(3min) scrolls off chart's left edge before settling |
-| No axis-interval UI | `PriceChart` already takes `windowMs`/`xIntervals`/`yIntervals`/`xMinorPerInterval` as props with `feedConfig.ts` defaults (`app/PriceChart.tsx:88-95`). Nothing surfaces them yet. A control changing `windowMs` also needs `WINDOW_MS` moved into state — the hook's `trim()` and the seed route both read the constant, so widening the window alone would show an empty left half until the series refills |
+| Fixed round length | `ROUND_SECONDS=60` hardcoded (`app/duel/btc/quick-play/page.tsx:8`). Configurable is easy but a round > `WINDOW_MS`(1min) scrolls off chart's left edge before settling |
+| No axis-interval UI (zoom aside) | `PriceChart` already takes `windowMs`/`xIntervals`/`yIntervals`/`xMinorPerInterval` as props with `feedConfig.ts` defaults (`app/PriceChart.tsx:88-95`). The wheel drives time and price zoom only; a settings control changing `windowMs` also needs `WINDOW_MS` moved into state — the hook's `trim()` and the seed route both read the constant, so widening the window alone would show an empty left half until the series refills |
 | BTC/USD only | Pair hardcoded in 5 places: socket sub (`app/usePriceFeed.ts:91`), REST ×2 (`app/api/price/route.ts:13`,`:18`), history ×2 (`app/api/history/route.ts:22`,`:58`). Coinbase/Binance spell pairs differently (`BTC-USD` vs `BTCUSDT`) |
 
 ## Quality gaps
