@@ -245,8 +245,8 @@ export default function PriceChart({
     " L ",
   )} L ${x(last.t)},${baseline} Z`;
 
-  const rising = last.p >= visible[0].p;
-  const stroke = rising ? UP : DOWN;
+  // Compare the latest value with the value at the left edge of the chart.
+  const stroke = last.p >= visible[0].p ? UP : DOWN;
 
   const gridValues = Array.from(
     { length: yIntervals + 1 },

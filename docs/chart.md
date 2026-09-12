@@ -69,7 +69,7 @@ Props, defaulting to `app/feedConfig.ts` (`:115-125`). A future settings UI over
 2. Time axis: baseline, minor ticks, major clock labels (`:316-357`)
 3. Round band: translucent indigo rect `roundStart`→right edge, "round" label pinned top-right of the band (`:362-396`)
 4. Area fill: vertical gradient 22%→0 opacity (`:282-286`, `:399`)
-5. Price line: polyline, green if last≥first else rose (`:239-240`, `:400-407`)
+5. Price line: single-color polyline, green when the latest value is ≥ the leftmost visible value, otherwise red (`:240`, `:248-249`, `:409-416`)
 6. Lock markers (vertical) — see below
 7. Prediction levels (horizontal) — see below
 8. Current price marker: 2 concentric circles, outer pings while live, static once frozen (`:490-502`)
