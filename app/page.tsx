@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { DailyCoin, pickDailyCoin } from "./DailyCoin";
 import { usePriceFeed } from "./usePriceFeed";
 
 const WAGER_PRESETS = [10, 100, 1000];
@@ -61,15 +62,17 @@ const recentResults = [
 ];
 
 type ModeId = "quick-play" | "pulse" | "battle-24h";
-type MarketId = "btc" | "eth";
+type MarketId = "btc" | "eth" | "doge";
 
 const MARKETS: Record<MarketId, { label: string; symbol: string; name: string }> = {
   btc: { label: "BTC", symbol: "₿", name: "BTC-USD" },
   eth: { label: "ETH", symbol: "Ξ", name: "ETH-USD" },
+  doge: { label: "DOGE", symbol: "Ð", name: "DOGE-USD" },
 };
 
-// Games are only built out for BTC so far; ETH gets the same mode list with
-// no href, which the panel below renders as "soon" and leaves inert.
+// Games are only built out for BTC so far; ETH and the daily coin get the
+// same mode list with no href, which the panel below renders as "soon" and
+// leaves inert.
 const MODES_BY_MARKET: Record<MarketId, { id: ModeId; label: string; meta: string; href?: string }[]> = {
   btc: [
     { id: "quick-play", label: "Quick Play", meta: "BTC · 60 seconds · head to head", href: "/duel/btc/quick-play" },
@@ -81,10 +84,22 @@ const MODES_BY_MARKET: Record<MarketId, { id: ModeId; label: string; meta: strin
     { id: "pulse", label: "Pulse", meta: "ETH · solo · trade live for 60 seconds" },
     { id: "battle-24h", label: "24hr Battle", meta: "ETH · one call · settled in 24 hours" },
   ],
+  doge: [
+    { id: "quick-play", label: "Quick Play", meta: "DOGE · 60 seconds · head to head" },
+    { id: "pulse", label: "Pulse", meta: "DOGE · solo · trade live for 60 seconds" },
+    { id: "battle-24h", label: "24hr Battle", meta: "DOGE · one call · settled in 24 hours" },
+  ],
+};
+
+const SYMBOL_CLASS: Record<MarketId, string> = {
+  btc: "btc-symbol",
+  eth: "eth-symbol",
+  doge: "doge-symbol",
 };
 
 export default function Page() {
   const [market, setMarket] = useState<MarketId>("btc");
+  const dailyCoinId = pickDailyCoin().toLowerCase() as MarketId;
   const activeMarket = MARKETS[market];
   const { price, points, status } = usePriceFeed(activeMarket.name);
   const [wager, setWager] = useState("10");
@@ -112,6 +127,7 @@ export default function Page() {
           <button className={market === "btc" ? "active" : ""} type="button" onClick={() => setMarket("btc")}><span className="market-symbol btc-symbol">₿</span> BTC</button>
           <button className={market === "eth" ? "active" : ""} type="button" onClick={() => setMarket("eth")}><span className="market-symbol eth-symbol">Ξ</span> ETH</button>
         </div>
+        <DailyCoin active={market === dailyCoinId} onSelect={() => setMarket(dailyCoinId)} />
       </nav>
 
       <section className="market-overview panel">
@@ -148,7 +164,7 @@ export default function Page() {
       </div>
 
       <section className="quick-play panel">
-        <div className="quick-play-market"><span className={`market-symbol ${market === "btc" ? "btc-symbol" : "eth-symbol"}`}>{activeMarket.symbol}</span><div><strong>{activeMarket.label} / USD</strong><span className="muted">{isPlayable ? "Current round" : "Not open yet"}</span></div></div>
+        <div className="quick-play-market"><span className={`market-symbol ${SYMBOL_CLASS[market]}`}>{activeMarket.symbol}</span><div><strong>{activeMarket.label} / USD</strong><span className="muted">{isPlayable ? "Current round" : "Not open yet"}</span></div></div>
         <div className="control-group">
           <span className="field-label">Wager</span>
           <div className="segmented-control" role="group" aria-label="Choose wager">

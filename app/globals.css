@@ -35,6 +35,9 @@
 .lobby-shell[data-market="eth"] {
   --accent: #627eea; --accent-strong: #8296ef; --accent-contrast: #ffffff;
 }
+.lobby-shell[data-market="doge"] {
+  --accent: #c2a633; --accent-strong: #ddc158; --accent-contrast: #1c1200;
+}
 * { box-sizing: border-box; }
 html { background: var(--bg); }
 body { min-height: 100vh; margin: 0; background: var(--bg); color: var(--text); font-family: Arial, Helvetica, sans-serif; }
@@ -54,12 +57,18 @@ button { cursor: pointer; }
 .balance-display { display: flex; align-items: center; gap: 9px; color: var(--text); font-size: 13px; }
 .balance-label { color: var(--muted-dim); font-size: 10px; letter-spacing: .09em; text-transform: uppercase; }
 .coin-mark { display: none; }
+.daily-coin { position: relative; display: flex; align-items: center; gap: 9px; border: 1px solid transparent; border-radius: 6px; background: transparent; padding: 5px 8px; color: var(--text); font-size: 13px; }
+.daily-coin:hover { color: var(--text); }
+.daily-coin.active { border-color: var(--line); background: var(--surface); }
+.daily-coin-tooltip { position: absolute; top: calc(100% + 8px); right: 0; width: 190px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--muted); font-size: 11px; line-height: 1.4; text-transform: none; letter-spacing: normal; opacity: 0; visibility: hidden; transform: translateY(-4px); transition: opacity .12s ease, transform .12s ease; pointer-events: none; z-index: 20; }
+.daily-coin:hover .daily-coin-tooltip,
+.daily-coin:focus-visible .daily-coin-tooltip { opacity: 1; visibility: visible; transform: translateY(0); }
 .lobby-shell { width: min(100% - 48px, 1080px); margin: 0 auto; padding: 28px 0 56px; }
 .panel { border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
 .eyebrow { color: var(--muted); font-size: 11px; letter-spacing: .11em; text-transform: uppercase; }
 .eyebrow-row { display: flex; align-items: center; gap: 12px; }
 .muted { color: var(--muted); }
-.market-nav { display: flex; align-items: center; justify-content: flex-start; margin: 0 2px 14px; }
+.market-nav { display: flex; align-items: center; justify-content: space-between; margin: 0 2px 14px; }
 .market-overview { display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.5fr) minmax(0, .65fr); gap: 26px; align-items: center; padding: 23px 26px; }
 .ticker-copy { min-width: 0; }
 .ticker-price { min-width: 0; margin-top: 8px; font-size: clamp(36px, 4.75vw, 56px); line-height: .95; color: var(--text); white-space: nowrap; }
@@ -90,6 +99,7 @@ button { cursor: pointer; }
 .market-symbol { display: grid; place-items: center; width: 28px; height: 28px; border: 1px solid var(--line-strong); border-radius: 6px; color: var(--text); font-size: 16px; line-height: 1; }
 .btc-symbol { color: var(--accent); }
 .eth-symbol { color: var(--muted); }
+.doge-symbol { color: var(--accent); }
 .control-group { display: grid; gap: 7px; min-width: 0; padding-left: 22px; border-left: 1px solid var(--line); }
 .field-label { color: var(--muted); font-size: 10px; letter-spacing: .09em; text-transform: uppercase; }
 .segmented-control { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; overflow: hidden; border: 1px solid var(--line); border-radius: 6px; }
