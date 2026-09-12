@@ -8,5 +8,6 @@ Agent-readable fact sheets, not prose. Format: flat bullets, `file:line` refs, n
 - [pulse-mode.md](pulse-mode.md) — solo trading state, leveraged P&L, settlement
 - [chart.md](chart.md) — SVG chart geometry, layers, scaling
 - [roadmap.md](roadmap.md) — unbuilt features, known gaps
+- [multiplayer-plan.md](multiplayer-plan.md) — planned Quick Play networking design, not yet built
 
 No DB, no server-side game state, no auth. Everything client-side except two stateless proxy routes.
