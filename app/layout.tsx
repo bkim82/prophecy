@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ClerkProvider, Show, SignInButton, UserButton } from "@clerk/nextjs";
 import { BalancePill } from "./BalancePill";
+import { ThemeToggle } from "./ThemeToggle";
+import { THEME_INIT_SCRIPT } from "./theme";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -11,13 +13,17 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" data-theme="dark" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
       <body>
         <ClerkProvider>
           <header className="app-header">
             <div className="app-header-inner">
               <Link href="/" className="brand">DUEL</Link>
               <div className="header-actions">
+                <ThemeToggle />
                 <Show
                   when="signed-in"
                   fallback={

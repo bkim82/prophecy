@@ -6,9 +6,11 @@ Deliberate gaps in a prototype scoped to the core loop. Not bugs.
 
 | Gap | Detail |
 | --- | --- |
-| Pulse Mode | Menu placeholder only (`app/page.tsx` `MODES`, no `href`) — rapid-fire back-to-back rounds, no implementation |
-| 24hr Battle | Menu placeholder only (`app/page.tsx` `MODES`, no `href`) — single prediction settled a day later, no implementation |
-| ETH Duel | Menu placeholder only (`app/page.tsx` `DUEL_TYPES`) — no price feed, routes, or settlement |
+| 24hr Battle | Switcher entry only (`app/page.tsx:63`, no `href` → panel locks, `:75`) — single prediction settled a day later, no implementation |
+| ETH Duel | Market switcher button only (`app/page.tsx:89`, inert) — no price feed, routes, or settlement |
+| Pulse leverage control | Fixed 1×–100× chips (`app/duel/btc/pulse/page.tsx:11`); no custom multiplier |
+| Pulse spot accounting | `app/duel/btc/pulse/trading.ts` (`executeTrade`) is written and tested-by-eye but has no importers — the page models one leveraged directional position, not a cash/BTC portfolio |
+| Pulse rival | "Nova · AI" is a local stub: side derived from the entry price's parity, fixed $48 × 10× size, no behaviour (`app/duel/btc/pulse/page.tsx:199-204`, `:301-306`) |
 | Same-browser 2P | Both predictions typed on one keyboard — no hidden input/commit step, either player sees the other's guess pre-lock |
 | No networking | No room/matchmaking/2nd client. Real multiplayer needs server-held round state — currently `/api/price`, `/api/history` are stateless proxies by design |
 | No persistence | Reload loses everything. No cross-round score/history/identity |
@@ -28,7 +30,8 @@ Deliberate gaps in a prototype scoped to the core loop. Not bugs.
 
 - Tie = exact float match only (`app/duel/btc/quick-play/page.tsx:84`) — matches UI copy, but no tolerance band option exists.
 - `roundStart` stamped in `lock()`, deadline computed later in countdown effect (`app/duel/btc/quick-play/page.tsx:144` vs `:110`) — 1-render gap, invisible today, would need merging if timing becomes authoritative.
-- Light mode only, no `prefers-color-scheme`.
+- Clerk components (`UserButton`, sign-in modal) keep their own default appearance — not wired to `data-theme`.
+- Pulse round length reuses the same hardcoded `ROUND_SECONDS=60` as quick-play (`app/duel/btc/pulse/page.tsx:8`) — two constants, one number.
 - No chart hover/tooltip/crosshair.
 - Slow `/api/history` can resolve after socket has already committed points — merge+trim (`app/usePriceFeed.ts:60`) keeps it correct but chart visibly re-draws.
 - The 250ms clock (`app/usePriceFeed.ts:48-51`) re-renders the quick-play page 4x/s even when nothing else changes. Cheap at this size; would want memoising the chart if the page grows.

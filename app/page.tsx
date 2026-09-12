@@ -55,14 +55,30 @@ const recentResults = [
   { market: "BTC", result: "Won", entry: "+1.00", time: "14m ago" },
 ];
 
+type ModeId = "quick-play" | "pulse" | "battle-24h";
+
+const MODES: { id: ModeId; label: string; meta: string; href?: string }[] = [
+  { id: "quick-play", label: "Quick Play", meta: "BTC · 60 seconds · head to head", href: "/duel/btc/quick-play" },
+  { id: "pulse", label: "Pulse", meta: "BTC · solo · trade live for 60 seconds", href: "/duel/btc/pulse" },
+  { id: "battle-24h", label: "24hr Battle", meta: "BTC · one call · settled in 24 hours" },
+];
+
 export default function Page() {
   const { price, points, status } = usePriceFeed();
   const [direction, setDirection] = useState<Direction>("UP");
   const [entry, setEntry] = useState("0.25");
+  const [mode, setMode] = useState<ModeId>("quick-play");
   const currentPrice = price ?? points.at(-1)?.p ?? null;
   const firstPrice = points[0]?.p ?? currentPrice;
   const change = currentPrice !== null && firstPrice ? ((currentPrice - firstPrice) / firstPrice) * 100 : null;
-  const playHref = `/duel/btc/quick-play?direction=${direction.toLowerCase()}&entry=${entry}`;
+  const activeMode = MODES.find((option) => option.id === mode) ?? MODES[0];
+  const isPlayable = Boolean(activeMode.href);
+  // Only Quick Play settles a single call; Pulse takes its stake and leverage
+  // on its own page, so it gets a bare href and leaves these controls inert.
+  const takesCall = mode === "quick-play";
+  const playHref = takesCall
+    ? `${activeMode.href}?direction=${direction.toLowerCase()}&entry=${entry}`
+    : (activeMode.href as string);
 
   return (
     <main className="lobby-shell">
@@ -91,15 +107,32 @@ export default function Page() {
         </dl>
       </section>
 
-      <div className="section-heading"><div><span className="eyebrow">Make a call</span><h1 className="display-font">Quick Play</h1></div><span className="round-meta">BTC · 60 seconds · head to head</span></div>
+      <div className="section-heading">
+        <div>
+          <span className="eyebrow">Make a call</span>
+          <h1 className="display-font">{activeMode.label}</h1>
+          <span className="round-meta">{activeMode.meta}</span>
+        </div>
+        <div className="mode-switcher" role="group" aria-label="Choose a mode">
+          <span className="field-label">Modes</span>
+          {MODES.map((option) => (
+            <button key={option.id} type="button" className={option.id === mode ? "active" : ""} aria-pressed={option.id === mode} onClick={() => setMode(option.id)}>
+              {option.label}
+              {option.href ? null : <small>soon</small>}
+            </button>
+          ))}
+        </div>
+      </div>
 
       <section className="quick-play panel">
-        <div className="quick-play-market"><span className="market-symbol btc-symbol">₿</span><div><strong>BTC / USD</strong><span className="muted">Current round</span></div></div>
-        <div className="control-group"><span className="field-label">Direction</span><div className="segmented-control" role="group" aria-label="Choose direction">{(["UP", "DOWN"] as const).map((option) => <button key={option} type="button" className={direction === option ? "is-selected" : ""} onClick={() => setDirection(option)}>{option}</button>)}</div></div>
-        <label className="control-group"><span className="field-label">Entry</span><span className="entry-input-wrap"><input value={entry} onChange={(event) => setEntry(event.target.value)} inputMode="decimal" aria-label="Entry amount" /><span>coins</span></span></label>
-        <div className="control-group timer-control"><span className="field-label">Timer</span><strong className="timer-value display-font">01:00</strong></div>
-        <div className="opponent-status"><span className="field-label">Opponent</span><strong><span className="status-dot is-online" /> Open lobby</strong><span className="muted">2,486 players online</span></div>
-        <Link href={playHref} className="play-button">Play <span aria-hidden="true">→</span></Link>
+        <div className="quick-play-market"><span className="market-symbol btc-symbol">₿</span><div><strong>BTC / USD</strong><span className="muted">{isPlayable ? "Current round" : "Not open yet"}</span></div></div>
+        <div className="control-group"><span className="field-label">Direction</span><div className="segmented-control" role="group" aria-label="Choose direction">{(["UP", "DOWN"] as const).map((option) => <button key={option} type="button" disabled={!takesCall} className={direction === option ? "is-selected" : ""} onClick={() => setDirection(option)}>{option}</button>)}</div></div>
+        <label className="control-group"><span className="field-label">Entry</span><span className="entry-input-wrap"><input value={entry} onChange={(event) => setEntry(event.target.value)} disabled={!takesCall} inputMode="decimal" aria-label="Entry amount" /><span>coins</span></span></label>
+        <div className="control-group timer-control"><span className="field-label">Timer</span><strong className="timer-value display-font">{isPlayable ? "01:00" : "—"}</strong></div>
+        <div className="opponent-status"><span className="field-label">Opponent</span><strong><span className={`status-dot ${isPlayable ? "is-online" : ""}`} /> {takesCall ? "Open lobby" : isPlayable ? "Solo · NOVA AI" : "Unavailable"}</strong><span className="muted">{takesCall ? "2,486 players online" : isPlayable ? "Stake and leverage set in-round" : "Mode in development"}</span></div>
+        {isPlayable
+          ? <Link href={playHref} className="play-button">Play <span aria-hidden="true">→</span></Link>
+          : <button type="button" className="play-button" disabled>Soon</button>}
       </section>
 
       <section className="lower-grid">
@@ -107,7 +140,6 @@ export default function Page() {
         <div><div className="list-heading"><h2>Recent results</h2><span className="muted">Today</span></div><div className="data-list panel">{recentResults.map((result, index) => <div className="data-row result-row" key={`${result.market}-${index}`}><div className="row-market"><span className={`market-symbol ${result.market === "BTC" ? "btc-symbol" : "eth-symbol"}`}>{result.market === "BTC" ? "₿" : "Ξ"}</span><strong>{result.market}</strong></div><span className={result.result === "Won" ? "change-up" : "change-down"}>{result.result}</span><span className="row-detail">{result.entry}</span><span className="row-age">{result.time}</span></div>)}</div></div>
       </section>
 
-      <section className="bottom-bar"><div className="quiet-modes"><span className="field-label">More formats</span><span>Pulse <small>soon</small></span><span>24hr Battle <small>soon</small></span></div></section>
     </main>
   );
 }

@@ -93,6 +93,12 @@ Props, defaulting to `app/feedConfig.ts` (`:115-125`). A future settings UI over
 - Dashed horizontal line per locked prediction, P1=blue, P2=amber (`app/duel/btc/quick-play/page.tsx:10-11`).
 - Out-of-range value (common — axis is tight): pin label to top/bottom edge + arrow, don't rescale chart or clip (`:455-487`). Dashed line only drawn if value in view.
 
+## Trade markers
+
+- `TradeMarker` uses `side: long|short` and `action: entry|exit|reverse` (`:22-27`).
+- Entries render as circles with `L`/`S`, exits as squares with `×`, reversals as diamonds with `R` (`:499-535`).
+- Stroke is the `UP`/`DOWN` token by side; the glyph sits on a `var(--surface)` fill so it stays legible in both themes.
+
 ## Freezing
 
 Settlement passes frozen snapshot + `frozen={true}` (`app/duel/btc/quick-play/page.tsx:255-263`). Chart response: pin `t1` to the last point, stop marker ping, show `settled` chip. Chart has no round concept — renders whatever it's given.

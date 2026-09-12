@@ -19,9 +19,17 @@ export type PredictionLine = {
   at?: number | null;
 };
 
+export type TradeMarker = {
+  t: number;
+  p: number;
+  side: "long" | "short";
+  action?: "entry" | "exit" | "reverse";
+};
+
 type Props = {
   points: PricePoint[];
   predictions?: PredictionLine[];
+  trades?: TradeMarker[];
   roundStart?: number | null;
   frozen?: boolean;
   /** Wall clock driving the right edge; ticks so the window scrolls on its own. */
@@ -41,8 +49,8 @@ const PAD = { top: 20, right: 78, bottom: 44, left: 12 };
 const INNER_W = W - PAD.left - PAD.right;
 const INNER_H = H - PAD.top - PAD.bottom;
 
-const UP = "#91b7d8";
-const DOWN = "#a4adb9";
+const UP = "var(--chart-up)";
+const DOWN = "var(--chart-down)";
 
 const MIN_LABEL_GAP = 42; // px between clock labels before thinning
 
@@ -115,6 +123,7 @@ function windowSlice(points: PricePoint[], t0: number): PricePoint[] {
 export default function PriceChart({
   points,
   predictions = [],
+  trades = [],
   roundStart = null,
   frozen = false,
   now,
@@ -205,7 +214,7 @@ export default function PriceChart({
     return (
       <div
         ref={containerRef}
-        className="flex h-[400px] items-center justify-center rounded-xl border border-[#2b3b4d] bg-[#131e2a] text-sm text-[#718195]"
+        className="flex h-[400px] items-center justify-center rounded-xl border border-[var(--line)] bg-[var(--surface)] text-sm text-[var(--muted-dim)]"
       >
         Waiting for price data…
       </div>
@@ -271,7 +280,7 @@ export default function PriceChart({
         setPriceScale(1);
       }}
       title="Scroll the plot to zoom time; scroll the price axis to zoom price; double-click to reset"
-      className="rounded-xl border border-[#2b3b4d] bg-[#131e2a] p-2"
+      className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-2"
     >
       <svg
         viewBox={`0 0 ${W} ${H}`}
@@ -287,7 +296,7 @@ export default function PriceChart({
         </defs>
 
         {/* Zoom levels, in the strip above the plot opposite `settled` */}
-        <text x={PAD.left} y={PAD.top - 7} fill="#a3a3a3" fontSize="11">
+        <text x={PAD.left} y={PAD.top - 7} fill="var(--muted)" fontSize="11">
           {spanLabel(viewMs)} · price{" "}
           {priceScale === 1 ? "auto" : `${priceScale.toFixed(1)}×`}
         </text>
@@ -300,12 +309,12 @@ export default function PriceChart({
               x2={PAD.left + INNER_W}
               y1={y(value)}
               y2={y(value)}
-              stroke="#263646"
+              stroke="var(--chart-grid)"
             />
             <text
               x={PAD.left + INNER_W + 8}
               y={y(value) + 4}
-              fill="#8493a3"
+              fill="var(--muted)"
               fontSize="12"
             >
               {axisLabel(value, visibleSpan)}
@@ -319,7 +328,7 @@ export default function PriceChart({
           x2={PAD.left + INNER_W}
           y1={baseline}
           y2={baseline}
-          stroke="#344658"
+          stroke="var(--chart-axis)"
         />
         {ticks.map((t) => {
           const tx = x(t);
@@ -333,7 +342,7 @@ export default function PriceChart({
                   x2={tx}
                   y1={PAD.top}
                   y2={baseline}
-                  stroke="#263646"
+                  stroke="var(--chart-grid)"
                 />
               )}
               <line
@@ -341,13 +350,13 @@ export default function PriceChart({
                 x2={tx}
                 y1={baseline}
                 y2={baseline + (labelled ? 8 : 5)}
-                stroke={labelled ? "#8493a3" : "#506173"}
+                stroke={labelled ? "var(--muted)" : "var(--line-strong)"}
               />
               {labelled && (
                 <text
                   x={tx}
                   y={baseline + 21}
-                  fill="#8493a3"
+                  fill="var(--muted)"
                   fontSize="10"
                   textAnchor="middle"
                 >
@@ -366,7 +375,7 @@ export default function PriceChart({
               y={PAD.top}
               width={Math.max(0, PAD.left + INNER_W - bandX)}
               height={INNER_H}
-              fill="#6e89a4"
+              fill="var(--line-strong)"
               fillOpacity="0.08"
             />
             {/* Only once the start itself is in view, and only if a lock marker
@@ -380,14 +389,14 @@ export default function PriceChart({
                   x2={bandX}
                   y1={PAD.top}
                   y2={baseline}
-                  stroke="#7897b6"
+                  stroke="var(--accent)"
                   strokeDasharray="3 3"
                 />
               )}
             <text
               x={PAD.left + INNER_W - 4}
               y={PAD.top + 12}
-              fill="#9ab5cf"
+              fill="var(--accent-strong)"
               fontSize="11"
               textAnchor="end"
             >
@@ -487,6 +496,45 @@ export default function PriceChart({
           );
         })}
 
+        {/* Each directional entry, exit, and reversal, marked where it happened */}
+        {trades.map((trade, i) => {
+          if (trade.t < t0 || trade.t > t1) return null;
+          const tx = x(trade.t);
+          const ty = y(Math.min(Math.max(trade.p, low), high));
+          const color = trade.side === "long" ? UP : DOWN;
+          const action = trade.action ?? "entry";
+          return (
+            <g key={i}>
+              {action === "exit" ? (
+                <rect
+                  x={tx - 5}
+                  y={ty - 5}
+                  width="10"
+                  height="10"
+                  rx="2"
+                  fill="var(--surface)"
+                  stroke={color}
+                  strokeWidth="2"
+                />
+              ) : action === "reverse" ? (
+                <path d={`M ${tx} ${ty - 7} L ${tx + 7} ${ty} L ${tx} ${ty + 7} L ${tx - 7} ${ty} Z`} fill="var(--surface)" stroke={color} strokeWidth="2" />
+              ) : (
+                <circle cx={tx} cy={ty} r="6" fill="var(--surface)" stroke={color} strokeWidth="2" />
+              )}
+              <text
+                x={tx}
+                y={ty + 3.5}
+                fill={color}
+                fontSize="7.5"
+                fontWeight="700"
+                textAnchor="middle"
+              >
+                {action === "entry" ? (trade.side === "long" ? "L" : "S") : action === "exit" ? "×" : "R"}
+              </text>
+            </g>
+          );
+        })}
+
         {/* Current price marker */}
         <circle
           cx={x(last.t)}
@@ -506,7 +554,7 @@ export default function PriceChart({
           <text
             x={PAD.left + INNER_W}
             y={PAD.top - 7}
-            fill="#8493a3"
+            fill="var(--muted)"
             fontSize="11"
             textAnchor="end"
           >
