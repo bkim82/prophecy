@@ -545,7 +545,7 @@ function TradingDock(props: DockProps) {
           <p className="text-xs uppercase tracking-wider text-[var(--muted)]">
             Balance
           </p>
-          <p className="mt-1 text-xl font-semibold tabular-nums text-[var(--accent-strong)]">
+          <p className="mt-1 text-2xl font-semibold tabular-nums text-[var(--accent-strong)]">
             {usd(balance)}
           </p>
         </div>
@@ -668,14 +668,11 @@ function TradingDock(props: DockProps) {
                     ? { backgroundColor: sideColor(side), color: "var(--accent-contrast)" }
                     : undefined
                 }
-                className={`rounded-lg px-4 py-4 text-left transition disabled:bg-[var(--btn-disabled-bg)] disabled:text-[var(--btn-disabled-text)] ${
+                className={`rounded-lg px-3 py-2.5 text-left transition disabled:bg-[var(--btn-disabled-bg)] disabled:text-[var(--btn-disabled-text)] ${
                   pressedSide === side ? "scale-[0.98]" : ""
                 }`}
               >
-                <span className="block text-xs uppercase tracking-wider opacity-70">
-                  Go
-                </span>
-                <span className="mt-0.5 block text-2xl font-semibold">
+                <span className="block text-xl font-semibold">
                   {side === "long" ? "Long ↗" : "Short ↘"}
                 </span>
               </button>
