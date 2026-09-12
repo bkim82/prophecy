@@ -138,7 +138,6 @@ export default function Page() {
           <span className="round-meta">{activeMode.meta}</span>
         </div>
         <div className="mode-switcher" role="group" aria-label="Choose a mode">
-          <span className="field-label">Modes</span>
           {modes.map((option) => (
             <button key={option.id} type="button" className={option.id === mode ? "active" : ""} aria-pressed={option.id === mode} onClick={() => setMode(option.id)}>
               {option.label}
