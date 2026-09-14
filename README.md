@@ -1,6 +1,6 @@
-# BTC Duel
+# BTC Arena
 
-A 1v1 Bitcoin duel with networked Quick Play predictions and Pulse live trading. Quick Play compares locked price guesses; Pulse compares server-settled leveraged P&L after both players choose a side.
+A 1v1 Bitcoin arena with networked Quick Play predictions and Pulse live trading. Quick Play compares locked price guesses; Pulse compares server-settled leveraged P&L after both players choose a side.
 
 Sign-in is optional — players are identified by an anonymous per-browser id. Nothing is staked: the wager is displayed, not charged. This is a prototype of the core loop, not a product.
 

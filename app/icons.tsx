@@ -2,7 +2,7 @@
 // streak affordances on-brand instead of dropping platform-rendered emoji art
 // into an otherwise deliberate visual system.
 
-export function DuelIcon({ className }: { className?: string }) {
+export function ArenaIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M2 14 12 4M9.3 2 14 2 14 6.7" />

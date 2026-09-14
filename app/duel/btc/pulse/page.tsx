@@ -360,7 +360,7 @@ export default function Page() {
       </Link>
 
       <h1 className="mt-4 text-center text-sm font-medium uppercase tracking-[0.2em] text-[var(--muted)]">
-        BTC Duel · Pulse
+        BTC Arena · Pulse
       </h1>
 
       {/* Scoreboard: you, the clock, the AI rival */}

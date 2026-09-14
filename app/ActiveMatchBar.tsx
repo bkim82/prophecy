@@ -42,7 +42,7 @@ export function ActiveMatchBar() {
   }, []);
 
   // Reset the stale view immediately on a match change so the bar never
-  // flashes the previous duel's phase while the first poll is in flight.
+  // flashes the previous arena's phase while the first poll is in flight.
   useEffect(() => setView(null), [match?.matchId]);
 
   const onOwnPage = Boolean(match) && pathname === activeMatchHref(match!);
@@ -101,7 +101,7 @@ export function ActiveMatchBar() {
   if (!match || onOwnPage || !view || queueing) return null;
 
   const marketLabel = match.market.toUpperCase();
-  const modeLabel = match.mode === "pulse" ? "Pulse" : "Cast";
+  const modeLabel = match.mode === "pulse" ? "Pulse" : "Quick Play";
   const status = statusCopy(view);
 
   const handlePillClick = (event: React.MouseEvent) => {
@@ -121,7 +121,7 @@ export function ActiveMatchBar() {
         <span className="active-match-bar-dot" aria-hidden="true" />
         <span className="active-match-bar-copy">
           <strong>
-            {marketLabel} {modeLabel} duel live
+            {marketLabel} {modeLabel} arena live
           </strong>
           <span className="muted">{status}</span>
         </span>
@@ -141,5 +141,5 @@ function statusCopy(view: MatchView): string {
       : "Lock a prediction before time runs out";
   }
   if (view.status === "countdown") return "Round in progress";
-  return "Duel in progress";
+  return "Arena in progress";
 }

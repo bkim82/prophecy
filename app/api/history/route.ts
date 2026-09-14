@@ -9,7 +9,7 @@ type Candle = [number, number, number, number, number, number];
 
 type Point = { t: number; p: number };
 
-const HEADERS = { "User-Agent": "btc-duel" };
+const HEADERS = { "User-Agent": "btc-arena" };
 const NO_STORE = { "Cache-Control": "no-store" };
 const SUPPORTED_PRODUCTS = new Set(["BTC-USD", "ETH-USD", "DOGE-USD"]);
 

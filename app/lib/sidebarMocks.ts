@@ -3,9 +3,9 @@
 // computation — see docs/feeds.md.
 import { GLOBAL_POSTS, type Market, type Post, type Side } from "@/app/lib/mockPosts";
 
-export type LiveDuel = { id: string; market: Market; players: string; timer: string };
+export type LiveArena = { id: string; market: Market; players: string; timer: string };
 
-export const LIVE_DUELS: LiveDuel[] = [
+export const LIVE_ARENAS: LiveArena[] = [
   { id: "d1", market: "btc", players: "Nova vs Ren", timer: "0:42" },
   { id: "d2", market: "eth", players: "Zane vs 8bit Kay", timer: "1:15" },
   { id: "d3", market: "doge", players: "Marcus vs Priya", timer: "0:08" },

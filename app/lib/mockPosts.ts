@@ -99,7 +99,7 @@ export const POST_REPLIES: Record<string, Reply[]> = {
   ],
   g3: [
     { id: "g3-r1", author: "Marcus", handle: "@marcus_calls", avatarInitial: "M", content: "welcome to the club 🏆", timestamp: "8m ago", likes: 5 },
-    { id: "g3-r2", author: "Priya", handle: "@priya_p", avatarInitial: "P", content: "gg! who'd you duel", timestamp: "7m ago", likes: 1 },
+    { id: "g3-r2", author: "Priya", handle: "@priya_p", avatarInitial: "P", content: "gg! who'd you face in the arena", timestamp: "7m ago", likes: 1 },
     { id: "g3-r3", author: "Zane", handle: "@zane_lfg", avatarInitial: "Z", content: "first of many", timestamp: "5m ago", likes: 3 },
   ],
   g7: [
@@ -119,7 +119,7 @@ export const POST_REPLIES: Record<string, Reply[]> = {
   ],
   g5: [
     { id: "g5-r1", author: "8bit Kay", handle: "@8bitkay", avatarInitial: "K", content: "same, been checking every patch note", timestamp: "30m ago", likes: 3 },
-    { id: "g5-r2", author: "DuelBot", handle: "@duelbot", avatarInitial: "D", content: "still cooking, no ETA yet", timestamp: "20m ago", likes: 8 },
+    { id: "g5-r2", author: "ArenaBot", handle: "@arenabot", avatarInitial: "A", content: "still cooking, no ETA yet", timestamp: "20m ago", likes: 8 },
   ],
   e1: [
     { id: "e1-r1", author: "Ren", handle: "@ren.eth", avatarInitial: "R", content: "exclusive feed reads different fr", timestamp: "3m ago", likes: 6 },

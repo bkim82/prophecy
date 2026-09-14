@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ClerkProvider, Show, SignInButton, UserButton } from "@clerk/nextjs";
 import { ActiveMatchBar } from "./ActiveMatchBar";
 import { BalancePill } from "./BalancePill";
-import { DuelIcon } from "./icons";
+import { ArenaIcon } from "./icons";
 import { TabNav } from "./TabNav";
 import { ThemeToggle } from "./ThemeToggle";
 import { THEME_INIT_SCRIPT } from "./theme";
@@ -19,8 +19,8 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 const plexMono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--font-mono" });
 
 export const metadata: Metadata = {
-  title: "Prophecy — Live market duels",
-  description: "Wager your foresight against the market. Live crypto duels, decided in seconds.",
+  title: "Prophecy — Live market arenas",
+  description: "Wager your foresight against the market. Live crypto arenas, decided in seconds.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -43,8 +43,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <TabNav />
               </div>
               <div className="header-actions">
-                <Link href="/duel/btc/battle" className="duel-cta">
-                  <DuelIcon className="duel-cta-icon" /> Duel
+                <Link href="/duel" className="arena-cta">
+                  <ArenaIcon className="arena-cta-icon" /> Arena
                 </Link>
                 <ThemeToggle />
                 <Show

@@ -1,7 +1,7 @@
 "use client";
 
-// Tracks the one live duel this browser is currently playing, independent of
-// which page is on screen. Lets a global bar offer "return to your duel" from
+// Tracks the one live arena this browser is currently playing, independent of
+// which page is on screen. Lets a global bar offer "return to your arena" from
 // anywhere, since leaving the room's page never calls `leave` and the match
 // keeps running server-side (docs/multiplayer-plan.md).
 const KEY = "activeMatch";

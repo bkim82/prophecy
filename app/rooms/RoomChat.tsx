@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent, type KeyboardEvent } from "react";
-import { DuelIcon } from "@/app/icons";
+import { ArenaIcon } from "@/app/icons";
 import type { Market } from "@/app/lib/mockPosts";
 import type { RoomCall, RoomMessage } from "@/app/lib/roomsMocks";
 
@@ -67,7 +67,7 @@ export function RoomChat({ initialMessages }: RoomChatProps) {
                   {message.call && <RoomCallChip call={message.call} />}
                   {message.challengeLabel && (
                     <button type="button" className="room-challenge-btn">
-                      <DuelIcon /> {message.challengeLabel}
+                      <ArenaIcon /> {message.challengeLabel}
                     </button>
                   )}
                 </div>

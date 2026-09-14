@@ -1,13 +1,13 @@
 # architecture
 
-- Root header (`app/layout.tsx`) merges the `PROPHECY` brand, a compact `Omens`/`Rooms` text-tab nav (`app/TabNav.tsx`, sliding underline, active via `usePathname()`), and a primary `Duel` CTA (icon from `app/icons.tsx`, `app/layout.tsx`, links to `/duel/btc/battle`) into one row. Routes: `/` (Global feed), `/rooms` (rank-gated group chat placeholder, `app/rooms/page.tsx`), `/duel` (the market lobby, moved from `app/page.tsx`). `/exclusive` (rank-gated feed) still exists but is no longer linked from the header nav. Live ticker on `/duel` reads the client-side BTC feed.
+- Root header (`app/layout.tsx`) merges the `PROPHECY` brand, a compact `Omens`/`Rooms` text-tab nav (`app/TabNav.tsx`, sliding underline, active via `usePathname()`), and a primary `Arena` CTA (icon from `app/icons.tsx`, `app/layout.tsx`, links to `/duel`) into one row. Routes: `/` (Global feed), `/rooms` (rank-gated group chat placeholder, `app/rooms/page.tsx`), `/duel` (the market lobby, moved from `app/page.tsx`). `/exclusive` (rank-gated feed) still exists but is no longer linked from the header nav. Live ticker on `/duel` reads the client-side BTC feed.
 - Quick Play and multiplayer Pulse are server-authoritative: a `matches` row owns the round (`db/schema.ts:20`), `/api/match/*` routes own the transitions, clients poll. See [multiplayer-plan.md](multiplayer-plan.md).
 - `/api/price` and `/api/history` remain stateless proxies to public exchange APIs. The price feed and chart stay client-side in every mode.
 
 ## Graph
 
 ```
-app/layout.tsx (root shell: PROPHECY, Omens/Rooms tabs, Duel CTA, balance, profile)
+app/layout.tsx (root shell: PROPHECY, Omens/Rooms tabs, Arena CTA, balance, profile)
   ├── app/TabNav.tsx (persistent Omens / Rooms tab switcher, sliding underline)
   ├── app/page.tsx (Global feed: mock PostCard list, app/lib/mockPosts.ts)
   ├── app/rooms/page.tsx (Rooms: rank-gated group chat placeholder, app/lib/roomsMocks.ts)
@@ -35,12 +35,13 @@ match room → POST /api/match/[id]/{lock,action,leave}
 /api/price   → lib/spotPrice.ts → api.coinbase.com → api.binance.com fallback chain
 ```
 
-BTC Quick Play and multiplayer Pulse are wired up. ETH and 24hr Battle are lobby-only
-placeholders — selectable in the mode switcher, which locks the play panel when
-the chosen mode has neither `href` nor `matched` (`app/duel/page.tsx:89-103`, `:120`).
-`matched` marks a mode with no fixed URL: Play posts to `find-or-create` and
-routes to the mode-specific room (`app/duel/page.tsx`). Pulse takes its stake and
-leverage in-round.
+BTC Quick Play, multiplayer Pulse, and the 24h Reading are wired up. The arena
+lobby opens on the 24h Reading by default and renders `Battle24h` inline;
+ETH and DOGE modes remain lobby-only placeholders. Selectable modes with
+neither `href` nor `matched` lock the play panel (`app/duel/page.tsx:112-127`,
+`:146`, `:447-449`). `matched` marks a mode with no fixed URL: Play posts to
+`find-or-create` and routes to the mode-specific room (`app/duel/page.tsx`).
+Pulse takes its stake and leverage in-round.
 
 ## Modules
 
@@ -94,7 +95,7 @@ leverage in-round.
 - All fetch paths degrade, never throw to the user: history → trades ∪ candles → `[]` (`app/api/history/route.ts:88-110`); price → Coinbase → Binance → 502 (`lib/spotPrice.ts:39-52`); match poll failure → keep polling, never eject the player (`app/duel/[market]/match/[matchId]/page.tsx:90-92`); settlement price outage → row stays in `countdown`, next poll retries (`lib/match.ts:71-73`).
 - `PriceChart` holds only its time and price wheel zoom levels (`docs/chart.md` → Zoom), and otherwise stays a pure function of props — including its clock, which arrives as the `now` prop rather than a `Date.now()` read or an interval of its own (`app/duel/[market]/match/[matchId]/page.tsx:321-327`). Round/freeze logic belongs in the match room (`app/duel/[market]/match/[matchId]/page.tsx:128-137`), not the chart. Same for lock timestamps: the server stamps them, the room converts them off the server clock (`app/duel/[market]/match/[matchId]/page.tsx:52-56`), and the chart just draws whatever `PredictionLine.at` it gets.
 - Color literals stay out of components: add a token to `app/globals.css` and define it in both blocks, or the toggle silently breaks in one theme.
-- The duel lobby may read `usePriceFeed()` for live market display (`app/duel/page.tsx:139`), but settlement logic stays out of it — Quick Play settles on the server (`lib/match.ts:64`), Pulse in its own page.
+- The arena lobby may read `usePriceFeed()` for live market display (`app/duel/page.tsx:139`), but settlement logic stays out of it — Quick Play settles on the server (`lib/match.ts:64`), Pulse in its own page.
 - Pulse long/short reuse `--chart-up`/`--chart-down` (`app/duel/btc/pulse/page.tsx:16-17`), so a chart marker matches the control that placed it. P&L sign uses `--positive`/`--negative` (`:71`).
 
 ## Round data flow (Quick Play, sequence)

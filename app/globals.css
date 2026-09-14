@@ -63,9 +63,9 @@ button { cursor: pointer; }
 .header-left { display: flex; align-items: center; gap: 22px; min-width: 0; }
 .brand { flex: none; font-family: var(--font-cinzel), Cinzel, Georgia, serif; color: var(--text); font-size: 16px; font-weight: 600; letter-spacing: .3em; text-decoration: none; }
 .header-actions { display: flex; align-items: center; gap: 14px; }
-.duel-cta { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--accent); border-radius: 6px; background: var(--accent); color: var(--accent-contrast); padding: 7px 14px; font-size: 13px; font-weight: 700; letter-spacing: .01em; text-decoration: none; box-shadow: 0 0 0 0 transparent; transition: background .15s ease, border-color .15s ease, box-shadow .2s ease; }
-.duel-cta:hover { background: var(--accent-strong); border-color: var(--accent-strong); box-shadow: 0 0 16px color-mix(in srgb, var(--accent) 45%, transparent); }
-.duel-cta-icon { width: 12px; height: 12px; }
+.arena-cta { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--accent); border-radius: 6px; background: var(--accent); color: var(--accent-contrast); padding: 7px 14px; font-size: 13px; font-weight: 700; letter-spacing: .01em; text-decoration: none; box-shadow: 0 0 0 0 transparent; transition: background .15s ease, border-color .15s ease, box-shadow .2s ease; }
+.arena-cta:hover { background: var(--accent-strong); border-color: var(--accent-strong); box-shadow: 0 0 16px color-mix(in srgb, var(--accent) 45%, transparent); }
+.arena-cta-icon { width: 12px; height: 12px; }
 .signin-button { border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--muted); padding: 7px 12px; font-size: 13px; }
 .signin-button:hover { border-color: var(--line-strong); color: var(--text); }
 .theme-toggle { display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--muted); padding: 0; }
@@ -433,7 +433,7 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
   .header-left { gap: 14px; }
   .main-nav { gap: 12px; }
   .main-nav-link { font-size: 12px; }
-  .duel-cta { padding: 7px 10px; font-size: 12px; }
+  .arena-cta { padding: 7px 10px; font-size: 12px; }
   .feed-shell { width: min(100% - 24px, 1080px); padding-top: 14px; gap: 20px; }
   .community-dropdown-trigger { font-size: 11px; padding: 5px 10px; }
   .post-card { padding: 10px 4px; gap: 10px; }

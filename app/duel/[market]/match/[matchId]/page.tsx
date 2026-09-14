@@ -299,11 +299,11 @@ export default function Page({
     return (
       <main className="mx-auto max-w-4xl px-4 py-10 text-center">
         <h1 className="text-lg font-medium text-[var(--text)]">
-          {inviteJoin ? "You've been invited to a duel" : "Sign in to view this match"}
+          {inviteJoin ? "You've been invited to an arena" : "Sign in to view this match"}
         </h1>
         <p className="mt-2 text-sm text-[var(--muted)]">
           {inviteJoin
-            ? "Sign in and you'll join this duel automatically."
+            ? "Sign in and you'll join this arena automatically."
             : "Sign in to continue."}
         </p>
         <div className="mt-6 flex items-center justify-center gap-3">
@@ -356,7 +356,7 @@ export default function Page({
       </Link>
 
       <h1 className="mt-4 text-center text-sm font-medium uppercase tracking-[0.2em] text-[var(--muted)]">
-        {marketLabel} Duel · Cast
+        {marketLabel} Arena · Quick Play
         {view ? ` · ${view.wager} embers · ${view.timerSeconds}s` : ""}
       </h1>
 
