@@ -233,7 +233,7 @@ button { cursor: pointer; }
 @keyframes pulse-screen-shake { 0%, 100% { transform: translate(0); } 18% { transform: translate(-2px, 1px); } 36% { transform: translate(2px, -1px); } 54% { transform: translate(-1px, 1px); } 72% { transform: translate(1px, 0); } }
 html.pulse-screen-shake { animation: pulse-screen-shake .24s ease-in-out; }
 @media (prefers-reduced-motion: reduce) { .pulse-movement-alert { animation: none; } html.pulse-screen-shake { animation: none; } }
-.active-match-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: flex; justify-content: center; padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); pointer-events: none; }
+.active-match-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: flex; flex-direction: column-reverse; align-items: center; gap: 8px; padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); pointer-events: none; }
 .active-match-bar-link { pointer-events: auto; display: flex; align-items: center; gap: 12px; width: min(100%, 480px); border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface); padding: 8px 8px 8px 16px; text-decoration: none; color: var(--text); box-shadow: 0 10px 30px rgba(0, 0, 0, .28); animation: active-match-bar-in .2s ease-out; }
 .active-match-bar-link:hover { border-color: var(--accent); }
 .active-match-bar-dot { flex: none; width: 8px; height: 8px; border-radius: 999px; background: var(--accent); animation: queue-pulse 1.4s ease-in-out infinite; }
@@ -243,6 +243,27 @@ html.pulse-screen-shake { animation: pulse-screen-shake .24s ease-in-out; }
 .active-match-bar-cta { flex: none; border-radius: 999px; background: var(--btn-bg); color: var(--btn-text); padding: 8px 14px; font-size: 12px; font-weight: 700; }
 @keyframes active-match-bar-in { 0% { opacity: 0; transform: translateY(12px); } 100% { opacity: 1; transform: translateY(0); } }
 @media (prefers-reduced-motion: reduce) { .active-match-bar-dot { animation: none; } .active-match-bar-link { animation: none; } }
+/* Minified Pulse trading controls, popped up above the bar on hover (desktop)
+   or tap (touch) — see app/PulseMiniDock.tsx. */
+.pulse-mini-dock { pointer-events: auto; display: flex; flex-direction: column; gap: 10px; width: min(100%, 380px); max-height: min(60vh, 420px); overflow-y: auto; border: 1px solid var(--line-strong); border-radius: 16px; background: var(--surface); padding: 14px; box-shadow: 0 10px 30px rgba(0, 0, 0, .28); animation: active-match-bar-in .16s ease-out; }
+.pulse-mini-dock-head { display: flex; align-items: center; justify-content: space-between; }
+.pulse-mini-dock-balance { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--accent-strong); }
+.pulse-mini-dock-timer { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text); }
+.pulse-mini-dock-positions { display: flex; flex-direction: column; gap: 6px; }
+.pulse-mini-dock-position { display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-raised); padding: 6px 10px; font-size: 12px; }
+.pulse-mini-dock-position .pnl { flex: 1; text-align: right; font-variant-numeric: tabular-nums; }
+.pulse-mini-dock-position button { flex: none; border: 0; background: transparent; color: var(--muted); padding: 0 2px; font-size: 16px; line-height: 1; }
+.pulse-mini-dock-position button:hover:not(:disabled) { color: var(--negative); }
+.pulse-mini-dock-row { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; }
+.pulse-mini-dock-row button { border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--muted); padding: 6px 4px; font-size: 11px; font-variant-numeric: tabular-nums; }
+.pulse-mini-dock-row button.active { border-color: var(--accent); background: var(--selected-bg); color: var(--accent-strong); }
+.pulse-mini-dock-row button:disabled, .pulse-mini-dock-position button:disabled { color: var(--muted-dim); cursor: default; }
+.pulse-mini-dock-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pulse-mini-dock-actions button { border: 0; border-radius: 8px; padding: 10px; font-size: 14px; font-weight: 700; background: var(--btn-disabled-bg); color: var(--btn-disabled-text); }
+.pulse-mini-dock-error { margin: 0; color: var(--negative); font-size: 11px; text-align: center; }
+.pulse-mini-dock-link { align-self: center; color: var(--muted-dim); font-size: 11px; text-decoration: none; }
+.pulse-mini-dock-link:hover { color: var(--text); }
+@media (prefers-reduced-motion: reduce) { .pulse-mini-dock { animation: none; } }
 .lower-grid { display: grid; grid-template-columns: 1.25fr 1fr; gap: 28px; margin-top: 30px; }
 .list-heading { display: flex; justify-content: space-between; align-items: center; margin: 0 2px 10px; }
 .list-heading h2 { margin: 0; font-size: 14px; font-weight: 600; }
