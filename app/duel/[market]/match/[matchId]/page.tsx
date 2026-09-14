@@ -190,7 +190,7 @@ export default function Page({
     } catch {
       // Best-effort; presence expiry covers a failed leave.
     }
-    router.push("/");
+    router.push("/duel");
   };
 
   const nudge = (pct: number) => {
@@ -281,7 +281,7 @@ export default function Page({
             : "Your opponent left before the round started, or the match no longer exists."}
         </p>
         <Link
-          href="/"
+          href="/duel"
           className="mt-6 inline-block rounded-md bg-[var(--btn-bg)] px-5 py-2 text-sm font-medium text-[var(--btn-text)] transition hover:bg-[var(--btn-bg-hover)]"
         >
           Back to lobby
@@ -293,7 +293,7 @@ export default function Page({
   return (
     <main className="mx-auto max-w-4xl px-4 py-10">
       <Link
-        href="/"
+        href="/duel"
         className="text-xs uppercase tracking-wider text-[var(--muted-dim)] transition hover:text-[var(--text)]"
       >
         ← Menu
@@ -653,7 +653,7 @@ export default function Page({
                 : "You ran out of time before locking a prediction."}
           </p>
           <Link
-            href="/"
+            href="/duel"
             className="mt-5 inline-block rounded-md bg-[var(--btn-bg)] px-5 py-2 text-sm font-medium text-[var(--btn-text)] transition hover:bg-[var(--btn-bg-hover)]"
           >
             Play Again
@@ -676,7 +676,7 @@ export default function Page({
             opponent off by {usd(outcome.oppDiff)}
           </p>
           <Link
-            href="/"
+            href="/duel"
             className="mt-5 inline-block rounded-md bg-[var(--btn-bg)] px-5 py-2 text-sm font-medium text-[var(--btn-text)] transition hover:bg-[var(--btn-bg-hover)]"
           >
             Play Again

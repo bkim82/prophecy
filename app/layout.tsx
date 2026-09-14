@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ClerkProvider, Show, SignInButton, UserButton } from "@clerk/nextjs";
 import { BalancePill } from "./BalancePill";
+import { TabNav } from "./TabNav";
 import { ThemeToggle } from "./ThemeToggle";
 import { THEME_INIT_SCRIPT } from "./theme";
 import "./globals.css";
@@ -38,6 +39,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </div>
             </div>
           </header>
+          <TabNav />
           {children}
         </ClerkProvider>
       </body>
