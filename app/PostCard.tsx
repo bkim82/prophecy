@@ -205,7 +205,11 @@ export function PostCard({ post }: { post: Post }) {
             <PostMenu firstName={firstName} />
           </span>
         </div>
-        <p className="post-content">{post.content}</p>
+        <div className="post-content">
+          {post.content.split(/\n\n+/).map((paragraph, index) => (
+            <p key={`${post.id}-paragraph-${index}`}>{paragraph}</p>
+          ))}
+        </div>
         {post.image && <PostImage image={post.image} />}
         {post.call && <MarketCallCard call={post.call} />}
         <div className="post-actions">

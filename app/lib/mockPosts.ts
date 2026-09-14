@@ -181,6 +181,20 @@ export const GLOBAL_POSTS: Post[] = [
     },
   },
   {
+    id: "g3",
+    author: "8bit Kay",
+    handle: "@8bitkay",
+    avatarInitial: "K",
+    content: `Base Season feels like the moment the whole onchain world remembers that the best ecosystems are not built by shouting the loudest, but by giving people a reason to keep showing up. What makes Base interesting to me is the mix of serious builders, weird little experiments, consumer apps, and culture that can all exist in the same block space without everything needing to look like another copy-pasted financial dashboard. The low-friction onboarding matters, but the bigger story is that Base keeps making crypto feel less like a place you visit for one trade and more like an internet neighborhood where identities, communities, games, art, and money can overlap. That is the part of the season I am watching: not just which token gets the biggest candle, but which projects earn actual habits from their users.
+
+My take is that Base Season will reward consistency over pure hype. The teams that last will be the ones turning attention into products people use on an ordinary Tuesday, while the communities that win will be the ones making newcomers feel like participants instead of exit liquidity. There will absolutely be noise, recycled narratives, and launches that sprint for a week before disappearing, but that is normal when a network becomes a cultural magnet. I would rather follow the builders shipping through the boring stretches, the creators making the ecosystem feel alive, and the apps that quietly remove three steps from something everyone already wants to do. If Base can keep that balance between speed, experimentation, and genuine usability, this season could be less of a speculative moment and more of a lasting reset for what an accessible onchain ecosystem looks like.`,
+    timestamp: "11m ago",
+    likes: 63,
+    replies: 12,
+    kind: "text",
+    rank: "Bronze III",
+  },
+  {
     id: "g-streak1",
     author: "Zane",
     handle: "@zane_lfg",
@@ -193,18 +207,6 @@ export const GLOBAL_POSTS: Post[] = [
     rank: "Gold I",
     streakStat: "6-day streak",
     market: "btc",
-  },
-  {
-    id: "g3",
-    author: "8bit Kay",
-    handle: "@8bitkay",
-    avatarInitial: "K",
-    content: "New to Prophecy, just won my first head-to-head. This is way more fun than I expected.",
-    timestamp: "11m ago",
-    likes: 63,
-    replies: 12,
-    kind: "text",
-    rank: "Bronze III",
   },
   {
     id: "g7",
