@@ -10,7 +10,7 @@ export default function Page() {
       <div className="feed-main">
         <section className="feed-heading">
           <span className="eyebrow">Exclusive</span>
-          <h1 className="display-font">Feed</h1>
+          <h1 className="display-font">Omens</h1>
           <span className="muted">Unlocked by rank</span>
         </section>
 

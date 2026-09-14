@@ -4,7 +4,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { useLayoutEffect, useRef, useState, useTransition } from "react";
 
 const TABS = [
-  { href: "/", label: "Feed" },
+  { href: "/", label: "Omens" },
   { href: "/rooms", label: "Rooms" },
 ];
 

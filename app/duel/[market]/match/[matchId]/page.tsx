@@ -320,8 +320,8 @@ export default function Page({
       </Link>
 
       <h1 className="mt-4 text-center text-sm font-medium uppercase tracking-[0.2em] text-[var(--muted)]">
-        {marketLabel} Duel · Quick Play
-        {view ? ` · ${view.wager} coins · ${view.timerSeconds}s` : ""}
+        {marketLabel} Duel · Cast
+        {view ? ` · ${view.wager} embers · ${view.timerSeconds}s` : ""}
       </h1>
 
       <section className="mt-6 text-center">
@@ -350,9 +350,9 @@ export default function Page({
           {!view && <p className="text-sm text-[var(--muted)]">Loading match…</p>}
           {view?.status === "open" && (
             <>
-              <p className="text-sm text-[var(--muted)]">Waiting for an opponent…</p>
+              <p className="text-sm text-[var(--muted)]">Awaiting a challenger…</p>
               <p className="mt-1 text-xs text-[var(--muted-dim)]">
-                Anyone picking {marketLabel} Quick Play at {view.wager} coins ·{" "}
+                Anyone picking {marketLabel} Cast at {view.wager} embers ·{" "}
                 {view.timerSeconds}s joins you.
               </p>
             </>

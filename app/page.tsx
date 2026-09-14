@@ -7,7 +7,7 @@ export default function Page() {
     <main className="feed-shell">
       <div className="feed-main">
         <section className="feed-heading">
-          <h1 className="display-font">Feed</h1>
+          <h1 className="display-font">Omens</h1>
         </section>
         <div className="feed-pulse-strip">
           <span className="status-dot is-online" aria-hidden="true" />

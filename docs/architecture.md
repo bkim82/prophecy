@@ -1,14 +1,14 @@
 # architecture
 
-- Root header (`app/layout.tsx`) merges the brand, a compact `Feed`/`Rooms` text-tab nav (`app/TabNav.tsx`, sliding underline, active via `usePathname()`), and a primary `⚔ DUEL` CTA (`app/layout.tsx`, links to `/duel`) into one row. Routes: `/` (Global feed), `/rooms` (rank-gated group chat placeholder, `app/rooms/page.tsx`), `/duel` (the market lobby, moved from `app/page.tsx`). `/exclusive` (rank-gated feed) still exists but is no longer linked from the header nav. Live ticker on `/duel` reads the client-side BTC feed.
+- Root header (`app/layout.tsx`) merges the `PROPHECY` brand, a compact `Omens`/`Rooms` text-tab nav (`app/TabNav.tsx`, sliding underline, active via `usePathname()`), and a primary `Duel` CTA (icon from `app/icons.tsx`, `app/layout.tsx`, links to `/duel`) into one row. Routes: `/` (Global feed), `/rooms` (rank-gated group chat placeholder, `app/rooms/page.tsx`), `/duel` (the market lobby, moved from `app/page.tsx`). `/exclusive` (rank-gated feed) still exists but is no longer linked from the header nav. Live ticker on `/duel` reads the client-side BTC feed.
 - Quick Play and multiplayer Pulse are server-authoritative: a `matches` row owns the round (`db/schema.ts:20`), `/api/match/*` routes own the transitions, clients poll. See [multiplayer-plan.md](multiplayer-plan.md).
 - `/api/price` and `/api/history` remain stateless proxies to public exchange APIs. The price feed and chart stay client-side in every mode.
 
 ## Graph
 
 ```
-app/layout.tsx (root shell: DUEL, Feed/Rooms tabs, ⚔ DUEL CTA, balance, profile)
-  ├── app/TabNav.tsx (persistent Feed / Rooms tab switcher, sliding underline)
+app/layout.tsx (root shell: PROPHECY, Omens/Rooms tabs, Duel CTA, balance, profile)
+  ├── app/TabNav.tsx (persistent Omens / Rooms tab switcher, sliding underline)
   ├── app/page.tsx (Global feed: mock PostCard list, app/lib/mockPosts.ts)
   ├── app/rooms/page.tsx (Rooms: rank-gated group chat placeholder, app/lib/roomsMocks.ts)
   ├── app/exclusive/page.tsx (Exclusive feed: rank-gated via app/lib/rank.ts stub, unlinked from nav)

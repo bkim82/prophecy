@@ -19,7 +19,7 @@ export function BalancePill() {
     <span className="balance-display">
       <span className="balance-label">Balance</span>
       <span className="tabular-nums">{balance === null ? "—" : balance}</span>
-      <span className="balance-label">coins</span>
+      <span className="balance-label">embers</span>
     </span>
   );
 }

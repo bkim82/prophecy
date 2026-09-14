@@ -1,4 +1,5 @@
 import type { Market } from "@/app/lib/mockPosts";
+import { DuelIcon } from "@/app/icons";
 import {
   CURRENT_ROOM_LABEL,
   CURRENT_ROOM_SUBRANK,
@@ -28,7 +29,7 @@ export default function RoomsPage() {
     <main className="feed-shell">
       <div className="feed-main">
         <section className="feed-heading">
-          <span className="eyebrow">Your Room</span>
+          <span className="eyebrow">Your Circle</span>
           <h1 className="display-font">{CURRENT_ROOM_LABEL}</h1>
           <span className="muted">{CURRENT_ROOM_SUBRANK}</span>
         </section>
@@ -43,7 +44,7 @@ export default function RoomsPage() {
                   {message.call && <RoomCallChip call={message.call} />}
                   {message.challengeLabel && (
                     <button type="button" className="room-challenge-btn">
-                      <span aria-hidden="true">⚔</span> {message.challengeLabel}
+                      <DuelIcon /> {message.challengeLabel}
                     </button>
                   )}
                 </div>
