@@ -436,8 +436,9 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
 @media (max-width: 640px) {
   body { overflow-x: hidden; }
   .app-header { padding-inline: 14px; }
-  .app-header-inner { min-height: 34px; }
-  .header-actions { gap: 8px; }
+  .app-header-inner { min-height: 34px; flex-wrap: wrap; row-gap: 10px; }
+  .header-left { flex: 1 1 100%; min-width: 0; }
+  .header-actions { flex: 1 1 100%; min-width: 0; justify-content: flex-end; flex-wrap: wrap; gap: 8px; row-gap: 7px; }
   .balance-display { gap: 5px; font-size: 12px; }
   .balance-display .balance-label { display: none; }
   .signin-button { min-height: 40px; padding: 8px 11px; }
@@ -491,7 +492,7 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
   .header-left { gap: 14px; }
   .main-nav { gap: 12px; }
   .main-nav-link { font-size: 12px; }
-  .arena-cta { padding: 7px 10px; font-size: 12px; }
+  .arena-cta, .wallet-cta { min-height: 40px; padding: 7px 10px; font-size: 12px; }
   .feed-shell { width: min(100% - 24px, 1080px); padding-top: 14px; gap: 20px; }
   .community-dropdown-trigger { font-size: 11px; padding: 5px 10px; }
   .post-card { padding: 10px 4px; gap: 10px; }
