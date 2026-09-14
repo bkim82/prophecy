@@ -23,8 +23,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ClerkProvider>
           <header className="app-header">
             <div className="app-header-inner">
-              <Link href="/" className="brand">DUEL</Link>
+              <div className="header-left">
+                <Link href="/" className="brand">DUEL</Link>
+                <TabNav />
+              </div>
               <div className="header-actions">
+                <Link href="/duel" className="duel-cta">
+                  <span aria-hidden="true">⚔</span> DUEL
+                </Link>
                 <ThemeToggle />
                 <Show
                   when="signed-in"
@@ -40,7 +46,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </div>
             </div>
           </header>
-          <TabNav />
           {children}
           <ActiveMatchBar />
         </ClerkProvider>
