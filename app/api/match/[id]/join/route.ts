@@ -1,7 +1,9 @@
 import { and, eq, gt, isNull } from "drizzle-orm";
+import { auth } from "@clerk/nextjs/server";
 import { getDb } from "@/db";
 import { matches } from "@/db/schema";
 import { findMatch, presenceCutoff, readBody, roleOf } from "@/lib/match";
+import { refundBalance, reserveBalance } from "@/lib/balance";
 
 export const dynamic = "force-dynamic";
 
@@ -13,12 +15,23 @@ export const dynamic = "force-dynamic";
  * the seat, everyone else gets 409.
  */
 export async function POST(request: Request, ctx: { params: Promise<{ id: string }> }) {
+  const { userId } = await auth();
+  if (!userId) return Response.json({ error: "Sign in to play" }, { status: 401 });
   const { id } = await ctx.params;
   const body = await readBody(request);
   const playerId = typeof body.playerId === "string" ? body.playerId : "";
   if (!playerId) {
     return Response.json({ error: "Missing playerId" }, { status: 400 });
   }
+
+  const candidate = await findMatch(id);
+  if (!candidate) return Response.json({ error: "Match not found" }, { status: 404 });
+  const existingRole = roleOf(candidate, playerId);
+  if (existingRole && (existingRole === 1 ? candidate.player1UserId : candidate.player2UserId) === userId) {
+    return Response.json({ matchId: candidate.id });
+  }
+  const reserved = await reserveBalance(userId, candidate.wager);
+  if (!reserved) return Response.json({ error: "Insufficient balance" }, { status: 402 });
 
   const now = new Date();
   const [joined] = await getDb()
@@ -27,6 +40,7 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
       player2Id: playerId,
       player2LastSeen: now,
       status: "predict",
+      player2UserId: userId,
       // Starts the 15s lock window for both players at the same instant.
       predictStartAt: now,
     })
@@ -43,6 +57,8 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
   if (joined) {
     return Response.json({ matchId: joined.id });
   }
+
+  await refundBalance(userId, candidate.wager);
 
   const row = await findMatch(id);
   if (!row) {

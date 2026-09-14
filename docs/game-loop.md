@@ -82,5 +82,5 @@ final point pinned to the deadline rather than to whenever the tab noticed
 ## Known non-behaviors (see roadmap.md for detail)
 
 - A `predict` match whose opponent walks away now ends on the 15s window, by forfeit. An `open` one still needs Cancel or presence expiry.
-- `wager` is stored and shown, never charged or paid out.
+- `wager` is reserved from each signed-in player's balance on match entry, refunded for pre-round exits/ties, and paid as a 2× pot to the winner via the idempotent payout ledger (`lib/balance.ts`, `db/schema.ts`).
 - No cross-round score or history; `matches` rows accumulate with no cleanup.

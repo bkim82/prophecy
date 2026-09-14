@@ -12,6 +12,13 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const matchPayouts = pgTable("match_payouts", {
+  id: text("id").primaryKey(),
+  matchId: text("match_id").notNull(),
+  userId: text("user_id").notNull(),
+  amount: integer("amount").notNull(),
+});
+
 // One row per Quick Play match — the single source of truth for a networked
 // round. `status` mirrors the client-side `Phase` vocabulary in docs/game-loop.md
 // so the mental model is unchanged, only who owns it.
@@ -26,6 +33,8 @@ export const matches = pgTable("matches", {
   status: text("status").notNull().default("open"),
   player1Id: text("player1_id").notNull(),
   player2Id: text("player2_id"),
+  player1UserId: text("player1_user_id"),
+  player2UserId: text("player2_user_id"),
   // Every timestamp here is `timestamptz`, not the bare `timestamp` `users`
   // uses: these are compared against wall-clock `Date.now()` and written from
   // more than one code path. A naive column stores whatever local time the

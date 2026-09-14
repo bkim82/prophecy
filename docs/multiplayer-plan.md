@@ -9,7 +9,7 @@ DB, server state, or a second client. Pulse and 24hr Battle are untouched.
 - Identity: anonymous per-browser UUID in `localStorage.playerId` (`app/lib/playerId.ts:20`). Not Clerk; sign-in stays optional and unrelated.
 - Sync: ~1s polling (`app/duel/[market]/match/[matchId]/page.tsx:14`), no WebSocket registry. Lobby list polls at 3s (`app/page.tsx:17`), the queue at 1s (`app/page.tsx:22`).
 - Nobody sits in a room alone: an `open` match is waited out on the lobby page (`app/page.tsx:389-407`); the room is entered only once `status` leaves `open`. The queued state exposes a shareable invite URL (`app/page.tsx:192-198`) that auto-joins a friend as player 2 (`app/duel/[market]/match/[matchId]/page.tsx:65-97`).
-- No balance deduction. `wager` is stored and displayed only.
+- Quick Play requires Clerk sign-in. Each player's `wager` is reserved atomically from `users.balance` on entry; open/predict cancellation refunds it, ties refund both stakes, and the winner receives the 2× pot (`lib/balance.ts`).
 
 ## Status machine
 
@@ -36,7 +36,7 @@ multi-statement transactions or row locks. Every transition is a single guarded
 
 | Transition | Guard | Loser does |
 | --- | --- | --- |
-| join | `status='open' AND player2_id IS NULL` | try next candidate, else create (`app/api/match/find-or-create/route.ts:75-93`) |
+| join | `status='open' AND player2_id IS NULL` plus atomic balance reservation | refund if the guarded seat is lost (`app/api/match/find-or-create/route.ts:79-102`) |
 | lock | `status='predict' AND prediction{N} IS NULL` | re-read, return current view (`app/api/match/[id]/lock/route.ts:63-69`) |
 | start countdown | `status='predict'` | nothing — only the 2nd locker sees both non-null (`app/api/match/[id]/lock/route.ts:71-80`) |
 | expire lock window | `status='predict'`, plus `prediction{N} IS NULL` re-asserted for every slot read empty | re-read; a lock that beat it owns the row (`lib/match.ts:90-115`) |
@@ -66,7 +66,7 @@ multi-statement transactions or row locks. Every transition is a single guarded
 | `GET /api/match/open?market=&mode=&playerId=` | joinable matches with a fresh host heartbeat |
 
 Validation on entry: market must price (`lib/spotPrice.ts:12`), mode must be
-`quick-play`, wager integer 1..1,000,000, timer 10..3600s.
+`quick-play`, signed-in user, wager integer 1..1,000,000 and no more than the user's balance, timer 10..3600s.
 
 ## Client
 

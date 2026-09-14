@@ -7,12 +7,14 @@ export function BalancePill() {
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/balance")
+    const refresh = () => fetch("/api/balance")
       .then((res) => res.json())
       .then((data) => {
         if (!cancelled && typeof data.balance === "number") setBalance(data.balance);
       });
-    return () => { cancelled = true; };
+    refresh();
+    window.addEventListener("balance-updated", refresh);
+    return () => { cancelled = true; window.removeEventListener("balance-updated", refresh); };
   }, []);
 
   return (
