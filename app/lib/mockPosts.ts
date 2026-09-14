@@ -62,14 +62,78 @@ export type Post = {
   call?: MarketCall;
   image?: PostImage;
   streakStat?: string;
+  // Community tag for the feed's market pills (app/FeedSwitcher.tsx). Only
+  // needed on posts without a `call` — a call post's own `call.market`
+  // already implies its community.
+  market?: Market;
 };
-
-export const LIVE_PLAYER_COUNT = 2486;
-export const LIVE_DUEL_COUNT = 384;
 
 // Drives the "Following" feed filter (app/FeedSwitcher.tsx) — not a real
 // social graph, just a hardcoded handle allowlist for the mock.
 export const FOLLOWED_HANDLES = ["@nova_trades", "@ren.eth", "@zane_lfg"];
+
+export type Reply = {
+  id: string;
+  author: string;
+  handle: string;
+  avatarInitial: string;
+  content: string;
+  timestamp: string;
+  likes: number;
+};
+
+// Replies shown when a post's thread is expanded (app/PostCard.tsx's
+// ReplyThread, toggled by the Reply action). Keyed by Post.id, a handful of
+// loaded replies per post — independent of Post.replies (the decorative
+// total count), same "not every reply is fetched" shorthand every real feed
+// uses. Posts with no entry here render an empty-state instead.
+export const POST_REPLIES: Record<string, Reply[]> = {
+  g1: [
+    { id: "g1-r1", author: "Zane", handle: "@zane_lfg", avatarInitial: "Z", content: "LFG 🔥 called it", timestamp: "1m ago", likes: 4 },
+    { id: "g1-r2", author: "Ren", handle: "@ren.eth", avatarInitial: "R", content: "wish I sized up on this one", timestamp: "1m ago", likes: 2 },
+    { id: "g1-r3", author: "Lena", handle: "@lena_q", avatarInitial: "L", content: "6 for 6 this week, insane", timestamp: "45s ago", likes: 1 },
+  ],
+  g2: [
+    { id: "g2-r1", author: "Nova", handle: "@nova_trades", avatarInitial: "N", content: "hang in there, still time on the clock", timestamp: "3m ago", likes: 2 },
+    { id: "g2-r2", author: "Tobi", handle: "@tobi.sol", avatarInitial: "T", content: "25x on ETH rn is wild honestly", timestamp: "2m ago", likes: 1 },
+  ],
+  g3: [
+    { id: "g3-r1", author: "Marcus", handle: "@marcus_calls", avatarInitial: "M", content: "welcome to the club 🏆", timestamp: "8m ago", likes: 5 },
+    { id: "g3-r2", author: "Priya", handle: "@priya_p", avatarInitial: "P", content: "gg! who'd you duel", timestamp: "7m ago", likes: 1 },
+    { id: "g3-r3", author: "Zane", handle: "@zane_lfg", avatarInitial: "Z", content: "first of many", timestamp: "5m ago", likes: 3 },
+  ],
+  g7: [
+    { id: "g7-r1", author: "Nova", handle: "@nova_trades", avatarInitial: "N", content: "dip buyers eating good fr", timestamp: "10m ago", likes: 9 },
+    { id: "g7-r2", author: "Ren", handle: "@ren.eth", avatarInitial: "R", content: "reclaim looks clean on the chart", timestamp: "9m ago", likes: 4 },
+    { id: "g7-r3", author: "Lena", handle: "@lena_q", avatarInitial: "L", content: "loaded more at 66.8", timestamp: "6m ago", likes: 2 },
+  ],
+  g8: [
+    { id: "g8-r1", author: "Marcus", handle: "@marcus_calls", avatarInitial: "M", content: "lmaooo felt this", timestamp: "16m ago", likes: 21 },
+    { id: "g8-r2", author: "8bit Kay", handle: "@8bitkay", avatarInitial: "K", content: "doge gang stays coping", timestamp: "14m ago", likes: 33 },
+    { id: "g8-r3", author: "Zane", handle: "@zane_lfg", avatarInitial: "Z", content: "this is a mood", timestamp: "9m ago", likes: 12 },
+  ],
+  g4: [{ id: "g4-r1", author: "Priya", handle: "@priya_p", avatarInitial: "P", content: "so close, brutal", timestamp: "22m ago", likes: 1 }],
+  g9: [
+    { id: "g9-r1", author: "Nova", handle: "@nova_trades", avatarInitial: "N", content: "sizing down, thanks for the heads up", timestamp: "28m ago", likes: 6 },
+    { id: "g9-r2", author: "Tobi", handle: "@tobi.sol", avatarInitial: "T", content: "violent move either way for sure", timestamp: "25m ago", likes: 3 },
+  ],
+  g5: [
+    { id: "g5-r1", author: "8bit Kay", handle: "@8bitkay", avatarInitial: "K", content: "same, been checking every patch note", timestamp: "30m ago", likes: 3 },
+    { id: "g5-r2", author: "DuelBot", handle: "@duelbot", avatarInitial: "D", content: "still cooking, no ETA yet", timestamp: "20m ago", likes: 8 },
+  ],
+  e1: [
+    { id: "e1-r1", author: "Ren", handle: "@ren.eth", avatarInitial: "R", content: "exclusive feed reads different fr", timestamp: "3m ago", likes: 6 },
+    { id: "e1-r2", author: "Lena", handle: "@lena_q", avatarInitial: "L", content: "watching for the same pullback", timestamp: "2m ago", likes: 2 },
+  ],
+  e2: [
+    { id: "e2-r1", author: "Nova", handle: "@nova_trades", avatarInitial: "N", content: "volatility got you this time", timestamp: "14m ago", likes: 3 },
+    { id: "e2-r2", author: "Tobi", handle: "@tobi.sol", avatarInitial: "T", content: "high-rank lobby is no joke", timestamp: "11m ago", likes: 5 },
+  ],
+  e3: [
+    { id: "e3-r1", author: "Marcus", handle: "@marcus_calls", avatarInitial: "M", content: "congrats, queue's way faster up here", timestamp: "35m ago", likes: 4 },
+    { id: "e3-r2", author: "Priya", handle: "@priya_p", avatarInitial: "P", content: "gg, see you in exclusive", timestamp: "30m ago", likes: 2 },
+  ],
+};
 
 export const GLOBAL_POSTS: Post[] = [
   {
@@ -128,6 +192,7 @@ export const GLOBAL_POSTS: Post[] = [
     kind: "streak",
     rank: "Gold I",
     streakStat: "6-day streak",
+    market: "btc",
   },
   {
     id: "g3",
@@ -153,6 +218,7 @@ export const GLOBAL_POSTS: Post[] = [
     kind: "text",
     rank: "Gold I",
     image: { kind: "chart", seed: "btc-reclaim", spark: [65.1, 65.6, 65.3, 66.2, 67.0, 66.8, 67.6, 68.4] },
+    market: "btc",
   },
   {
     id: "g8",
@@ -166,6 +232,7 @@ export const GLOBAL_POSTS: Post[] = [
     kind: "text",
     rank: "Silver II",
     image: { kind: "meme", seed: "doge-cope", emoji: "🐕" },
+    market: "doge",
   },
   {
     id: "g4",
