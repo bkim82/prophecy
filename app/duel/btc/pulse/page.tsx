@@ -353,7 +353,7 @@ export default function Page() {
     <main className="mx-auto max-w-4xl px-4 py-10">
       <PulseMovementAlert total={liveEquity} />
       <Link
-        href="/"
+        href="/duel"
         className="text-xs uppercase tracking-wider text-[var(--muted-dim)] transition hover:text-[var(--text)]"
       >
         ← Menu

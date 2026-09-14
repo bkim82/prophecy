@@ -1,6 +1,6 @@
 # pulse-mode
 
-- Solo BTC duel route: `app/duel/btc/pulse/page.tsx`; multiplayer Pulse route: `app/duel/[market]/pulse/[matchId]/page.tsx`. Both are reached from the lobby mode switcher (`app/page.tsx`).
+- Solo BTC duel route: `app/duel/btc/pulse/page.tsx`; multiplayer Pulse route: `app/duel/[market]/pulse/[matchId]/page.tsx`. Both are reached from the lobby mode switcher (`app/duel/page.tsx`).
 - Multiplayer Pulse uses the shared match row and polling lifecycle. A 5-second pre-round countdown starts automatically after the second player joins; during the round each player can add server-priced long/short positions until their available cash is exhausted, with each open stake reserved until close, through `POST /api/match/[id]/action`; the timer deadline automatically closes remaining positions at the final price, releases their stakes, and realizes their P&L before comparing the players (`lib/match.ts`, `lib/pulse.ts`).
 - State machine: `setup` before entry (also re-entered immediately after a close, pre-loaded with the prior stake/leverage), `open` while a directional position is live, `settling` during final-price fetch, `result` after the 60-second round (`app/duel/btc/pulse/page.tsx:20`, `:187-203`).
 - Round starts on the first Long/Short press; duration is 60 seconds; starting bankroll is $100 (`app/duel/btc/pulse/page.tsx:8-12`, `:199-204`).

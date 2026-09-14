@@ -8,8 +8,8 @@ share matchmaking, presence, polling, and lazy settlement.
 - One `matches` row = one round, single source of truth (`db/schema.ts:20`). Pulse
   positions, realized P&L, and final P&L live in the same row.
 - Identity: anonymous per-browser UUID in `localStorage.playerId` (`app/lib/playerId.ts:20`). Not Clerk; sign-in stays optional and unrelated.
-- Sync: ~1s polling (`app/duel/[market]/match/[matchId]/page.tsx:14`), no WebSocket registry. Lobby list polls at 3s (`app/page.tsx:17`), the queue at 1s (`app/page.tsx:22`).
-- Nobody sits in a room alone: an `open` match is waited out on the lobby page (`app/page.tsx:389-407`); the room is entered only once `status` leaves `open`. The queued state exposes a mode-specific shareable invite URL (`app/page.tsx:192-198`) that auto-joins a friend as player 2 (`app/duel/[market]/match/[matchId]/page.tsx:65-97`, `app/duel/[market]/pulse/[matchId]/page.tsx:57-84`).
+- Sync: ~1s polling (`app/duel/[market]/match/[matchId]/page.tsx:14`), no WebSocket registry. Lobby list polls at 3s (`app/duel/page.tsx:24`), the queue at 1s (`app/duel/page.tsx:29`).
+- Nobody sits in a room alone: an `open` match is waited out on the lobby page (`app/duel/page.tsx:420-438`); the room is entered only once `status` leaves `open`. The queued state exposes a mode-specific shareable invite URL (`app/duel/page.tsx:216-243`) that auto-joins a friend as player 2 (`app/duel/[market]/match/[matchId]/page.tsx:65-97`, `app/duel/[market]/pulse/[matchId]/page.tsx:57-84`).
 - Quick Play has no balance deduction; its `wager` is stored and displayed only. Pulse reserves each entry's stake from the player's round bankroll and returns that stake when the position closes.
 
 ## Status machine
@@ -48,7 +48,7 @@ multi-statement transactions or row locks. Every transition is a single guarded
 
 - `PRESENCE_MS = 8000` (`lib/match.ts:14`). Stale `open` rows are filtered out of listing and matchmaking, never deleted — a dead row is just invisible, so there is no cleanup cron.
 - Heartbeat is folded into the poll: `touchAndRead` stamps the caller's `last_seen` and reads the row in one statement via a `CASE` (`lib/match.ts:52`). No separate heartbeat endpoint.
-- A queued lobby therefore polls at room speed, not lobby speed (`app/page.tsx:22`): a 3s beat would age its own row out of the very list it is waiting to be found in.
+- A queued lobby therefore polls at room speed, not lobby speed (`app/duel/page.tsx:29`): a 3s beat would age its own row out of the very list it is waiting to be found in.
 - Only matters pre-lock. During `predict` it drives "opponent disconnected"; the 15s window, not presence, is what ends an abandoned match.
 
 ## Timestamps
@@ -77,12 +77,12 @@ and position id.
 
 - `app/duel/[market]/match/[matchId]/page.tsx` — Quick Play room.
 - `app/duel/[market]/pulse/[matchId]/page.tsx` — multiplayer Pulse room; renders positions and live P&L, stops polling on `settled` or 404.
-- Leaving a room's page never calls `leave` — only the explicit Cancel/Leave button does — so a match already survives navigation server-side. `app/lib/activeMatch.ts` persists `{matchId, market, mode}` to `localStorage` once a room's poll sees `predict`/`countdown` (`app/duel/[market]/match/[matchId]/page.tsx:73-84`, `app/duel/[market]/pulse/[matchId]/page.tsx` equivalent), cleared on `settled`, 404/403 (`gone`), or the Leave button. `app/ActiveMatchBar.tsx`, mounted in `app/layout.tsx`, reads that pointer on every page, polls the same role-scoped `GET /api/match/[id]` at 2s once it's not on the match's own route, and renders a fixed bottom pill linking back in. Deliberately not set while `open` (queued/waiting) — that phase already has first-class UI on the lobby page (`app/page.tsx` `queue` panel).
+- Leaving a room's page never calls `leave` — only the explicit Cancel/Leave button does — so a match already survives navigation server-side. `app/lib/activeMatch.ts` persists `{matchId, market, mode}` to `localStorage` once a room's poll sees `predict`/`countdown` (`app/duel/[market]/match/[matchId]/page.tsx:73-84`, `app/duel/[market]/pulse/[matchId]/page.tsx` equivalent), cleared on `settled`, 404/403 (`gone`), or the Leave button. `app/ActiveMatchBar.tsx`, mounted in `app/layout.tsx`, reads that pointer on every page, polls the same role-scoped `GET /api/match/[id]` at 2s once it's not on the match's own route, and renders a fixed bottom pill linking back in. Deliberately not set while `open` (queued/waiting) — that phase already has first-class UI on the lobby page (`app/duel/page.tsx` `queue` panel).
 - One ticker drives both deadlines — the lock window in `predict`, the round in `countdown` (`app/duel/[market]/match/[matchId]/page.tsx:116-133`).
 - `<PriceChart>` still reads the browser's own `usePriceFeed()` — the chart stays client-direct to Coinbase, no server round trip. Only `roundStart`/lock-marker times come from the poll.
 - Settlement freezes the series with the final point pinned to the deadline, not to whenever the tab noticed (`app/duel/[market]/match/[matchId]/page.tsx:135-144`). A forfeit has no final price, so nothing freezes.
-- Lobby Play button for Quick Play is an async matchmaker, not a `Link` (`app/page.tsx:186-217`); Open Matches rows are join buttons (`app/page.tsx:388-399`), inert for your own row while you hold it. While queued, Share invite uses native sharing when available and clipboard copy otherwise, preserving the queued mode in the URL (`app/page.tsx:192-219`, `app/page.tsx:389-407`).
-- Queueing replaces the whole Quick Play control panel rather than disabling it — the criteria are already committed to a row (`app/page.tsx:340-352`). Cancel deletes the row via `leave` (`app/page.tsx:263-277`); the room is prefetched while waiting so navigation does not eat into the 15s (`app/page.tsx:223`).
+- Lobby Play button for Quick Play is an async matchmaker, not a `Link` (`app/duel/page.tsx:253-287`); Open Matches rows are join buttons (`app/duel/page.tsx:483-497`), inert for your own row while you hold it. While queued, Share invite uses native sharing when available and clipboard copy otherwise, preserving the queued mode in the URL (`app/duel/page.tsx:216-243`, `app/duel/page.tsx:420-438`).
+- Queueing replaces the whole Quick Play control panel rather than disabling it — the criteria are already committed to a row (`app/duel/page.tsx:440-479`). Cancel deletes the row via `leave` (`app/duel/page.tsx:342-356`); the room is prefetched while waiting so navigation does not eat into the 15s (`app/duel/page.tsx:298`).
 
 ## Verified
 

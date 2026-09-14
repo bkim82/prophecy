@@ -22,7 +22,7 @@ open --(opponent joins)--> predict --(lock window / 5s Pulse start)--> countdown
 Server status: `open | predict | countdown | settled` (`db/schema.ts:26`,
 `lib/match.ts:7`). `open` has no client-side equivalent — it is the pre-round
 wait for an opponent, and it is now waited out on the lobby, not in the room
-(`app/page.tsx:340-352`). `settling` and `result` are both `settled`
+(`app/duel/page.tsx:420-438`). `settling` and `result` are both `settled`
 server-side. There is no loop back: "play again" is a new row, not a reset.
 
 | Phase | State |
