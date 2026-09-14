@@ -1,17 +1,18 @@
 # architecture
 
-- Root header (`app/layout.tsx`) merges the `PROPHECY` brand, a compact `Omens`/`Rooms` text-tab nav (`app/TabNav.tsx`, sliding underline, active via `usePathname()`), and a primary `Arena` CTA (icon from `app/icons.tsx`, `app/layout.tsx`, links to `/duel`) into one row. Routes: `/` (Global feed), `/rooms` (rank-gated group chat placeholder, `app/rooms/page.tsx`), `/duel` (the market lobby, moved from `app/page.tsx`). `/exclusive` (rank-gated feed) still exists but is no longer linked from the header nav. Live ticker on `/duel` reads the client-side BTC feed.
+- Root header (`app/layout.tsx`) merges the `PROPHECY` brand, a compact `Omens`/`Rooms` text-tab nav (`app/TabNav.tsx`, sliding underline, active via `usePathname()`), and primary `Arena` and `Wallet` CTAs into one row. Routes: `/` (Global feed), `/rooms` (rank-gated group chat placeholder, `app/rooms/page.tsx`), `/duel` (the market lobby, moved from `app/page.tsx`), `/wallet` (wallet desk with injected EIP-1193 connection and sticky BTC long/short ticket). `/exclusive` (rank-gated feed) still exists but is no longer linked from the header nav. Live ticker on `/duel` reads the client-side BTC feed.
 - Quick Play and multiplayer Pulse are server-authoritative: a `matches` row owns the round (`db/schema.ts:20`), `/api/match/*` routes own the transitions, clients poll. See [multiplayer-plan.md](multiplayer-plan.md).
 - `/api/price` and `/api/history` remain stateless proxies to public exchange APIs. The price feed and chart stay client-side in every mode.
 
 ## Graph
 
 ```
-app/layout.tsx (root shell: PROPHECY, Omens/Rooms tabs, Arena CTA, balance, profile)
+app/layout.tsx (root shell: PROPHECY, Omens/Rooms tabs, Arena/Wallet CTAs, balance, profile)
   ├── app/TabNav.tsx (persistent Omens / Rooms tab switcher, sliding underline)
   ├── app/page.tsx (Global feed: mock PostCard list, app/lib/mockPosts.ts)
   ├── app/rooms/page.tsx (Rooms: rank-gated group chat placeholder, app/lib/roomsMocks.ts)
   ├── app/exclusive/page.tsx (Exclusive feed: rank-gated via app/lib/rank.ts stub, unlinked from nav)
+  ├── app/wallet/page.tsx (wallet desk: injected EIP-1193 connection, BTC long/short ticket)
   └── app/duel/page.tsx (live lobby: BTC ticker, mini-chart, quick-play controls, match rows)
         └── usePriceFeed() → price, sampled series, status, now
 app/duel/[market]/match/[matchId]/page.tsx (Quick Play prediction room)
@@ -55,6 +56,8 @@ Pulse takes its stake and leverage in-round.
 | `app/lib/mockPosts.ts` | hardcoded `GLOBAL_POSTS`/`EXCLUSIVE_POSTS` mock data, no persistence |
 | `app/lib/rank.ts` | hardcoded mock rank/threshold stub gating `/exclusive` — no real rank system exists |
 | `app/duel/page.tsx` | live lobby, BTC ticker/chart, mode switcher, quick-play controls, matchmaking + open-match list (moved from `app/page.tsx`) |
+| `app/wallet/page.tsx` | wallet desk: injected EIP-1193 connection, wallet status, and BTC long/short ticket |
+| `app/lib/wallet.ts` | injected EIP-1193 provider helpers, chain labels, ETH formatting, and address shortening |
 | `app/duel/[market]/match/[matchId]/page.tsx` | Quick Play room: 1s poll, prediction lock, countdown, result |
 | `app/duel/[market]/pulse/[matchId]/page.tsx` | multiplayer Pulse room: position actions, live P&L, countdown, result |
 | `app/ActiveMatchBar.tsx` | global bottom pill for a match running off-page; mounts `PulseMiniDock` while the active match is Pulse in `countdown` |

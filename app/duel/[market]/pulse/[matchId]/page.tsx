@@ -103,7 +103,10 @@ export default function Page({ params }: { params: Promise<{ market: string; mat
           const next = (await res.json()) as MatchView;
           if (next.mode !== "pulse") return setGone("ended");
           applyView(next);
-          if (next.status === "settled") return;
+          if (next.status === "settled") {
+            window.dispatchEvent(new Event("balance-updated"));
+            return;
+          }
         }
       } catch {
         // Keep polling through transient API failures.
