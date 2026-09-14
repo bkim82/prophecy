@@ -46,6 +46,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <Link href="/duel" className="duel-cta">
                   <DuelIcon className="duel-cta-icon" /> Duel
                 </Link>
+                <Link href="/wallet" className="wallet-cta">Wallet</Link>
                 <ThemeToggle />
                 <Show
                   when="signed-in"
