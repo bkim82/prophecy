@@ -74,11 +74,20 @@ button { cursor: pointer; }
 .feed-main { min-width: 0; }
 .feed-heading { margin: 0 2px 14px; }
 .feed-heading h1 { margin: 4px 0 0; font-size: 28px; }
+.feed-heading-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.community-dropdown { position: relative; margin-top: 4px; }
+.community-dropdown-trigger { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--text); padding: 6px 12px; font-size: 12px; font-weight: 600; }
+.community-dropdown-trigger:hover, .community-dropdown-trigger[aria-expanded="true"] { border-color: var(--line-strong); background: var(--surface-hover); }
+.community-dropdown-caret { color: var(--muted); font-size: 10px; }
+.community-dropdown-menu { position: absolute; top: calc(100% + 6px); right: 0; z-index: 10; min-width: 140px; padding: 4px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-raised); box-shadow: 0 8px 24px rgba(0, 0, 0, .3); }
+.community-dropdown-menu button { display: flex; width: 100%; align-items: center; gap: 6px; border: 0; border-radius: 6px; background: transparent; color: var(--text); padding: 8px 10px; font-size: 13px; font-weight: 600; text-align: left; }
+.community-dropdown-menu button:hover { background: var(--surface-hover); }
+.community-dropdown-menu button.active { color: var(--accent-strong); }
+.community-dropdown .market-symbol { width: 16px; height: 16px; border: 0; font-size: 11px; }
 .feed-tabs { display: inline-flex; gap: 3px; margin: 2px 2px 16px; padding: 3px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); }
 .feed-tabs button { border: 0; border-radius: 999px; background: transparent; color: var(--muted); padding: 6px 13px; font-size: 12px; font-weight: 600; }
 .feed-tabs button.active { background: var(--selected-bg); color: var(--accent-strong); }
 .feed-tabs button:hover:not(.active) { color: var(--text); }
-.feed-pulse-strip { display: inline-flex; align-items: center; gap: 8px; width: fit-content; margin: 0 2px 16px; padding: 7px 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--muted); font-size: 12px; }
 .feed-list { display: block; }
 .feed-empty { padding: 24px 4px; }
 .post-card { display: flex; gap: 12px; padding: 13px 6px; border-bottom: 1px solid var(--line); }
@@ -104,6 +113,20 @@ button { cursor: pointer; }
 .post-image--chart svg.is-down path { stroke: var(--chart-down); }
 .post-image--meme { display: grid; place-items: center; height: 160px; font-size: 56px; }
 .post-actions { display: flex; align-items: center; gap: 16px; margin-top: 1px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.post-actions .action-reply { display: inline-flex; align-items: center; gap: 4px; border: 0; background: transparent; padding: 0; margin: 0; color: var(--muted); font: inherit; font-size: 12px; font-variant-numeric: tabular-nums; }
+.post-actions .action-reply:hover, .post-actions .action-reply[aria-expanded="true"] { color: var(--accent-strong); }
+.action-reply-caret { font-size: 9px; color: var(--muted-dim); }
+.post-actions .action-reply:hover .action-reply-caret, .post-actions .action-reply[aria-expanded="true"] .action-reply-caret { color: var(--accent-strong); }
+.reply-thread { display: grid; gap: 10px; margin: 6px 0 2px; padding-left: 14px; border-left: 2px solid var(--line); }
+.reply-thread-empty { margin: 4px 0 0 14px; font-size: 12px; }
+.reply-item { display: flex; gap: 8px; }
+.reply-avatar { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 999px; color: #fff; font-size: 11px; font-weight: 700; text-shadow: 0 1px 2px rgba(0, 0, 0, .35); }
+.reply-body { min-width: 0; display: grid; gap: 3px; }
+.reply-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 5px; font-size: 12px; }
+.reply-content { margin: 0; color: var(--text); font-size: 13px; line-height: 1.4; }
+.reply-actions { display: flex; align-items: center; gap: 14px; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.reply-thread-more { justify-self: start; border: 0; background: transparent; padding: 0; color: var(--accent); font-size: 12px; font-weight: 600; }
+.reply-thread-more:hover { color: var(--accent-strong); }
 .market-call { display: grid; gap: 6px; margin-top: 1px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-raised); }
 .market-call-head { display: flex; align-items: center; gap: 8px; }
 .market-call-head .market-symbol { width: 20px; height: 20px; border: 0; font-size: 13px; }
@@ -311,7 +334,7 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
   .tab-nav { padding: 8px 14px 0; }
   .tab-switcher a { min-height: 40px; padding: 8px; font-size: 12px; }
   .feed-shell { width: min(100% - 24px, 1080px); padding-top: 14px; gap: 20px; }
-  .feed-pulse-strip { font-size: 11px; padding: 6px 12px; }
+  .community-dropdown-trigger { font-size: 11px; padding: 5px 10px; }
   .post-card { padding: 10px 4px; gap: 10px; }
   .post-avatar { width: 32px; height: 32px; }
   .market-call-prices { flex-wrap: wrap; row-gap: 2px; }
