@@ -1,5 +1,5 @@
 import type { Market } from "@/app/lib/mockPosts";
-import { LIVE_DUELS, TOP_TRADERS, TRENDING_CALLS } from "@/app/lib/sidebarMocks";
+import { LIVE_DUELS, TRENDING_CALLS, TRENDING_PROPHECIES } from "@/app/lib/sidebarMocks";
 
 const MARKET_META: Record<Market, { symbol: string; symbolClass: string }> = {
   btc: { symbol: "₿", symbolClass: "btc-symbol" },
@@ -11,7 +11,7 @@ export function FeedSidebar() {
   return (
     <aside className="feed-sidebar">
       <section className="panel sidebar-panel">
-        <h3>Live Duels</h3>
+        <h3>Leaderboard</h3>
         {LIVE_DUELS.map((duel) => {
           const meta = MARKET_META[duel.market];
           return (
@@ -27,7 +27,7 @@ export function FeedSidebar() {
       </section>
 
       <section className="panel sidebar-panel">
-        <h3>Trending Calls</h3>
+        <h3>Most Profitable Calls</h3>
         {TRENDING_CALLS.map((call) => {
           const meta = MARKET_META[call.market];
           const isUp = call.changePct >= 0;
@@ -47,14 +47,14 @@ export function FeedSidebar() {
       </section>
 
       <section className="panel sidebar-panel">
-        <h3>Top Traders</h3>
-        {TOP_TRADERS.map((trader, index) => (
-          <div className="sidebar-row" key={trader.id}>
+        <h3>Trending Prophecie</h3>
+        {TRENDING_PROPHECIES.map((post) => (
+          <div className="sidebar-row sidebar-row--prophecy" key={post.id}>
             <div className="sidebar-row-main">
-              <span className="sidebar-rank">{index + 1}</span>
-              <strong>{trader.handle}</strong>
+              <span className="sidebar-avatar">{post.avatarInitial}</span>
+              <strong>{post.handle}</strong>
             </div>
-            <span className="sidebar-value">{trader.winRate}</span>
+            <p className="sidebar-prophecy-content">{post.content}</p>
           </div>
         ))}
       </section>

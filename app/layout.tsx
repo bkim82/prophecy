@@ -43,7 +43,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <TabNav />
               </div>
               <div className="header-actions">
-                <Link href="/duel" className="duel-cta">
+                <Link href="/duel/btc/battle" className="duel-cta">
                   <DuelIcon className="duel-cta-icon" /> Duel
                 </Link>
                 <ThemeToggle />

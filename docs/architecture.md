@@ -1,6 +1,6 @@
 # architecture
 
-- Root header (`app/layout.tsx`) merges the `PROPHECY` brand, a compact `Omens`/`Rooms` text-tab nav (`app/TabNav.tsx`, sliding underline, active via `usePathname()`), and a primary `Duel` CTA (icon from `app/icons.tsx`, `app/layout.tsx`, links to `/duel`) into one row. Routes: `/` (Global feed), `/rooms` (rank-gated group chat placeholder, `app/rooms/page.tsx`), `/duel` (the market lobby, moved from `app/page.tsx`). `/exclusive` (rank-gated feed) still exists but is no longer linked from the header nav. Live ticker on `/duel` reads the client-side BTC feed.
+- Root header (`app/layout.tsx`) merges the `PROPHECY` brand, a compact `Omens`/`Rooms` text-tab nav (`app/TabNav.tsx`, sliding underline, active via `usePathname()`), and a primary `Duel` CTA (icon from `app/icons.tsx`, `app/layout.tsx`, links to `/duel/btc/battle`) into one row. Routes: `/` (Global feed), `/rooms` (rank-gated group chat placeholder, `app/rooms/page.tsx`), `/duel` (the market lobby, moved from `app/page.tsx`). `/exclusive` (rank-gated feed) still exists but is no longer linked from the header nav. Live ticker on `/duel` reads the client-side BTC feed.
 - Quick Play and multiplayer Pulse are server-authoritative: a `matches` row owns the round (`db/schema.ts:20`), `/api/match/*` routes own the transitions, clients poll. See [multiplayer-plan.md](multiplayer-plan.md).
 - `/api/price` and `/api/history` remain stateless proxies to public exchange APIs. The price feed and chart stay client-side in every mode.
 

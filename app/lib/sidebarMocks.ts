@@ -1,7 +1,7 @@
 // Mock content for the feed's persistent right rail (app/FeedSidebar.tsx).
 // Same status as app/lib/mockPosts.ts: display-only, no backend, no
 // computation — see docs/feeds.md.
-import type { Market, Side } from "@/app/lib/mockPosts";
+import { GLOBAL_POSTS, type Market, type Post, type Side } from "@/app/lib/mockPosts";
 
 export type LiveDuel = { id: string; market: Market; players: string; timer: string };
 
@@ -19,10 +19,11 @@ export const TRENDING_CALLS: TrendingCall[] = [
   { id: "t3", handle: "@ren.eth", market: "eth", side: "LONG", changePct: -0.4 },
 ];
 
-export type TopTrader = { id: string; handle: string; rank: string; winRate: string };
+// "Trending Prophecie" surfaces actual posts from the Global feed (by like
+// count) rather than separate mock data — real tweets, not a synthetic
+// leaderboard.
+const TRENDING_PROPHECY_IDS = ["g8", "g7", "g1"];
 
-export const TOP_TRADERS: TopTrader[] = [
-  { id: "p1", handle: "@nova_trades", rank: "Gold II", winRate: "71%" },
-  { id: "p2", handle: "@zane_lfg", rank: "Gold I", winRate: "68%" },
-  { id: "p3", handle: "@ren.eth", rank: "Silver I", winRate: "64%" },
-];
+export const TRENDING_PROPHECIES: Post[] = TRENDING_PROPHECY_IDS.map(
+  (id) => GLOBAL_POSTS.find((post) => post.id === id)!,
+);
