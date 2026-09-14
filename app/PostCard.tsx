@@ -62,9 +62,15 @@ function MarketCallCard({ call }: { call: MarketCall }) {
           {meta.label} {isLong ? "↑" : "↓"} {call.side}
           {call.leverage ? ` · ${call.leverage}x` : ""}
         </strong>
-        <svg className={`call-spark ${isChangeUp ? "is-up" : "is-down"}`} viewBox="0 0 56 18" preserveAspectRatio="none" aria-hidden="true">
-          <path d={sparkPath(call.spark)} />
-        </svg>
+        {!call.outcome ? (
+          <button type="button" className="market-call-copy" aria-label={`Copy ${meta.label} trade`}>
+            ↗ Copy trade
+          </button>
+        ) : (
+          <svg className={`call-spark ${isChangeUp ? "is-up" : "is-down"}`} viewBox="0 0 56 18" preserveAspectRatio="none" aria-hidden="true">
+            <path d={sparkPath(call.spark)} />
+          </svg>
+        )}
       </div>
       <div className="market-call-prices">
         <span>${call.entryPrice}</span>
