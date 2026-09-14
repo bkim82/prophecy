@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { SignInButton, useUser } from "@clerk/nextjs";
 import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import PriceChart, { type PredictionLine } from "@/app/PriceChart";
 import { usePriceFeed, type PricePoint } from "@/app/usePriceFeed";
@@ -35,6 +36,7 @@ export default function Page({
 }) {
   const { market, matchId } = use(params);
   const router = useRouter();
+  const { isSignedIn, isLoaded } = useUser();
   const product = productForMarket(market) ?? "BTC-USD";
   const { price, points, status, now } = usePriceFeed(product);
 
@@ -87,7 +89,10 @@ export default function Page({
   }, [gone, matchId]);
 
   useEffect(() => {
-    if (!playerId) return;
+    // Wait for Clerk to resolve and for the visitor to be signed in - the
+    // match endpoints are auth-gated, and signing in via the modal below
+    // should pick this loop back up rather than requiring a reload.
+    if (!playerId || !isLoaded || !isSignedIn) return;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout>;
 
@@ -116,6 +121,9 @@ export default function Page({
           const next = (await res.json()) as MatchView;
           if (cancelled) return;
           applyView(next);
+          if (next.status === "settled") {
+            window.dispatchEvent(new Event("balance-updated"));
+          }
           if (next.status === "settled") return; // nothing left to change
         }
       } catch {
@@ -129,7 +137,7 @@ export default function Page({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [matchId, playerId, inviteJoin, applyView]);
+  }, [matchId, playerId, inviteJoin, applyView, isLoaded, isSignedIn]);
 
   // Seed the input from the live price once, so the spinner steps from the
   // current price instead of from 0.
@@ -286,6 +294,34 @@ export default function Page({
       error: `${((offBy / reference) * 100).toFixed(2)}%`,
     };
   };
+
+  if (isLoaded && !isSignedIn) {
+    return (
+      <main className="mx-auto max-w-4xl px-4 py-10 text-center">
+        <h1 className="text-lg font-medium text-[var(--text)]">
+          {inviteJoin ? "You've been invited to a duel" : "Sign in to view this match"}
+        </h1>
+        <p className="mt-2 text-sm text-[var(--muted)]">
+          {inviteJoin
+            ? "Sign in and you'll join this duel automatically."
+            : "Sign in to continue."}
+        </p>
+        <div className="mt-6 flex items-center justify-center gap-3">
+          <SignInButton mode="modal">
+            <button className="rounded-md bg-[var(--btn-bg)] px-5 py-2 text-sm font-medium text-[var(--btn-text)] transition hover:bg-[var(--btn-bg-hover)]">
+              Sign in
+            </button>
+          </SignInButton>
+          <Link
+            href="/"
+            className="text-xs uppercase tracking-wider text-[var(--muted-dim)] transition hover:text-[var(--text)]"
+          >
+            Back to lobby
+          </Link>
+        </div>
+      </main>
+    );
+  }
 
   if (gone) {
     return (

@@ -1,7 +1,8 @@
 import { and, eq, isNull } from "drizzle-orm";
+import { auth } from "@clerk/nextjs/server";
 import { getDb } from "@/db";
 import { matches } from "@/db/schema";
-import { expireLocksIfDue, findMatch, readBody, roleOf, viewFor } from "@/lib/match";
+import { expireLocksIfDue, findMatch, readBody, roleOf, settleFundsIfNeeded, viewFor } from "@/lib/match";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,8 @@ export const dynamic = "force-dynamic";
  * is stamped exactly once however the two requests interleave.
  */
 export async function POST(request: Request, ctx: { params: Promise<{ id: string }> }) {
+  const { userId } = await auth();
+  if (!userId) return Response.json({ error: "Sign in to play" }, { status: 401 });
   const { id } = await ctx.params;
   const body = await readBody(request);
   const playerId = typeof body.playerId === "string" ? body.playerId : "";
@@ -32,6 +35,9 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
   }
   const role = roleOf(found, playerId);
   if (!role) {
+    return Response.json({ error: "Not in this match" }, { status: 403 });
+  }
+  if ((role === 1 ? found.player1UserId : found.player2UserId) !== userId) {
     return Response.json({ error: "Not in this match" }, { status: 403 });
   }
   if (found.mode !== "quick-play") {
@@ -81,6 +87,8 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
       return Response.json(viewFor(started, role));
     }
   }
+
+  await settleFundsIfNeeded(locked);
 
   return Response.json(viewFor(locked, role));
 }

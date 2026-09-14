@@ -17,7 +17,6 @@ Deliberate gaps in a prototype scoped to the core loop. Not bugs.
 | No abandon timeout (`open` only) | `predict` is capped at 15s and forfeits (`lib/match.ts:81`), but an `open` match nobody joins just stops being listed once the heartbeat goes stale — the creator is held on the lobby and must press Cancel (`app/duel/page.tsx:263-277`) |
 | No match cleanup | `matches` rows are never deleted after `settled`; stale `open` rows self-filter by heartbeat but still accumulate. No cron, no TTL (`app/api/match/open/route.ts:28`) |
 | No persistence outside a match | Quick Play rounds persist in Postgres, but there is still no cross-round score or history; Pulse keeps nothing |
-| No stakes | `matches.wager` is stored and displayed only — no balance deduction, no payout (`db/schema.ts:20`) |
 | Round length vs chart window | Quick Play's timer is per-match now (10–3600s; lobby offers 60/120/300s), but any round > `WINDOW_MS`(1min) still scrolls off the chart's left edge before settling — the chart window is fixed |
 | No axis-interval UI (zoom aside) | `PriceChart` already takes `windowMs`/`xIntervals`/`yIntervals`/`xMinorPerInterval` as props with `feedConfig.ts` defaults (`app/PriceChart.tsx:88-95`). The wheel drives time and price zoom only; a settings control changing `windowMs` also needs `WINDOW_MS` moved into state — the hook's `trim()` and the seed route both read the constant, so widening the window alone would show an empty left half until the series refills |
 | BTC/USD only | Pair hardcoded in 5 places: socket sub (`app/usePriceFeed.ts:91`), REST ×2 (`app/api/price/route.ts:13`,`:18`), history ×2 (`app/api/history/route.ts:22`,`:58`). Coinbase/Binance spell pairs differently (`BTC-USD` vs `BTCUSDT`) |
@@ -46,9 +45,5 @@ Deliberate gaps in a prototype scoped to the core loop. Not bugs.
 
 ## Next fork
 
-Networking landed ([multiplayer-plan.md](multiplayer-plan.md)), so stakes are the
-fork point now: `matches` carries `wager` and a settled winner, `users.balance`
-exists, and nothing moves between them. Deducting on lock and paying on settle
-needs a money path that survives the same races the round state does — and
-`neon-http` still has no transactions, so it needs the same guarded-UPDATE
-discipline plus an idempotency key per match.
+Networking and balance-backed Quick Play stakes are built. The remaining fork
+is cross-round history and broader game modes.

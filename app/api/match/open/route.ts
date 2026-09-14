@@ -1,4 +1,4 @@
-import { and, desc, eq, gt } from "drizzle-orm";
+import { and, desc, eq, gt, isNotNull } from "drizzle-orm";
 import { getDb } from "@/db";
 import { matches } from "@/db/schema";
 import { presenceCutoff } from "@/lib/match";
@@ -25,6 +25,7 @@ export async function GET(request: Request) {
     .where(
       and(
         eq(matches.status, "open"),
+        isNotNull(matches.player1UserId),
         gt(matches.player1LastSeen, presenceCutoff()),
         ...(market ? [eq(matches.market, market)] : []),
         ...(mode ? [eq(matches.mode, mode)] : []),

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { DailyCoin, pickDailyCoin } from "@/app/DailyCoin";
@@ -132,6 +133,7 @@ const SYMBOL_CLASS: Record<MarketId, string> = {
 };
 
 export default function Page() {
+  const { isSignedIn } = useUser();
   const router = useRouter();
   const [market, setMarket] = useState<MarketId>("btc");
   const dailyCoinId = pickDailyCoin().toLowerCase() as MarketId;
@@ -251,7 +253,7 @@ export default function Page() {
   // Pressing Play either takes a seat someone was holding — straight into the
   // room — or opens a match and waits here. Nobody enters a room alone.
   const play = async () => {
-    if (!playerId || pending || queue || !canPlay || activeMatch) return;
+    if (!playerId || !isSignedIn || pending || queue || !canPlay || activeMatch) return;
     setPending("play");
     setMatchError(null);
     try {
@@ -268,7 +270,7 @@ export default function Page() {
           timerSeconds: timer,
         }),
       });
-      if (!res.ok) throw new Error("no match");
+      if (!res.ok) throw new Error(res.status === 402 ? "insufficient" : "no match");
       const { matchId, status: matchStatus } = (await res.json()) as {
         matchId: string;
         status: string;
@@ -280,8 +282,10 @@ export default function Page() {
         return;
       }
       enterMatch(market, matchId, matchMode);
-    } catch {
-      setMatchError("Could not reach the lobby. Try again.");
+    } catch (error) {
+      setMatchError(error instanceof Error && error.message === "insufficient"
+        ? "Not enough coins for that wager."
+        : isSignedIn ? "Could not reach the lobby. Try again." : "Sign in to wager your balance.");
       setPending(null);
     }
   };
@@ -356,7 +360,7 @@ export default function Page() {
   };
 
   const join = async (match: OpenMatch) => {
-    if (!playerId || pending || queue || activeMatch) return;
+    if (!playerId || !isSignedIn || pending || queue || activeMatch) return;
     setPending(match.id);
     setMatchError(null);
     try {
@@ -365,10 +369,12 @@ export default function Page() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ playerId }),
       });
-      if (!res.ok) throw new Error("taken");
+      if (!res.ok) throw new Error(res.status === 402 ? "insufficient" : "taken");
       enterMatch(match.market, match.id, match.mode);
-    } catch {
-      setMatchError("That match was taken. Pick another, or press Play.");
+    } catch (error) {
+      setMatchError(error instanceof Error && error.message === "insufficient"
+        ? "Not enough coins to join that match."
+        : isSignedIn ? "That match was taken. Pick another, or press Play." : "Sign in to wager your balance.");
       setPending(null);
     }
   };
@@ -467,7 +473,7 @@ export default function Page() {
         </div>
         <div className="opponent-status"><span className="field-label">Opponent</span><strong><span className={`status-dot ${isPlayable ? "is-online" : ""}`} /> {takesCall ? "Open lobby" : isPlayable ? "Solo · NOVA AI" : "Unavailable"}</strong><span className="muted">{takesCall ? `${openMatches.length} ${mode === "pulse" ? "Pulse match" : "match"}${openMatches.length === 1 ? "" : "es"} waiting` : isPlayable ? "Stake and leverage set in-round" : "Mode in development"}</span></div>
         {activeMode.matched
-          ? <button type="button" className="play-button" onClick={play} disabled={!playerId || pending !== null || queue !== null || !canPlay || activeMatch !== null}>{pending === "play" ? "Finding a match…" : <>Play <span aria-hidden="true">→</span></>}</button>
+          ? <button type="button" className="play-button" onClick={play} disabled={!playerId || !isSignedIn || pending !== null || queue !== null || !canPlay || activeMatch !== null}>{pending === "play" ? "Finding a match…" : isSignedIn ? <>Play <span aria-hidden="true">→</span></> : "Sign in to play"}</button>
           : isPlayable
             ? <Link href={playHref} className="play-button">Play <span aria-hidden="true">→</span></Link>
             : <button type="button" className="play-button" disabled>Soon</button>}

@@ -3,6 +3,7 @@ import { getDb } from "@/db";
 import { matches } from "@/db/schema";
 import { pulsePositionsPnl, type PulsePosition } from "@/lib/pulse";
 import { getSpotPrice, productForMarket } from "@/lib/spotPrice";
+import { creditPayout } from "@/lib/balance";
 
 export type MatchRow = typeof matches.$inferSelect;
 export type MatchStatus = "open" | "predict" | "countdown" | "settled";
@@ -193,6 +194,24 @@ export async function settleIfDue(row: MatchRow): Promise<MatchRow> {
 
   // No row back = another request settled it first; its values win.
   return settled ?? (await findMatch(row.id)) ?? row;
+}
+
+/** Pays a settled match. The payout ledger makes repeated polls harmless. */
+export async function settleFundsIfNeeded(row: MatchRow): Promise<void> {
+  if (row.status !== "settled") return;
+  if (!row.player1UserId || !row.player2UserId || !row.winner) return;
+
+  if (row.winner === "tie") {
+    await Promise.all([
+      creditPayout(row.id, 1, row.player1UserId, row.wager),
+      creditPayout(row.id, 2, row.player2UserId, row.wager),
+    ]);
+    return;
+  }
+
+  const winnerRole = row.winner === "1" ? 1 : 2;
+  const winnerId = winnerRole === 1 ? row.player1UserId : row.player2UserId;
+  await creditPayout(row.id, winnerRole, winnerId, row.wager * 2);
 }
 
 /** What one player is allowed to see. The opponent's number stays hidden until the round starts. */

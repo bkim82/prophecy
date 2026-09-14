@@ -8,9 +8,9 @@ share matchmaking, presence, polling, and lazy settlement.
 - One `matches` row = one round, single source of truth (`db/schema.ts:20`). Pulse
   positions, realized P&L, and final P&L live in the same row.
 - Identity: anonymous per-browser UUID in `localStorage.playerId` (`app/lib/playerId.ts:20`). Not Clerk; sign-in stays optional and unrelated.
-- Sync: ~1s polling (`app/duel/[market]/match/[matchId]/page.tsx:14`), no WebSocket registry. Lobby list polls at 3s (`app/duel/page.tsx:24`), the queue at 1s (`app/duel/page.tsx:29`).
-- Nobody sits in a room alone: an `open` match is waited out on the lobby page (`app/duel/page.tsx:420-438`); the room is entered only once `status` leaves `open`. The queued state exposes a mode-specific shareable invite URL (`app/duel/page.tsx:216-243`) that auto-joins a friend as player 2 (`app/duel/[market]/match/[matchId]/page.tsx:65-97`, `app/duel/[market]/pulse/[matchId]/page.tsx:57-84`).
-- Quick Play has no balance deduction; its `wager` is stored and displayed only. Pulse reserves each entry's stake from the player's round bankroll and returns that stake when the position closes.
+- Sync: ~1s polling (`app/duel/[market]/match/[matchId]/page.tsx:14`), no WebSocket registry. Lobby list polls at 3s (`app/duel/page.tsx:25`), the queue at 1s (`app/duel/page.tsx:30`).
+- Nobody sits in a room alone: an `open` match is waited out on the lobby page (`app/duel/page.tsx:427-444`); the room is entered only once `status` leaves `open`. The queued state exposes a mode-specific shareable invite URL (`app/duel/page.tsx:222-245`) that auto-joins a friend as player 2 (`app/duel/[market]/match/[matchId]/page.tsx:65-97`, `app/duel/[market]/pulse/[matchId]/page.tsx:57-84`).
+- Quick Play requires Clerk sign-in. Each player's `wager` is reserved atomically from `users.balance` on entry; open/predict cancellation refunds it, ties refund both stakes, and the winner receives the 2× pot (`lib/balance.ts`). Pulse reserves each entry's stake from the player's round bankroll and returns that stake when the position closes.
 
 ## Status machine
 
@@ -37,8 +37,8 @@ multi-statement transactions or row locks. Every transition is a single guarded
 
 | Transition | Guard | Loser does |
 | --- | --- | --- |
-| join | `status='open' AND player2_id IS NULL` | try next candidate, else create (`app/api/match/find-or-create/route.ts:75-93`) |
-| lock | `status='predict' AND prediction{N} IS NULL` | re-read, return current view |
+| join | `status='open' AND player2_id IS NULL` plus atomic balance reservation | refund if the guarded seat is lost, else try next candidate or create (`app/api/match/find-or-create/route.ts:84-111`) |
+| lock | `status='predict' AND prediction{N} IS NULL` | re-read, return current view (`app/api/match/[id]/lock/route.ts:55-69`) |
 | Pulse action | `status='countdown' AND the caller's position JSON is unchanged` | re-read, return current view |
 | start countdown | `status='predict'` | nothing — only the 2nd locker sees both non-null (`app/api/match/[id]/lock/route.ts:71-80`) |
 | expire lock window | `status='predict'`, plus `prediction{N} IS NULL` re-asserted for every slot read empty | re-read; a lock that beat it owns the row (`lib/match.ts:90-115`) |
@@ -69,7 +69,8 @@ multi-statement transactions or row locks. Every transition is a single guarded
 | `GET /api/match/open?market=&mode=&playerId=` | joinable matches with a fresh host heartbeat |
 
 Validation on entry: market must price (`lib/spotPrice.ts:12`), mode must be
-`quick-play` or `pulse`, wager integer 1..1,000,000, timer 10..3600s. Pulse
+`quick-play` or `pulse`, caller must be a signed-in Clerk user, wager integer
+1..1,000,000 and no more than the user's balance, timer 10..3600s. Pulse
 actions additionally validate side, stake ≤ $100 and available bankroll, leverage,
 and position id.
 
