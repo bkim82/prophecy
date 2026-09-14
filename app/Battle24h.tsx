@@ -56,7 +56,7 @@ function useCountdownToUtcMidnight() {
 // panel, or the standalone /duel/btc/battle deep link) rather than gated
 // behind a separate "Play" step.
 export function Battle24h({ feedSymbol }: { feedSymbol: string }) {
-  const { price, points, status } = usePriceFeed(feedSymbol);
+  const { price, points } = usePriceFeed(feedSymbol);
   const currentPrice = price ?? points.at(-1)?.p ?? null;
   const msLeft = useCountdownToUtcMidnight();
   const locked = msLeft <= 0;
@@ -117,23 +117,9 @@ export function Battle24h({ feedSymbol }: { feedSymbol: string }) {
   };
 
   return (
-    <div className="battle-shell">
-      {/* Make your call — the dominant hero: price, settlement, countdown, choices */}
+    <div className="battle-shell" data-market="btc">
+      {/* Make your call — the one bordered, elevated panel: countdown and choices */}
       <section className="battle-hero panel">
-        <div className="battle-hero-head">
-          <div>
-            <span className="field-label">BTC / USD · {status === "live" ? "Live" : status}</span>
-            <div className="battle-hero-price display-font">{usd(currentPrice ?? 0)}</div>
-          </div>
-          <div className="battle-countdown">
-            <span>{locked ? "Settling" : "Locks in"}</span>
-            <strong className={locked ? "is-locked" : ""}>
-              {locked ? "00:00:00" : `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`}
-            </strong>
-            <span>Settles 11:59 PM UTC</span>
-          </div>
-        </div>
-
         <div className="battle-choices">
           <button
             type="button"
@@ -142,13 +128,9 @@ export function Battle24h({ feedSymbol }: { feedSymbol: string }) {
             disabled={locked || pick === "long"}
             aria-pressed={pick === "long"}
           >
-            <div className="battle-choice-top">
-              <span className="battle-choice-arrow" aria-hidden="true">↑</span>
-              <span className="battle-choice-check" aria-hidden="true">✓ Called</span>
-            </div>
+            <span className="battle-choice-arrow" aria-hidden="true">↑</span>
             <span className="battle-choice-label">Long</span>
-            <span className="battle-choice-sub">BTC will close higher</span>
-            {pick === "long" && <span className="battle-choice-meta">Called at {usd(pickEntryPrice ?? 0)}</span>}
+            {pick === "long" && <span className="battle-choice-meta">✓ Called at {usd(pickEntryPrice ?? 0)}</span>}
           </button>
           <button
             type="button"
@@ -157,13 +139,9 @@ export function Battle24h({ feedSymbol }: { feedSymbol: string }) {
             disabled={locked || pick === "short"}
             aria-pressed={pick === "short"}
           >
-            <div className="battle-choice-top">
-              <span className="battle-choice-arrow" aria-hidden="true">↓</span>
-              <span className="battle-choice-check" aria-hidden="true">✓ Called</span>
-            </div>
+            <span className="battle-choice-arrow" aria-hidden="true">↓</span>
             <span className="battle-choice-label">Short</span>
-            <span className="battle-choice-sub">BTC will close lower</span>
-            {pick === "short" && <span className="battle-choice-meta">Called at {usd(pickEntryPrice ?? 0)}</span>}
+            {pick === "short" && <span className="battle-choice-meta">✓ Called at {usd(pickEntryPrice ?? 0)}</span>}
           </button>
         </div>
         {pick !== null && !locked && (
@@ -171,32 +149,28 @@ export function Battle24h({ feedSymbol }: { feedSymbol: string }) {
         )}
       </section>
 
-      {/* Community positioning */}
-      <section className="battle-split panel">
+      {/* Community positioning, visually attached to the call above it */}
+      <section className="battle-split">
         <div className="battle-split-labels">
           <span className="change-up">↑ Long {longPct}%</span>
-          <span className="battle-split-count">{totalVotes.toLocaleString("en-US")} calls today</span>
           <span className="change-down">Short {shortPct}% ↓</span>
         </div>
         <div className="battle-split-bar" role="img" aria-label={`${longPct}% long, ${shortPct}% short`}>
           <div style={{ width: `${longPct}%`, background: "var(--chart-up)" }} />
           <div style={{ width: `${shortPct}%`, background: "var(--chart-down)" }} />
         </div>
-        <div className="battle-stats-group">
-          <div className="battle-stat">
-            <strong>{currentStreak > 0 ? `🔥 ${currentStreak}` : currentStreak}</strong>
-            <span>Current streak</span>
-          </div>
-          <div className="battle-stat">
-            <strong>{bestStreak}</strong>
-            <span>Best streak</span>
-          </div>
+        <div className="battle-split-meta">
+          <strong>{totalVotes.toLocaleString("en-US")}</strong> calls today
+          <i>·</i>
+          <strong>{currentStreak > 0 ? `🔥${currentStreak}` : currentStreak}</strong> streak
+          <i>·</i>
+          <strong>{bestStreak}</strong> best
         </div>
       </section>
 
-      {/* History calendar + battle record */}
+      {/* History calendar + battle record, side by side */}
       <section className="battle-columns">
-        <div className="battle-calendar panel">
+        <div className="battle-calendar">
           <div className="battle-calendar-head">
             <span className="eyebrow">{monthLabel}</span>
             <div className="battle-calendar-legend">
@@ -227,7 +201,14 @@ export function Battle24h({ feedSymbol }: { feedSymbol: string }) {
           </div>
         </div>
 
-        <div className="battle-record panel">
+        <div className="battle-record">
+          <div className="battle-countdown battle-record-countdown">
+            <span>{locked ? "Settling" : "Locks in"}</span>
+            <strong className={locked ? "is-locked" : ""}>
+              {locked ? "00:00:00" : `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`}
+            </strong>
+            <span>Settles 11:59 PM UTC</span>
+          </div>
           <span className="eyebrow">Your Battle Record</span>
           <div className="battle-record-grid">
             <div className="battle-record-item">

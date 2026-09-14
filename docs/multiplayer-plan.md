@@ -80,7 +80,7 @@ and position id.
 - One ticker drives both deadlines — the lock window in `predict`, the round in `countdown` (`app/duel/[market]/match/[matchId]/page.tsx:116-133`).
 - `<PriceChart>` still reads the browser's own `usePriceFeed()` — the chart stays client-direct to Coinbase, no server round trip. Only `roundStart`/lock-marker times come from the poll.
 - Settlement freezes the series with the final point pinned to the deadline, not to whenever the tab noticed (`app/duel/[market]/match/[matchId]/page.tsx:135-144`). A forfeit has no final price, so nothing freezes.
-- Lobby Play button for Quick Play is an async matchmaker, not a `Link` (`app/page.tsx:186-217`); Open Matches rows are join buttons (`app/page.tsx:388-399`), inert for your own row while you hold it. While queued, Share invite uses native sharing when available and clipboard copy otherwise, preserving the queued mode in the URL (`app/page.tsx:192-219`, `app/page.tsx:389-407`).
+- Lobby Play button for Quick Play is an async matchmaker, not a `Link` (`app/page.tsx:186-217`). While queued, Share invite uses native sharing when available and clipboard copy otherwise, preserving the queued mode in the URL (`app/page.tsx:192-219`, `app/page.tsx:389-407`).
 - Queueing replaces the whole Quick Play control panel rather than disabling it — the criteria are already committed to a row (`app/page.tsx:340-352`). Cancel deletes the row via `leave` (`app/page.tsx:263-277`); the room is prefetched while waiting so navigation does not eat into the 15s (`app/page.tsx:223`).
 
 ## Verified

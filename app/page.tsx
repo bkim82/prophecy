@@ -15,8 +15,6 @@ const TIMER_PRESETS = [
   { label: "300s", value: 300 },
 ];
 
-// The open-match list is a lobby view, not a round — it can lag a poll or two.
-const LOBBY_POLL_MS = 3000;
 // Pressing Play holds you here, in an `open` match, until someone joins. The
 // queue poll doubles as that match's presence heartbeat, so it runs at round
 // speed rather than lobby speed — a slower beat would age the row out of the
@@ -32,11 +30,6 @@ const usd = (value: number | null) =>
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       });
-
-const age = (since: number) => {
-  const seconds = Math.max(0, Math.round((Date.now() - since) / 1000));
-  return seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m`;
-};
 
 function MiniChart({ points }: { points: { t: number; p: number }[] }) {
   const chart = useMemo(() => {
@@ -73,22 +66,6 @@ type Queue = {
   timerSeconds: number;
   since: number;
 };
-
-type OpenMatch = {
-  id: string;
-  market: string;
-  mode: string;
-  wager: number;
-  timerSeconds: number;
-  createdAt: number;
-  isYours: boolean;
-};
-
-const recentResults = [
-  { market: "BTC", result: "Won", entry: "+0.50", time: "2m ago" },
-  { market: "ETH", result: "Lost", entry: "−0.25", time: "8m ago" },
-  { market: "BTC", result: "Won", entry: "+1.00", time: "14m ago" },
-];
 
 type ModeId = "quick-play" | "pulse" | "battle-24h";
 type MarketId = "btc" | "eth" | "doge";
@@ -137,7 +114,6 @@ export default function Page() {
   const [timer, setTimer] = useState(60);
   const [mode, setMode] = useState<ModeId>("quick-play");
   const [playerId, setPlayerId] = useState<string | null>(null);
-  const [openMatches, setOpenMatches] = useState<OpenMatch[]>([]);
   const [pending, setPending] = useState<string | null>(null); // "play" | match id
   const [matchError, setMatchError] = useState<string | null>(null);
   // Set while this browser is sitting in its own `open` match. The room is
@@ -159,34 +135,6 @@ export default function Page() {
   const canPlay = matchMode === "pulse" || wagerIsValid;
 
   useEffect(() => setPlayerId(getPlayerId()), []);
-
-  // Only poll the lobby list while a networked mode is on screen.
-  useEffect(() => {
-    if (!takesCall) return;
-    let cancelled = false;
-    let timerId: ReturnType<typeof setTimeout>;
-
-    const poll = async () => {
-      try {
-        const query = new URLSearchParams({ market, mode: matchMode });
-        if (playerId) query.set("playerId", playerId);
-        const res = await fetch(`/api/match/open?${query}`, { cache: "no-store" });
-        if (!cancelled && res.ok) {
-          const data = (await res.json()) as { matches: OpenMatch[] };
-          if (!cancelled) setOpenMatches(data.matches);
-        }
-      } catch {
-        // Keep the last list rather than blanking the panel on a blip.
-      }
-      if (!cancelled) timerId = setTimeout(poll, LOBBY_POLL_MS);
-    };
-
-    poll();
-    return () => {
-      cancelled = true;
-      clearTimeout(timerId);
-    };
-  }, [market, takesCall, matchMode, playerId]);
 
   const matchHref = (matchMarket: string, matchId: string, matchMode = "quick-play") =>
     matchMode === "pulse"
@@ -335,24 +283,6 @@ export default function Page() {
     }
   };
 
-  const join = async (match: OpenMatch) => {
-    if (!playerId || pending || queue) return;
-    setPending(match.id);
-    setMatchError(null);
-    try {
-      const res = await fetch(`/api/match/${encodeURIComponent(match.id)}/join`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ playerId }),
-      });
-      if (!res.ok) throw new Error("taken");
-      enterMatch(match.market, match.id, match.mode);
-    } catch {
-      setMatchError("That match was taken. Pick another, or press Play.");
-      setPending(null);
-    }
-  };
-
   return (
     <main className="lobby-shell" data-market={market}>
       <nav className="market-nav" aria-label="Market switcher">
@@ -447,7 +377,7 @@ export default function Page() {
             ))}
           </div>
         </div>
-        <div className="opponent-status"><span className="field-label">Opponent</span><strong><span className={`status-dot ${isPlayable ? "is-online" : ""}`} /> {takesCall ? "Open lobby" : isPlayable ? "Solo · NOVA AI" : "Unavailable"}</strong><span className="muted">{takesCall ? `${openMatches.length} ${mode === "pulse" ? "Pulse match" : "match"}${openMatches.length === 1 ? "" : "es"} waiting` : isPlayable ? "Stake and leverage set in-round" : "Mode in development"}</span></div>
+        <div className="opponent-status"><span className="field-label">Opponent</span><strong><span className={`status-dot ${isPlayable ? "is-online" : ""}`} /> {takesCall ? "Matchmaking" : isPlayable ? "Solo · NOVA AI" : "Unavailable"}</strong><span className="muted">{takesCall ? "Play to find an opponent" : isPlayable ? "Stake and leverage set in-round" : "Mode in development"}</span></div>
         {activeMode.matched
           ? <button type="button" className="play-button" onClick={play} disabled={!playerId || pending !== null || queue !== null || !canPlay}>{pending === "play" ? "Finding a match…" : <>Play <span aria-hidden="true">→</span></>}</button>
           : isPlayable
@@ -456,25 +386,6 @@ export default function Page() {
         {matchError && <span className="muted">{matchError}</span>}
       </section>
       )}
-
-      <section className="lower-grid">
-        <div><div className="list-heading"><h2>Open matches</h2><span className="muted">Live lobby</span></div><div className="data-list panel">
-          {!takesCall && <div className="data-row"><span className="muted">Choose Quick Play or Pulse</span></div>}
-          {takesCall && openMatches.length === 0 && <div className="data-row"><span className="muted">No one is waiting — press Play to open one.</span></div>}
-          {takesCall && openMatches.map((match) => {
-            const label = MARKETS[match.market as MarketId]?.label ?? match.market.toUpperCase();
-            return (
-              <button type="button" className="data-row" key={match.id} onClick={() => join(match)} disabled={pending !== null || queue !== null || match.isYours}>
-                <div className="row-market"><span className={`market-symbol ${match.market === "btc" ? "btc-symbol" : "eth-symbol"}`}>{match.market === "btc" ? "₿" : "Ξ"}</span><span><strong>{label}</strong><span className="muted">{match.timerSeconds}s · {match.isYours ? "yours" : match.mode === "pulse" ? "Pulse" : "Quick Play"}</span></span></div>
-                <span className="row-detail">1 / 2</span>
-                <span className="row-detail">{match.mode === "pulse" ? "live trade" : `${match.wager} coins`}</span>
-                <span className="row-age">{pending === match.id ? "joining…" : age(match.createdAt)}</span>
-              </button>
-            );
-          })}
-        </div></div>
-        <div><div className="list-heading"><h2>Recent results</h2><span className="muted">Today</span></div><div className="data-list panel">{recentResults.map((result, index) => <div className="data-row result-row" key={`${result.market}-${index}`}><div className="row-market"><span className={`market-symbol ${result.market === "BTC" ? "btc-symbol" : "eth-symbol"}`}>{result.market === "BTC" ? "₿" : "Ξ"}</span><strong>{result.market}</strong></div><span className={result.result === "Won" ? "change-up" : "change-down"}>{result.result}</span><span className="row-detail">{result.entry}</span><span className="row-age">{result.time}</span></div>)}</div></div>
-      </section>
 
     </main>
   );
