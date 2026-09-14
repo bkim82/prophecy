@@ -4,6 +4,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { DailyCoin, pickDailyCoin } from "./DailyCoin";
+import {
+  getActiveMatch,
+  setQueueing,
+  subscribeActiveMatch,
+  type ActiveMatch,
+} from "./lib/activeMatch";
 import { getPlayerId } from "./lib/playerId";
 import { usePriceFeed } from "./usePriceFeed";
 
@@ -143,6 +149,9 @@ export default function Page() {
   // only entered once an opponent takes the seat.
   const [queue, setQueue] = useState<Queue | null>(null);
   const [queuedFor, setQueuedFor] = useState(0);
+  // A live match elsewhere blocks queueing/joining another one here — the
+  // global ActiveMatchBar is the only way back into it.
+  const [activeMatch, setActiveMatchState] = useState<ActiveMatch | null>(null);
   const [inviteState, setInviteState] = useState<"idle" | "shared" | "copied" | "error">("idle");
   const modes = MODES_BY_MARKET[market];
   const currentPrice = price ?? points.at(-1)?.p ?? null;
@@ -158,6 +167,18 @@ export default function Page() {
   const canPlay = matchMode === "pulse" || wagerIsValid;
 
   useEffect(() => setPlayerId(getPlayerId()), []);
+
+  useEffect(() => {
+    setActiveMatchState(getActiveMatch());
+    return subscribeActiveMatch(() => setActiveMatchState(getActiveMatch()));
+  }, []);
+
+  // The queue panel is this page's own "waiting for an opponent" UI, so the
+  // global return-to-match bar steps aside while it's showing.
+  useEffect(() => {
+    setQueueing(Boolean(queue));
+    return () => setQueueing(false);
+  }, [queue]);
 
   // Only poll the lobby list while a networked mode is on screen.
   useEffect(() => {
@@ -230,7 +251,7 @@ export default function Page() {
   // Pressing Play either takes a seat someone was holding — straight into the
   // room — or opens a match and waits here. Nobody enters a room alone.
   const play = async () => {
-    if (!playerId || pending || queue || !canPlay) return;
+    if (!playerId || pending || queue || !canPlay || activeMatch) return;
     setPending("play");
     setMatchError(null);
     try {
@@ -335,7 +356,7 @@ export default function Page() {
   };
 
   const join = async (match: OpenMatch) => {
-    if (!playerId || pending || queue) return;
+    if (!playerId || pending || queue || activeMatch) return;
     setPending(match.id);
     setMatchError(null);
     try {
@@ -446,11 +467,15 @@ export default function Page() {
         </div>
         <div className="opponent-status"><span className="field-label">Opponent</span><strong><span className={`status-dot ${isPlayable ? "is-online" : ""}`} /> {takesCall ? "Open lobby" : isPlayable ? "Solo · NOVA AI" : "Unavailable"}</strong><span className="muted">{takesCall ? `${openMatches.length} ${mode === "pulse" ? "Pulse match" : "match"}${openMatches.length === 1 ? "" : "es"} waiting` : isPlayable ? "Stake and leverage set in-round" : "Mode in development"}</span></div>
         {activeMode.matched
-          ? <button type="button" className="play-button" onClick={play} disabled={!playerId || pending !== null || queue !== null || !canPlay}>{pending === "play" ? "Finding a match…" : <>Play <span aria-hidden="true">→</span></>}</button>
+          ? <button type="button" className="play-button" onClick={play} disabled={!playerId || pending !== null || queue !== null || !canPlay || activeMatch !== null}>{pending === "play" ? "Finding a match…" : <>Play <span aria-hidden="true">→</span></>}</button>
           : isPlayable
             ? <Link href={playHref} className="play-button">Play <span aria-hidden="true">→</span></Link>
             : <button type="button" className="play-button" disabled>Soon</button>}
-        {matchError && <span className="muted">{matchError}</span>}
+        {activeMatch ? (
+          <span className="muted">Finish your live duel before starting another.</span>
+        ) : (
+          matchError && <span className="muted">{matchError}</span>
+        )}
       </section>
       )}
 
@@ -461,7 +486,7 @@ export default function Page() {
           {takesCall && openMatches.map((match) => {
             const label = MARKETS[match.market as MarketId]?.label ?? match.market.toUpperCase();
             return (
-              <button type="button" className="data-row" key={match.id} onClick={() => join(match)} disabled={pending !== null || queue !== null || match.isYours}>
+              <button type="button" className="data-row" key={match.id} onClick={() => join(match)} disabled={pending !== null || queue !== null || match.isYours || activeMatch !== null}>
                 <div className="row-market"><span className={`market-symbol ${match.market === "btc" ? "btc-symbol" : "eth-symbol"}`}>{match.market === "btc" ? "₿" : "Ξ"}</span><span><strong>{label}</strong><span className="muted">{match.timerSeconds}s · {match.isYours ? "yours" : match.mode === "pulse" ? "Pulse" : "Quick Play"}</span></span></div>
                 <span className="row-detail">1 / 2</span>
                 <span className="row-detail">{match.mode === "pulse" ? "live trade" : `${match.wager} coins`}</span>

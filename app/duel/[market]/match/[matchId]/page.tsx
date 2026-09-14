@@ -6,6 +6,7 @@ import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import PriceChart, { type PredictionLine } from "@/app/PriceChart";
 import { usePriceFeed, type PricePoint } from "@/app/usePriceFeed";
 import { getPlayerId } from "@/app/lib/playerId";
+import { clearActiveMatch, setActiveMatch } from "@/app/lib/activeMatch";
 import { productForMarket } from "@/lib/spotPrice";
 import type { MatchView } from "@/lib/match";
 
@@ -69,6 +70,21 @@ export default function Page({
     skewRef.current = next.serverNow - Date.now();
     setView(next);
   }, []);
+
+  // Once the round is actually underway, remember it so a global bar can
+  // offer a way back in from anywhere else in the app - leaving this page
+  // does not call `leave`, so the match keeps running server-side either way.
+  useEffect(() => {
+    if (view?.status === "predict" || view?.status === "countdown") {
+      setActiveMatch({ matchId, market, mode: "quick-play" });
+    } else if (view?.status === "settled") {
+      clearActiveMatch(matchId);
+    }
+  }, [view?.status, matchId, market]);
+
+  useEffect(() => {
+    if (gone) clearActiveMatch(matchId);
+  }, [gone, matchId]);
 
   useEffect(() => {
     if (!playerId) return;
@@ -190,6 +206,7 @@ export default function Page({
     } catch {
       // Best-effort; presence expiry covers a failed leave.
     }
+    clearActiveMatch(matchId);
     router.push("/");
   };
 
@@ -255,15 +272,18 @@ export default function Page({
     yourPrediction !== null &&
     view?.opponentPrediction !== null;
 
+  // Settled rounds compare against the final price; a live countdown compares
+  // against the current tick so the cards update instead of sitting blank.
   const metricFor = (prediction: number) => {
-    if (!outcome) {
+    const reference = outcome ? outcome.finalPrice : view?.status === "countdown" ? price : null;
+    if (reference === null) {
       return { call: "—", offBy: "—", error: "—" };
     }
-    const offBy = Math.abs(outcome.finalPrice - prediction);
+    const offBy = Math.abs(reference - prediction);
     return {
-      call: prediction >= outcome.finalPrice ? "Above" : "Below",
+      call: prediction >= reference ? "Above" : "Below",
       offBy: usd(offBy),
-      error: `${((offBy / outcome.finalPrice) * 100).toFixed(2)}%`,
+      error: `${((offBy / reference) * 100).toFixed(2)}%`,
     };
   };
 

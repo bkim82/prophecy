@@ -6,6 +6,7 @@ import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import PriceChart, { type TradeMarker } from "@/app/PriceChart";
 import PulseMovementAlert from "@/app/PulseMovementAlert";
 import { getPlayerId } from "@/app/lib/playerId";
+import { clearActiveMatch, setActiveMatch } from "@/app/lib/activeMatch";
 import { usePriceFeed } from "@/app/usePriceFeed";
 import { type MatchView } from "@/lib/match";
 import {
@@ -61,6 +62,21 @@ export default function Page({ params }: { params: Promise<{ market: string; mat
     skewRef.current = next.serverNow - Date.now();
     setView(next);
   }, []);
+
+  // Once the round is actually underway, remember it so a global bar can
+  // offer a way back in from anywhere else in the app - leaving this page
+  // does not call `leave`, so the match keeps running server-side either way.
+  useEffect(() => {
+    if (view?.status === "predict" || view?.status === "countdown") {
+      setActiveMatch({ matchId, market, mode: "pulse" });
+    } else if (view?.status === "settled") {
+      clearActiveMatch(matchId);
+    }
+  }, [view?.status, matchId, market]);
+
+  useEffect(() => {
+    if (gone) clearActiveMatch(matchId);
+  }, [gone, matchId]);
 
   useEffect(() => {
     if (!playerId) return;
@@ -165,6 +181,7 @@ export default function Page({ params }: { params: Promise<{ market: string; mat
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ playerId }),
       });
     } finally {
+      clearActiveMatch(matchId);
       router.push("/");
     }
   };
