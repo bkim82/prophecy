@@ -6,12 +6,11 @@ Deliberate gaps in a prototype scoped to the core loop. Not bugs.
 
 | Gap | Detail |
 | --- | --- |
-| 24hr Battle | Switcher entry only (`app/duel/page.tsx:63`, no `href` → panel locks, `:75`) — single prediction settled a day later, no implementation |
-| ETH Duel | Lobby leaves ETH inert (`app/duel/page.tsx:95-99`, no `href`/`matched`). The feed, `/api/price`, the match routes and `/duel/[market]/match/[matchId]` all already handle `eth` — only the lobby entry is missing |
 | Real rank/tier system | `app/lib/rank.ts` is a hardcoded stub (`MOCK_CURRENT_RANK`/`MOCK_RANK_THRESHOLD`) gating `/exclusive` — no computation, no persistence, not tied to Clerk `userId` |
 | Rooms: real-time chat + rank gating | `/rooms` (`app/rooms/page.tsx`) is a static mock (`app/lib/roomsMocks.ts`) — no messaging backend, no per-user rank check, no room unlock logic, `⚔ Challenge` buttons are visual only (see [rooms.md](rooms.md)) |
 | Post composer / feed persistence | `/` and `/exclusive` render static arrays from `app/lib/mockPosts.ts` — no create/like/reply, no database table, no Clerk-backed authorship |
 | Daily BTC call | Feed's streak post (`app/lib/mockPosts.ts` `g-streak1`) implies a once-a-day BTC prediction settling at 11:59pm with a consecutive-day streak counter — no submission flow, settlement job, or streak computation exists anywhere in the app |
+| 24hr Battle | UI only, BTC-only: `app/Battle24h.tsx` renders inline in the `/duel` lobby when the "24hr Battle" tab is picked (no separate Play step), and is reused as-is by the standalone deep link `app/duel/btc/battle/page.tsx` — pick/vote-split/streak/calendar all client `useState`, no schema, no settlement job, no cron. Identity and day-boundary (UTC midnight, decided) still need a real per-player store before this is more than a mock |
 | Pulse leverage control | Fixed 1×–100× chips (`app/duel/btc/pulse/page.tsx:11`); no custom multiplier |
 | Pulse spot accounting | `app/duel/btc/pulse/trading.ts` (`executeTrade`) is written and tested-by-eye but has no importers — the page models one leveraged directional position, not a cash/BTC portfolio |
 | Pulse rival | "Nova · AI" is a local stub: side derived from the entry price's parity, fixed $48 × 10× size, no behaviour (`app/duel/btc/pulse/page.tsx:199-204`, `:301-306`) |

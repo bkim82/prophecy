@@ -407,3 +407,87 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
   .post-avatar { width: 32px; height: 32px; }
   .market-call-prices { flex-wrap: wrap; row-gap: 2px; }
  }
+
+/* Mode switcher reads as a proper segmented control: filled active state,
+   distinct from the plain tab-style .market-switcher it shares a rule with
+   above. Higher in source order than that shared rule, so it wins the tie. */
+.mode-switcher { border: 1px solid var(--line); border-radius: 7px; padding: 3px; background: var(--surface); gap: 2px; }
+.mode-switcher button { border-radius: 5px; padding: 7px 12px; }
+.mode-switcher button.active { border-color: transparent; background: var(--accent); color: var(--accent-contrast); }
+.mode-switcher button.active:hover { color: var(--accent-contrast); }
+
+/* 24hr Battle: a focused, single-purpose game screen rather than a dashboard
+   panel — its own max-width so it reads right dropped into the 1080px lobby
+   shell or the narrower standalone deep link alike. */
+.battle-shell { width: 100%; max-width: 1180px; margin: 0 auto; display: grid; gap: 28px; }
+
+.battle-hero { padding: 26px 28px; display: grid; gap: 22px; }
+.battle-hero-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 14px; }
+.battle-hero-price { margin-top: 6px; font-size: 32px; line-height: 1; color: var(--text); }
+.battle-countdown { display: grid; justify-items: end; gap: 4px; }
+.battle-countdown strong { font-size: 24px; line-height: 1; font-variant-numeric: tabular-nums; color: var(--accent-strong); }
+.battle-countdown strong.is-locked { color: var(--negative); }
+.battle-countdown span { font-size: 11px; color: var(--muted-dim); }
+
+.battle-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.battle-choice { display: grid; gap: 6px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-raised); padding: 20px 22px; text-align: left; }
+.battle-choice:hover:not(:disabled) { border-color: var(--line-strong); background: var(--surface-hover); }
+.battle-choice:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.battle-choice:disabled { cursor: default; }
+.battle-choice-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.battle-choice-arrow { font-size: 20px; line-height: 1; }
+.battle-choice-label { font-size: 18px; font-weight: 700; }
+.battle-choice-sub { color: var(--muted); font-size: 12px; }
+.battle-choice-meta { margin-top: 2px; color: var(--muted-dim); font-size: 11px; }
+.battle-choice-check { display: none; font-size: 13px; }
+.battle-choice.is-long .battle-choice-label, .battle-choice.is-long .battle-choice-arrow { color: var(--chart-up); }
+.battle-choice.is-short .battle-choice-label, .battle-choice.is-short .battle-choice-arrow { color: var(--chart-down); }
+.battle-choice.is-long.is-selected { border-color: var(--chart-up); background: color-mix(in srgb, var(--chart-up) 13%, var(--surface-raised)); }
+.battle-choice.is-short.is-selected { border-color: var(--chart-down); background: color-mix(in srgb, var(--chart-down) 13%, var(--surface-raised)); }
+.battle-choice.is-selected .battle-choice-check { display: inline; }
+.battle-choice:disabled:not(.is-selected) { opacity: .5; }
+.battle-choices-hint { margin: 0; color: var(--muted-dim); font-size: 11px; text-align: center; }
+
+.battle-split { padding: 20px 24px; display: grid; gap: 16px; }
+.battle-split-labels { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; font-weight: 600; }
+.battle-split-count { color: var(--muted-dim); font-size: 11px; font-weight: 400; }
+.battle-split-bar { display: flex; height: 10px; border-radius: 999px; overflow: hidden; background: var(--surface-raised); }
+.battle-stats-group { display: flex; gap: 28px; }
+.battle-stat strong { display: block; font-size: 22px; line-height: 1; color: var(--text); }
+.battle-stat span { display: block; margin-top: 5px; color: var(--muted); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; }
+
+.battle-columns { display: grid; grid-template-columns: 1.15fr .85fr; gap: 24px; align-items: start; }
+
+.battle-calendar { padding: 22px 24px; }
+.battle-calendar-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 16px; }
+.battle-calendar-legend { display: flex; gap: 14px; }
+.battle-calendar-legend span { display: flex; align-items: center; gap: 6px; color: var(--muted-dim); font-size: 11px; }
+.battle-calendar-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 3px; background: var(--chart-up); }
+.battle-calendar-legend i.is-loss { background: var(--chart-down); }
+.battle-calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.battle-calendar-dow { text-align: center; color: var(--muted-dim); font-size: 11px; padding-bottom: 4px; }
+.battle-day { display: grid; place-items: center; aspect-ratio: 1; border-radius: 7px; color: var(--muted-dim); font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.battle-day.is-win { background: color-mix(in srgb, var(--chart-up) 20%, transparent); color: var(--chart-up); font-weight: 700; }
+.battle-day.is-loss { background: color-mix(in srgb, var(--chart-down) 16%, transparent); color: var(--chart-down); font-weight: 700; }
+.battle-day.is-today { border: 1.5px solid var(--accent); color: var(--accent-strong); font-weight: 700; }
+
+.battle-record { padding: 22px 24px; display: grid; gap: 18px; align-content: start; }
+.battle-record-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.battle-record-item strong { display: block; font-size: 26px; line-height: 1; color: var(--text); }
+.battle-record-item span { display: block; margin-top: 6px; color: var(--muted); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; }
+.battle-record-accuracy { display: flex; align-items: baseline; justify-content: space-between; padding-top: 16px; border-top: 1px solid var(--line); }
+.battle-record-accuracy strong { font-size: 28px; color: var(--accent-strong); }
+.battle-record-accuracy span { color: var(--muted); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; }
+
+@media (max-width: 800px) {
+  .battle-columns { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  .battle-hero { padding: 18px; gap: 16px; border-radius: 10px; }
+  .battle-hero-price { font-size: 26px; }
+  .battle-choices { grid-template-columns: 1fr; gap: 10px; }
+  .battle-choice { padding: 16px 18px; }
+  .battle-split { padding: 16px 18px; border-radius: 10px; }
+  .battle-calendar, .battle-record { padding: 16px; border-radius: 10px; }
+  .battle-stats-group { gap: 20px; }
+}
