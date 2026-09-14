@@ -3,7 +3,8 @@
 Agent-readable fact sheets, not prose. Format: flat bullets, `file:line` refs, no narration. Update per [[AGENTS.md]] orchestration rule when `app/**` behavior changes.
 
 - [architecture.md](architecture.md) — module map, data flow, invariants
-- [feeds.md](feeds.md) — Global/Exclusive Twitter-style feeds, tab nav, rank stub
+- [feeds.md](feeds.md) — Global/Exclusive Twitter-style feeds, header nav, rank stub
+- [rooms.md](rooms.md) — rank-gated group chat placeholder, nav, mock messages/ladder
 - [price-feed.md](price-feed.md) — socket/seed/REST sources, sampling, reconnect
 - [game-loop.md](game-loop.md) — phase machine, lock/settle/reset logic
 - [pulse-mode.md](pulse-mode.md) — solo trading state, leveraged P&L, settlement

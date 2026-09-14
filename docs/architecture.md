@@ -1,16 +1,17 @@
 # architecture
 
-- Root shell now has three top-level destinations via a persistent tab nav (`app/TabNav.tsx`): `/` (Global feed), `/exclusive` (rank-gated feed), `/duel` (the market lobby, moved from `app/page.tsx`). Live ticker on `/duel` reads the client-side BTC feed.
+- Root header (`app/layout.tsx`) merges the `PROPHECY` brand, a compact `Omens`/`Rooms` text-tab nav (`app/TabNav.tsx`, sliding underline, active via `usePathname()`), and a primary `Duel` CTA (icon from `app/icons.tsx`, `app/layout.tsx`, links to `/duel`) into one row. Routes: `/` (Global feed), `/rooms` (rank-gated group chat placeholder, `app/rooms/page.tsx`), `/duel` (the market lobby, moved from `app/page.tsx`). `/exclusive` (rank-gated feed) still exists but is no longer linked from the header nav. Live ticker on `/duel` reads the client-side BTC feed.
 - Quick Play and multiplayer Pulse are server-authoritative: a `matches` row owns the round (`db/schema.ts:20`), `/api/match/*` routes own the transitions, clients poll. See [multiplayer-plan.md](multiplayer-plan.md).
 - `/api/price` and `/api/history` remain stateless proxies to public exchange APIs. The price feed and chart stay client-side in every mode.
 
 ## Graph
 
 ```
-app/layout.tsx (root shell: DUEL, balance, profile)
-  ├── app/TabNav.tsx (persistent Global / Exclusive / Duel tab switcher)
+app/layout.tsx (root shell: PROPHECY, Omens/Rooms tabs, Duel CTA, balance, profile)
+  ├── app/TabNav.tsx (persistent Omens / Rooms tab switcher, sliding underline)
   ├── app/page.tsx (Global feed: mock PostCard list, app/lib/mockPosts.ts)
-  ├── app/exclusive/page.tsx (Exclusive feed: rank-gated via app/lib/rank.ts stub)
+  ├── app/rooms/page.tsx (Rooms: rank-gated group chat placeholder, app/lib/roomsMocks.ts)
+  ├── app/exclusive/page.tsx (Exclusive feed: rank-gated via app/lib/rank.ts stub, unlinked from nav)
   └── app/duel/page.tsx (live lobby: BTC ticker, mini-chart, quick-play controls, match rows)
         └── usePriceFeed() → price, sampled series, status, now
 app/duel/[market]/match/[matchId]/page.tsx (Quick Play prediction room)
@@ -46,8 +47,9 @@ leverage in-round.
 | File | Responsibility |
 | --- | --- |
 | `app/page.tsx` | Global feed: static `PostCard` list from `app/lib/mockPosts.ts`, no backend |
-| `app/exclusive/page.tsx` | Exclusive feed: gates on `app/lib/rank.ts` mock rank, locked teaser vs. unlocked list |
-| `app/TabNav.tsx` | persistent Global/Exclusive/Duel tab switcher, active tab via `usePathname()` |
+| `app/exclusive/page.tsx` | Exclusive feed: gates on `app/lib/rank.ts` mock rank, locked teaser vs. unlocked list; not linked from the header nav |
+| `app/rooms/page.tsx` | Rooms placeholder: current-room heading, mock group chat with market-call/challenge chips, subtle rank ladder — see [rooms.md](rooms.md) |
+| `app/TabNav.tsx` | persistent Feed/Rooms tab switcher in the header, active tab + sliding underline via `usePathname()` |
 | `app/PostCard.tsx` | shared post rendering for both feed pages |
 | `app/lib/mockPosts.ts` | hardcoded `GLOBAL_POSTS`/`EXCLUSIVE_POSTS` mock data, no persistence |
 | `app/lib/rank.ts` | hardcoded mock rank/threshold stub gating `/exclusive` — no real rank system exists |

@@ -1,4 +1,5 @@
 import type { Market, MarketCall, Outcome, Post, PostImage as PostImageData } from "@/app/lib/mockPosts";
+import { FlameIcon } from "@/app/icons";
 import { PostMenu } from "@/app/PostMenu";
 
 // Deterministic hash so the same handle always gets the same gradient —
@@ -72,7 +73,7 @@ function MarketCallCard({ call }: { call: MarketCall }) {
         </span>
       </div>
       {call.outcome && <OutcomeBadge outcome={call.outcome} />}
-      {!call.outcome && call.expiresIn && <div className="call-expiry">⏳ resolves in {call.expiresIn}</div>}
+      {!call.outcome && call.expiresIn && <div className="call-expiry">resolves in {call.expiresIn}</div>}
     </div>
   );
 }
@@ -104,7 +105,7 @@ function StreakCard({ post }: { post: Post }) {
   return (
     <article className="post-card post-card--streak">
       <div className="streak-banner">
-        <span className="streak-icon" aria-hidden="true">🔥</span>
+        <FlameIcon className="streak-icon" />
         <div className="streak-copy">
           <strong>{post.author}</strong> <span className="muted">{post.handle} · {post.timestamp}</span>
           <p>{post.content}</p>
