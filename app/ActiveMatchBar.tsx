@@ -101,7 +101,7 @@ export function ActiveMatchBar() {
   if (!match || onOwnPage || !view || queueing) return null;
 
   const marketLabel = match.market.toUpperCase();
-  const modeLabel = match.mode === "pulse" ? "Pulse" : "Quick Play";
+  const modeLabel = match.mode === "pulse" ? "Pulse" : "Cast";
   const status = statusCopy(view);
 
   const handlePillClick = (event: React.MouseEvent) => {

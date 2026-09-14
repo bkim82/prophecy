@@ -110,19 +110,19 @@ const MARKETS: Record<MarketId, { label: string; symbol: string; name: string }>
 // leaves inert.
 const MODES_BY_MARKET: Record<MarketId, { id: ModeId; label: string; meta: string; href?: string; matched?: boolean }[]> = {
   btc: [
-    { id: "quick-play", label: "Quick Play", meta: "BTC · head to head · online", matched: true },
+    { id: "quick-play", label: "Cast", meta: "BTC · head to head · online", matched: true },
     { id: "pulse", label: "Pulse", meta: "BTC · head to head · trade live", matched: true },
-    { id: "battle-24h", label: "24hr Battle", meta: "BTC · one call · settled in 24 hours" },
+    { id: "battle-24h", label: "24h Reading", meta: "BTC · one call · settled in 24 hours" },
   ],
   eth: [
-    { id: "quick-play", label: "Quick Play", meta: "ETH · head to head · online" },
+    { id: "quick-play", label: "Cast", meta: "ETH · head to head · online" },
     { id: "pulse", label: "Pulse", meta: "ETH · solo · trade live for 60 seconds" },
-    { id: "battle-24h", label: "24hr Battle", meta: "ETH · one call · settled in 24 hours" },
+    { id: "battle-24h", label: "24h Reading", meta: "ETH · one call · settled in 24 hours" },
   ],
   doge: [
-    { id: "quick-play", label: "Quick Play", meta: "DOGE · 60 seconds · head to head" },
+    { id: "quick-play", label: "Cast", meta: "DOGE · 60 seconds · head to head" },
     { id: "pulse", label: "Pulse", meta: "DOGE · solo · trade live for 60 seconds" },
-    { id: "battle-24h", label: "24hr Battle", meta: "DOGE · one call · settled in 24 hours" },
+    { id: "battle-24h", label: "24h Reading", meta: "DOGE · one call · settled in 24 hours" },
   ],
 };
 
@@ -227,7 +227,7 @@ export default function Page() {
       if (navigator.share) {
         await navigator.share({
           title: "Join my Prophecy duel",
-          text: `Tap to play a ${MARKETS[queue.market].label} ${queue.mode === "pulse" ? "Pulse" : "Quick Play"} duel against me.`,
+          text: `Tap to play a ${MARKETS[queue.market].label} ${queue.mode === "pulse" ? "Pulse" : "Cast"} duel against me.`,
           url,
         });
         setInviteState("shared");
@@ -409,7 +409,7 @@ export default function Page() {
 
       <div className="section-heading">
         <div>
-          <span className="eyebrow">Make a call</span>
+          <span className="eyebrow">Cast a prophecy</span>
           <h1 className="display-font">{activeMode.label}</h1>
           <span className="round-meta">{activeMode.meta}</span>
         </div>
@@ -428,9 +428,9 @@ export default function Page() {
           <span className="queue-pulse" aria-hidden="true" />
           <div className="queue-copy">
             <span className="field-label">In queue</span>
-            <strong>Waiting for an opponent…</strong>
+            <strong>Awaiting a challenger…</strong>
             <span className="muted">
-              {MARKETS[queue.market].label} {queue.mode === "pulse" ? "Pulse" : "Quick Play"} · {queue.timerSeconds}s round
+              {MARKETS[queue.market].label} {queue.mode === "pulse" ? "Pulse" : "Cast"} · {queue.timerSeconds}s round
             </span>
           </div>
           <span className="queue-elapsed">{queuedFor}s</span>
@@ -453,14 +453,14 @@ export default function Page() {
           </div>
         ) : (
           <div className="control-group">
-            <span className="field-label">Wager</span>
-            <div className="segmented-control" role="group" aria-label="Choose wager">
+            <span className="field-label">Stake</span>
+            <div className="segmented-control" role="group" aria-label="Choose stake">
               {WAGER_PRESETS.map((preset) => (
                 <button key={preset} type="button" disabled={!takesCall} className={!isCustomWager && wager === String(preset) ? "is-selected" : ""} onClick={() => { setWager(String(preset)); setIsCustomWager(false); }}>{preset}</button>
               ))}
               <button type="button" disabled={!takesCall} className={isCustomWager ? "is-selected" : ""} onClick={() => setIsCustomWager(true)}>Custom</button>
             </div>
-            {isCustomWager && <span className="entry-input-wrap"><input value={wager} onChange={(event) => setWager(event.target.value)} disabled={!takesCall} inputMode="decimal" aria-label="Custom wager amount" /><span>coins</span></span>}
+            {isCustomWager && <span className="entry-input-wrap"><input value={wager} onChange={(event) => setWager(event.target.value)} disabled={!takesCall} inputMode="decimal" aria-label="Custom stake amount" /><span>embers</span></span>}
           </div>
         )}
         <div className="control-group">
@@ -471,7 +471,7 @@ export default function Page() {
             ))}
           </div>
         </div>
-        <div className="opponent-status"><span className="field-label">Opponent</span><strong><span className={`status-dot ${isPlayable ? "is-online" : ""}`} /> {takesCall ? "Open lobby" : isPlayable ? "Solo · NOVA AI" : "Unavailable"}</strong><span className="muted">{takesCall ? `${openMatches.length} ${mode === "pulse" ? "Pulse match" : "match"}${openMatches.length === 1 ? "" : "es"} waiting` : isPlayable ? "Stake and leverage set in-round" : "Mode in development"}</span></div>
+        <div className="opponent-status"><span className="field-label">Opponent</span><strong><span className={`status-dot ${isPlayable ? "is-online" : ""}`} /> {takesCall ? "Open lobby" : isPlayable ? "Solo · SIBYL AI" : "Unavailable"}</strong><span className="muted">{takesCall ? `${openMatches.length} ${mode === "pulse" ? "Pulse match" : "match"}${openMatches.length === 1 ? "" : "es"} waiting` : isPlayable ? "Stake and leverage set in-round" : "Mode in development"}</span></div>
         {activeMode.matched
           ? <button type="button" className="play-button" onClick={play} disabled={!playerId || !isSignedIn || pending !== null || queue !== null || !canPlay || activeMatch !== null}>{pending === "play" ? "Finding a match…" : isSignedIn ? <>Play <span aria-hidden="true">→</span></> : "Sign in to play"}</button>
           : isPlayable
@@ -486,22 +486,22 @@ export default function Page() {
       )}
 
       <section className="lower-grid">
-        <div><div className="list-heading"><h2>Open matches</h2><span className="muted">Live lobby</span></div><div className="data-list panel">
-          {!takesCall && <div className="data-row"><span className="muted">Choose Quick Play or Pulse</span></div>}
+        <div><div className="list-heading"><h2>Open Duels</h2><span className="muted">Live lobby</span></div><div className="data-list panel">
+          {!takesCall && <div className="data-row"><span className="muted">Choose Cast or Pulse</span></div>}
           {takesCall && openMatches.length === 0 && <div className="data-row"><span className="muted">No one is waiting — press Play to open one.</span></div>}
           {takesCall && openMatches.map((match) => {
             const label = MARKETS[match.market as MarketId]?.label ?? match.market.toUpperCase();
             return (
               <button type="button" className="data-row" key={match.id} onClick={() => join(match)} disabled={pending !== null || queue !== null || match.isYours || activeMatch !== null}>
-                <div className="row-market"><span className={`market-symbol ${match.market === "btc" ? "btc-symbol" : "eth-symbol"}`}>{match.market === "btc" ? "₿" : "Ξ"}</span><span><strong>{label}</strong><span className="muted">{match.timerSeconds}s · {match.isYours ? "yours" : match.mode === "pulse" ? "Pulse" : "Quick Play"}</span></span></div>
+                <div className="row-market"><span className={`market-symbol ${match.market === "btc" ? "btc-symbol" : "eth-symbol"}`}>{match.market === "btc" ? "₿" : "Ξ"}</span><span><strong>{label}</strong><span className="muted">{match.timerSeconds}s · {match.isYours ? "yours" : match.mode === "pulse" ? "Pulse" : "Cast"}</span></span></div>
                 <span className="row-detail">1 / 2</span>
-                <span className="row-detail">{match.mode === "pulse" ? "live trade" : `${match.wager} coins`}</span>
+                <span className="row-detail">{match.mode === "pulse" ? "live trade" : `${match.wager} embers`}</span>
                 <span className="row-age">{pending === match.id ? "joining…" : age(match.createdAt)}</span>
               </button>
             );
           })}
         </div></div>
-        <div><div className="list-heading"><h2>Recent results</h2><span className="muted">Today</span></div><div className="data-list panel">{recentResults.map((result, index) => <div className="data-row result-row" key={`${result.market}-${index}`}><div className="row-market"><span className={`market-symbol ${result.market === "BTC" ? "btc-symbol" : "eth-symbol"}`}>{result.market === "BTC" ? "₿" : "Ξ"}</span><strong>{result.market}</strong></div><span className={result.result === "Won" ? "change-up" : "change-down"}>{result.result}</span><span className="row-detail">{result.entry}</span><span className="row-age">{result.time}</span></div>)}</div></div>
+        <div><div className="list-heading"><h2>Past Readings</h2><span className="muted">Today</span></div><div className="data-list panel">{recentResults.map((result, index) => <div className="data-row result-row" key={`${result.market}-${index}`}><div className="row-market"><span className={`market-symbol ${result.market === "BTC" ? "btc-symbol" : "eth-symbol"}`}>{result.market === "BTC" ? "₿" : "Ξ"}</span><strong>{result.market}</strong></div><span className={result.result === "Won" ? "change-up" : "change-down"}>{result.result}</span><span className="row-detail">{result.entry}</span><span className="row-age">{result.time}</span></div>)}</div></div>
       </section>
 
     </main>

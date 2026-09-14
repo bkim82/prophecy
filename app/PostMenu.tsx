@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { DuelIcon } from "@/app/icons";
 
-// Overflow menu for the post header — keeps ⚔ Challenge (not a real handler
+// Overflow menu for the post header — keeps Challenge (not a real handler
 // yet, see docs/feeds.md) off the main actions row so it isn't the loudest
 // thing on the card.
 export function PostMenu({ firstName }: { firstName: string }) {
@@ -28,7 +29,7 @@ export function PostMenu({ firstName }: { firstName: string }) {
       {open && (
         <div className="post-menu-dropdown" role="menu">
           <button type="button" role="menuitem" onClick={() => setOpen(false)}>
-            ⚔ Challenge {firstName}
+            <DuelIcon /> Challenge {firstName}
           </button>
         </div>
       )}

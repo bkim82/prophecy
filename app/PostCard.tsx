@@ -1,4 +1,8 @@
-import type { Market, MarketCall, Outcome, Post, PostImage as PostImageData } from "@/app/lib/mockPosts";
+"use client";
+
+import { useState } from "react";
+import { POST_REPLIES, type Market, type MarketCall, type Outcome, type Post, type PostImage as PostImageData, type Reply } from "@/app/lib/mockPosts";
+import { FlameIcon } from "@/app/icons";
 import { PostMenu } from "@/app/PostMenu";
 
 // Deterministic hash so the same handle always gets the same gradient —
@@ -72,7 +76,7 @@ function MarketCallCard({ call }: { call: MarketCall }) {
         </span>
       </div>
       {call.outcome && <OutcomeBadge outcome={call.outcome} />}
-      {!call.outcome && call.expiresIn && <div className="call-expiry">⏳ resolves in {call.expiresIn}</div>}
+      {!call.outcome && call.expiresIn && <div className="call-expiry">resolves in {call.expiresIn}</div>}
     </div>
   );
 }
@@ -100,11 +104,64 @@ function PostImage({ image }: { image: PostImageData }) {
   );
 }
 
+const REPLIES_SHOWN_INITIALLY = 2;
+
+function ReplyItem({ reply }: { reply: Reply }) {
+  return (
+    <div className="reply-item">
+      <div className="reply-avatar" aria-hidden="true" style={{ background: avatarGradient(reply.handle) }}>
+        {reply.avatarInitial}
+      </div>
+      <div className="reply-body">
+        <div className="reply-meta">
+          <strong>{reply.author}</strong>
+          <span className="muted">{reply.handle}</span>
+          <span className="muted">· {reply.timestamp}</span>
+        </div>
+        <p className="reply-content">{reply.content}</p>
+        <div className="reply-actions">
+          <span className="action-like">♡ {reply.likes}</span>
+          <span className="action-reply">Reply</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Inline expand-in-place thread (Reddit-style, not a TikTok overlay): shows
+// the first couple of already-loaded POST_REPLIES, "view N more" just
+// reveals the rest of that same local array — there's no backend to fetch
+// against.
+function ReplyThread({ postId }: { postId: string }) {
+  const [shown, setShown] = useState(REPLIES_SHOWN_INITIALLY);
+  const replies = POST_REPLIES[postId] ?? [];
+
+  if (replies.length === 0) {
+    return <p className="muted reply-thread-empty">No replies yet — be the first.</p>;
+  }
+
+  const visible = replies.slice(0, shown);
+  const remaining = replies.length - visible.length;
+
+  return (
+    <div className="reply-thread">
+      {visible.map((reply) => (
+        <ReplyItem key={reply.id} reply={reply} />
+      ))}
+      {remaining > 0 && (
+        <button type="button" className="reply-thread-more" onClick={() => setShown((n) => n + remaining)}>
+          View {remaining} more {remaining === 1 ? "reply" : "replies"}
+        </button>
+      )}
+    </div>
+  );
+}
+
 function StreakCard({ post }: { post: Post }) {
   return (
     <article className="post-card post-card--streak">
       <div className="streak-banner">
-        <span className="streak-icon" aria-hidden="true">🔥</span>
+        <FlameIcon className="streak-icon" />
         <div className="streak-copy">
           <strong>{post.author}</strong> <span className="muted">{post.handle} · {post.timestamp}</span>
           <p>{post.content}</p>
@@ -126,6 +183,8 @@ function PromoCard({ post }: { post: Post }) {
 }
 
 export function PostCard({ post }: { post: Post }) {
+  const [repliesOpen, setRepliesOpen] = useState(false);
+
   if (post.kind === "streak") return <StreakCard post={post} />;
   if (post.kind === "promo") return <PromoCard post={post} />;
 
@@ -151,8 +210,17 @@ export function PostCard({ post }: { post: Post }) {
         {post.call && <MarketCallCard call={post.call} />}
         <div className="post-actions">
           <span className="action-like">♡ {post.likes}</span>
-          <span className="action-reply">Reply {post.replies}</span>
+          <button
+            type="button"
+            className="action-reply"
+            aria-expanded={repliesOpen}
+            onClick={() => setRepliesOpen((v) => !v)}
+          >
+            💬 Reply {post.replies}
+            <span className="action-reply-caret" aria-hidden="true">{repliesOpen ? "▴" : "▾"}</span>
+          </button>
         </div>
+        {repliesOpen && <ReplyThread postId={post.id} />}
       </div>
     </article>
   );

@@ -386,7 +386,7 @@ export default function Page() {
           </span>
         </div>
         <Score
-          name="Nova · AI"
+          name="Sibyl · AI"
           equity={STARTING_CASH + rivalPnl}
           pnl={rivalPnl}
           align="right"
