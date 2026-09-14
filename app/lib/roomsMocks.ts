@@ -22,6 +22,7 @@ export type RoomMessage = {
   id: string;
   author: string;
   text: string;
+  time: string;
   call?: RoomCall;
   challengeLabel?: string;
 };
@@ -31,6 +32,7 @@ export const ROOM_MESSAGES: RoomMessage[] = [
     id: "r1",
     author: "Nova",
     text: "BTC breaks 70K tonight.",
+    time: "8:41 PM",
     call: { market: "btc", side: "LONG", price: "$70,000", window: "Tonight" },
     challengeLabel: "Challenge",
   },
@@ -38,11 +40,13 @@ export const ROOM_MESSAGES: RoomMessage[] = [
     id: "r2",
     author: "Ren",
     text: "No shot. Taking the other side.",
+    time: "8:43 PM",
     challengeLabel: "Challenge Ren",
   },
   {
     id: "r3",
     author: "8bit Kay",
     text: "ETH still lagging majors, watching 3.4K support before I call anything.",
+    time: "8:45 PM",
   },
 ];

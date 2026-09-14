@@ -1,57 +1,30 @@
-import type { Market } from "@/app/lib/mockPosts";
-import { DuelIcon } from "@/app/icons";
+import { RoomChat } from "@/app/rooms/RoomChat";
 import {
   CURRENT_ROOM_LABEL,
   CURRENT_ROOM_SUBRANK,
   ROOM_LADDER,
   ROOM_MESSAGES,
-  type RoomCall,
 } from "@/app/lib/roomsMocks";
-
-const MARKET_META: Record<Market, { symbol: string; symbolClass: string }> = {
-  btc: { symbol: "₿", symbolClass: "btc-symbol" },
-  eth: { symbol: "Ξ", symbolClass: "eth-symbol" },
-  doge: { symbol: "Ð", symbolClass: "doge-symbol" },
-};
-
-function RoomCallChip({ call }: { call: RoomCall }) {
-  const meta = MARKET_META[call.market];
-  return (
-    <span className="room-call-chip">
-      <span className={`market-symbol ${meta.symbolClass}`}>{meta.symbol}</span>
-      {call.side === "LONG" ? "↑" : "↓"} {call.price} · {call.window}
-    </span>
-  );
-}
 
 export default function RoomsPage() {
   return (
     <main className="feed-shell">
       <div className="feed-main">
         <section className="feed-heading">
-          <span className="eyebrow">Your Circle</span>
-          <h1 className="display-font">{CURRENT_ROOM_LABEL}</h1>
-          <span className="muted">{CURRENT_ROOM_SUBRANK}</span>
+          <div className="room-heading-row">
+            <div>
+              <span className="eyebrow">Your Circle</span>
+              <h1 className="display-font">{CURRENT_ROOM_LABEL}</h1>
+              <span className="muted">{CURRENT_ROOM_SUBRANK}</span>
+            </div>
+            <span className="room-chip">
+              <span className="room-chip-dot" aria-hidden="true" />
+              Gold Prophecies
+            </span>
+          </div>
         </section>
 
-        <div className="panel chat-panel">
-          {ROOM_MESSAGES.map((message) => (
-            <div className="chat-message" key={message.id}>
-              <div className="chat-author">{message.author}</div>
-              <p className="chat-text">{message.text}</p>
-              {(message.call || message.challengeLabel) && (
-                <div className="chat-chips">
-                  {message.call && <RoomCallChip call={message.call} />}
-                  {message.challengeLabel && (
-                    <button type="button" className="room-challenge-btn">
-                      <DuelIcon /> {message.challengeLabel}
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
+        <RoomChat initialMessages={ROOM_MESSAGES} />
       </div>
 
       <aside className="feed-sidebar">
