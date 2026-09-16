@@ -219,6 +219,13 @@ export default function Page() {
     ? `${matchHref(queue.market, queue.matchId, queue.mode)}?invite=1`
     : null;
 
+  const practiceHref =
+    mode === "pulse"
+      ? market === "btc"
+        ? "/duel/btc/pulse?practice=1"
+        : null
+      : `/duel/${market}/practice`;
+
   const shareInvite = async () => {
     if (!inviteHref || !queue) return;
     const url = `${window.location.origin}${inviteHref}`;
@@ -474,11 +481,18 @@ export default function Page() {
           </div>
         </div>
         <div className="opponent-status"><span className="field-label">Opponent</span><strong><span className={`status-dot ${isPlayable ? "is-online" : ""}`} /> {takesCall ? "Open lobby" : isPlayable ? "Solo · NOVA AI" : "Unavailable"}</strong><span className="muted">{takesCall ? `${openMatches.length} ${mode === "pulse" ? "Pulse match" : "match"}${openMatches.length === 1 ? "" : "es"} waiting` : isPlayable ? "Stake and leverage set in-round" : "Mode in development"}</span></div>
-        {activeMode.matched
-          ? <button type="button" className="play-button" onClick={play} disabled={!playerId || !isSignedIn || pending !== null || queue !== null || !canPlay || activeMatch !== null}>{pending === "play" ? "Finding a match…" : isSignedIn ? <>Play <span aria-hidden="true">→</span></> : "Sign in to play"}</button>
-          : isPlayable
-            ? <Link href={playHref} className="play-button">Play <span aria-hidden="true">→</span></Link>
-            : <button type="button" className="play-button" disabled>Soon</button>}
+        <div className="play-actions">
+          {activeMode.matched
+            ? <button type="button" className="play-button" onClick={play} disabled={!playerId || !isSignedIn || pending !== null || queue !== null || !canPlay || activeMatch !== null}>{pending === "play" ? "Finding a match…" : isSignedIn ? <>Play <span aria-hidden="true">→</span></> : "Sign in to play"}</button>
+            : isPlayable
+              ? <Link href={playHref} className="play-button">Play <span aria-hidden="true">→</span></Link>
+              : <button type="button" className="play-button" disabled>Soon</button>}
+          {takesCall && practiceHref && (
+            <Link href={practiceHref} className="practice-button">
+              Practice
+            </Link>
+          )}
+        </div>
         {activeMatch ? (
           <span className="muted">Finish your live arena before starting another.</span>
         ) : (

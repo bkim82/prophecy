@@ -349,10 +349,13 @@ button { cursor: pointer; }
 .timer-value { font-size: 25px; line-height: 1; }
 .opponent-status { display: grid; gap: 6px; padding-left: 22px; border-left: 1px solid var(--line); }
 .opponent-status strong { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 500; }
+.play-actions { display: flex; align-items: center; gap: 8px; }
 .play-button { display: inline-flex; align-items: center; justify-content: center; gap: 14px; min-width: 104px; border: 1px solid var(--accent); border-radius: 6px; background: var(--accent); color: var(--accent-contrast); padding: 11px 16px; font-size: 13px; font-weight: 700; text-decoration: none; transition: background .15s ease, box-shadow .2s ease; }
 .play-button:hover:not(:disabled) { background: var(--accent-strong); box-shadow: 0 0 20px color-mix(in srgb, var(--accent) 40%, transparent); }
 .play-button:disabled { border-color: var(--line); background: transparent; color: var(--muted); cursor: default; }
 .play-button span { font-size: 18px; line-height: 0; }
+.practice-button { display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--muted); padding: 9px 11px; font-size: 11px; text-decoration: none; white-space: nowrap; transition: border-color .15s ease, background .15s ease, color .15s ease; }
+.practice-button:hover { border-color: var(--line-strong); background: var(--surface-hover); color: var(--text); }
 /* Replaces the Quick Play controls while this browser holds an open match:
    the settings are already committed, so there is nothing left to adjust. */
 .queue-panel { display: flex; align-items: center; gap: 14px; padding: 19px 20px; }
@@ -594,4 +597,9 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
   .battle-choice { padding: 14px; }
   .battle-split { padding: 12px 14px; }
   .battle-calendar, .battle-record { padding: 12px 14px; border-radius: 9px; }
+}
+
+@media (max-width: 640px) {
+  .play-actions { grid-column: span 2; width: 100%; }
+  .play-actions .play-button { flex: 1; }
 }

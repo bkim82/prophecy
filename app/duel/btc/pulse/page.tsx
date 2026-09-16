@@ -107,6 +107,7 @@ export default function Page() {
   const [pressedAction, setPressedAction] = useState<Side | "close" | null>(null);
   const [rivalEntryPrice, setRivalEntryPrice] = useState<number | null>(null);
   const [rivalSide, setRivalSide] = useState<Side>("short");
+  const [isPractice, setIsPractice] = useState(false);
 
   const priceRef = useRef(price);
   priceRef.current = price;
@@ -144,6 +145,10 @@ export default function Page() {
     } catch {
       // Audio is a progressive enhancement; the interaction stays functional.
     }
+  }, []);
+
+  useEffect(() => {
+    setIsPractice(new URLSearchParams(window.location.search).get("practice") === "1");
   }, []);
 
   useEffect(() => {
@@ -360,7 +365,7 @@ export default function Page() {
       </Link>
 
       <h1 className="mt-4 text-center text-sm font-medium uppercase tracking-[0.2em] text-[var(--muted)]">
-        BTC Arena · Pulse
+        BTC {isPractice ? "Practice" : "Arena"} · Pulse
       </h1>
 
       {/* Scoreboard: you, the clock, the AI rival */}
