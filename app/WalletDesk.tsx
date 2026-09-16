@@ -12,7 +12,7 @@ type Side = "long" | "short" | "buy" | "sell";
 const EMPTY_WALLET: WalletState = { address: null, chain: null, balance: null, assets: [] };
 const ASSETS = ["BTC", "ETH", "Other"];
 
-export function WalletDesk({ showHoldings = false, showConnection = true }: { showHoldings?: boolean; showConnection?: boolean }) {
+export function WalletDesk({ showHoldings = false, showConnection = true, showTicket = true }: { showHoldings?: boolean; showConnection?: boolean; showTicket?: boolean }) {
   const router = useRouter();
   const [wallet, setWallet] = useState<WalletState>(EMPTY_WALLET);
   const [notice, setNotice] = useState<string | null>(null);
@@ -74,7 +74,7 @@ export function WalletDesk({ showHoldings = false, showConnection = true }: { sh
 
     {showHoldings && wallet.address && <section className="panel wallet-card wallet-holdings"><div className="wallet-ticket-heading"><div><span className="eyebrow">Portfolio</span><h2>Current holdings</h2></div><span className="wallet-live-dot">Wallet</span></div><div className="wallet-holding-list">{wallet.assets.map((item) => <div className="wallet-holding-row" key={`${item.symbol}-${item.name}`}><span><strong>{item.symbol}</strong><small>{item.name ?? "Asset"}</small></span><span className="wallet-ticket-value">{item.balance}</span></div>)}</div><p className="wallet-ticket-note">Token discovery depends on your wallet provider; native ETH is always shown.</p></section>}
 
-    <section className="panel wallet-card wallet-ticket">
+    {showTicket && <section className="panel wallet-card wallet-ticket">
       <div className="wallet-ticket-heading"><div><span className="eyebrow">Quick ticket</span><h2>{asset} / USD</h2></div></div>
       <div className="wallet-asset-picker" role="tablist" aria-label="Trade asset">{ASSETS.map((item) => <button key={item} type="button" className={asset === item ? "is-selected" : ""} onClick={() => setAsset(item)}>{item}</button>)}</div>
       <div className="wallet-mode-picker" role="tablist" aria-label="Trade type"><button type="button" className={kind === "directional" ? "is-selected" : ""} onClick={() => setKind("directional")}>Long / Short</button><button type="button" className={kind === "spot" ? "is-selected" : ""} onClick={() => setKind("spot")}>Buy / Sell</button></div>
@@ -83,6 +83,6 @@ export function WalletDesk({ showHoldings = false, showConnection = true }: { sh
       <div className="wallet-actions">{(kind === "directional" ? [["long", "Long", "↗"], ["short", "Short", "↘"]] : [["buy", "Buy", "↗"], ["sell", "Sell", "↘"]]).map(([side, label, icon]) => <button type="button" key={side} className={`wallet-side-button ${side === "long" || side === "buy" ? "is-long" : "is-short"}`} disabled={!wallet.address} onClick={() => trade(side as Side)}><span>{label}</span><span>{icon}</span></button>)}</div>
       <p className="wallet-ticket-note">{wallet.address ? kind === "directional" ? `Opens ${asset} Pulse at ${leverage}× leverage.` : `Spot ${asset} orders need a connected trading venue.` : "Connect your wallet to unlock the ticket."}</p>
       {notice && <p className="wallet-notice" role="status">{notice}</p>}
-    </section>
+    </section>}
   </>;
 }

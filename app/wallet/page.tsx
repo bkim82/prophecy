@@ -12,7 +12,7 @@ export default function WalletPage() {
         <p>Connect your own wallet to unlock the quick ticket and view your current holdings.</p>
       </section>
       <div className="wallet-page-content">
-        <WalletDesk showHoldings />
+        <WalletDesk showHoldings showTicket={false} />
       </div>
     </main>
   );

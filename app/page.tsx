@@ -1,6 +1,5 @@
 import { FeedSidebar } from "@/app/FeedSidebar";
 import { FeedSwitcher } from "@/app/FeedSwitcher";
-import { WalletDesk } from "@/app/WalletDesk";
 import { GLOBAL_POSTS } from "@/app/lib/mockPosts";
 
 export default function Page() {
@@ -10,7 +9,6 @@ export default function Page() {
         <FeedSwitcher posts={GLOBAL_POSTS} />
       </div>
       <aside className="feed-sidebar">
-        <WalletDesk showConnection={false} />
         <FeedSidebar />
       </aside>
     </main>

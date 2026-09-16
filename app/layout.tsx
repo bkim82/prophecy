@@ -5,6 +5,7 @@ import { ClerkProvider, Show, SignInButton, UserButton } from "@clerk/nextjs";
 import { ActiveMatchBar } from "./ActiveMatchBar";
 import { BalancePill } from "./BalancePill";
 import { ArenaIcon } from "./icons";
+import { QuickTicketBar } from "./QuickTicketBar";
 import { TabNav } from "./TabNav";
 import { ThemeToggle } from "./ThemeToggle";
 import { THEME_INIT_SCRIPT } from "./theme";
@@ -63,6 +64,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </div>
           </header>
           {children}
+          <QuickTicketBar />
           <ActiveMatchBar />
         </ClerkProvider>
       </body>
