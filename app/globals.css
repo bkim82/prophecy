@@ -351,6 +351,18 @@ html.pulse-screen-shake { animation: pulse-screen-shake .24s ease-in-out; }
 .active-match-bar-cta { flex: none; border-radius: 999px; background: var(--btn-bg); color: var(--btn-text); padding: 8px 14px; font-size: 12px; font-weight: 700; }
 @keyframes active-match-bar-in { 0% { opacity: 0; transform: translateY(12px); } 100% { opacity: 1; transform: translateY(0); } }
 @media (prefers-reduced-motion: reduce) { .active-match-bar-dot { animation: none; } .active-match-bar-link { animation: none; } }
+/* Idle-state ticket tab. It shares the active-match bar's bottom slot and
+   unfolds upward when pressed. */
+.quick-ticket-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 39; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 0 14px calc(10px + env(safe-area-inset-bottom)); pointer-events: none; }
+.quick-ticket-popover { pointer-events: auto; width: min(100%, 380px); max-height: min(72vh, 560px); overflow-y: auto; border: 1px solid color-mix(in srgb, var(--accent) 42%, var(--line-strong)); border-radius: 14px; background: var(--surface); box-shadow: 0 12px 34px rgba(0, 0, 0, .3); animation: quick-ticket-popover-in .16s ease-out; }
+.quick-ticket-popover .wallet-ticket { position: static; border: 0; border-radius: 0; box-shadow: none; }
+.quick-ticket-tab { pointer-events: auto; display: inline-flex; align-items: center; gap: 8px; border: 1px solid color-mix(in srgb, var(--accent) 42%, var(--line-strong)); border-radius: 999px; background: var(--surface); color: var(--text); padding: 8px 15px; box-shadow: 0 8px 22px rgba(0, 0, 0, .22); font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; transition: background .15s ease, color .15s ease, border-color .15s ease; }
+.quick-ticket-tab:hover, .quick-ticket-tab:focus-visible { border-color: var(--accent); background: var(--surface-hover); color: var(--accent-strong); outline: none; }
+.quick-ticket-tab-mark { display: grid; place-items: center; width: 16px; height: 16px; border: 1px solid currentColor; border-radius: 999px; font-size: 13px; font-weight: 400; line-height: 1; }
+.quick-ticket-tab-chevron { color: var(--muted-dim); font-size: 15px; line-height: .7; transform: translateY(1px); }
+@keyframes quick-ticket-popover-in { 0% { opacity: 0; transform: translateY(10px); } 100% { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .quick-ticket-popover { animation: none; } }
+@media (max-width: 640px) { .quick-ticket-bar { padding-inline: 10px; } .quick-ticket-popover { width: min(100%, 380px); max-height: min(78vh, 560px); } .quick-ticket-popover .wallet-card { padding: 16px; } .quick-ticket-tab { min-height: 40px; padding-inline: 15px; } }
 /* Minified Pulse trading controls, popped up above the bar on hover (desktop)
    or tap (touch) — see app/PulseMiniDock.tsx. */
 .pulse-mini-dock { pointer-events: auto; display: flex; flex-direction: column; gap: 10px; width: min(100%, 380px); max-height: min(60vh, 420px); overflow-y: auto; border: 1px solid var(--line-strong); border-radius: 16px; background: var(--surface); padding: 14px; box-shadow: 0 10px 30px rgba(0, 0, 0, .28); animation: active-match-bar-in .16s ease-out; }
