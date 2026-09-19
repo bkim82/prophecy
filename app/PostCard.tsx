@@ -113,6 +113,7 @@ function PostImage({ image }: { image: PostImageData }) {
 const REPLIES_SHOWN_INITIALLY = 2;
 
 function ReplyItem({ reply }: { reply: Reply }) {
+  const [liked, setLiked] = useState(false);
   return (
     <div className="reply-item">
       <div className="reply-avatar" aria-hidden="true" style={{ background: avatarGradient(reply.handle) }}>
@@ -126,8 +127,15 @@ function ReplyItem({ reply }: { reply: Reply }) {
         </div>
         <p className="reply-content">{reply.content}</p>
         <div className="reply-actions">
-          <span className="action-like">♡ {reply.likes}</span>
-          <span className="action-reply">Reply</span>
+          <button
+            type="button"
+            className={`action-like${liked ? " is-active" : ""}`}
+            aria-pressed={liked}
+            onClick={() => setLiked((v) => !v)}
+          >
+            <span aria-hidden="true">{liked ? "♥" : "♡"}</span> {reply.likes + (liked ? 1 : 0)}
+          </button>
+          <button type="button" className="action-reply">Reply</button>
         </div>
       </div>
     </div>
@@ -190,11 +198,14 @@ function PromoCard({ post }: { post: Post }) {
 
 export function PostCard({ post }: { post: Post }) {
   const [repliesOpen, setRepliesOpen] = useState(false);
+  const [liked, setLiked] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   if (post.kind === "streak") return <StreakCard post={post} />;
   if (post.kind === "promo") return <PromoCard post={post} />;
 
   const firstName = post.author.split(" ")[0];
+  const isLongPost = post.content.length > 220;
 
   return (
     <article className="post-card">
@@ -211,15 +222,27 @@ export function PostCard({ post }: { post: Post }) {
             <PostMenu firstName={firstName} />
           </span>
         </div>
-        <div className="post-content">
+        <div className={`post-content${isLongPost && !expanded ? " is-collapsed" : ""}`}>
           {post.content.split(/\n\n+/).map((paragraph, index) => (
             <p key={`${post.id}-paragraph-${index}`}>{paragraph}</p>
           ))}
         </div>
+        {isLongPost && (
+          <button type="button" className="post-read-more" onClick={() => setExpanded((value) => !value)}>
+            {expanded ? "Show less" : "Read more"}
+          </button>
+        )}
         {post.image && <PostImage image={post.image} />}
         {post.call && <MarketCallCard call={post.call} />}
         <div className="post-actions">
-          <span className="action-like">♡ {post.likes}</span>
+          <button
+            type="button"
+            className={`action-like${liked ? " is-active" : ""}`}
+            aria-pressed={liked}
+            onClick={() => setLiked((v) => !v)}
+          >
+            <span aria-hidden="true">{liked ? "♥" : "♡"}</span> {post.likes + (liked ? 1 : 0)}
+          </button>
           <button
             type="button"
             className="action-reply"

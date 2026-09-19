@@ -11,6 +11,43 @@ export function ArenaIcon({ className }: { className?: string }) {
   );
 }
 
+export function OmensIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" className={className} fill="none" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M2.5 10s2.7-4.1 7.5-4.1 7.5 4.1 7.5 4.1-2.7 4.1-7.5 4.1S2.5 10 2.5 10Z" />
+      <circle cx="10" cy="10" r="1.8" />
+    </svg>
+  );
+}
+
+export function RoomsIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" className={className} fill="none" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 4.5h14v9H8l-4.5 3v-12Z" />
+      <path d="M6.5 8.5h7M6.5 11h4.5" />
+    </svg>
+  );
+}
+
+export function WalletIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" className={className} fill="none" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 5.2A1.7 1.7 0 0 1 4.7 3.5h10.6A1.7 1.7 0 0 1 17 5.2v9.6a1.7 1.7 0 0 1-1.7 1.7H4.7A1.7 1.7 0 0 1 3 14.8V5.2Z" />
+      <path d="M3 6.5h11.7A2.3 2.3 0 0 1 17 8.8v2.4H13a1.9 1.9 0 1 1 0-3.8h4" />
+      <circle cx="13.1" cy="9.3" r=".45" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+export function ProfileIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" className={className} fill="none" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="10" cy="6.5" r="2.8" />
+      <path d="M4.5 16c.7-2.7 2.5-4.1 5.5-4.1s4.8 1.4 5.5 4.1" />
+    </svg>
+  );
+}
+
 export function FlameIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

@@ -4,7 +4,8 @@ import Link from "next/link";
 import { ClerkProvider, Show, SignInButton, UserButton } from "@clerk/nextjs";
 import { ActiveMatchBar } from "./ActiveMatchBar";
 import { BalancePill } from "./BalancePill";
-import { ArenaIcon } from "./icons";
+import { ArenaIcon, ProfileIcon, WalletIcon } from "./icons";
+import { MobileBottomNav } from "./MobileBottomNav";
 import { QuickTicketBar } from "./QuickTicketBar";
 import { TabNav } from "./TabNav";
 import { ThemeToggle } from "./ThemeToggle";
@@ -39,31 +40,57 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ClerkProvider>
           <header className="app-header">
             <div className="app-header-inner">
-              <div className="header-left">
-                <Link href="/" className="brand">PROPHECY</Link>
-                <TabNav />
+              <div className="desktop-header-content">
+                <div className="header-left">
+                  <Link href="/" className="brand">PROPHECY</Link>
+                  <TabNav />
+                </div>
+                <div className="header-actions">
+                  <Link href="/duel" className="arena-cta">
+                    <ArenaIcon className="arena-cta-icon" /> Arena
+                  </Link>
+                  <Link href="/wallet" className="wallet-cta">Wallet</Link>
+                  <ThemeToggle />
+                  <Show
+                    when="signed-in"
+                    fallback={
+                      <SignInButton mode="modal">
+                        <button className="signin-button">Sign in</button>
+                      </SignInButton>
+                    }
+                  >
+                    <BalancePill />
+                    <UserButton />
+                  </Show>
+                </div>
               </div>
-              <div className="header-actions">
-                <Link href="/duel" className="arena-cta">
-                  <ArenaIcon className="arena-cta-icon" /> Arena
-                </Link>
-                <Link href="/wallet" className="wallet-cta">Wallet</Link>
-                <ThemeToggle />
-                <Show
-                  when="signed-in"
-                  fallback={
-                    <SignInButton mode="modal">
-                      <button className="signin-button">Sign in</button>
-                    </SignInButton>
-                  }
-                >
-                  <BalancePill />
-                  <UserButton />
-                </Show>
+              <div className="mobile-header-content">
+                <Link href="/" className="brand">PROPHECY</Link>
+                <div className="mobile-header-actions">
+                  <Link href="/wallet" className="mobile-wallet-cta">
+                    <WalletIcon className="mobile-nav-icon" />
+                    <span>Wallet</span>
+                  </Link>
+                  <div className="mobile-account-control">
+                    <Show
+                      when="signed-in"
+                      fallback={
+                        <SignInButton mode="modal">
+                          <button type="button" className="mobile-signin-avatar" aria-label="Sign in">
+                            <ProfileIcon className="mobile-profile-icon" />
+                          </button>
+                        </SignInButton>
+                      }
+                    >
+                      <UserButton />
+                    </Show>
+                  </div>
+                </div>
               </div>
             </div>
           </header>
           {children}
+          <MobileBottomNav />
           <QuickTicketBar />
           <ActiveMatchBar />
         </ClerkProvider>
