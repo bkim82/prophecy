@@ -1,6 +1,6 @@
 # architecture
 
-- Root header (`app/layout.tsx`) merges the `PROPHECY` brand, a compact `Omens`/`Rooms` text-tab nav (`app/TabNav.tsx`, sliding underline, active via `usePathname()`), and primary `Arena` and `Wallet` CTAs into one row on desktop and two responsive rows on narrow screens. Routes: `/` (Global feed), `/rooms` (rank-gated group chat placeholder, `app/rooms/page.tsx`), `/duel` (the market lobby, moved from `app/page.tsx`), `/wallet` (wallet desk with injected EIP-1193 connection and holdings). When not in a game, the root shell shows the compact bottom oval `QuickTicketBar`; an active match takes that slot instead. `/exclusive` (rank-gated feed) still exists but is no longer linked from the header nav. Live ticker on `/duel` reads the client-side BTC feed.
+- Root header (`app/layout.tsx`) keeps the full `PROPHECY`/`Omens`/`Rooms`/`Arena`/`Wallet`/account desktop row, while `app/MobileBottomNav.tsx` supplies the dedicated phone navigation (`Omens`/`Rooms`/`Arena`/`Profile`) at or below 768px and the compact mobile header keeps only the brand, Wallet, and account control. Routes: `/` (Global feed), `/rooms` (rank-gated group chat placeholder, `app/rooms/page.tsx`), `/duel` (the market lobby, moved from `app/page.tsx`), `/wallet` (wallet desk with injected EIP-1193 connection and holdings). When not in a game, the root shell shows the compact bottom oval `QuickTicketBar`; an active match takes that slot instead. `/exclusive` (rank-gated feed) still exists but is no longer linked from the header nav. Live ticker on `/duel` reads the client-side BTC feed.
 - Quick Play and multiplayer Pulse are server-authoritative: a `matches` row owns the round (`db/schema.ts:20`), `/api/match/*` routes own the transitions, clients poll. See [multiplayer-plan.md](multiplayer-plan.md).
 - Practice is client-only: Quick Play uses `app/duel/[market]/practice/page.tsx`; Pulse practice reuses `app/duel/btc/pulse/page.tsx?practice=1` without creating a match or reserving a wager. See [practice-mode.md](practice-mode.md).
 - `/api/price` and `/api/history` remain stateless proxies to public exchange APIs. The price feed and chart stay client-side in every mode.
@@ -8,8 +8,9 @@
 ## Graph
 
 ```
-app/layout.tsx (root shell: PROPHECY, Omens/Rooms tabs, Arena/Wallet CTAs, balance, profile)
-  ├── app/TabNav.tsx (persistent Omens / Rooms tab switcher, sliding underline)
+app/layout.tsx (root shell: desktop header, compact mobile header, Clerk account controls)
+  ├── app/TabNav.tsx (desktop Omens / Rooms tab switcher, sliding underline)
+  ├── app/MobileBottomNav.tsx (phone Omens / Rooms / Arena / Profile navigation)
   ├── app/page.tsx (Global feed: mock PostCard list, app/lib/mockPosts.ts)
   ├── app/rooms/page.tsx (Rooms: rank-gated group chat placeholder, app/lib/roomsMocks.ts)
   ├── app/exclusive/page.tsx (Exclusive feed: rank-gated via app/lib/rank.ts stub, unlinked from nav)
@@ -63,7 +64,8 @@ with a fixed, non-matchmade URL — Play is a plain `Link` (`app/duel/page.tsx`
 | `app/page.tsx` | Global feed: static `PostCard` list from `app/lib/mockPosts.ts`, no backend |
 | `app/exclusive/page.tsx` | Exclusive feed: gates on `app/lib/rank.ts` mock rank, locked teaser vs. unlocked list; not linked from the header nav |
 | `app/rooms/page.tsx` | Rooms placeholder: current-room heading, mock group chat with market-call/challenge chips, subtle rank ladder — see [rooms.md](rooms.md) |
-| `app/TabNav.tsx` | persistent Feed/Rooms tab switcher in the header, active tab + sliding underline via `usePathname()` |
+| `app/TabNav.tsx` | desktop Feed/Rooms tab switcher in the header, active tab + sliding underline via `usePathname()` |
+| `app/MobileBottomNav.tsx` | dedicated sub-768px bottom navigation for Omens, Rooms, Arena, and Profile |
 | `app/PostCard.tsx` | shared post rendering for both feed pages |
 | `app/lib/mockPosts.ts` | hardcoded `GLOBAL_POSTS`/`EXCLUSIVE_POSTS` mock data, no persistence |
 | `app/lib/rank.ts` | hardcoded mock rank/threshold stub gating `/exclusive` — no real rank system exists |
