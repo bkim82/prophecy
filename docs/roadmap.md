@@ -6,8 +6,7 @@ Deliberate gaps in a prototype scoped to the core loop. Not bugs.
 
 | Gap | Detail |
 | --- | --- |
-| 24hr Battle | Switcher entry only (`app/duel/page.tsx:63`, no `href` → panel locks, `:75`) — single prediction settled a day later, no implementation |
-| ETH Duel | Lobby leaves ETH inert (`app/duel/page.tsx:95-99`, no `href`/`matched`). The feed, `/api/price`, the match routes and `/duel/[market]/match/[matchId]` all already handle `eth` — only the lobby entry is missing |
+| ETH Duel (Cast/Pulse) | Lobby leaves ETH's head-to-head modes inert (`app/duel/page.tsx`, no `href`/`matched` on `quick-play`/`pulse`). The feed, `/api/price`, the match routes and `/duel/[market]/match/[matchId]` all already handle `eth` — only the lobby entry is missing. 24h Reading is already live for ETH (see [reading.md](reading.md)) |
 | Real rank/tier system | `app/lib/rank.ts` is a hardcoded stub (`MOCK_CURRENT_RANK`/`MOCK_RANK_THRESHOLD`) gating `/exclusive` — no computation, no persistence, not tied to Clerk `userId` |
 | Rooms: real-time chat + rank gating | `/rooms` (`app/rooms/page.tsx`) is a static mock (`app/lib/roomsMocks.ts`) — no messaging backend, no per-user rank check, no room unlock logic, `⚔ Challenge` buttons are visual only (see [rooms.md](rooms.md)) |
 | Post composer / feed persistence | `/` and `/exclusive` render static arrays from `app/lib/mockPosts.ts` — no create/like/reply, no database table, no Clerk-backed authorship |

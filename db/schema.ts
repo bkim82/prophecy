@@ -76,3 +76,35 @@ export const matches = pgTable("matches", {
   winner: text("winner"), // "1" | "2" | "tie"
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const readingPayouts = pgTable("reading_payouts", {
+  id: text("id").primaryKey(), // = reading id, one payout per settled reading
+  readingId: text("reading_id").notNull(),
+  userId: text("user_id").notNull(),
+  amount: integer("amount").notNull(),
+});
+
+// One row per 24h Reading call: a solo leveraged long/short wager, no
+// opponent and no manual close. Windows reset every 6 hours at 00:00/06:00/
+// 12:00/18:00 in the *caller's own local time*, not a shared UTC clock — the
+// boundaries are computed once at creation from a client-reported timezone
+// offset and stored as absolute instants (lib/reading.ts readingWindowFor).
+// `id` is deterministic (`${userId}:${market}:${windowStartAt epoch ms}`), so
+// a second call attempt in the same window collides on insert rather than
+// needing a read-then-write check.
+export const readings = pgTable("readings", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  market: text("market").notNull(), // "btc" | "eth"
+  side: text("side").notNull(), // "long" | "short"
+  wager: integer("wager").notNull(),
+  leverage: integer("leverage").notNull(),
+  entryPrice: doublePrecision("entry_price").notNull(),
+  windowStartAt: timestamp("window_start_at", { withTimezone: true }).notNull(),
+  windowEndAt: timestamp("window_end_at", { withTimezone: true }).notNull(),
+  status: text("status").notNull().default("open"), // "open" | "settled"
+  exitPrice: doublePrecision("exit_price"),
+  pnl: integer("pnl"), // embers; realized loss floored at -wager, same stop-out as Pulse
+  settledAt: timestamp("settled_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});

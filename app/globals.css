@@ -407,3 +407,60 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
   .post-avatar { width: 32px; height: 32px; }
   .market-call-prices { flex-wrap: wrap; row-gap: 2px; }
  }
+
+/* 24h Battle tab */
+.battle-shell { width: 100%; display: grid; gap: 18px; }
+.battle-hero { padding: 18px 20px; display: grid; gap: 16px; background: var(--surface); }
+.battle-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.battle-choice { display: grid; justify-items: center; gap: 3px; text-align: center; border: 1px solid var(--line); border-radius: 8px; background: var(--field-bg); color: var(--text); padding: 18px 12px; transition: background .15s ease, border-color .15s ease; }
+.battle-choice:hover:not(:disabled) { background: var(--surface-hover); }
+.battle-choice:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.battle-choice:disabled { cursor: default; }
+.battle-choice-arrow { font-size: 20px; line-height: 1; }
+.battle-choice-label { font-size: 17px; font-weight: 700; }
+.battle-choice-meta { margin-top: 3px; color: var(--muted-dim); font-size: 11px; }
+.battle-choice.is-long { border-color: color-mix(in srgb, var(--chart-up) 45%, transparent); }
+.battle-choice.is-short { border-color: color-mix(in srgb, var(--chart-down) 45%, transparent); }
+.battle-choice.is-long:hover:not(:disabled) { background: color-mix(in srgb, var(--chart-up) 14%, var(--field-bg)); }
+.battle-choice.is-short:hover:not(:disabled) { background: color-mix(in srgb, var(--chart-down) 14%, var(--field-bg)); }
+.battle-choice.is-long .battle-choice-label, .battle-choice.is-long .battle-choice-arrow { color: var(--chart-up); }
+.battle-choice.is-short .battle-choice-label, .battle-choice.is-short .battle-choice-arrow { color: var(--chart-down); }
+.battle-choice.is-long.is-selected { border-color: var(--chart-up); background: color-mix(in srgb, var(--chart-up) 20%, var(--field-bg)); }
+.battle-choice.is-short.is-selected { border-color: var(--chart-down); background: color-mix(in srgb, var(--chart-down) 20%, var(--field-bg)); }
+.battle-choice:disabled:not(.is-selected) { opacity: .55; }
+.battle-choices-hint { margin: 0; color: var(--muted-dim); font-size: 11px; text-align: center; }
+.battle-result { margin: 0; font-size: 13px; font-weight: 700; text-align: center; }
+.battle-result.is-win { color: var(--chart-up); }
+.battle-result.is-loss { color: var(--chart-down); }
+.battle-split { padding: 12px 20px; display: grid; gap: 10px; border-radius: 8px; background: var(--surface); }
+.battle-split-labels { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; font-weight: 600; }
+.battle-split-bar { display: flex; height: 7px; border-radius: 999px; overflow: hidden; background: var(--surface-raised); }
+.battle-split-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; font-size: 12px; color: var(--muted); }
+.battle-split-meta strong { color: var(--text); font-weight: 600; }
+.battle-split-meta i { font-style: normal; color: var(--line-strong); }
+.battle-columns { display: grid; grid-template-columns: minmax(260px, 320px) 1fr; gap: 16px; align-items: stretch; }
+.battle-calendar { padding: 14px 16px; border-radius: 8px; background: var(--surface); }
+.battle-calendar-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.battle-calendar-legend { display: flex; gap: 10px; }
+.battle-calendar-legend span { display: flex; align-items: center; gap: 5px; color: var(--muted-dim); font-size: 10px; }
+.battle-calendar-legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: var(--chart-up); }
+.battle-calendar-legend i.is-loss { background: var(--chart-down); }
+.battle-calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+.battle-calendar-dow { text-align: center; color: var(--muted-dim); font-size: 10px; padding-bottom: 3px; }
+.battle-day { display: grid; place-items: center; aspect-ratio: 1; border-radius: 5px; color: var(--muted-dim); font-size: 11px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.battle-day.is-win { background: color-mix(in srgb, var(--chart-up) 20%, transparent); color: var(--chart-up); font-weight: 700; }
+.battle-day.is-loss { background: color-mix(in srgb, var(--chart-down) 16%, transparent); color: var(--chart-down); font-weight: 700; }
+.battle-day.is-today { border: 1.5px solid var(--accent); color: var(--accent-strong); font-weight: 700; }
+.battle-record { padding: 14px 18px; display: grid; gap: 12px; align-content: start; border-radius: 8px; background: var(--surface); }
+.battle-countdown { display: grid; justify-items: center; gap: 5px; padding: 12px 0 8px; border-bottom: 1px solid color-mix(in srgb, var(--line) 55%, transparent); text-align: center; }
+.battle-countdown strong { font-size: clamp(32px, 5vw, 48px); line-height: 1; letter-spacing: .03em; font-variant-numeric: tabular-nums; color: var(--accent-strong); }
+.battle-countdown strong.is-locked { color: var(--negative); }
+.battle-countdown span { font-size: 11px; color: var(--muted-dim); }
+.battle-record-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.battle-record-item strong { display: block; font-size: 21px; line-height: 1; color: var(--text); }
+.battle-record-item span { display: block; margin-top: 4px; color: var(--muted); font-size: 11px; }
+.battle-calendar-accuracy { display: flex; align-items: baseline; justify-content: space-between; margin-top: 10px; padding-top: 10px; border-top: 1px solid color-mix(in srgb, var(--line) 55%, transparent); }
+.battle-calendar-accuracy strong { font-size: 22px; color: var(--accent-strong); }
+.battle-calendar-accuracy span { color: var(--muted); font-size: 11px; }
+@media (max-width: 800px) { .battle-columns { grid-template-columns: 1fr; } .battle-calendar { max-width: 320px; margin: 0 auto; width: 100%; } }
+@media (max-width: 640px) { .battle-hero { padding: 14px 16px; gap: 12px; border-radius: 9px; } .battle-choices { grid-template-columns: 1fr; gap: 8px; } .battle-choice { padding: 14px; } .battle-split { padding: 12px 14px; } .battle-calendar, .battle-record { padding: 12px 14px; border-radius: 9px; } }

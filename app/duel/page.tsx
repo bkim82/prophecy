@@ -13,6 +13,7 @@ import {
 } from "@/app/lib/activeMatch";
 import { getPlayerId } from "@/app/lib/playerId";
 import { usePriceFeed } from "@/app/usePriceFeed";
+import { Battle24h } from "@/app/Battle24h";
 
 const WAGER_PRESETS = [10, 100, 1000];
 const TIMER_PRESETS = [
@@ -112,12 +113,12 @@ const MODES_BY_MARKET: Record<MarketId, { id: ModeId; label: string; meta: strin
   btc: [
     { id: "quick-play", label: "Cast", meta: "BTC · head to head · online", matched: true },
     { id: "pulse", label: "Pulse", meta: "BTC · head to head · trade live", matched: true },
-    { id: "battle-24h", label: "24h Reading", meta: "BTC · one call · settled in 24 hours" },
+    { id: "battle-24h", label: "24h Reading", meta: "BTC · new call every 6h · leveraged", href: "/duel/btc/reading" },
   ],
   eth: [
     { id: "quick-play", label: "Cast", meta: "ETH · head to head · online" },
     { id: "pulse", label: "Pulse", meta: "ETH · solo · trade live for 60 seconds" },
-    { id: "battle-24h", label: "24h Reading", meta: "ETH · one call · settled in 24 hours" },
+    { id: "battle-24h", label: "24h Reading", meta: "ETH · new call every 6h · leveraged", href: "/duel/eth/reading" },
   ],
   doge: [
     { id: "quick-play", label: "Cast", meta: "DOGE · 60 seconds · head to head" },
@@ -442,6 +443,8 @@ export default function Page() {
           </div>
           <button type="button" className="queue-cancel" onClick={cancelQueue}>Cancel</button>
         </section>
+      ) : mode === "battle-24h" && isPlayable ? (
+        <Battle24h feedSymbol={activeMarket.name} />
       ) : (
       <section className="quick-play panel">
         <div className="quick-play-market"><span className={`market-symbol ${SYMBOL_CLASS[market]}`}>{activeMarket.symbol}</span><div><strong>{activeMarket.label} / USD</strong><span className="muted">{isPlayable ? "Current round" : "Not open yet"}</span></div></div>
