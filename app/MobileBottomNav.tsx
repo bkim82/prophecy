@@ -1,14 +1,14 @@
 "use client";
 
-import { Show, SignInButton, UserButton } from "@clerk/nextjs";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArenaIcon, OmensIcon, ProfileIcon, RoomsIcon } from "./icons";
+import { ArenaIcon, OmensIcon, RoomsIcon, WalletIcon } from "./icons";
 
 const NAV_ITEMS = [
   { href: "/", label: "Omens", Icon: OmensIcon },
   { href: "/rooms", label: "Rooms", Icon: RoomsIcon },
   { href: "/duel", label: "Arena", Icon: ArenaIcon, className: "mobile-bottom-nav-link--arena" },
+  { href: "/wallet", label: "Wallet", Icon: WalletIcon, className: "mobile-bottom-nav-link--wallet" },
 ];
 
 function isActive(pathname: string | null, href: string) {
@@ -36,24 +36,6 @@ export function MobileBottomNav() {
             </Link>
           );
         })}
-        <div className="mobile-bottom-nav-profile">
-          <Show
-            when="signed-in"
-            fallback={
-              <SignInButton mode="modal">
-                <button type="button" className="mobile-bottom-nav-account" aria-label="Sign in">
-                  <ProfileIcon className="mobile-bottom-nav-icon" />
-                  <span>Profile</span>
-                </button>
-              </SignInButton>
-            }
-          >
-            <div className="mobile-bottom-nav-account">
-              <UserButton />
-              <span>Profile</span>
-            </div>
-          </Show>
-        </div>
       </div>
     </nav>
   );
