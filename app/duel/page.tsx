@@ -142,7 +142,7 @@ export default function Page() {
   const [wager, setWager] = useState("10");
   const [isCustomWager, setIsCustomWager] = useState(false);
   const [timer, setTimer] = useState(60);
-  const [mode, setMode] = useState<ModeId>("battle-24h");
+  const [mode, setMode] = useState<ModeId>("quick-play");
   const [playerId, setPlayerId] = useState<string | null>(null);
   const [openMatches, setOpenMatches] = useState<OpenMatch[]>([]);
   const [pending, setPending] = useState<string | null>(null); // "play" | match id
