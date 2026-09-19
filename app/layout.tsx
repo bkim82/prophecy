@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ClerkProvider, Show, SignInButton, UserButton } from "@clerk/nextjs";
 import { ActiveMatchBar } from "./ActiveMatchBar";
 import { BalancePill } from "./BalancePill";
-import { ArenaIcon, ProfileIcon, WalletIcon } from "./icons";
+import { ArenaIcon, ProfileIcon } from "./icons";
 import { MobileBottomNav } from "./MobileBottomNav";
 import { QuickTicketBar } from "./QuickTicketBar";
 import { TabNav } from "./TabNav";
@@ -67,10 +67,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <div className="mobile-header-content">
                 <Link href="/" className="brand">PROPHECY</Link>
                 <div className="mobile-header-actions">
-                  <Link href="/wallet" className="mobile-wallet-cta">
-                    <WalletIcon className="mobile-nav-icon" />
-                    <span>Wallet</span>
-                  </Link>
+                  <BalancePill />
+                  <ThemeToggle />
                   <div className="mobile-account-control">
                     <Show
                       when="signed-in"

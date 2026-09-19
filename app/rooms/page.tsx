@@ -8,7 +8,7 @@ import {
 
 export default function RoomsPage() {
   return (
-    <main className="feed-shell">
+    <main className="feed-shell rooms-shell">
       <div className="feed-main">
         <section className="feed-heading">
           <div className="room-heading-row">
