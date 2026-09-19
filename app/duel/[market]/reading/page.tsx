@@ -194,7 +194,7 @@ export function ReadingRoom({ market }: { market: string }) {
         <div className="flex items-center justify-center gap-2">
           <p className="text-xs uppercase tracking-wider text-[var(--muted)]">{market.toUpperCase()} / USD</p>
           <span className="flex items-center gap-1.5 text-xs text-[var(--muted)]">
-            <span className={`h-1.5 w-1.5 rounded-full ${status === "live" ? "animate-pulse bg-[var(--accent)]" : "bg-[var(--muted-dim)]"}`} />
+            <span className={`h-1.5 w-1.5 rounded-full ${status === "live" ? "animate-pulse bg-[var(--brand)]" : "bg-[var(--muted-dim)]"}`} />
             {status === "live" ? "live" : status}
           </span>
         </div>
@@ -244,7 +244,7 @@ export function ReadingRoom({ market }: { market: string }) {
                       onClick={() => setWager(option)}
                       className={`rounded-md border py-1.5 text-xs font-medium tabular-nums transition ${
                         wager === option
-                          ? "border-[var(--accent)] bg-[var(--selected-bg)] text-[var(--accent-strong)]"
+                          ? "border-[var(--brand)] bg-[var(--selected-bg)] text-[var(--brand-strong)]"
                           : "border-[var(--line)] text-[var(--muted)] hover:border-[var(--line-strong)] hover:bg-[var(--surface-hover)]"
                       }`}
                     >
@@ -273,7 +273,7 @@ export function ReadingRoom({ market }: { market: string }) {
                       onClick={() => setLeverage(option)}
                       className={`rounded-md border py-1.5 text-xs font-medium tabular-nums transition ${
                         leverage === option
-                          ? "border-[var(--accent)] bg-[var(--selected-bg)] text-[var(--accent-strong)]"
+                          ? "border-[var(--brand)] bg-[var(--selected-bg)] text-[var(--brand-strong)]"
                           : "border-[var(--line)] text-[var(--muted)] hover:border-[var(--line-strong)] hover:bg-[var(--surface-hover)]"
                       }`}
                     >
@@ -291,7 +291,7 @@ export function ReadingRoom({ market }: { market: string }) {
                   type="button"
                   disabled={busy || price === null}
                   onClick={() => void placeCall(option)}
-                  style={price !== null ? { backgroundColor: sideColor(option), color: "var(--accent-contrast)" } : undefined}
+                  style={price !== null ? { backgroundColor: sideColor(option), color: "var(--trade-contrast)" } : undefined}
                   className="rounded-lg px-3 py-2.5 text-left transition disabled:bg-[var(--btn-disabled-bg)] disabled:text-[var(--btn-disabled-text)]"
                 >
                   <span className="block text-xl font-semibold">{option === "long" ? "Long ↗" : "Short ↘"}</span>

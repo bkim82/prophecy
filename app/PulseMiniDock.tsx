@@ -156,7 +156,7 @@ export function PulseMiniDock({
           type="button"
           disabled={!canTrade}
           onClick={() => void sendAction("enter", "long")}
-          style={canTrade ? { backgroundColor: sideColor("long"), color: "var(--accent-contrast)" } : undefined}
+          style={canTrade ? { backgroundColor: sideColor("long"), color: "var(--trade-contrast)" } : undefined}
         >
           Long ↗
         </button>
@@ -164,7 +164,7 @@ export function PulseMiniDock({
           type="button"
           disabled={!canTrade}
           onClick={() => void sendAction("enter", "short")}
-          style={canTrade ? { backgroundColor: sideColor("short"), color: "var(--accent-contrast)" } : undefined}
+          style={canTrade ? { backgroundColor: sideColor("short"), color: "var(--trade-contrast)" } : undefined}
         >
           Short ↘
         </button>

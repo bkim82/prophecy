@@ -157,7 +157,7 @@ export default function Page({
             <span className="flex items-center gap-1.5 text-xs text-[var(--muted)]">
               <span
                 className={`h-1.5 w-1.5 rounded-full ${
-                  status === "live" ? "animate-pulse bg-[var(--accent)]" : "bg-[var(--muted-dim)]"
+                  status === "live" ? "animate-pulse bg-[var(--brand)]" : "bg-[var(--muted-dim)]"
                 }`}
               />
               {status === "live" ? "live" : status}
@@ -203,7 +203,7 @@ export default function Page({
                 if (event.key === "Enter") lockPrediction();
               }}
               placeholder={currentPrice?.toFixed(2) ?? "0.00"}
-              className="mt-2 w-full rounded-md border border-[var(--line)] bg-[var(--field-bg)] px-3 py-3 text-lg text-[var(--text)] tabular-nums outline-none transition placeholder:text-[var(--muted-dim)] focus:border-[var(--accent)]"
+              className="mt-2 w-full rounded-md border border-[var(--line)] bg-[var(--field-bg)] px-3 py-3 text-lg text-[var(--text)] tabular-nums outline-none transition placeholder:text-[var(--muted-dim)] focus:border-[var(--brand)]"
             />
             <button
               type="button"

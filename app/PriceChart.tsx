@@ -425,14 +425,14 @@ export default function PriceChart({
                   x2={bandX}
                   y1={chartPad.top}
                   y2={baseline}
-                  stroke="var(--accent)"
+                  stroke="var(--chart-accent)"
                   strokeDasharray="3 3"
                 />
               )}
             <text
               x={chartPad.left + chartInnerWidth - 4}
               y={chartPad.top + 15}
-              fill="var(--accent-strong)"
+              fill="var(--chart-accent-strong)"
               fontSize={isCompact ? 14 : 11}
               textAnchor="end"
             >

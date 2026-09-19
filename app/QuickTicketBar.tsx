@@ -57,13 +57,12 @@ export function QuickTicketBar() {
       <button
         type="button"
         className="quick-ticket-tab"
+        aria-label={open ? "Close quick ticket" : "Open quick ticket"}
         aria-expanded={open}
         aria-controls="quick-ticket-popover"
         onClick={() => setOpen((value) => !value)}
       >
-        <span className="quick-ticket-tab-mark" aria-hidden="true">+</span>
-        <span>Quick ticket</span>
-        <span className="quick-ticket-tab-chevron" aria-hidden="true">⌃</span>
+        +
       </button>
     </div>
   );

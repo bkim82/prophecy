@@ -383,7 +383,7 @@ export default function Page() {
           <span
             className={`mt-1 text-2xl font-semibold tabular-nums ${
               secondsLeft <= 10 && roundStart !== null
-                ? "text-[var(--accent-strong)]"
+                ? "text-[var(--brand-strong)]"
                 : "text-[var(--text)]"
             }`}
           >
@@ -409,7 +409,7 @@ export default function Page() {
               <span
                 className={`h-1.5 w-1.5 rounded-full ${
                   status === "live"
-                    ? "animate-pulse bg-[var(--accent)]"
+                    ? "animate-pulse bg-[var(--brand)]"
                     : "bg-[var(--muted-dim)]"
                 }`}
               />
@@ -417,7 +417,7 @@ export default function Page() {
             </span>
           )}
           {roundStart !== null && phase !== "result" && (
-            <span className="text-xs uppercase tracking-wider text-[var(--accent)]">
+            <span className="text-xs uppercase tracking-wider text-[var(--brand)]">
               · round live
             </span>
           )}
@@ -570,7 +570,7 @@ function TradingDock(props: DockProps) {
           <p className="text-xs uppercase tracking-wider text-[var(--muted)]">
             Balance
           </p>
-          <p className="mt-1 text-2xl font-semibold tabular-nums text-[var(--accent-strong)]">
+          <p className="mt-1 text-2xl font-semibold tabular-nums text-[var(--brand-strong)]">
             {usd(balance)}
           </p>
         </div>
@@ -625,7 +625,7 @@ function TradingDock(props: DockProps) {
                       onClick={() => setStake(option)}
                       className={`rounded-md border py-1.5 text-xs font-medium tabular-nums transition disabled:cursor-not-allowed disabled:opacity-40 ${
                         stake === option
-                          ? "border-[var(--accent)] bg-[var(--selected-bg)] text-[var(--accent-strong)]"
+                          ? "border-[var(--brand)] bg-[var(--selected-bg)] text-[var(--brand-strong)]"
                           : "border-[var(--line)] text-[var(--muted)] hover:border-[var(--line-strong)] hover:bg-[var(--surface-hover)]"
                       }`}
                     >
@@ -639,7 +639,7 @@ function TradingDock(props: DockProps) {
                   onClick={() => setStake(availableCash)}
                   className={`rounded-md border py-1.5 text-xs font-medium tabular-nums transition disabled:cursor-not-allowed disabled:opacity-40 ${
                     stake === availableCash
-                      ? "border-[var(--accent)] bg-[var(--selected-bg)] text-[var(--accent-strong)]"
+                      ? "border-[var(--brand)] bg-[var(--selected-bg)] text-[var(--brand-strong)]"
                       : "border-[var(--line)] text-[var(--muted)] hover:border-[var(--line-strong)] hover:bg-[var(--surface-hover)]"
                   }`}
                 >
@@ -664,7 +664,7 @@ function TradingDock(props: DockProps) {
                     onClick={() => setLeverage(option)}
                     className={`rounded-md border py-1.5 text-xs font-medium tabular-nums transition ${
                       leverage === option
-                        ? "border-[var(--accent)] bg-[var(--selected-bg)] text-[var(--accent-strong)]"
+                        ? "border-[var(--brand)] bg-[var(--selected-bg)] text-[var(--brand-strong)]"
                         : "border-[var(--line)] text-[var(--muted)] hover:border-[var(--line-strong)] hover:bg-[var(--surface-hover)]"
                     }`}
                   >
@@ -690,7 +690,7 @@ function TradingDock(props: DockProps) {
                 }}
                 style={
                   canEnter
-                    ? { backgroundColor: sideColor(side), color: "var(--accent-contrast)" }
+                    ? { backgroundColor: sideColor(side), color: "var(--trade-contrast)" }
                     : undefined
                 }
                 className={`rounded-lg px-3 py-2.5 text-left transition disabled:bg-[var(--btn-disabled-bg)] disabled:text-[var(--btn-disabled-text)] ${

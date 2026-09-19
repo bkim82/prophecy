@@ -370,7 +370,7 @@ export default function Page({
               <span
                 className={`h-1.5 w-1.5 rounded-full ${
                   status === "live"
-                    ? "animate-pulse bg-[var(--accent)]"
+                    ? "animate-pulse bg-[var(--brand)]"
                     : "bg-[var(--muted-dim)]"
                 }`}
               />
@@ -505,7 +505,7 @@ export default function Page({
                 }}
                 disabled={!canEdit}
                 placeholder={price !== null ? price.toFixed(2) : "0.00"}
-                className="mt-1 w-full rounded-md border border-[var(--line)] bg-[var(--field-bg)] px-3 py-2 text-lg text-[var(--text)] tabular-nums outline-none transition placeholder:text-[var(--muted-dim)] focus:border-[var(--accent)] disabled:bg-[var(--surface-raised)] disabled:text-[var(--muted-dim)]"
+                className="mt-1 w-full rounded-md border border-[var(--line)] bg-[var(--field-bg)] px-3 py-2 text-lg text-[var(--text)] tabular-nums outline-none transition placeholder:text-[var(--muted-dim)] focus:border-[var(--brand)] disabled:bg-[var(--surface-raised)] disabled:text-[var(--muted-dim)]"
               />
 
               {canEdit && (
@@ -539,7 +539,7 @@ export default function Page({
               )}
 
               {yourPrediction !== null && (
-                <p className="mt-3 py-2 text-center text-sm font-medium text-[var(--accent)]">
+                <p className="mt-3 py-2 text-center text-sm font-medium text-[var(--brand)]">
                   Locked at {usd(yourPrediction)}
                 </p>
               )}
@@ -623,7 +623,7 @@ export default function Page({
                     <span
                       className={`h-1.5 w-1.5 rounded-full ${
                         view.opponentPresent
-                          ? "bg-[var(--accent)]"
+                          ? "bg-[var(--brand)]"
                           : "bg-[var(--muted-dim)]"
                       }`}
                     />
