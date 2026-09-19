@@ -32,8 +32,8 @@
 /* Market-scoped accent: the lobby's chart line/dot, live indicator, play button,
    and selected segmented-control text all resolve through --accent, so retinting
    it here per data-market recolors them without touching the shared theme tokens.
-   Not scoped to .lobby-shell so the standalone /duel/btc/battle deep link (which
-   has no lobby chrome around it) still gets BTC orange rather than the default
+   Not scoped to .lobby-shell so a standalone reading deep link (which has no
+   lobby chrome around it) still gets BTC orange rather than the default
    accent — see [data-market="btc"] on .battle-shell in Battle24h.tsx. */
 [data-market="btc"] {
   --accent: #f7931a; --accent-strong: #ffab3d; --accent-contrast: #1c1200;
@@ -523,21 +523,17 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
 .mode-switcher button.active { border-color: transparent; background: var(--accent); color: var(--accent-contrast); }
 .mode-switcher button.active:hover { color: var(--accent-contrast); }
 
-/* 24hr Battle: a focused, single-purpose game screen rather than a dashboard
+/* 24h Reading: a focused, single-purpose game screen rather than a dashboard
    panel — its own max-width so it reads right dropped into the 1080px lobby
-   shell or the narrower standalone deep link alike. Only the call panel
-   carries a visible border; everything below it separates by surface color
-   alone so the page doesn't read as a stack of outlined dashboard cards. */
+   shell or the standalone room page alike. Only the call panel carries a
+   visible border; everything below it separates by surface color alone so
+   the page doesn't read as a stack of outlined dashboard cards. */
 .battle-shell { width: 100%; max-width: 1160px; margin: 0 auto; display: grid; gap: 18px; }
-
 .battle-hero { padding: 18px 20px; display: grid; gap: 16px; background: var(--surface); }
-.battle-countdown { display: grid; justify-items: end; gap: 2px; }
-.battle-countdown strong { font-size: 21px; line-height: 1; font-variant-numeric: tabular-nums; color: var(--accent-strong); }
+.battle-countdown { display: grid; justify-items: center; gap: 5px; padding: 12px 0 8px; border-bottom: 1px solid color-mix(in srgb, var(--line) 55%, transparent); text-align: center; }
+.battle-countdown strong { font-size: clamp(32px, 5vw, 48px); line-height: 1; letter-spacing: .03em; font-variant-numeric: tabular-nums; color: var(--accent-strong); }
 .battle-countdown strong.is-locked { color: var(--negative); }
 .battle-countdown span { font-size: 11px; color: var(--muted-dim); }
-.battle-record-countdown { justify-items: center; gap: 5px; padding: 12px 0 8px; border-bottom: 1px solid color-mix(in srgb, var(--line) 55%, transparent); text-align: center; }
-.battle-record-countdown strong { font-size: clamp(32px, 5vw, 48px); letter-spacing: .03em; }
-
 .battle-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .battle-choice {
   display: grid; justify-items: center; gap: 3px; text-align: center;
@@ -550,7 +546,6 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
 .battle-choice:disabled { cursor: default; }
 .battle-choice-arrow { font-size: 20px; line-height: 1; }
 .battle-choice-label { font-size: 17px; font-weight: 700; }
-.battle-choice-sub { color: var(--muted); font-size: 12px; }
 .battle-choice-meta { margin-top: 3px; color: var(--muted-dim); font-size: 11px; }
 .battle-choice.is-long {
   border-color: color-mix(in srgb, var(--chart-up) 45%, transparent);
@@ -568,16 +563,16 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
 .battle-choice.is-short.is-selected { border-color: var(--chart-down); background: color-mix(in srgb, var(--chart-down) 20%, var(--field-bg)); }
 .battle-choice:disabled:not(.is-selected) { opacity: .55; }
 .battle-choices-hint { margin: 0; color: var(--muted-dim); font-size: 11px; text-align: center; }
-
+.battle-result { margin: 0; font-size: 13px; font-weight: 700; text-align: center; }
+.battle-result.is-win { color: var(--chart-up); }
+.battle-result.is-loss { color: var(--chart-down); }
 .battle-split { padding: 12px 20px; display: grid; gap: 10px; border-radius: 8px; background: var(--surface); }
 .battle-split-labels { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; font-weight: 600; }
 .battle-split-bar { display: flex; height: 7px; border-radius: 999px; overflow: hidden; background: var(--surface-raised); }
 .battle-split-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; font-size: 12px; color: var(--muted); }
 .battle-split-meta strong { color: var(--text); font-weight: 600; }
 .battle-split-meta i { font-style: normal; color: var(--line-strong); }
-
 .battle-columns { display: grid; grid-template-columns: minmax(260px, 320px) 1fr; gap: 16px; align-items: stretch; }
-
 .battle-calendar { padding: 14px 16px; border-radius: 8px; background: var(--surface); }
 .battle-calendar-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
 .battle-calendar-legend { display: flex; gap: 10px; }
@@ -590,14 +585,13 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
 .battle-day.is-win { background: color-mix(in srgb, var(--chart-up) 20%, transparent); color: var(--chart-up); font-weight: 700; }
 .battle-day.is-loss { background: color-mix(in srgb, var(--chart-down) 16%, transparent); color: var(--chart-down); font-weight: 700; }
 .battle-day.is-today { border: 1.5px solid var(--accent); color: var(--accent-strong); font-weight: 700; }
-
 .battle-record { padding: 14px 18px; display: grid; gap: 12px; align-content: start; border-radius: 8px; background: var(--surface); }
 .battle-record-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .battle-record-item strong { display: block; font-size: 21px; line-height: 1; color: var(--text); }
 .battle-record-item span { display: block; margin-top: 4px; color: var(--muted); font-size: 11px; }
-.battle-record-accuracy { display: flex; align-items: baseline; justify-content: space-between; padding-top: 10px; }
-.battle-record-accuracy strong { font-size: 22px; color: var(--accent-strong); }
-.battle-record-accuracy span { color: var(--muted); font-size: 11px; }
+.battle-calendar-accuracy { display: flex; align-items: baseline; justify-content: space-between; margin-top: 10px; padding-top: 10px; border-top: 1px solid color-mix(in srgb, var(--line) 55%, transparent); }
+.battle-calendar-accuracy strong { font-size: 22px; color: var(--accent-strong); }
+.battle-calendar-accuracy span { color: var(--muted); font-size: 11px; }
 
 @media (max-width: 800px) {
   .battle-columns { grid-template-columns: 1fr; }
