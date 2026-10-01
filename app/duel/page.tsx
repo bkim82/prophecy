@@ -372,6 +372,18 @@ export default function Page() {
 
   return (
     <main className="lobby-shell" data-market={market}>
+      <div className="mode-row">
+        <div className="mode-switcher" role="group" aria-label="Choose a mode">
+          {modes.map((option) => (
+            <button key={option.id} type="button" className={option.id === mode ? "active" : ""} aria-pressed={option.id === mode} onClick={() => setMode(option.id)}>
+              {option.label}
+              {option.href || option.matched ? null : <small>soon</small>}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {mode === "pulse" && (
       <nav className="market-nav" aria-label="Market switcher">
         <div className="market-switcher">
           <span className="field-label">Markets</span>
@@ -380,7 +392,9 @@ export default function Page() {
         </div>
         <DailyCoin active={market === dailyCoinId} onSelect={() => setMarket(dailyCoinId)} />
       </nav>
+      )}
 
+      {mode === "pulse" && (
       <section className="market-overview panel">
         <div className="ticker-copy">
           <div className="eyebrow-row">
@@ -397,20 +411,13 @@ export default function Page() {
           <div><dt>Players</dt><dd>2,486</dd></div>
         </dl>
       </section>
+      )}
 
       <div className="section-heading">
         <div>
           <span className="eyebrow">Make a call</span>
           <h1 className="display-font">{activeMode.label}</h1>
           <span className="round-meta">{activeMode.meta}</span>
-        </div>
-        <div className="mode-switcher" role="group" aria-label="Choose a mode">
-          {modes.map((option) => (
-            <button key={option.id} type="button" className={option.id === mode ? "active" : ""} aria-pressed={option.id === mode} onClick={() => setMode(option.id)}>
-              {option.label}
-              {option.href || option.matched ? null : <small>soon</small>}
-            </button>
-          ))}
         </div>
       </div>
 
