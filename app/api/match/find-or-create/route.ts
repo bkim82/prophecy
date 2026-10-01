@@ -8,8 +8,8 @@ import { presenceCutoff, readBody } from "@/lib/match";
 
 export const dynamic = "force-dynamic";
 
-// Criteria have to agree exactly for two players to share a round, so the
-// lobby's custom-wager box is bounded rather than free-form.
+// Criteria have to agree exactly for two players to share a round, so wagers
+// are bounded rather than free-form.
 const MAX_WAGER = 1_000_000;
 const MIN_TIMER = 10;
 const MAX_TIMER = 3600;
@@ -40,7 +40,7 @@ export async function POST(request: Request) {
   if (!productForMarket(market)) {
     return Response.json({ error: "Unsupported market" }, { status: 400 });
   }
-  if (mode !== "quick-play" && mode !== "pulse") {
+  if (mode !== "pulse") {
     return Response.json({ error: "Unsupported mode" }, { status: 400 });
   }
   if (!Number.isInteger(wager) || wager <= 0 || wager > MAX_WAGER) {
@@ -94,7 +94,7 @@ export async function POST(request: Request) {
         player2UserId: userId,
         player2LastSeen: now,
         status: "predict",
-        // Starts the 15s lock window for both players at the same instant.
+        // Starts the 5s pre-round countdown for both players at the same instant.
         predictStartAt: now,
       })
       .where(

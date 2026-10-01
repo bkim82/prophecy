@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
  *
  * Deletes the row while it is still `open` or `predict`; the other player's
  * next poll 404s and returns them to the lobby. Once the countdown is running
- * the match belongs to its two stored predictions, not to anyone's tab, so
+ * the match belongs to its stored positions, not to anyone's tab, so
  * leaving is refused (409) — the round settles either way.
  */
 export async function POST(request: Request, ctx: { params: Promise<{ id: string }> }) {

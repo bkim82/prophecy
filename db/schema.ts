@@ -24,15 +24,15 @@ export const matchPayouts = pgTable("match_payouts", {
   amount: integer("amount").notNull(),
 });
 
-// One row per networked match — the single source of truth for Quick Play and
+// One row per networked match — the single source of truth for multiplayer
 // Pulse rounds. `status` mirrors the client-side `Phase` vocabulary in docs/game-loop.md
 // so the mental model is unchanged, only who owns it.
-//   open --(p2 joins)--> predict --(both ready | 15s lock window)--> countdown --(deadline)--> settled
+//   open --(p2 joins)--> predict --(5s pre-round countdown)--> countdown --(deadline)--> settled
 // Player ids are anonymous per-browser UUIDs (app/lib/playerId.ts), not Clerk ids.
 export const matches = pgTable("matches", {
   id: text("id").primaryKey(),
   market: text("market").notNull(), // "btc" | "eth"
-  mode: text("mode").notNull(), // "quick-play" | "pulse"
+  mode: text("mode").notNull(), // "pulse"
   wager: integer("wager").notNull(),
   timerSeconds: integer("timer_seconds").notNull(),
   status: text("status").notNull().default("open"),
@@ -45,16 +45,12 @@ export const matches = pgTable("matches", {
   // more than one code path. A naive column stores whatever local time the
   // writer happened to be in, so a row written from a laptop and read on a UTC
   // server lands hours out — which reads as "that player went offline".
-  // Presence only gates matchmaking/listing pre-lock; see lib/match.ts PRESENCE_MS.
+  // Presence only gates matchmaking/listing pre-round; see lib/match.ts PRESENCE_MS.
   player1LastSeen: timestamp("player1_last_seen", { withTimezone: true }).notNull().defaultNow(),
   player2LastSeen: timestamp("player2_last_seen", { withTimezone: true }),
-  // Stamped when player 2 joins: the `predict` phase is a hard 15s window
-  // (lib/match.ts LOCK_SECONDS), not an untimed wait for both players.
+  // Stamped when player 2 joins: the `predict` phase is a hard 5s window
+  // (lib/match.ts PULSE_START_SECONDS), not an untimed wait for both players.
   predictStartAt: timestamp("predict_start_at", { withTimezone: true }),
-  prediction1: doublePrecision("prediction1"),
-  prediction2: doublePrecision("prediction2"),
-  lockedAt1: timestamp("locked_at1", { withTimezone: true }),
-  lockedAt2: timestamp("locked_at2", { withTimezone: true }),
   // Pulse keeps each player's position set and realized P&L in the match row
   // so a reload or a second tab cannot invent a different position.
   pulseReady1: boolean("pulse_ready1").notNull().default(false),

@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
  * GET ?playerId= → the caller's role-scoped view of the match.
  *
  * This is the only endpoint the match room polls: it also stamps the caller's
- * heartbeat, closes the 15s lock window, and performs lazy settlement once the
+ * heartbeat, closes the 5s pre-round countdown, and performs lazy settlement once the
  * round deadline has passed, so a round needs no cron and no second request
  * per tick. It is also what the lobby polls while queued in an `open` match.
  */

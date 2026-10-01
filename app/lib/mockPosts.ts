@@ -12,7 +12,7 @@ export type Side = "LONG" | "SHORT";
 export type OutcomeStatus = "won" | "lost" | "close";
 
 // "won"/"lost" carry a dollar PnL (leveraged Pulse-style position). "close"
-// carries a plain-language miss distance instead (Quick Play predicts an
+// carries a plain-language miss distance instead (an exact-price call predicts an
 // exact settlement price, so a near-miss isn't a dollar amount).
 export type Outcome = {
   status: OutcomeStatus;

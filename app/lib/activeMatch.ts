@@ -16,19 +16,19 @@ let queueing = false;
 export type ActiveMatch = {
   matchId: string;
   market: string;
-  mode: "quick-play" | "pulse";
+  mode: "pulse";
 };
 
 export function activeMatchHref(match: ActiveMatch): string {
-  return match.mode === "pulse"
-    ? `/duel/${match.market}/pulse/${match.matchId}`
-    : `/duel/${match.market}/match/${match.matchId}`;
+  return `/duel/${match.market}/pulse/${match.matchId}`;
 }
 
 export function getActiveMatch(): ActiveMatch | null {
   try {
     const raw = localStorage.getItem(KEY);
-    return raw ? (JSON.parse(raw) as ActiveMatch) : null;
+    const match = raw ? (JSON.parse(raw) as ActiveMatch) : null;
+    // Pointers left behind by the removed Quick Play mode have no room to return to.
+    return match?.mode === "pulse" ? match : null;
   } catch {
     return null;
   }

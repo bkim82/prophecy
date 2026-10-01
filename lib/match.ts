@@ -1,4 +1,4 @@
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { matches } from "@/db/schema";
 import { pulsePositionsPnl, type PulsePosition } from "@/lib/pulse";
@@ -11,7 +11,7 @@ export type MatchStatus = "open" | "predict" | "countdown" | "settled";
 /**
  * How stale a heartbeat may get before a player counts as gone. Only gates
  * matchmaking/listing of `open` matches and the "opponent disconnected" notice
- * during `predict` — once both players lock, the match settles without either.
+ * during `predict` — once the round starts, the match settles without either.
  */
 export const PRESENCE_MS = 8000;
 
@@ -29,17 +29,13 @@ export const deadlineOf = (row: MatchRow): number | null =>
     ? null
     : row.roundStartAt.getTime() + row.timerSeconds * 1000;
 
-/**
- * Quick Play's prediction window. Pulse uses its separate 5-second automatic
- * start window below; both are stamped when the second player joins.
- */
-export const LOCK_SECONDS = 15;
+/** Pulse's automatic pre-round countdown, stamped when the second player joins. */
 export const PULSE_START_SECONDS = 5;
 
 export const lockDeadlineOf = (row: MatchRow): number | null =>
   row.predictStartAt === null
     ? null
-    : row.predictStartAt.getTime() + (row.mode === "pulse" ? PULSE_START_SECONDS : LOCK_SECONDS) * 1000;
+    : row.predictStartAt.getTime() + PULSE_START_SECONDS * 1000;
 
 export const pulsePositionsFor = (row: MatchRow, role: 1 | 2): PulsePosition[] =>
   (role === 1 ? row.pulsePositions1 : row.pulsePositions2) ?? [];
@@ -77,66 +73,21 @@ export async function touchAndRead(
 }
 
 /**
- * Closes the 15-second lock window once it has passed. Lazy and idempotent,
- * the same shape as `settleIfDue`: every poll may call it, exactly one guarded
- * UPDATE lands. Each guard also re-states what was read, so a lock request
- * arriving in the same instant either wins the seat (and this call falls
- * through to a re-read) or loses to the expiry.
- *
- * - Quick Play: both locked -> start the countdown, dated to the deadline
- * - Pulse: always start the countdown, even with no positions
- * - one locked   -> that player wins by forfeit; `finalPrice` stays null
- * - neither      -> settled as a tie with no predictions and no final price
+ * Starts the round once the 5-second pre-round countdown has passed, dated to
+ * the deadline, even with no positions. Lazy and idempotent, the same shape as
+ * `settleIfDue`: every poll may call it, exactly one guarded UPDATE lands.
  */
 export async function expireLocksIfDue(row: MatchRow): Promise<MatchRow> {
   if (row.status !== "predict") return row;
   const deadline = lockDeadlineOf(row);
   if (deadline === null || Date.now() < deadline) return row;
 
-  if (row.mode === "pulse") {
-    const db = getDb();
-    const [started] = await db
-      .update(matches)
-      .set({ status: "countdown", roundStartAt: new Date(deadline) })
-      .where(and(eq(matches.id, row.id), eq(matches.status, "predict")))
-      .returning();
-    return started ?? (await findMatch(row.id)) ?? row;
-  }
-
-  const locked1 = row.prediction1 !== null;
-  const locked2 = row.prediction2 !== null;
-
-  const db = getDb();
-  const guard = and(eq(matches.id, row.id), eq(matches.status, "predict"));
-  const [updated] = locked1 && locked2
-    ? await db
-        .update(matches)
-        .set({ status: "countdown", roundStartAt: new Date(deadline) })
-        .where(guard)
-        .returning()
-    : await db
-        .update(matches)
-        .set({
-          status: "settled",
-          winner: locked1 ? "1" : locked2 ? "2" : "tie",
-        })
-        .where(
-          and(
-            guard,
-            // Re-assert the empty slots: whoever locked between the read and
-            // this statement must not be forfeited.
-            ...(locked1
-              ? []
-              : [row.mode === "pulse" ? eq(matches.pulseReady1, false) : isNull(matches.prediction1)]),
-            ...(locked2
-              ? []
-              : [row.mode === "pulse" ? eq(matches.pulseReady2, false) : isNull(matches.prediction2)]),
-          ),
-        )
-        .returning();
-
-  // No row back = a lock landed first; re-read and let that path own the row.
-  return updated ?? (await findMatch(row.id)) ?? row;
+  const [started] = await getDb()
+    .update(matches)
+    .set({ status: "countdown", roundStartAt: new Date(deadline) })
+    .where(and(eq(matches.id, row.id), eq(matches.status, "predict")))
+    .returning();
+  return started ?? (await findMatch(row.id)) ?? row;
 }
 
 /**
@@ -148,50 +99,35 @@ export async function settleIfDue(row: MatchRow): Promise<MatchRow> {
   if (row.status !== "countdown") return row;
   const deadline = deadlineOf(row);
   if (deadline === null || Date.now() < deadline) return row;
-  if (row.mode !== "pulse" && (row.prediction1 === null || row.prediction2 === null)) return row;
 
   const product = productForMarket(row.market);
   if (!product) return row;
   const spot = await getSpotPrice(product);
   if (!spot) return row;
 
-  if (row.mode === "pulse") {
-    const positions1 = pulsePositionsFor(row, 1);
-    const positions2 = pulsePositionsFor(row, 2);
-    // Treat the round deadline as a market close for every remaining
-    // position. Clearing the arrays releases their reserved stakes, while
-    // carrying the final P&L into realized keeps the balance settled.
-    const profit1 = pulseRealizedFor(row, 1) + pulsePositionsPnl(positions1, spot.price);
-    const profit2 = pulseRealizedFor(row, 2) + pulsePositionsPnl(positions2, spot.price);
-    const winner = profit1 === profit2 ? "tie" : profit1 > profit2 ? "1" : "2";
-    const [settled] = await getDb()
-      .update(matches)
-      .set({
-        status: "settled",
-        finalPrice: spot.price,
-        winner,
-        pulsePositions1: [],
-        pulsePositions2: [],
-        pulseRealizedPnl1: profit1,
-        pulseRealizedPnl2: profit2,
-        pulseProfit1: profit1,
-        pulseProfit2: profit2,
-      })
-      .where(and(eq(matches.id, row.id), eq(matches.status, "countdown")))
-      .returning();
-    return settled ?? (await findMatch(row.id)) ?? row;
-  }
-
-  const diff1 = Math.abs(spot.price - row.prediction1!);
-  const diff2 = Math.abs(spot.price - row.prediction2!);
-  const winner = diff1 === diff2 ? "tie" : diff1 < diff2 ? "1" : "2";
-
+  const positions1 = pulsePositionsFor(row, 1);
+  const positions2 = pulsePositionsFor(row, 2);
+  // Treat the round deadline as a market close for every remaining
+  // position. Clearing the arrays releases their reserved stakes, while
+  // carrying the final P&L into realized keeps the balance settled.
+  const profit1 = pulseRealizedFor(row, 1) + pulsePositionsPnl(positions1, spot.price);
+  const profit2 = pulseRealizedFor(row, 2) + pulsePositionsPnl(positions2, spot.price);
+  const winner = profit1 === profit2 ? "tie" : profit1 > profit2 ? "1" : "2";
   const [settled] = await getDb()
     .update(matches)
-    .set({ status: "settled", finalPrice: spot.price, winner })
+    .set({
+      status: "settled",
+      finalPrice: spot.price,
+      winner,
+      pulsePositions1: [],
+      pulsePositions2: [],
+      pulseRealizedPnl1: profit1,
+      pulseRealizedPnl2: profit2,
+      pulseProfit1: profit1,
+      pulseProfit2: profit2,
+    })
     .where(and(eq(matches.id, row.id), eq(matches.status, "countdown")))
     .returning();
-
   // No row back = another request settled it first; its values win.
   return settled ?? (await findMatch(row.id)) ?? row;
 }
@@ -214,7 +150,7 @@ export async function settleFundsIfNeeded(row: MatchRow): Promise<void> {
   await creditPayout(row.id, winnerRole, winnerId, row.wager * 2);
 }
 
-/** What one player is allowed to see. The opponent's number stays hidden until the round starts. */
+/** What one player is allowed to see. The opponent's positions stay hidden until the round starts. */
 export type MatchView = {
   id: string;
   market: string;
@@ -225,16 +161,7 @@ export type MatchView = {
   you: 1 | 2;
   opponentJoined: boolean;
   opponentPresent: boolean;
-  yourPrediction: number | null;
-  yourLockedAt: number | null;
-  opponentLocked: boolean;
-  opponentLockedAt: number | null;
-  /**
-   * null until the round starts — this is the whole point of the role-scoped
-   * view. Both numbers go public at `countdown`, once neither can be changed.
-   */
-  opponentPrediction: number | null;
-  /** End of the 15s lock window; null outside `predict`. */
+  /** End of the 5s pre-round countdown; null outside `predict`. */
   lockDeadlineAt: number | null;
   roundStartAt: number | null;
   deadlineAt: number | null;
@@ -251,15 +178,9 @@ export type MatchView = {
 };
 
 export function viewFor(row: MatchRow, you: 1 | 2): MatchView {
-  // Predictions are frozen from `countdown` on, so there is nothing left to
-  // game by seeing the opponent's — reveal both as the round starts.
+  // The opponent's positions go public as the round starts.
   const revealed = row.status === "countdown" || row.status === "settled";
-  const mine = you === 1;
-  const yourPrediction = mine ? row.prediction1 : row.prediction2;
-  const oppPrediction = mine ? row.prediction2 : row.prediction1;
-  const yourLockedAt = mine ? row.lockedAt1 : row.lockedAt2;
-  const oppLockedAt = mine ? row.lockedAt2 : row.lockedAt1;
-  const oppLastSeen = mine ? row.player2LastSeen : row.player1LastSeen;
+  const oppLastSeen = you === 1 ? row.player2LastSeen : row.player1LastSeen;
   const pulseYourPositions = pulsePositionsFor(row, you);
   const pulseOpponentPositions = revealed
     ? pulsePositionsFor(row, you === 1 ? 2 : 1)
@@ -284,11 +205,6 @@ export function viewFor(row: MatchRow, you: 1 | 2): MatchView {
     you,
     opponentJoined: row.player2Id !== null,
     opponentPresent: isFresh(oppLastSeen),
-    yourPrediction,
-    yourLockedAt: yourLockedAt?.getTime() ?? null,
-    opponentLocked: row.mode === "pulse" ? revealed : oppPrediction !== null,
-    opponentLockedAt: oppLockedAt?.getTime() ?? null,
-    opponentPrediction: revealed ? oppPrediction : null,
     lockDeadlineAt: row.status === "predict" ? lockDeadlineOf(row) : null,
     roundStartAt: row.roundStartAt?.getTime() ?? null,
     deadlineAt: deadlineOf(row),

@@ -55,4 +55,4 @@ it — a seed covering only the last 40s would leave most of the axis empty.
 
 ## Status values
 
-`"connecting" | "live" | "reconnecting"` → dot color in UI (`app/duel/[market]/match/[matchId]/page.tsx:252-264`).
+`"connecting" | "live" | "reconnecting"` → dot color in UI (`app/duel/[market]/pulse/[matchId]/page.tsx:200`).

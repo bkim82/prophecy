@@ -11,14 +11,6 @@ import {
 } from "./feedConfig";
 import type { PricePoint } from "./usePriceFeed";
 
-export type PredictionLine = {
-  label: string;
-  value: number;
-  color: string;
-  /** When the player locked in — drawn as a vertical marker. */
-  at?: number | null;
-};
-
 export type TradeMarker = {
   t: number;
   p: number;
@@ -28,7 +20,6 @@ export type TradeMarker = {
 
 type Props = {
   points: PricePoint[];
-  predictions?: PredictionLine[];
   trades?: TradeMarker[];
   roundStart?: number | null;
   frozen?: boolean;
@@ -56,7 +47,7 @@ const MIN_LABEL_GAP = 42; // px between clock labels before thinning
 // range: ~1.16x per 100px notch, ~5 notches across the full 1min→30s span.
 const ZOOM_RATE = 0.0015;
 // Price zoom starts at the data-fitting range and only expands from there. A
-// generous ceiling lets an off-screen prediction be brought into view without
+// generous ceiling lets an off-screen trade marker be brought into view without
 // letting the price line collapse all the way to a rounding error.
 const MAX_PRICE_SCALE = 32;
 // deltaY arrives in lines or pages on some browsers/devices; normalise to px so
@@ -120,7 +111,6 @@ function windowSlice(points: PricePoint[], t0: number): PricePoint[] {
 
 export default function PriceChart({
   points,
-  predictions = [],
   trades = [],
   roundStart = null,
   frozen = false,
@@ -260,22 +250,6 @@ export default function PriceChart({
   const line = visible.map((pt) => `${x(pt.t)},${y(pt.p)}`).join(" ");
   const baseline = chartPad.top + chartInnerHeight;
   const last = visible[visible.length - 1];
-  // Keep coincident prediction levels legible. Two players can intentionally
-  // choose the same price, so a shared y coordinate would hide whichever line
-  // is rendered first. Center the lines around the true level and stack their
-  // labels so the chart still communicates both predictions.
-  const predictionSlots = predictions.map((prediction, index) => {
-    const peerCount = predictions.filter(
-      (peer) => peer.value === prediction.value,
-    ).length;
-    const slot = predictions
-      .slice(0, index)
-      .filter((peer) => peer.value === prediction.value).length;
-    return {
-      offset: peerCount > 1 ? (slot - (peerCount - 1) / 2) * 4 : 0,
-      labelOffset: peerCount > 1 ? slot * 14 : 0,
-    };
-  });
   const area = `M ${x(visible[0].t)},${baseline} L ${line.replaceAll(
     " ",
     " L ",
@@ -403,7 +377,7 @@ export default function PriceChart({
           );
         })}
 
-        {/* The locked round, shaded from the moment both players locked in */}
+        {/* The live round, shaded from the moment it started */}
         {bandVisible && (
           <>
             <rect
@@ -414,12 +388,8 @@ export default function PriceChart({
               fill="var(--line-strong)"
               fillOpacity="0.08"
             />
-            {/* Only once the start itself is in view, and only if a lock marker
-                isn't already drawing that same edge. */}
-            {roundStart > t0 &&
-              !predictions.some(
-                (p) => p.at != null && Math.abs(p.at - roundStart) < 750,
-              ) && (
+            {/* Only once the start itself is in view. */}
+            {roundStart > t0 && (
                 <line
                   x1={bandX}
                   x2={bandX}
@@ -450,89 +420,6 @@ export default function PriceChart({
           strokeLinejoin="round"
           strokeLinecap="round"
         />
-
-        {/* The moment each player locked, marked where it happened */}
-        {predictions.map((prediction, i) => {
-          if (prediction.at == null) return null;
-          if (prediction.at < t0 || prediction.at > t1) return null;
-          const lx = x(prediction.at);
-          // Locks seconds apart would stack their chips, so offset by slot.
-          const chipY = chartPad.top + 4 + i * (isCompact ? 23 : 19);
-          const chipW = isCompact ? 78 : 62;
-          // Near the right edge, flip the chip to the left of the line.
-          const flip = lx + 2 + chipW > chartPad.left + chartInnerWidth;
-          const chipX = flip ? lx - 2 - chipW : lx + 2;
-          return (
-            <g key={`${prediction.label}-at`}>
-              <line
-                x1={lx}
-                x2={lx}
-                y1={chartPad.top}
-                y2={baseline}
-                stroke={prediction.color}
-                strokeWidth="1.5"
-                strokeDasharray="4 4"
-                opacity="0.75"
-              />
-              <rect
-                x={chipX}
-                y={chipY}
-                width={chipW}
-                height={isCompact ? 20 : 16}
-                rx="3"
-                fill={prediction.color}
-                fillOpacity="0.12"
-              />
-              <text
-                x={chipX + 5}
-                y={chipY + (isCompact ? 15 : 12)}
-                fill={prediction.color}
-                fontSize={isCompact ? 13 : 11}
-                fontWeight="600"
-              >
-                {prediction.label} locked
-              </text>
-            </g>
-          );
-        })}
-
-        {/* Prediction levels: a dashed line when in view, an edge chip when not */}
-        {predictions.map((prediction, i) => {
-          const inView = prediction.value >= low && prediction.value <= high;
-          const py = inView
-            ? y(prediction.value)
-            : prediction.value > high
-              ? chartPad.top + 6
-              : baseline - 6;
-          const slot = predictionSlots[i];
-          const levelY = py + slot.offset;
-          return (
-            <g key={prediction.label}>
-              {inView && (
-                <line
-                  x1={chartPad.left}
-                  x2={chartPad.left + chartInnerWidth}
-                  y1={levelY}
-                  y2={levelY}
-                  stroke={prediction.color}
-                  strokeWidth="1.5"
-                  strokeDasharray="5 4"
-                />
-              )}
-              <text
-                x={chartPad.left + 6}
-                y={py - 5 + slot.labelOffset}
-                fill={prediction.color}
-                fontSize={isCompact ? 14 : 12}
-                fontWeight="500"
-              >
-                {prediction.label}
-                {inView ? "" : prediction.value > high ? " ↑" : " ↓"}{" "}
-                {axisLabel(prediction.value, visibleSpan)}
-              </text>
-            </g>
-          );
-        })}
 
         {/* Each directional entry, exit, and reversal, marked where it happened */}
         {trades.map((trade, i) => {

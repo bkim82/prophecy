@@ -80,10 +80,9 @@ export function ActiveMatchBar() {
     };
   }, [match, onOwnPage]);
 
-  // A live Pulse round is the only phase you can act on mid-round (Quick Play
-  // just locks one prediction before the round starts), so only it earns the
+  // A live round is the only phase you can act on, so only it earns the
   // hover/tap trading dock.
-  const dockEligible = match?.mode === "pulse" && view?.status === "countdown";
+  const dockEligible = view?.status === "countdown";
 
   useEffect(() => {
     if (!dockEligible) setDockOpen(false);
@@ -101,7 +100,6 @@ export function ActiveMatchBar() {
   if (!match || onOwnPage || !view || queueing) return null;
 
   const marketLabel = match.market.toUpperCase();
-  const modeLabel = match.mode === "pulse" ? "Pulse" : "Quick Play";
   const status = statusCopy(view);
 
   const handlePillClick = (event: React.MouseEvent) => {
@@ -121,7 +119,7 @@ export function ActiveMatchBar() {
         <span className="active-match-bar-dot" aria-hidden="true" />
         <span className="active-match-bar-copy">
           <strong>
-            {marketLabel} {modeLabel} arena live
+            {marketLabel} Pulse arena live
           </strong>
           <span className="muted">{status}</span>
         </span>
@@ -135,11 +133,7 @@ export function ActiveMatchBar() {
 
 function statusCopy(view: MatchView): string {
   if (view.status === "open") return "Waiting for an opponent…";
-  if (view.status === "predict") {
-    return view.yourPrediction !== null
-      ? "Waiting on your opponent to lock in"
-      : "Lock a prediction before time runs out";
-  }
+  if (view.status === "predict") return "Round starting…";
   if (view.status === "countdown") return "Round in progress";
   return "Arena in progress";
 }

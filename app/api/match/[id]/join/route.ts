@@ -41,7 +41,7 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
       player2LastSeen: now,
       status: "predict",
       player2UserId: userId,
-      // Starts the 15s lock window for both players at the same instant.
+      // Starts the 5s pre-round countdown for both players at the same instant.
       predictStartAt: now,
     })
     .where(

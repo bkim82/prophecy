@@ -1,6 +1,6 @@
 "use client";
 
-// Anonymous, per-browser identity. Quick Play needs to tell two tabs apart, not
+// Anonymous, per-browser identity. Multiplayer needs to tell two tabs apart, not
 // to know who anyone is — Clerk sign-in stays optional and unrelated. Two
 // windows of the same profile share this id; use a private window for a 2nd
 // player on one machine.

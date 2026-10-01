@@ -398,7 +398,7 @@ export default function Page() {
         />
       </section>
 
-      {/* BTC price + feed status, centered like Quick Play */}
+      {/* BTC price + feed status, centered */}
       <section className="mt-6 text-center">
         <div className="flex items-center justify-center gap-2">
           <p className="text-xs uppercase tracking-wider text-[var(--muted)]">

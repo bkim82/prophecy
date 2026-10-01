@@ -1,6 +1,6 @@
 # chart
 
-`app/PriceChart.tsx`. Props→SVG, no fetch, no chart lib. Local state holds independent time and price wheel zoom levels (see below) — view concerns with no caller that cares (hand-rolled — cheaper than configuring a lib for tight-zoom axes + edge-pinned prediction labels + round-band shading + wall-clock tick axis).
+`app/PriceChart.tsx`. Props→SVG, no fetch, no chart lib. Local state holds independent time and price wheel zoom levels (see below) — view concerns with no caller that cares (hand-rolled — cheaper than configuring a lib for tight-zoom axes + trade markers + round-band shading + wall-clock tick axis).
 
 ## Geometry
 
@@ -13,7 +13,7 @@
 ## Time window (fixed width, scrolling)
 
 - `t1` = `max(now, last point)`, `t0` = `t1 - viewMs` (`:147-152`). The domain width is constant from the first frame, so the axis scrolls left instead of compressing as points accumulate. `viewMs` is `windowMs` unless the wheel has zoomed in — see Zoom.
-- `now` comes in as a prop from `usePriceFeed` (`app/duel/[market]/match/[matchId]/page.tsx:327`), which ticks it every `CLOCK_MS`=100ms (`app/usePriceFeed.ts:11`, `:48-51`) — ~1px of travel per tick at the default window. A silent socket scrolls the axis past the last point rather than freezing the chart.
+- `now` comes in as a prop from `usePriceFeed` (`app/duel/[market]/pulse/[matchId]/page.tsx:201`), which ticks it every `CLOCK_MS`=100ms (`app/usePriceFeed.ts:11`, `:48-51`) — ~1px of travel per tick at the default window. A silent socket scrolls the axis past the last point rather than freezing the chart.
 - `frozen` pins `t1` to the last point so a settled chart stops scrolling (`:147-151`).
 - `windowSlice()` clips to `[t0, …]` and **interpolates** the price where the line crosses the left edge (`:104-112`), so a scrolled-past segment ends on the axis instead of floating in. Needs one sample of slack outside the window — supplied by `trim()` and `/api/history`, both cutting at `WINDOW_MS + SAMPLE_MS`.
 - Every point older than the window → `windowSlice` returns `[]` → placeholder. That is the dead-feed rendering.
@@ -72,29 +72,14 @@ Props, defaulting to `app/feedConfig.ts` (`:115-125`). A future settings UI over
 3. Round band: translucent indigo rect `roundStart`→right edge, "round" label pinned top-right of the band (`:362-396`)
 4. Area fill: vertical gradient 22%→0 opacity (`:282-286`, `:399`)
 5. Price line: single-color polyline, green when the latest value is ≥ the leftmost visible value, otherwise red (`:240`, `:248-249`, `:409-416`)
-6. Lock markers (vertical) — see below
-7. Prediction levels (horizontal) — see below
-8. Current price marker: 2 concentric circles, outer pings while live, static once frozen (`:490-502`)
-9. `settled` chip, top-right above the plot, only when `frozen` (`:505-516`); zoom labels, top-left of the same strip, always (`:289-293`)
+6. Trade markers — see below
+7. Current price marker: 2 concentric circles, outer pings while live, static once frozen (`:490-502`)
+8. `settled` chip, top-right above the plot, only when `frozen` (`:505-516`); zoom labels, top-left of the same strip, always (`:289-293`)
 
 ## Round band
 
 - Drawn whenever `roundStart <= t1`; its left edge clamps to `t0` (`:261-262`), so a round that started before the window still shades the whole visible stretch.
-- Its own dashed boundary is drawn only when `roundStart > t0` (edge actually in view) **and** no lock marker sits within 750ms of `roundStart` (`:374-377`) — the 2nd lock *is* `roundStart`, so drawing both stacked two dashed lines of different colors.
-
-## Lock markers (vertical)
-
-- `PredictionLine.at` = ms timestamp the player locked (`:19`); omit/null → no marker.
-- Full-height dashed line in the player's color + a `"P1 locked"` chip (`:410-451`).
-- Chips stagger 19px by array index so near-simultaneous locks don't overlap (`:415`).
-- Chip flips to the left of its line near the right edge (`:418-419`).
-- Skipped when `at` falls outside `[t0, t1]` — the window scrolls locks off the left edge (`:411-412`).
-
-## Prediction levels (horizontal)
-
-- Dashed horizontal line per locked prediction. The match room is single-perspective: your line is `--p1` (blue), the opponent's `--p2` (amber), so both players see themselves in blue (`app/duel/[market]/match/[matchId]/page.tsx:17-18`). The opponent's line only exists once the round settles — before that the server withholds the value (`lib/match.ts:146`).
-- Coincident prediction values are rendered as centered, 4px-separated dashed lines with stacked labels so an exact tie does not hide one player's line (`app/PriceChart.tsx:240-253`, `:461-489`).
-- Out-of-range value (common — axis is tight): pin label to top/bottom edge + arrow, don't rescale chart or clip (`:455-487`). Dashed line only drawn if value in view.
+- Its own dashed boundary is drawn only when `roundStart > t0` (edge actually in view) (`:392`).
 
 ## Trade markers
 
@@ -104,7 +89,7 @@ Props, defaulting to `app/feedConfig.ts` (`:115-125`). A future settings UI over
 
 ## Freezing
 
-Settlement passes frozen snapshot + `frozen={true}` (`app/duel/[market]/match/[matchId]/page.tsx:128-137`, `:321-327`). Chart response: pin `t1` to the last point, stop marker ping, show `settled` chip. Chart has no round concept — renders whatever it's given.
+Settlement passes frozen snapshot + `frozen={true}` (`app/duel/[market]/pulse/[matchId]/page.tsx:132`, `:201`). Chart response: pin `t1` to the last point, stop marker ping, show `settled` chip. Chart has no round concept — renders whatever it's given.
 
 ## Empty state
 
