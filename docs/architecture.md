@@ -20,7 +20,7 @@ app/layout.tsx (root shell: desktop header, compact mobile header, Clerk account
 app/duel/[market]/match/[matchId]/page.tsx (Quick Play prediction room)
 app/duel/[market]/pulse/[matchId]/page.tsx (multiplayer Pulse positions, countdown, result)
 app/duel/[market]/practice/page.tsx (client-only Quick Play practice round)
-app/duel/[market]/reading/page.tsx (solo 24h Reading: one leveraged call per 6h window, stats)
+app/duel/portfolio/page.tsx (solo 24h Portfolio: freely-tradeable spot/leverage positions on Base meme coins)
 app/duel/btc/pulse/page.tsx (solo trades, countdown, leveraged P&L, settlement)
   ├── usePriceFeed() → price, sampled series, status, now
   └── <PriceChart /> → pure SVG render, fixed-width scrolling window
@@ -36,9 +36,10 @@ match room → GET /api/match/[id] (1s poll: view + heartbeat + lazy settle)
 match room → POST /api/match/[id]/{lock,action,leave}
 /api/match/* → Neon Postgres (matches); settlement → lib/spotPrice.ts
 
-reading room → GET /api/reading?market=&tzOffsetMinutes= (3s poll: window/call/stats + lazy settle)
-reading room → POST /api/reading {market,side,wager,leverage,tzOffsetMinutes}
-/api/reading/* → Neon Postgres (readings, reading_payouts); settlement → lib/spotPrice.ts
+portfolio room → GET /api/portfolio/session (3s poll: session/positions/history + lazy settle)
+portfolio room → POST /api/portfolio/session {stake}, POST /api/portfolio/positions {...}, POST /api/portfolio/positions/[id]/close
+/api/portfolio/* → Neon Postgres (portfolio_sessions, positions, portfolio_payouts); pricing → lib/basePrices.ts (DexScreener, Base chain)
+/api/tokens/search, /api/tokens/prices → lib/basePrices.ts (token search + batch price quote); /api/tokens/trending, /api/tokens/history → lib/tokenHistory.ts (GeckoTerminal)
 
 /api/history → api.exchange.coinbase.com (trades + candles, both, merged)
 /api/price   → lib/spotPrice.ts → api.coinbase.com → api.binance.com fallback chain
@@ -46,16 +47,21 @@ reading room → POST /api/reading {market,side,wager,leverage,tzOffsetMinutes}
 duel/page.tsx Play controls → compact Practice action beside Play
 ```
 
-BTC Quick Play and multiplayer Pulse are wired up, for both BTC and ETH so is
-24h Reading (solo, DB-backed — see [reading.md](reading.md)). ETH's Cast/Pulse
-and DOGE entirely are still lobby-only placeholders — selectable in the mode
-switcher, which locks the play panel when the chosen mode has neither `href`
-nor `matched` (`app/duel/page.tsx:111-127`, `:163`). `matched` marks a mode
-that goes through matchmaking with no fixed URL: Play posts to
-`find-or-create` and routes to the mode-specific room. `href` marks a mode
-with a fixed, non-matchmade URL — Play is a plain `Link` (`app/duel/page.tsx`
-`playHref`) and the 24h Reading room can also render inline in the selected
-24h tab. Pulse takes its stake and leverage in-round; so does 24h Reading.
+BTC Quick Play and multiplayer Pulse are wired up. The 24h Portfolio (solo,
+DB-backed — see [portfolio.md](portfolio.md)) is wired up identically across
+all three market tabs, since it's asset-agnostic (token search picks the
+coin, not the lobby's market switcher). ETH's Cast/Pulse and DOGE's Cast/Pulse
+are still lobby-only placeholders — selectable in the mode switcher, which
+locks the play panel when the chosen mode has neither `href` nor `matched`
+(`app/duel/page.tsx:111-127`, `:163`). `matched` marks a mode that goes
+through matchmaking with no fixed URL: Play posts to `find-or-create` and
+routes to the mode-specific room. `href` marks a mode with a fixed,
+non-matchmade URL, normally reached via a plain `Link` (`app/duel/page.tsx`
+`playHref`) — the 24h Portfolio is the one exception: selecting it renders
+`<PortfolioGame />` inline in the lobby instead (same as the retired
+`Battle24h` widget did for 24h Reading), and its `href` only exists so
+`/duel/portfolio` stays directly linkable as a standalone room. Pulse takes
+its stake and leverage in-round; so does the 24h Portfolio.
 
 ## Modules
 
@@ -75,10 +81,15 @@ with a fixed, non-matchmade URL — Play is a plain `Link` (`app/duel/page.tsx`
 | `app/duel/[market]/match/[matchId]/page.tsx` | Quick Play room: 1s poll, prediction lock, countdown, result |
 | `app/duel/[market]/pulse/[matchId]/page.tsx` | multiplayer Pulse room: position actions, live P&L, countdown, result |
 | `app/duel/[market]/practice/page.tsx` | client-only Quick Play practice: 60s prediction, final price, distance/error result |
-| `app/duel/[market]/reading/page.tsx` | 24h Reading room: solo leveraged call, no manual close, cumulative/day P&L + combined win-loss-accuracy stats |
-| `lib/readingRules.ts` | pure 24h Reading math/window rules, no DB import — client-safe, mirrors `lib/pulse.ts` |
-| `lib/reading.ts` | 24h Reading DB layer built on `readingRules.ts`: lazy settlement, stats aggregation, payout ledger |
-| `app/api/reading/route.ts` | `GET` current window/call/stats (settles due calls first), `POST` places this window's call |
+| `app/duel/portfolio/PortfolioGame.tsx` + `SessionHeader.tsx`/`TokenSearch.tsx`/`TradeTicket.tsx`/`OpenPositions.tsx`/`ClosedPositions.tsx` | 24h Portfolio game: session start, live-priced token search, spot/leverage trade ticket, open/closed position lists — embedded inline in `app/duel/page.tsx`'s mode switcher and wrapped standalone by `app/duel/portfolio/page.tsx` |
+| `lib/portfolioRules.ts` | pure 24h Portfolio math/constants, no DB import — client-safe, mirrors `lib/pulse.ts` |
+| `lib/basePrices.ts` | DexScreener wrapper: Base-only token search + batched/cached price lookup + token meta (logo, 24h change), shared by `/api/tokens/*` and portfolio settlement |
+| `lib/tokenHistory.ts` | GeckoTerminal wrapper: 24h hourly history + trending Base coins, budgeted under its ~30 req/min limit |
+| `lib/portfolio.ts` | 24h Portfolio DB layer built on `portfolioRules.ts`: session start, guarded position open/close, lazy settlement, payout ledger |
+| `app/api/portfolio/session/route.ts` | `GET` current session/positions/history (settles a past-due session first), `POST` starts a session |
+| `app/api/portfolio/positions/route.ts`, `app/api/portfolio/positions/[id]/close/route.ts` | open/close a position at the live price |
+| `app/api/tokens/search/route.ts`, `app/api/tokens/prices/route.ts` | thin wrappers over `lib/basePrices.ts` |
+| `app/api/tokens/trending/route.ts`, `app/api/tokens/history/route.ts` | thin wrappers over `lib/tokenHistory.ts` |
 | `app/ActiveMatchBar.tsx` | global bottom pill for a match running off-page; mounts `PulseMiniDock` while the active match is Pulse in `countdown` |
 | `app/QuickTicketBar.tsx` | idle-state global bottom tab; expands the shared `WalletDesk` ticket upward when no match or queue is active |
 | `app/PulseMiniDock.tsx` | condensed Pulse trading controls (stake/leverage/long/short/close) shown from `ActiveMatchBar` on hover (desktop) or tap (touch), same `/api/match/[id]/action` calls as the full room |
@@ -86,7 +97,7 @@ with a fixed, non-matchmade URL — Play is a plain `Link` (`app/duel/page.tsx`
 | `lib/match.ts` | `MatchView` role-scoping, presence, guarded settlement — shared by every `/api/match/*` route |
 | `lib/spotPrice.ts` | Coinbase→Binance fallback chain + `productForMarket`; shared by `/api/price` and settlement |
 | `app/api/match/*` | match lifecycle: find-or-create, view/heartbeat/settle, join, lock, leave, open list |
-| `db/schema.ts` | `users` (Clerk id, balance), `matches` (one row per networked round), `readings`/`reading_payouts` (one row per 24h Reading call + its idempotent payout) |
+| `db/schema.ts` | `users` (Clerk id, balance), `matches` (one row per networked round), `portfolio_sessions`/`positions`/`portfolio_payouts` (one row per 24h Portfolio session, its independent spot/leverage position lots, and each session's idempotent payout) |
 | `app/duel/btc/pulse/page.tsx` | solo trading state, countdown, leveraged P&L, settlement, layout |
 | `app/api/match/[id]/action/route.ts` | server-priced Pulse entry, close, and reverse actions |
 | `app/duel/btc/pulse/trading.ts` | pure buy/sell portfolio accounting and full-position clamping — **no importers yet**, the page tracks a single leveraged position instead |
@@ -111,7 +122,7 @@ with a fixed, non-matchmade URL — Play is a plain `Link` (`app/duel/page.tsx`
 - `feedConfig.ts` constants must stay shared, not duplicated (`app/feedConfig.ts:3-10`) — divergence = visible seam between seeded and live chart segments.
 - The chart's x-domain is a **fixed window ending now**, never the extent of the data (`app/PriceChart.tsx:101-108`). Deriving it from the data is what made the axis cram as points accumulated.
 - `trim()` and `/api/history` must cut at the same `WINDOW_MS + SAMPLE_MS`, one sample wider than the window (`app/usePriceFeed.ts:16`, `app/api/history/route.ts:92`) — the chart interpolates its left-edge crossing from that extra point.
-- Every API route: `export const dynamic = "force-dynamic"`. Price, history, match views and reading state also send `Cache-Control: no-store` (`app/api/price/route.ts:3`, `app/api/history/route.ts:3`, `app/api/match/[id]/route.ts:3`, `app/api/reading/route.ts`). Never cache a price or a round.
+- Every API route: `export const dynamic = "force-dynamic"`. Price, history, match views and portfolio state also send `Cache-Control: no-store` (`app/api/price/route.ts:3`, `app/api/history/route.ts:3`, `app/api/match/[id]/route.ts:3`, `app/api/portfolio/session/route.ts`, `app/api/tokens/*`). Never cache a price or a round at the HTTP layer — this is distinct from the intentional in-memory TTL caches in `lib/basePrices.ts` and `lib/tokenHistory.ts`, which exist purely to stay under DexScreener's/GeckoTerminal's rate limits and are never surfaced as an HTTP cache header.
 - Match state transitions are single guarded `UPDATE ... WHERE <guard> RETURNING *` statements, never read-then-write: `neon-http` has no transactions or row locks, so the guard *is* the lock (`app/api/match/[id]/lock/route.ts:43-58`). 0 rows back means someone else won — re-read, never retry blindly.
 - The opponent's prediction is withheld server-side, not hidden in the client (`lib/match.ts:146`). Anything added to `MatchView` must be safe for the other player to read.
 - `matches` timestamps are `timestamptz`; a bare `timestamp` column stores the writer's local time and silently breaks presence across timezones (`db/schema.ts:29-35`).

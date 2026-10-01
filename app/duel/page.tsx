@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Battle24h } from "@/app/Battle24h";
 import { DailyCoin, pickDailyCoin } from "@/app/DailyCoin";
+import { PortfolioGame } from "@/app/duel/portfolio/PortfolioGame";
 import {
   getActiveMatch,
   setQueueing,
@@ -112,17 +112,17 @@ const MODES_BY_MARKET: Record<MarketId, { id: ModeId; label: string; meta: strin
   btc: [
     { id: "quick-play", label: "Quick Play", meta: "BTC · head to head · online", matched: true },
     { id: "pulse", label: "Pulse", meta: "BTC · head to head · trade live", matched: true },
-    { id: "battle-24h", label: "24h Reading", meta: "BTC · new call every 6h · leveraged", href: "/duel/btc/reading" },
+    { id: "battle-24h", label: "24h Portfolio", meta: "Base meme coins · spot & leverage · 24h session", href: "/duel/portfolio" },
   ],
   eth: [
     { id: "quick-play", label: "Quick Play", meta: "ETH · head to head · online" },
     { id: "pulse", label: "Pulse", meta: "ETH · solo · trade live for 60 seconds" },
-    { id: "battle-24h", label: "24h Reading", meta: "ETH · new call every 6h · leveraged", href: "/duel/eth/reading" },
+    { id: "battle-24h", label: "24h Portfolio", meta: "Base meme coins · spot & leverage · 24h session", href: "/duel/portfolio" },
   ],
   doge: [
     { id: "quick-play", label: "Quick Play", meta: "DOGE · 60 seconds · head to head" },
     { id: "pulse", label: "Pulse", meta: "DOGE · solo · trade live for 60 seconds" },
-    { id: "battle-24h", label: "24h Reading", meta: "DOGE · one call · settled in 24 hours" },
+    { id: "battle-24h", label: "24h Portfolio", meta: "Base meme coins · spot & leverage · 24h session", href: "/duel/portfolio" },
   ],
 };
 
@@ -450,7 +450,7 @@ export default function Page() {
           <button type="button" className="queue-cancel" onClick={cancelQueue}>Cancel</button>
         </section>
       ) : mode === "battle-24h" && isPlayable ? (
-        <Battle24h feedSymbol={activeMarket.name} />
+        <PortfolioGame />
       ) : (
       <section className="quick-play panel">
         <div className="quick-play-market"><span className={`market-symbol ${SYMBOL_CLASS[market]}`}>{activeMarket.symbol}</span><div><strong>{activeMarket.label} / USD</strong><span className="muted">{isPlayable ? "Current round" : "Not open yet"}</span></div></div>
@@ -501,6 +501,7 @@ export default function Page() {
       </section>
       )}
 
+      {mode !== "battle-24h" && (
       <section className="lower-grid">
         <div><div className="list-heading"><h2>Open matches</h2><span className="muted">Live lobby</span></div><div className="data-list panel">
           {!takesCall && <div className="data-row"><span className="muted">Choose Quick Play or Pulse</span></div>}
@@ -519,6 +520,7 @@ export default function Page() {
         </div></div>
         <div><div className="list-heading"><h2>Recent results</h2><span className="muted">Today</span></div><div className="data-list panel">{recentResults.map((result, index) => <div className="data-row result-row" key={`${result.market}-${index}`}><div className="row-market"><span className={`market-symbol ${result.market === "BTC" ? "btc-symbol" : "eth-symbol"}`}>{result.market === "BTC" ? "₿" : "Ξ"}</span><strong>{result.market}</strong></div><span className={result.result === "Won" ? "change-up" : "change-down"}>{result.result}</span><span className="row-detail">{result.entry}</span><span className="row-age">{result.time}</span></div>)}</div></div>
       </section>
+      )}
 
     </main>
   );

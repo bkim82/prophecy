@@ -21,6 +21,7 @@
   --shell-max: 1220px;
   --p1: #d9a066; --p2: #8a8177;
   --btn-bg: var(--brand); --btn-bg-hover: var(--brand-strong); --btn-text: var(--brand-contrast); --btn-disabled-bg: #20364a; --btn-disabled-text: #718595;
+  --ember: #f2994a; --spot: #7d9bc4;
 }
 [data-theme="light"] {
   color-scheme: light;
@@ -39,6 +40,7 @@
   --chart-grid: #e6dcc8; --chart-axis: #cbb99a; --chart-up: #3f7d52; --chart-down: #a83f3f;
   --p1: #8a5a26; --p2: #6d6152;
   --btn-bg: var(--brand); --btn-bg-hover: var(--brand-strong); --btn-text: var(--brand-contrast); --btn-disabled-bg: #e6dcc8; --btn-disabled-text: #a49a88;
+  --ember: #c4621c; --spot: #4f6f99;
 }
 /* Market identity and market chart accents are scoped by data-market. Shared
    brand actions, live states, and interaction tokens stay turquoise. */
@@ -755,3 +757,33 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
   .play-actions { grid-column: span 2; width: 100%; }
   .play-actions .play-button { flex: 1; }
 }
+
+/* 24h Portfolio room (app/duel/portfolio). --ember marks Ember balances only;
+   --spot is the neutral edge for spot positions (long = brand, short = negative). */
+/* The global `button, input { font: inherit }` is unlayered, so it beats Tailwind's
+   layered text-/font-/leading- utilities; inside this room let those utilities apply. */
+.portfolio-game button, .portfolio-game input { font-size: revert-layer; font-weight: revert-layer; line-height: revert-layer; }
+.pf-live-dot { display: inline-block; width: 7px; height: 7px; border-radius: 999px; background: var(--brand); box-shadow: 0 0 0 0 color-mix(in srgb, var(--brand) 50%, transparent); animation: pf-live 2s ease-out infinite; }
+@keyframes pf-live { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--brand) 45%, transparent); } 70%, 100% { box-shadow: 0 0 0 6px transparent; } }
+.pf-flash-up { animation: pf-flash-up .7s ease-out; }
+.pf-flash-down { animation: pf-flash-down .7s ease-out; }
+@keyframes pf-flash-up { from { background-color: color-mix(in srgb, var(--positive) 16%, transparent); } to { background-color: transparent; } }
+@keyframes pf-flash-down { from { background-color: color-mix(in srgb, var(--negative) 16%, transparent); } to { background-color: transparent; } }
+.pf-shimmer { display: block; background: var(--surface-hover); animation: pf-shimmer 1.4s ease-in-out infinite; }
+@keyframes pf-shimmer { 50% { opacity: .45; } }
+.pf-scroll-x { scrollbar-width: none; -webkit-overflow-scrolling: touch; scroll-snap-type: x proximity; }
+.pf-scroll-x::-webkit-scrollbar { display: none; }
+.pf-scroll-x > * { scroll-snap-align: start; }
+.pf-range { height: 24px; appearance: none; background: transparent; cursor: pointer; }
+.pf-range:disabled { cursor: not-allowed; opacity: .4; }
+.pf-range::-webkit-slider-runnable-track { height: 4px; border-radius: 999px; background: linear-gradient(to right, var(--brand) var(--pf-fill, 0%), var(--line) var(--pf-fill, 0%)); }
+.pf-range::-moz-range-track { height: 4px; border-radius: 999px; background: var(--line); }
+.pf-range::-moz-range-progress { height: 4px; border-radius: 999px; background: var(--brand); }
+.pf-range::-webkit-slider-thumb { appearance: none; width: 18px; height: 18px; margin-top: -7px; border: 3px solid var(--surface); border-radius: 999px; background: var(--brand-strong); }
+.pf-range::-moz-range-thumb { width: 12px; height: 12px; border: 3px solid var(--surface); border-radius: 999px; background: var(--brand-strong); }
+.pf-range:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 6px; }
+@media (max-width: 767px) {
+  /* Valid order only: the submit button rides just above the mobile bottom nav. */
+  .pf-sticky-submit { position: sticky; bottom: calc(72px + env(safe-area-inset-bottom)); z-index: 10; margin-inline: -16px; padding: 0 16px 6px; background: var(--surface); }
+}
+@media (prefers-reduced-motion: reduce) { .pf-live-dot, .pf-flash-up, .pf-flash-down, .pf-shimmer { animation: none; } }

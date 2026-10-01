@@ -6,7 +6,9 @@ import {
   timestamp,
   doublePrecision,
   jsonb,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import type { PulsePosition } from "@/lib/pulse";
 
 export const users = pgTable("users", {
@@ -77,34 +79,65 @@ export const matches = pgTable("matches", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-export const readingPayouts = pgTable("reading_payouts", {
-  id: text("id").primaryKey(), // = reading id, one payout per settled reading
-  readingId: text("reading_id").notNull(),
-  userId: text("user_id").notNull(),
-  amount: integer("amount").notNull(),
-});
-
-// One row per 24h Reading call: a solo leveraged long/short wager, no
-// opponent and no manual close. Windows reset every 6 hours at 00:00/06:00/
-// 12:00/18:00 in the *caller's own local time*, not a shared UTC clock — the
-// boundaries are computed once at creation from a client-reported timezone
-// offset and stored as absolute instants (lib/reading.ts readingWindowFor).
-// `id` is deterministic (`${userId}:${market}:${windowStartAt epoch ms}`), so
-// a second call attempt in the same window collides on insert rather than
-// needing a read-then-write check.
-export const readings = pgTable("readings", {
+// One row per 24h portfolio session. `endAt = startAt + 24h`, computed once
+// at creation and stored as an absolute instant — never recomputed from a
+// later clock read, same rule the retired `readingWindowFor` followed.
+// `committedCash`/`realizedPnl` are running totals mutated only via
+// scalar-arithmetic guarded UPDATEs (lib/balance.ts reserveBalance/
+// refundBalance idiom) — Postgres serializes concurrent single-row UPDATEs
+// so no transaction is needed (db/index.ts's neon-http driver has none).
+// Buying power is always derived: startingBalance - committedCash + realizedPnl
+// (lib/portfolioRules.ts availableCash).
+export const portfolioSessions = pgTable("portfolio_sessions", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull(),
-  market: text("market").notNull(), // "btc" | "eth"
-  side: text("side").notNull(), // "long" | "short"
-  wager: integer("wager").notNull(),
-  leverage: integer("leverage").notNull(),
-  entryPrice: doublePrecision("entry_price").notNull(),
-  windowStartAt: timestamp("window_start_at", { withTimezone: true }).notNull(),
-  windowEndAt: timestamp("window_end_at", { withTimezone: true }).notNull(),
-  status: text("status").notNull().default("open"), // "open" | "settled"
-  exitPrice: doublePrecision("exit_price"),
-  pnl: integer("pnl"), // embers; realized loss floored at -wager, same stop-out as Pulse
+  startingBalance: integer("starting_balance").notNull(),
+  committedCash: integer("committed_cash").notNull().default(0),
+  realizedPnl: integer("realized_pnl").notNull().default(0),
+  status: text("status").notNull().default("active"), // "active" | "settled"
+  startAt: timestamp("start_at", { withTimezone: true }).notNull().defaultNow(),
+  endAt: timestamp("end_at", { withTimezone: true }).notNull(),
   settledAt: timestamp("settled_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  // Enforces "one active session per user" as a single guarded INSERT
+  // (`ON CONFLICT DO NOTHING` against this index), never a read-then-insert.
+  oneActivePerUser: uniqueIndex("portfolio_sessions_one_active_per_user")
+    .on(table.userId)
+    .where(sql`${table.status} = 'active'`),
+}));
+
+// One row per position, either shape, discriminated by `kind`. Spot uses
+// qty+entryPrice (ownership, valued mark-to-market); leverage uses
+// committedCash+leverage+side (directional wager, same P&L shape the retired
+// readings.pnl formula used). No averaging, no partial close — every
+// buy/long/short is its own lot, closing always closes it entirely, same
+// all-or-nothing shape as lib/pulse.ts PulsePosition.
+export const positions = pgTable("positions", {
+  id: text("id").primaryKey(),
+  sessionId: text("session_id").notNull(),
+  userId: text("user_id").notNull(), // denormalized for cross-session history queries
+  kind: text("kind").notNull(), // "spot" | "leverage"
+  tokenAddress: text("token_address").notNull(), // lowercased Base contract address
+  tokenSymbol: text("token_symbol").notNull(), // denormalized at open time — never re-looked-up for history
+  tokenName: text("token_name").notNull(),
+  side: text("side"), // "long" | "short" — leverage only, null for spot
+  leverage: integer("leverage"), // 1|2|3|5 — leverage only, null for spot (spot is implicitly 1x)
+  qty: doublePrecision("qty"), // spot only — token quantity owned; null for leverage
+  entryPrice: doublePrecision("entry_price").notNull(),
+  committedCash: integer("committed_cash").notNull(), // embers locked: spot cost basis or leverage margin
+  status: text("status").notNull().default("open"), // "open" | "closed"
+  exitPrice: doublePrecision("exit_price"),
+  realizedPnl: integer("realized_pnl"), // embers, null until closed, floored at -committedCash
+  closeReason: text("close_reason"), // "manual" | "session_end"
+  openedAt: timestamp("opened_at", { withTimezone: true }).notNull().defaultNow(),
+  closedAt: timestamp("closed_at", { withTimezone: true }),
+});
+
+// Idempotent payout ledger, same shape as lib/balance.ts creditPayout.
+export const portfolioPayouts = pgTable("portfolio_payouts", {
+  id: text("id").primaryKey(), // = session id, one payout per settled session
+  sessionId: text("session_id").notNull(),
+  userId: text("user_id").notNull(),
+  amount: integer("amount").notNull(),
 });
