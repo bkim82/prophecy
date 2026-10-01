@@ -497,7 +497,7 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
   .market-stats dd { font-size: 11px; }
   .section-heading h1 { font-size: 28px; }
   .round-meta { max-width: 30ch; line-height: 1.4; }
-  .mode-switcher { width: 100%; flex-wrap: nowrap; overflow-x: auto; padding: 2px 1px 4px; scrollbar-width: none; }
+  .mode-switcher { max-width: 100%; flex-wrap: nowrap; overflow-x: auto; padding: 2px 1px 4px; scrollbar-width: none; }
   .mode-switcher::-webkit-scrollbar { display: none; }
   .mode-switcher button { flex: 0 0 auto; min-height: 40px; padding: 8px 10px; }
   .play-panel { gap: 14px; padding: 16px; border-radius: 10px; }
