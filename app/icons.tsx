@@ -82,3 +82,12 @@ export function LiveCallsIcon({ className }: { className?: string }) {
     </svg>
   );
 }
+
+export function LockIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="7" width="10" height="7" rx="1.5" />
+      <path d="M5.3 7V5a2.7 2.7 0 0 1 5.4 0v2" />
+    </svg>
+  );
+}
