@@ -45,11 +45,11 @@ portfolio room → POST /api/portfolio/session {stake}, POST /api/portfolio/posi
 duel/page.tsx Play controls → compact Practice action beside Play
 ```
 
-Multiplayer BTC Pulse is wired up. The 24h Portfolio (solo,
+Multiplayer BTC and ETH Pulse are wired up (same room, `/duel/[market]/pulse/[matchId]`; solo practice serves both via `app/duel/btc/pulse/page.tsx?practice=1&market=`). The 24h Portfolio (solo,
 DB-backed — see [portfolio.md](portfolio.md)) is wired up identically across
 all three market tabs, since it's asset-agnostic (token search picks the
-coin, not the lobby's market switcher). ETH's Cast/Pulse and DOGE's Cast/Pulse
-are still lobby-only placeholders — selectable in the mode switcher, which
+coin, not the lobby's market switcher). DOGE's Pulse
+is still a lobby-only placeholder — selectable in the mode switcher, which
 locks the play panel when the chosen mode has neither `href` nor `matched`
 (`app/duel/page.tsx:111-127`, `:163`). `matched` marks a mode that goes
 through matchmaking with no fixed URL: Play posts to `find-or-create` and

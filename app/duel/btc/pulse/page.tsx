@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import PriceChart, { type TradeMarker } from "../../../PriceChart";
 import { usePriceFeed, type PricePoint } from "../../../usePriceFeed";
 import PulseMovementAlert from "../../../PulseMovementAlert";
+import { productForMarket } from "@/lib/spotPrice";
 
 const ROUND_SECONDS = 60;
 const STARTING_CASH = 100;
@@ -89,7 +90,11 @@ function SoundWave() {
 }
 
 export default function Page() {
-  const { price, points, status, now, getLivePrice } = usePriceFeed();
+  // `?market=eth` reuses this solo loop for any priced market; BTC otherwise.
+  const [market, setMarket] = useState("btc");
+  const product = productForMarket(market) ?? "BTC-USD";
+  const marketLabel = market.toUpperCase();
+  const { price, points, status, now, getLivePrice } = usePriceFeed(product);
   const [phase, setPhase] = useState<Phase>("setup");
   const [position, setPosition] = useState<Position | null>(null);
   const [closedPosition, setClosedPosition] = useState<ClosedPosition | null>(null);
@@ -148,7 +153,10 @@ export default function Page() {
   }, []);
 
   useEffect(() => {
-    setIsPractice(new URLSearchParams(window.location.search).get("practice") === "1");
+    const query = new URLSearchParams(window.location.search);
+    setIsPractice(query.get("practice") === "1");
+    const requested = query.get("market");
+    if (requested && productForMarket(requested)) setMarket(requested);
   }, []);
 
   useEffect(() => {
@@ -165,7 +173,7 @@ export default function Page() {
     try {
       let finalPrice = getLivePrice();
       if (finalPrice === null) {
-        const res = await fetch("/api/price", { cache: "no-store" });
+        const res = await fetch(`/api/price?symbol=${product}`, { cache: "no-store" });
         if (!res.ok) throw new Error("price unavailable");
         finalPrice = ((await res.json()) as { price: number }).price;
       }
@@ -206,7 +214,7 @@ export default function Page() {
       setSettleError(true);
       setPhase("settling");
     }
-  }, [getLivePrice]);
+  }, [getLivePrice, product]);
 
   useEffect(() => {
     if (roundStart === null || phase === "result" || phase === "settling") return;
@@ -355,7 +363,7 @@ export default function Page() {
   }, [availableCash, stake]);
 
   return (
-    <main className="mx-auto max-w-4xl px-4 py-10">
+    <main className="mx-auto max-w-4xl px-4 py-10" data-market={market}>
       <PulseMovementAlert total={liveEquity} />
       <Link
         href="/duel"
@@ -365,7 +373,7 @@ export default function Page() {
       </Link>
 
       <h1 className="mt-4 text-center text-sm font-medium uppercase tracking-[0.2em] text-[var(--muted)]">
-        BTC {isPractice ? "Practice" : "Arena"} · Pulse
+        {marketLabel} {isPractice ? "Practice" : "Arena"} · Pulse
       </h1>
 
       {/* Scoreboard: you, the clock, the AI rival */}
@@ -398,11 +406,11 @@ export default function Page() {
         />
       </section>
 
-      {/* BTC price + feed status, centered */}
+      {/* Market price + feed status, centered */}
       <section className="mt-6 text-center">
         <div className="flex items-center justify-center gap-2">
           <p className="text-xs uppercase tracking-wider text-[var(--muted)]">
-            {outcome ? "Final BTC / USD" : "BTC / USD"}
+            {outcome ? `Final ${marketLabel} / USD` : `${marketLabel} / USD`}
           </p>
           {!outcome && (
             <span className="flex items-center gap-1.5 text-xs text-[var(--muted)]">
@@ -444,6 +452,7 @@ export default function Page() {
       </section>
 
       <TradingDock
+        marketLabel={marketLabel}
         phase={phase}
         stake={stake}
         setStake={setStake}
@@ -506,6 +515,7 @@ function Score({
 }
 
 type DockProps = {
+  marketLabel: string;
   phase: Phase;
   stake: number;
   setStake: (value: number) => void;
@@ -533,7 +543,7 @@ type DockProps = {
 
 function TradingDock(props: DockProps) {
   const {
-    phase, stake, setStake, leverage, setLeverage, position, closedPosition,
+    marketLabel, phase, stake, setStake, leverage, setLeverage, position, closedPosition,
     livePrice, livePositionPnl, realizedPnl, balance, availableCash, isBusted, canEnter, canManage,
     pressedAction, onEnter, onClose, onReverse, onRetry,
     settleError, outcome, onPlayAgain,
@@ -813,7 +823,7 @@ function TradingDock(props: DockProps) {
         <div className="flex flex-col gap-4 pt-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-xs uppercase tracking-wider text-[var(--muted)]">
-              Round result · final BTC {usd(outcome.finalPrice)}
+              Round result · final {marketLabel} {usd(outcome.finalPrice)}
             </p>
             <p className="mt-1 text-2xl font-semibold tabular-nums text-[var(--text)]">
               {outcome.profit >= 0 ? "You won" : "Round loss"}{" "}
