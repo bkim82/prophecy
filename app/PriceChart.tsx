@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import {
   MIN_WINDOW_MS,
@@ -16,6 +16,11 @@ export type TradeMarker = {
   p: number;
   side: "long" | "short";
   action?: "entry" | "exit" | "reverse";
+  /** Whose trade this is — distinguishes markers when two parties trade on
+   * the same chart. Defaults to "you" so existing callers are unaffected. */
+  owner?: "you" | "sibyl";
+  /** Realized P&L, shown as a transient toast on the newest closing marker. */
+  pnl?: number;
 };
 
 type Props = {
@@ -23,6 +28,8 @@ type Props = {
   trades?: TradeMarker[];
   roundStart?: number | null;
   frozen?: boolean;
+  /** While a position is open, draws a labeled dashed line at its entry price. */
+  openEntry?: { t: number; p: number; side: "long" | "short" } | null;
   /** Wall clock driving the right edge; ticks so the window scrolls on its own. */
   now?: number;
   /** Axis divisions — defaults live in feedConfig. */
@@ -109,11 +116,79 @@ function windowSlice(points: PricePoint[], t0: number): PricePoint[] {
   return [{ t: t0, p: prev.p + (next.p - prev.p) * k }, ...points.slice(first)];
 }
 
+/** Price at `t`, interpolated between samples; clamps to the ends. Drives the
+ * hover crosshair — the only reader that needs a value *between* samples. */
+function valueAt(points: PricePoint[], t: number): number | null {
+  if (points.length === 0) return null;
+  if (t <= points[0].t) return points[0].p;
+  for (let i = 1; i < points.length; i++) {
+    const b = points[i];
+    if (b.t >= t) {
+      const a = points[i - 1];
+      const f = b.t === a.t ? 1 : (t - a.t) / (b.t - a.t);
+      return a.p + (b.p - a.p) * f;
+    }
+  }
+  return points[points.length - 1].p;
+}
+
+// Monotone cubic (Fritsch–Carlson): smooth, but never overshoots a sample — a
+// fake peak above the real high would be a lie on a price chart. Mirrors
+// app/MarketChart.tsx's version; kept local rather than shared since the two
+// charts are intentionally independent (see docs/chart.md).
+function monotonePath(xs: number[], ys: number[]) {
+  const n = xs.length;
+  if (n < 2) return "";
+  const d: number[] = [];
+  const m: number[] = [];
+  for (let i = 0; i < n - 1; i++) d.push((ys[i + 1] - ys[i]) / (xs[i + 1] - xs[i] || 1));
+  m.push(d[0]);
+  for (let i = 1; i < n - 1; i++) m.push(d[i - 1] * d[i] <= 0 ? 0 : (d[i - 1] + d[i]) / 2);
+  m.push(d[n - 2]);
+  for (let i = 0; i < n - 1; i++) {
+    if (d[i] === 0) { m[i] = 0; m[i + 1] = 0; continue; }
+    const a = m[i] / d[i];
+    const b = m[i + 1] / d[i];
+    const s = a * a + b * b;
+    if (s > 9) {
+      const k = 3 / Math.sqrt(s);
+      m[i] = k * a * d[i];
+      m[i + 1] = k * b * d[i];
+    }
+  }
+  let path = `M${xs[0].toFixed(2)},${ys[0].toFixed(2)}`;
+  for (let i = 0; i < n - 1; i++) {
+    const h = (xs[i + 1] - xs[i]) / 3;
+    path += `C${(xs[i] + h).toFixed(2)},${(ys[i] + m[i] * h).toFixed(2)} ${(xs[i + 1] - h).toFixed(2)},${(ys[i + 1] - m[i + 1] * h).toFixed(2)} ${xs[i + 1].toFixed(2)},${ys[i + 1].toFixed(2)}`;
+  }
+  return path;
+}
+
+// A fixed starfield, seeded so server and client agree. Fractions of the plot.
+const STARS = (() => {
+  let seed = 0x85ebca6b;
+  const rand = () => {
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  return Array.from({ length: 34 }, (_, i) => ({
+    fx: rand(),
+    fy: rand(),
+    r: 0.5 + rand() * 1.1,
+    tone: i % 3,
+    dur: 2.4 + rand() * 4,
+    delay: -rand() * 6,
+  }));
+})();
+
 export default function PriceChart({
   points,
   trades = [],
   roundStart = null,
   frozen = false,
+  openEntry = null,
   now,
   windowMs = WINDOW_MS,
   minWindowMs = MIN_WINDOW_MS,
@@ -121,11 +196,13 @@ export default function PriceChart({
   yIntervals = Y_INTERVALS,
   xMinorPerInterval = X_MINOR_PER_INTERVAL,
 }: Props) {
+  const uid = useId().replace(/:/g, "");
   // Zoom is a view concern, so it lives here rather than being plumbed through
   // every caller. Time and price remain independent axes.
   const [zoomMs, setZoomMs] = useState(windowMs);
   const [priceScale, setPriceScale] = useState(1);
   const [isCompact, setIsCompact] = useState(false);
+  const [hoverX, setHoverX] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // A fixed desktop viewBox makes SVG text shrink to a few pixels on phones.
@@ -158,6 +235,17 @@ export default function PriceChart({
   priceScaleRef.current = priceScale;
 
   const lastSample = points[points.length - 1];
+
+  // Flash the head/pill whenever the live price moves a tick, colour matching
+  // direction — same cue as the lobby chart (app/MarketChart.tsx).
+  const [flash, setFlash] = useState({ key: 0, dir: "up" as "up" | "down" });
+  const prevP = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    const prev = prevP.current;
+    prevP.current = lastSample?.p;
+    if (prev === undefined || lastSample === undefined || lastSample.p === prev) return;
+    setFlash((f) => ({ key: f.key + 1, dir: lastSample.p > prev ? "up" : "down" }));
+  }, [lastSample?.p]);
 
   // The window is a fixed span ending now, not the extent of the data: it holds
   // its width from the first frame, so the axis scrolls instead of compressing
@@ -224,7 +312,7 @@ export default function PriceChart({
     return (
       <div
         ref={containerRef}
-        className="flex h-[clamp(280px,75vw,400px)] items-center justify-center rounded-xl border border-[var(--line)] bg-[var(--surface)] text-sm text-[var(--muted-dim)]"
+        className="price-chart flex h-[clamp(280px,75vw,400px)] items-center justify-center rounded-xl border border-[var(--line)] bg-[var(--surface)] text-sm text-[var(--muted-dim)]"
       >
         Waiting for price data…
       </div>
@@ -247,16 +335,21 @@ export default function PriceChart({
   const x = (t: number) => chartPad.left + ((t - t0) / viewMs) * chartInnerWidth;
   const y = (p: number) => chartPad.top + ((high - p) / visibleSpan) * chartInnerHeight;
 
-  const line = visible.map((pt) => `${x(pt.t)},${y(pt.p)}`).join(" ");
   const baseline = chartPad.top + chartInnerHeight;
   const last = visible[visible.length - 1];
-  const area = `M ${x(visible[0].t)},${baseline} L ${line.replaceAll(
-    " ",
-    " L ",
-  )} L ${x(last.t)},${baseline} Z`;
+  const open = visible[0].p;
 
-  // Compare the latest value with the value at the left edge of the chart.
-  const stroke = last.p >= visible[0].p ? UP : DOWN;
+  const xs = visible.map((pt) => x(pt.t));
+  const ys = visible.map((pt) => y(pt.p));
+  const lineD = monotonePath(xs, ys);
+  const headX = xs[xs.length - 1];
+  const headY = ys[ys.length - 1];
+  const area = `${lineD}L${headX.toFixed(2)},${baseline.toFixed(2)}L${xs[0].toFixed(2)},${baseline.toFixed(2)}Z`;
+
+  // Compare the latest value with the value at the left edge of the chart —
+  // the same reference the hover tooltip's delta uses.
+  const up = last.p >= open;
+  const stroke = up ? UP : DOWN;
 
   const gridValues = Array.from(
     { length: yIntervals + 1 },
@@ -280,6 +373,28 @@ export default function PriceChart({
   const bandVisible = roundStart !== null && roundStart <= t1;
   const bandX = bandVisible ? x(Math.max(roundStart, t0)) : 0;
 
+  // Live price pill in the right gutter, sized the same way as the lobby
+  // chart's — the gutter width minus a margin.
+  const pillW = chartPad.right - 8;
+  const pillX = chartWidth - pillW - 2;
+
+  // Hover crosshair: time + price at the cursor, like the lobby chart's scrub.
+  // Hidden once the pointer crosses into the price-zoom gutter on the right.
+  const scrub = (() => {
+    if (hoverX === null) return null;
+    if (hoverX > chartPad.left + chartInnerWidth) return null;
+    const cx = clamp(hoverX, chartPad.left, chartPad.left + chartInnerWidth);
+    const t = t0 + ((cx - chartPad.left) / chartInnerWidth) * viewMs;
+    const p = valueAt(visible, t);
+    if (p === null) return null;
+    return { x: cx, y: y(clamp(p, low, high)), t, p };
+  })();
+
+  const pointerMove = (event: React.PointerEvent<SVGSVGElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    setHoverX(((event.clientX - rect.left) / rect.width) * chartWidth);
+  };
+
   return (
     <div
       ref={containerRef}
@@ -290,20 +405,62 @@ export default function PriceChart({
         setPriceScale(1);
       }}
       title="Scroll the plot to zoom time; scroll the price axis to zoom price; double-click to reset"
-      className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-2"
+      className="price-chart rounded-xl border border-[var(--line)] bg-[var(--surface)] p-2"
     >
       <svg
+        // A fresh round (or settling) replays the reveal sweep and the head's pop.
+        key={`${roundStart ?? "none"}-${frozen}`}
         viewBox={`0 0 ${chartWidth} ${chartHeight}`}
         className="h-auto w-full"
         role="img"
         aria-label={`BTC/USD price, last ${spanLabel(viewMs)}, price scale ${priceScale.toFixed(1)} times fitted range`}
+        onPointerMove={pointerMove}
+        onPointerDown={pointerMove}
+        onPointerLeave={() => setHoverX(null)}
+        onPointerCancel={() => setHoverX(null)}
       >
         <defs>
-          <linearGradient id="fill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={stroke} stopOpacity="0.22" />
+          <linearGradient id={`${uid}-fill`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={stroke} stopOpacity="0.24" />
             <stop offset="100%" stopColor={stroke} stopOpacity="0" />
           </linearGradient>
+          {/* Line fades in from the left — older samples read as dimmer, the head as brightest. */}
+          <linearGradient id={`${uid}-stroke`} gradientUnits="userSpaceOnUse" x1={xs[0]} x2={headX} y1="0" y2="0">
+            <stop offset="0" stopColor={stroke} stopOpacity=".25" />
+            <stop offset=".6" stopColor={stroke} stopOpacity=".9" />
+            <stop offset="1" stopColor={stroke} stopOpacity="1" />
+          </linearGradient>
+          <linearGradient id={`${uid}-band`} x1="0" x2="1" y1="0" y2="0">
+            <stop offset="0" stopColor="var(--brand)" stopOpacity=".16" />
+            <stop offset="1" stopColor="var(--brand)" stopOpacity="0" />
+          </linearGradient>
+          <radialGradient id={`${uid}-aura`}>
+            <stop offset="0" stopColor={stroke} stopOpacity=".4" />
+            <stop offset=".5" stopColor={stroke} stopOpacity=".12" />
+            <stop offset="1" stopColor={stroke} stopOpacity="0" />
+          </radialGradient>
+          <radialGradient id={`${uid}-orb`} cx=".38" cy=".35" r=".7">
+            <stop offset="0" stopColor="#ffffff" />
+            <stop offset=".45" stopColor={stroke} />
+            <stop offset="1" stopColor={stroke} stopOpacity=".65" />
+          </radialGradient>
+          <filter id={`${uid}-glow`} x="-20%" y="-60%" width="140%" height="220%">
+            <feGaussianBlur stdDeviation="3.5" />
+          </filter>
         </defs>
+
+        <g className="mc-stars" aria-hidden="true">
+          {STARS.map((star, i) => (
+            <circle
+              key={i}
+              className={`mc-star tone-${star.tone}`}
+              cx={chartPad.left + star.fx * chartInnerWidth}
+              cy={chartPad.top + star.fy * chartInnerHeight}
+              r={star.r}
+              style={{ animationDuration: `${star.dur}s`, animationDelay: `${star.delay}s` }}
+            />
+          ))}
+        </g>
 
         {/* Zoom levels, in the strip above the plot opposite `settled` */}
         <text x={chartPad.left} y={chartPad.top - 9} fill="var(--muted)" fontSize={isCompact ? 14 : 11}>
@@ -311,26 +468,34 @@ export default function PriceChart({
           {priceScale === 1 ? "auto" : `${priceScale.toFixed(1)}×`}
         </text>
 
-        {/* Gridlines + price axis */}
-        {gridValues.map((value, i) => (
-          <g key={i}>
-            <line
-              x1={chartPad.left}
-              x2={chartPad.left + chartInnerWidth}
-              y1={y(value)}
-              y2={y(value)}
-              stroke="var(--chart-grid)"
-            />
-            <text
-              x={chartPad.left + chartInnerWidth + 8}
-              y={y(value) + 4}
-              fill="var(--muted)"
-              fontSize={isCompact ? 14 : 12}
-            >
-              {axisLabel(value, visibleSpan)}
-            </text>
-          </g>
-        ))}
+        {/* Gridlines + price axis. A label within 14px of the live pill is dropped. */}
+        <g className="mc-grid">
+          {gridValues.map((value, i) => {
+            const gy = y(value);
+            const nearPill = Math.abs(gy - headY) < 14;
+            return (
+              <g key={i} style={{ "--i": i } as React.CSSProperties}>
+                <line
+                  x1={chartPad.left}
+                  x2={chartPad.left + chartInnerWidth}
+                  y1={gy}
+                  y2={gy}
+                  stroke="var(--chart-grid)"
+                />
+                {!nearPill && (
+                  <text
+                    x={chartPad.left + chartInnerWidth + 8}
+                    y={gy + 4}
+                    fill="var(--muted)"
+                    fontSize={isCompact ? 14 : 12}
+                  >
+                    {axisLabel(value, visibleSpan)}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+        </g>
 
         {/* Time axis: a minor mark per subdivision, a clock time per major tick */}
         <line
@@ -340,42 +505,44 @@ export default function PriceChart({
           y2={baseline}
           stroke="var(--chart-axis)"
         />
-        {ticks.map((t) => {
-          const tx = x(t);
-          // A label centred on the first tick can hang off the viewBox.
-          const labelled = t % labelEvery === 0 && tx > 22;
-          return (
-            <g key={t}>
-              {labelled && (
+        <g className="mc-ticks">
+          {ticks.map((t) => {
+            const tx = x(t);
+            // A label centred on the first tick can hang off the viewBox.
+            const labelled = t % labelEvery === 0 && tx > 22;
+            return (
+              <g key={t}>
+                {labelled && (
+                  <line
+                    x1={tx}
+                    x2={tx}
+                    y1={chartPad.top}
+                    y2={baseline}
+                    stroke="var(--chart-grid)"
+                  />
+                )}
                 <line
                   x1={tx}
                   x2={tx}
-                  y1={chartPad.top}
-                  y2={baseline}
-                  stroke="var(--chart-grid)"
+                  y1={baseline}
+                  y2={baseline + (labelled ? 10 : 6)}
+                  stroke={labelled ? "var(--muted)" : "var(--line-strong)"}
                 />
-              )}
-              <line
-                x1={tx}
-                x2={tx}
-                y1={baseline}
-                y2={baseline + (labelled ? 10 : 6)}
-                stroke={labelled ? "var(--muted)" : "var(--line-strong)"}
-              />
-              {labelled && (
-                <text
-                  x={tx}
-                  y={baseline + 27}
-                  fill="var(--muted)"
-                  fontSize={isCompact ? 13 : 10}
-                  textAnchor="middle"
-                >
-                  {clockLabel(t)}
-                </text>
-              )}
-            </g>
-          );
-        })}
+                {labelled && (
+                  <text
+                    x={tx}
+                    y={baseline + 27}
+                    fill="var(--muted)"
+                    fontSize={isCompact ? 13 : 10}
+                    textAnchor="middle"
+                  >
+                    {clockLabel(t)}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+        </g>
 
         {/* The live round, shaded from the moment it started */}
         {bandVisible && (
@@ -385,8 +552,7 @@ export default function PriceChart({
               y={chartPad.top}
               width={Math.max(0, chartPad.left + chartInnerWidth - bandX)}
               height={chartInnerHeight}
-              fill="var(--line-strong)"
-              fillOpacity="0.08"
+              fill={`url(#${uid}-band)`}
             />
             {/* Only once the start itself is in view. */}
             {roundStart > t0 && (
@@ -397,29 +563,59 @@ export default function PriceChart({
                   y2={baseline}
                   stroke="var(--chart-accent)"
                   strokeDasharray="3 3"
+                  style={{ filter: `drop-shadow(0 0 3px var(--chart-accent))` }}
                 />
               )}
-            <text
-              x={chartPad.left + chartInnerWidth - 4}
-              y={chartPad.top + 15}
-              fill="var(--chart-accent-strong)"
-              fontSize={isCompact ? 14 : 11}
-              textAnchor="end"
-            >
-              round
-            </text>
+            {!frozen ? (
+              <g className="pc-chip is-live" transform={`translate(${chartPad.left + chartInnerWidth - 78}, ${chartPad.top + 4})`}>
+                <rect width="74" height="18" rx="9" />
+                <circle cx="11" cy="9" r="3" />
+                <text x="20" y="13">LIVE ROUND</text>
+              </g>
+            ) : null}
           </>
         )}
 
-        <path d={area} fill="url(#fill)" />
-        <polyline
-          points={line}
-          fill="none"
-          stroke={stroke}
-          strokeWidth="2"
-          strokeLinejoin="round"
-          strokeLinecap="round"
-        />
+        {/* Price line: a monotone curve, glowing, fading brighter toward the head */}
+        <g className="mc-reveal">
+          <path className="mc-area" d={area} fill={`url(#${uid}-fill)`} />
+          <path className="market-chart-glow" d={lineD} fill="none" filter={`url(#${uid}-glow)`} style={{ stroke: `url(#${uid}-stroke)` }} />
+          <path className="market-chart-line" d={lineD} fill="none" style={{ stroke: `url(#${uid}-stroke)` }} />
+        </g>
+
+        {/* Labeled entry-price line for the currently open position */}
+        {openEntry && openEntry.t >= t0 && openEntry.t <= t1 && (() => {
+          const entryColor = openEntry.side === "long" ? UP : DOWN;
+          const ex = x(openEntry.t);
+          const ey = y(clamp(openEntry.p, low, high));
+          return (
+            <g className="pc-entry-line" pointerEvents="none">
+              <line
+                x1={ex}
+                x2={headX}
+                y1={ey}
+                y2={ey}
+                stroke={entryColor}
+                strokeDasharray="4 3"
+                strokeWidth="1.5"
+                opacity="0.75"
+              />
+              <rect
+                x={chartPad.left + 2}
+                y={ey - 9}
+                width="54"
+                height="16"
+                rx="4"
+                fill="var(--surface)"
+                stroke={entryColor}
+                strokeOpacity="0.6"
+              />
+              <text x={chartPad.left + 29} y={ey + 3} fill={entryColor} fontSize="9" fontWeight="600" textAnchor="middle">
+                {axisLabel(openEntry.p, visibleSpan)}
+              </text>
+            </g>
+          );
+        })()}
 
         {/* Each directional entry, exit, and reversal, marked where it happened */}
         {trades.map((trade, i) => {
@@ -428,8 +624,10 @@ export default function PriceChart({
           const ty = y(Math.min(Math.max(trade.p, low), high));
           const color = trade.side === "long" ? UP : DOWN;
           const action = trade.action ?? "entry";
+          const isSibyl = trade.owner === "sibyl";
+          const dash = isSibyl ? "2 2" : undefined;
           return (
-            <g key={i}>
+            <g key={i} style={{ filter: `drop-shadow(0 0 3px ${color})` }} opacity={isSibyl ? 0.85 : 1}>
               {action === "exit" ? (
                 <rect
                   x={tx - 5}
@@ -440,11 +638,12 @@ export default function PriceChart({
                   fill="var(--surface)"
                   stroke={color}
                   strokeWidth="2"
+                  strokeDasharray={dash}
                 />
               ) : action === "reverse" ? (
-                <path d={`M ${tx} ${ty - 7} L ${tx + 7} ${ty} L ${tx} ${ty + 7} L ${tx - 7} ${ty} Z`} fill="var(--surface)" stroke={color} strokeWidth="2" />
+                <path d={`M ${tx} ${ty - 7} L ${tx + 7} ${ty} L ${tx} ${ty + 7} L ${tx - 7} ${ty} Z`} fill="var(--surface)" stroke={color} strokeWidth="2" strokeDasharray={dash} />
               ) : (
-                <circle cx={tx} cy={ty} r="6" fill="var(--surface)" stroke={color} strokeWidth="2" />
+                <circle cx={tx} cy={ty} r="6" fill="var(--surface)" stroke={color} strokeWidth="2" strokeDasharray={dash} />
               )}
               <text
                 x={tx}
@@ -460,32 +659,85 @@ export default function PriceChart({
           );
         })}
 
-        {/* Current price marker */}
-        <circle
-          cx={x(last.t)}
-          cy={y(last.p)}
-          r="4"
-          fill={stroke}
-          className={
-            frozen
-              ? undefined
-              : "animate-ping [transform-box:fill-box] origin-center"
+        {/* A transient P&L callout on the most recent closing trade only — a
+            historical replay of every exit would clutter a multi-reverse round. */}
+        {(() => {
+          let latest: TradeMarker | null = null;
+          for (const trade of trades) {
+            if (trade.action !== "exit" && trade.action !== "reverse") continue;
+            if (trade.pnl === undefined) continue;
+            if (!latest || trade.t > latest.t) latest = trade;
           }
-          opacity={frozen ? 1 : 0.45}
-        />
-        <circle cx={x(last.t)} cy={y(last.p)} r="3.5" fill={stroke} />
+          if (!latest || latest.t < t0 || latest.t > t1) return null;
+          const tx = x(latest.t);
+          const ty = y(Math.min(Math.max(latest.p, low), high));
+          const positive = (latest.pnl ?? 0) >= 0;
+          return (
+            <g
+              key={`${latest.t}-${latest.action}`}
+              className="pc-pnl-toast"
+              transform={`translate(${tx}, ${ty - 18})`}
+              pointerEvents="none"
+            >
+              <rect x="-26" y="-13" width="52" height="16" rx="8" fill={positive ? "var(--positive)" : "var(--negative)"} />
+              <text x="0" y="-1.5" textAnchor="middle" fontSize="9" fontWeight="700" fill="var(--trade-contrast)">
+                {positive ? "+" : "-"}${Math.abs(latest.pnl ?? 0).toFixed(2)}
+              </text>
+            </g>
+          );
+        })()}
+
+        {/* Current price: a pulsing orb while live, a plain dot once settled */}
+        <g transform={`translate(${headX}, ${headY})`}>
+          {!frozen && <circle className="mc-aura" r="46" fill={`url(#${uid}-aura)`} />}
+          <g className={frozen ? undefined : "mc-head-pop"}>
+            {!frozen && <circle className="mc-shock" r="5" style={{ stroke }} />}
+            {!frozen && Array.from({ length: 4 }, (_, i) => (
+              <circle key={i} className="mc-spark" r={1.5 - i * 0.2} style={{ fill: stroke, animationDelay: `${(i * 1.4) / 4}s` }} />
+            ))}
+            {!frozen && <circle className="mc-halo" r="9" />}
+            {!frozen && <circle className="market-chart-ping" r="5" style={{ fill: stroke }} />}
+            {!frozen && flash.key > 0 && <circle key={flash.key} className={`market-chart-ripple is-${flash.dir}`} r="5" />}
+            <circle className="mc-orb" r="4.5" fill={`url(#${uid}-orb)`} />
+          </g>
+        </g>
+
+        {/* Live price pill in the right gutter */}
+        <line className="market-chart-live" x1={headX} x2={chartWidth - pillW - 4} y1={headY} y2={headY} style={{ stroke }} />
+        <g transform={`translate(${pillX}, ${clamp(headY, chartPad.top, baseline) - 11})`}>
+          <g className="mc-pill-in">
+            <rect className="market-chart-pill" width={pillW} height="22" rx="11" style={{ fill: stroke }} />
+            {flash.key > 0 && <rect key={flash.key} className={`market-chart-pill-flash is-${flash.dir}`} width={pillW} height="22" rx="11" />}
+            <text className="market-chart-pill-text" x={pillW / 2} y="15" textAnchor="middle">{axisLabel(last.p, visibleSpan)}</text>
+          </g>
+        </g>
 
         {frozen && (
-          <text
-            x={chartPad.left + chartInnerWidth}
-            y={chartPad.top - 9}
-            fill="var(--muted)"
-            fontSize={isCompact ? 14 : 11}
-            textAnchor="end"
-          >
-            settled
-          </text>
+          <g className="pc-chip is-settled" transform={`translate(${chartPad.left + chartInnerWidth - 64}, ${chartPad.top - 25})`}>
+            <rect width="64" height="16" rx="8" />
+            <text x="10" y="11">SETTLED</text>
+          </g>
         )}
+
+        {/* Hover crosshair: time + price at the cursor, vs. the window's open */}
+        {scrub && (() => {
+          const delta = scrub.p - open;
+          const tipW = 112;
+          const tipX = clamp(scrub.x - tipW / 2, chartPad.left, chartPad.left + chartInnerWidth - tipW);
+          return (
+            <g className="market-chart-scrub" pointerEvents="none">
+              <line x1={scrub.x} x2={scrub.x} y1={chartPad.top} y2={baseline} />
+              <circle cx={scrub.x} cy={scrub.y} r="4" className="mc-scrub-dot" style={{ fill: stroke }} />
+              <g transform={`translate(${tipX}, ${chartPad.top - 24})`}>
+                <rect className="market-chart-tip" width={tipW} height="18" rx="9" />
+                <text className="market-chart-tip-text" x="9" y="12.5">{clockLabel(scrub.t)}</text>
+                <text className={`market-chart-tip-text ${delta >= 0 ? "change-up" : "change-down"}`} x={tipW - 9} y="12.5" textAnchor="end">
+                  {delta >= 0 ? "+" : "−"}{axisLabel(Math.abs(delta), visibleSpan)}
+                </text>
+              </g>
+            </g>
+          );
+        })()}
 
         {/* A transparent hit area gives the price-axis gesture a visual cursor
             and a focused tooltip without obscuring its labels. */}

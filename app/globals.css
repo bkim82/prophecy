@@ -500,9 +500,18 @@ button { cursor: pointer; }
 @keyframes market-chart-ripple { 0% { opacity: .9; transform: scale(1); } 100% { opacity: 0; transform: scale(4.5); } }
 @keyframes market-chart-ping { 0% { opacity: .5; transform: scale(1); } 100% { opacity: 0; transform: scale(3.4); } }
 @media (prefers-reduced-motion: reduce) {
-  .market-chart *, .market-chart *::before { animation: none !important; }
+  .market-chart *, .market-chart *::before, .price-chart *, .price-chart *::before { animation: none !important; }
   .mc-shock, .mc-spark, .market-chart-pill-flash, .market-chart-ripple { display: none; }
 }
+/* In-round chart (app/PriceChart.tsx): same starfield/glow/orb vocabulary as
+   the lobby chart above (mc-* classes reused as-is — none of them are scoped
+   to .market-chart), plus its own round-status chip. */
+.price-chart svg { cursor: crosshair; }
+.pc-chip rect { fill: var(--surface-raised); stroke: var(--line-strong); }
+.pc-chip text { fill: var(--muted); font-size: 10px; font-weight: 600; }
+.pc-chip.is-live circle { fill: var(--positive); animation: mc-breathe 1.3s ease-in-out infinite; }
+.pc-chip.is-live rect { stroke: color-mix(in srgb, var(--positive) 45%, var(--line-strong)); }
+.pc-chip.is-live text { fill: var(--positive); }
 .market-stats { display: grid; gap: 13px; margin: 0; padding-left: 24px; border-left: 1px solid var(--line); }
 .market-stats div { display: flex; justify-content: space-between; gap: 12px; }
 .market-stats dt { color: var(--muted); font-size: 11px; }
@@ -611,6 +620,95 @@ button { cursor: pointer; }
 .queue-cancel { border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--muted); padding: 10px 16px; font-size: 13px; }
 @keyframes queue-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
 @media (prefers-reduced-motion: reduce) { .queue-pulse { animation: none; } }
+/* In-round Pulse arena (app/duel/btc/pulse/page.tsx practice,
+   app/duel/[market]/pulse/[matchId]/page.tsx multiplayer) — same entrance,
+   glow and pulse vocabulary as the lobby (.pulse-stage) and queue panel
+   above, reusing their keyframes rather than redefining them. */
+.arena-shell > * { animation: stage-rise .6s cubic-bezier(.2, .8, .2, 1) both; }
+.arena-shell > *:nth-child(2) { animation-delay: .06s; }
+.arena-shell > *:nth-child(3) { animation-delay: .12s; }
+.arena-shell > *:nth-child(4) { animation-delay: .18s; }
+.arena-shell > *:nth-child(5) { animation-delay: .24s; }
+@media (prefers-reduced-motion: reduce) { .arena-shell > * { animation: none; } }
+.arena-panel { position: relative; overflow: hidden; border-color: color-mix(in srgb, var(--violet) 22%, var(--line)) !important; background:
+  radial-gradient(90% 70% at 88% 92%, color-mix(in srgb, var(--brand) 11%, transparent), transparent 62%),
+  radial-gradient(70% 60% at 6% 0%, color-mix(in srgb, var(--violet) 14%, transparent), transparent 60%),
+  var(--surface) !important; }
+.arena-live-dot { animation: queue-pulse 1.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .arena-live-dot { animation: none; } }
+.arena-timer.is-urgent { color: var(--negative); text-shadow: 0 0 20px color-mix(in srgb, var(--negative) 55%, transparent); animation: queue-pulse .9s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .arena-timer.is-urgent { animation: none; } }
+/* Long/short CTAs glow in their own colour — the one choice that matters
+   each round, same way lobby Play is the one violet thing on its page. */
+.arena-choice { position: relative; overflow: hidden; }
+.arena-choice:not(:disabled)::after { content: ""; position: absolute; inset: 0; background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, .3) 50%, transparent 65%); transform: translateX(-100%); animation: play-sheen 3.2s ease-in-out .6s infinite; pointer-events: none; }
+.arena-choice.is-long:not(:disabled) { animation: arena-choice-up 2.6s ease-in-out infinite; }
+.arena-choice.is-short:not(:disabled) { animation: arena-choice-down 2.6s ease-in-out infinite; }
+@keyframes arena-choice-up { 0%, 100% { box-shadow: 0 10px 26px color-mix(in srgb, var(--chart-up) 35%, transparent); } 50% { box-shadow: 0 10px 40px color-mix(in srgb, var(--chart-up) 65%, transparent); } }
+@keyframes arena-choice-down { 0%, 100% { box-shadow: 0 10px 26px color-mix(in srgb, var(--chart-down) 35%, transparent); } 50% { box-shadow: 0 10px 40px color-mix(in srgb, var(--chart-down) 65%, transparent); } }
+@media (prefers-reduced-motion: reduce) { .arena-choice.is-long:not(:disabled), .arena-choice.is-short:not(:disabled), .arena-choice::after { animation: none; } }
+
+/* Solo Pulse trading dock (app/duel/btc/pulse/page.tsx TradingDock): a
+   compact two-row bar — small Amount/Leverage dropdowns + a gear row, then
+   equal-width primary actions below — instead of a tall settings panel.
+   Solid surface, no glow; only the action fills carry color. */
+.dock-bar { position: relative; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); padding: 10px; }
+.dock-last-note { margin: 0 0 8px; text-align: center; font-size: 11px; color: var(--muted); }
+.dock-row { display: flex; align-items: stretch; gap: 8px; }
+.dock-row + .dock-row { margin-top: 8px; }
+.dock-select { position: relative; flex: 1; min-width: 0; }
+.dock-select > summary { display: flex; height: 40px; align-items: center; justify-content: space-between; gap: 6px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-raised); padding: 0 10px; list-style: none; color: var(--text); font-size: 13px; cursor: pointer; }
+.dock-select > summary::-webkit-details-marker { display: none; }
+.dock-select > summary:hover { border-color: var(--line-strong); background: var(--surface-hover); }
+.dock-select[open] > summary { border-color: var(--brand); }
+.dock-select-label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .04em; }
+.dock-select-value { font-weight: 600; font-variant-numeric: tabular-nums; }
+.dock-select-chevron { color: var(--muted-dim); font-size: 10px; transition: transform .15s ease; }
+.dock-select[open] .dock-select-chevron { transform: rotate(180deg); }
+.dock-select-menu { position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 20; display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface-raised); padding: 8px; box-shadow: 0 10px 30px rgba(0, 0, 0, .3); }
+.dock-select-menu button { border-radius: 6px; border: 1px solid var(--line); padding: 6px 0; font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--muted); background: transparent; transition: border-color .15s ease, background .15s ease, color .15s ease; }
+.dock-select-menu button:hover:not(:disabled) { border-color: var(--line-strong); background: var(--surface-hover); }
+.dock-select-menu button.is-selected { border-color: var(--brand); background: var(--selected-bg); color: var(--brand-strong); }
+.dock-select-menu button:disabled { opacity: .4; cursor: not-allowed; }
+.dock-gear { flex: none; display: inline-flex; width: 40px; height: 40px; align-items: center; justify-content: center; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-raised); color: var(--muted); font-size: 15px; }
+.dock-action { flex: 1; height: 44px; border-radius: 8px; text-align: center; font-size: 15px; font-weight: 700; color: var(--trade-contrast); transition: filter .15s ease, transform .1s ease; }
+.dock-action:hover:not(:disabled) { filter: brightness(1.08); }
+.dock-action:active:not(:disabled) { transform: scale(.98); }
+.dock-action.is-long { background: color-mix(in srgb, var(--chart-up) 88%, black 12%); }
+.dock-action.is-short { background: color-mix(in srgb, var(--chart-down) 88%, black 12%); }
+.dock-action:disabled { background: var(--btn-disabled-bg); color: var(--btn-disabled-text); }
+.dock-action-secondary { flex: 1; height: 44px; border-radius: 8px; border: 1px solid var(--line); background: transparent; color: var(--text); font-size: 14px; font-weight: 600; transition: border-color .15s ease, background .15s ease; }
+.dock-action-secondary:hover:not(:disabled) { border-color: var(--line-strong); background: var(--surface-hover); }
+.dock-action-secondary:disabled { color: var(--btn-disabled-text); }
+.dock-chip { flex: none; display: inline-flex; height: 40px; align-items: center; border: 1px solid; border-radius: 8px; padding: 0 10px; font-size: 12px; font-weight: 700; letter-spacing: .04em; }
+.dock-live-pnl { flex: 1; display: flex; align-items: center; justify-content: center; height: 40px; font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.dock-meta { flex: none; display: flex; flex-direction: column; justify-content: center; height: 40px; text-align: right; font-size: 11px; color: var(--muted); }
+
+/* Sibyl duel: scoreboard avatars/ring/lead bar, dock hero P&L, result card. */
+.duel-avatar { position: relative; display: flex; flex-shrink: 0; align-items: center; justify-content: center; border-radius: 999px; font-weight: 700; color: #fff; box-shadow: 0 2px 10px rgba(0, 0, 0, .25); }
+.duel-avatar.is-lead { animation: duel-lead-pop .5s cubic-bezier(.2, .8, .2, 1); }
+@keyframes duel-lead-pop { 0% { transform: scale(1); } 40% { transform: scale(1.12); } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .duel-avatar.is-lead { animation: none; } }
+.sibyl-face-mouth { transition: opacity .2s ease; }
+.duel-ring-track { stroke: var(--line); fill: none; }
+.duel-ring-progress { stroke: var(--brand); fill: none; stroke-linecap: round; transform: rotate(-90deg); transform-origin: center; transition: stroke-dashoffset .18s linear; }
+.duel-ring-progress.is-urgent { stroke: var(--negative); animation: queue-pulse .9s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .duel-ring-progress.is-urgent { animation: none; } }
+.duel-lead-bar { position: relative; height: 6px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.duel-lead-fill { position: absolute; top: 0; bottom: 0; left: 0; width: 50%; border-radius: 999px; background: var(--brand); transition: width .35s cubic-bezier(.2, .8, .2, 1), background-color .35s ease; }
+.duel-lead-mid { position: absolute; top: -3px; bottom: -3px; left: 50%; width: 1px; background: var(--line-strong); }
+.sibyl-bubble { animation: duel-bubble-in .25s cubic-bezier(.2, .8, .2, 1) both; }
+@keyframes duel-bubble-in { from { opacity: 0; transform: translateY(4px) scale(.96); } }
+@media (prefers-reduced-motion: reduce) { .sibyl-bubble { animation: none; } }
+.dock-pnl-hero { transition: color .2s ease; }
+.result-burst { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.result-burst-particle { position: absolute; top: 50%; left: 50%; height: 7px; width: 7px; border-radius: 2px; background: var(--brand); opacity: 0; animation: result-burst-fly .85s ease-out forwards; }
+@keyframes result-burst-fly { 0% { opacity: 1; transform: translate(-50%, -50%) rotate(var(--rot, 0deg)) translateY(0); } 100% { opacity: 0; transform: translate(-50%, -50%) rotate(var(--rot, 0deg)) translateY(var(--dist, -90px)); } }
+@media (prefers-reduced-motion: reduce) { .result-burst { display: none; } }
+.pc-pnl-toast { animation: pc-toast-fade 1.6s ease-out forwards; }
+@keyframes pc-toast-fade { 0% { opacity: 0; transform: translateY(4px); } 15% { opacity: 1; transform: translateY(0); } 75% { opacity: 1; } 100% { opacity: 0; transform: translateY(-6px); } }
+@media (prefers-reduced-motion: reduce) { .pc-pnl-toast { animation: none; opacity: 0; } }
+
 .pulse-movement-alert { position: fixed; top: 50%; left: 50%; z-index: 50; pointer-events: none; transform: translate(-50%, -50%); border: 2px solid currentColor; border-radius: 14px; background: color-mix(in srgb, var(--surface) 84%, currentColor 16%); padding: 18px 26px; box-shadow: 0 16px 60px color-mix(in srgb, currentColor 42%, transparent), 0 0 18px color-mix(in srgb, currentColor 32%, transparent); font-size: clamp(42px, 9vw, 88px); font-weight: 800; line-height: 1; letter-spacing: -.04em; font-variant-numeric: tabular-nums; text-shadow: 0 0 18px color-mix(in srgb, currentColor 48%, transparent); animation: pulse-alert-pop 1.8s cubic-bezier(.2,.8,.2,1) both; }
 .pulse-movement-alert.is-positive { color: var(--chart-up); }
 .pulse-movement-alert.is-negative { color: var(--chart-down); }
