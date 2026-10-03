@@ -14,7 +14,8 @@ function readTheme(): Theme {
   }
 }
 
-export function ThemeToggle() {
+/** Shared by the standalone toggle and the avatar-menu action (AccountMenu.tsx). */
+export function useTheme() {
   const [theme, setTheme] = useState<Theme>("dark");
 
   // The inline script already set the attribute; this syncs React's state to it
@@ -34,6 +35,29 @@ export function ThemeToggle() {
     setTheme(next);
   }
 
+  return { theme, toggle };
+}
+
+export function SunIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="4.5" />
+      <path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M19.1 4.9l-1.8 1.8M6.7 17.3l-1.8 1.8" />
+    </svg>
+  );
+}
+
+export function MoonIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true">
+      <path d="M20.5 14.4A8.6 8.6 0 0 1 9.6 3.5a8.6 8.6 0 1 0 10.9 10.9Z" />
+    </svg>
+  );
+}
+
+// Signed-out fallback only; signed-in users switch theme from the avatar menu.
+export function ThemeToggle() {
+  const { theme, toggle } = useTheme();
   const label = theme === "dark" ? "Switch to light mode" : "Switch to dark mode";
   return (
     <button
@@ -43,16 +67,7 @@ export function ThemeToggle() {
       title={label}
       aria-label={label}
     >
-      {theme === "dark" ? (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-          <circle cx="12" cy="12" r="4.5" />
-          <path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M19.1 4.9l-1.8 1.8M6.7 17.3l-1.8 1.8" />
-        </svg>
-      ) : (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true">
-          <path d="M20.5 14.4A8.6 8.6 0 0 1 9.6 3.5a8.6 8.6 0 1 0 10.9 10.9Z" />
-        </svg>
-      )}
+      {theme === "dark" ? <SunIcon /> : <MoonIcon />}
     </button>
   );
 }

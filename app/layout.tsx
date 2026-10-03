@@ -1,14 +1,13 @@
 import type { Metadata } from "next";
 import { Cinzel, IBM_Plex_Mono, Inter } from "next/font/google";
 import Link from "next/link";
-import { ClerkProvider, Show, SignInButton, UserButton } from "@clerk/nextjs";
+import { ClerkProvider, Show } from "@clerk/nextjs";
+import { AccountMenu } from "./AccountMenu";
 import { ActiveMatchBar } from "./ActiveMatchBar";
 import { BalancePill } from "./BalancePill";
-import { ArenaIcon, ProfileIcon } from "./icons";
 import { MobileBottomNav } from "./MobileBottomNav";
 import { QuickTicketBar } from "./QuickTicketBar";
 import { TabNav } from "./TabNav";
-import { ThemeToggle } from "./ThemeToggle";
 import { THEME_INIT_SCRIPT } from "./theme";
 import "./globals.css";
 
@@ -41,47 +40,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <header className="app-header">
             <div className="app-header-inner">
               <div className="desktop-header-content">
-                <div className="header-left">
-                  <Link href="/" className="brand">PROPHECY</Link>
-                  <TabNav />
-                </div>
+                <Link href="/" className="brand">PROPHECY</Link>
+                <TabNav />
                 <div className="header-actions">
-                  <Link href="/duel" className="arena-cta">
-                    <ArenaIcon className="arena-cta-icon" /> Arena
-                  </Link>
-                  <Link href="/wallet" className="wallet-cta">Wallet</Link>
-                  <ThemeToggle />
-                  <Show
-                    when="signed-in"
-                    fallback={
-                      <SignInButton mode="modal">
-                        <button className="signin-button">Sign in</button>
-                      </SignInButton>
-                    }
-                  >
-                    <BalancePill />
-                    <UserButton />
-                  </Show>
+                  <Show when="signed-in"><BalancePill /></Show>
+                  <AccountMenu />
                 </div>
               </div>
               <div className="mobile-header-content">
                 <Link href="/" className="brand">PROPHECY</Link>
                 <div className="mobile-header-actions">
-                  <BalancePill />
-                  <ThemeToggle />
+                  <Show when="signed-in"><BalancePill /></Show>
                   <div className="mobile-account-control">
-                    <Show
-                      when="signed-in"
-                      fallback={
-                        <SignInButton mode="modal">
-                          <button type="button" className="mobile-signin-avatar" aria-label="Sign in">
-                            <ProfileIcon className="mobile-profile-icon" />
-                          </button>
-                        </SignInButton>
-                      }
-                    >
-                      <UserButton />
-                    </Show>
+                    <AccountMenu compact />
                   </div>
                 </div>
               </div>

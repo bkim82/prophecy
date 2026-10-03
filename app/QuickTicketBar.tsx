@@ -41,8 +41,10 @@ export function QuickTicketBar() {
     return () => document.removeEventListener("pointerdown", onPointerDown);
   }, [open]);
 
-  const inGame = pathname?.startsWith("/duel/") ?? false;
-  if (activeMatch || queueing || inGame) return null;
+  // Arena (lobby and every game under it) has its own Play/trade actions, so
+  // the floating + would only overlap the setup card and compete with them.
+  const inArena = pathname === "/duel" || (pathname?.startsWith("/duel/") ?? false);
+  if (activeMatch || queueing || inArena) return null;
 
   return (
     <div

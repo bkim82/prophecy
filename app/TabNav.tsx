@@ -1,40 +1,34 @@
 "use client";
 
 import { useRouter, usePathname } from "next/navigation";
-import { useLayoutEffect, useRef, useState, useTransition } from "react";
+import { useTransition } from "react";
+import { ArenaIcon, OmensIcon, RoomsIcon, WalletIcon } from "./icons";
 
+// Same four destinations, same order, as MobileBottomNav.
 const TABS = [
-  { href: "/", label: "Omens" },
-  { href: "/rooms", label: "Rooms" },
+  { href: "/", label: "Omens", Icon: OmensIcon },
+  { href: "/rooms", label: "Rooms", Icon: RoomsIcon },
+  { href: "/duel", label: "Arena", Icon: ArenaIcon },
+  { href: "/wallet", label: "Wallet", Icon: WalletIcon },
 ];
 
 export function TabNav() {
   const pathname = usePathname();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const linkRefs = useRef<(HTMLAnchorElement | null)[]>([]);
-  const [underline, setUnderline] = useState<{ left: number; width: number } | null>(null);
 
-  // "/" only matches itself; "/rooms" matches by prefix so nested room
-  // routes would keep Rooms highlighted.
+  // "/" only matches itself; the rest match by prefix so nested routes
+  // (/duel/portfolio, /duel/btc/pulse/…) keep their section highlighted.
   const activeIndex = TABS.findIndex((tab) => (tab.href === "/" ? pathname === "/" : pathname.startsWith(tab.href)));
-
-  useLayoutEffect(() => {
-    const el = linkRefs.current[activeIndex];
-    if (el) setUnderline({ left: el.offsetLeft, width: el.offsetWidth });
-  }, [activeIndex, pathname]);
 
   return (
     <nav className="main-nav" aria-label="Primary" aria-busy={isPending}>
-      {TABS.map((tab, index) => {
+      {TABS.map(({ href, label, Icon }, index) => {
         const isActive = index === activeIndex;
         return (
           <a
-            key={tab.href}
-            ref={(el) => {
-              linkRefs.current[index] = el;
-            }}
-            href={tab.href}
+            key={href}
+            href={href}
             className={`main-nav-link${isActive ? " active" : ""}`}
             aria-current={isActive ? "page" : undefined}
             draggable={false}
@@ -48,21 +42,15 @@ export function TabNav() {
               // behind it.
               event.preventDefault();
               startTransition(() => {
-                router.push(tab.href);
+                router.push(href);
               });
             }}
           >
-            {tab.label}
+            <Icon className="main-nav-icon" />
+            {label}
           </a>
         );
       })}
-      {underline && (
-        <span
-          className="main-nav-underline"
-          style={{ transform: `translateX(${underline.left}px)`, width: underline.width }}
-          aria-hidden="true"
-        />
-      )}
     </nav>
   );
 }

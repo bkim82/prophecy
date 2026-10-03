@@ -115,6 +115,8 @@ export default function Page() {
   // While the chart is being scrubbed, the headline reads the scrubbed point.
   const [scrub, setScrub] = useState<ScrubPoint>(null);
   const [timer, setTimer] = useState(60);
+  // Phones only: 24h high/low/players collapse so Play stays above the fold.
+  const [statsOpen, setStatsOpen] = useState(false);
   const [mode, setMode] = useState<ModeId>("pulse");
   const [playerId, setPlayerId] = useState<string | null>(null);
   const [openMatches, setOpenMatches] = useState<OpenMatch[]>([]);
@@ -366,25 +368,31 @@ export default function Page() {
 
   return (
     <main className="lobby-shell" data-market={market}>
-      <div className="mode-row">
-        <div className="mode-switcher" role="group" aria-label="Choose a mode">
-          {modes.map((option) => (
-            <button key={option.id} type="button" className={option.id === mode ? "active" : ""} aria-pressed={option.id === mode} onClick={() => setMode(option.id)}>
-              {option.label}
-              {option.href || option.matched ? null : <small>soon</small>}
-            </button>
-          ))}
+      <section className="feed-heading arena-heading">
+        <div className="feed-heading-row">
+          <h1 className="display-font">Arena</h1>
         </div>
+      </section>
+
+      <div className="feed-tabs arena-mode-tabs" role="group" aria-label="Choose a mode">
+        {modes.map((option) => (
+          <button key={option.id} type="button" className={option.id === mode ? "active" : ""} aria-pressed={option.id === mode} onClick={() => setMode(option.id)}>
+            {option.label}
+            {option.href || option.matched ? null : <small>soon</small>}
+          </button>
+        ))}
       </div>
 
       {mode === "pulse" && (
       <nav className="market-nav" aria-label="Market switcher">
         <div className="market-switcher">
           <span className="field-label">Markets</span>
-          <button className={market === "btc" ? "active" : ""} type="button" onClick={() => setMarket("btc")}><span className="market-symbol btc-symbol">₿</span> BTC</button>
-          <button className={market === "eth" ? "active" : ""} type="button" onClick={() => setMarket("eth")}><span className="market-symbol eth-symbol">Ξ</span> ETH</button>
+          <button className={market === "btc" ? "active" : ""} aria-pressed={market === "btc"} type="button" onClick={() => setMarket("btc")}><span className="market-symbol btc-symbol">₿</span> BTC</button>
+          <button className={market === "eth" ? "active" : ""} aria-pressed={market === "eth"} type="button" onClick={() => setMarket("eth")}><span className="market-symbol eth-symbol">Ξ</span> ETH</button>
         </div>
-        <DailyCoin active={market === dailyCoinId} onSelect={() => setMarket(dailyCoinId)} />
+        <div className="market-switcher">
+          <DailyCoin active={market === dailyCoinId} onSelect={() => setMarket(dailyCoinId)} />
+        </div>
       </nav>
       )}
 
@@ -401,7 +409,10 @@ export default function Page() {
           <div className="ticker-change"><span className={change !== null && change >= 0 ? "change-up" : "change-down"}>{change === null ? "—" : `${change >= 0 ? "+" : ""}${change.toFixed(Math.abs(change) < 0.1 ? 3 : 2)}%`}</span><span className="muted">{scrub ? clockLabel(scrub.t) : `last ${MARKET_CHART_WINDOW_MS / 1000}s`}</span></div>
         </div>
         <div className="ticker-chart-wrap"><MarketChart points={points} now={now} label={activeMarket.label} tickSize={activeMarket.tickSize} height="fill" onScrub={setScrub} /></div>
-        <dl className="market-stats">
+        <button type="button" className="market-stats-toggle" aria-expanded={statsOpen} aria-controls="arena-market-stats" onClick={() => setStatsOpen((open) => !open)}>
+          {statsOpen ? "Hide market stats" : "Market stats"}
+        </button>
+        <dl id="arena-market-stats" className={`market-stats${statsOpen ? "" : " is-collapsed"}`}>
           <div><dt>24h high</dt><dd>{usd(day?.high ?? null, activeMarket.tickSize)}</dd></div>
           <div><dt>24h low</dt><dd>{usd(day?.low ?? null, activeMarket.tickSize)}</dd></div>
           <div><dt>24h change</dt><dd className={day && livePrice !== null ? (livePrice >= day.open ? "change-up" : "change-down") : ""}>{day && livePrice !== null ? `${livePrice >= day.open ? "+" : ""}${(((livePrice - day.open) / day.open) * 100).toFixed(2)}%` : "—"}</dd></div>
@@ -414,7 +425,7 @@ export default function Page() {
       <div className="section-heading">
         <div>
           <span className="eyebrow">Make a call</span>
-          <h1 className="display-font">{activeMode.label}</h1>
+          <h2 className="display-font">{activeMode.label}</h2>
           <span className="round-meta">{activeMode.meta}</span>
         </div>
       </div>
@@ -443,12 +454,12 @@ export default function Page() {
       ) : (
       <section className="play-panel panel">
         <div className="play-panel-market"><span className={`market-symbol ${SYMBOL_CLASS[market]}`}>{activeMarket.symbol}</span><div><strong>{activeMarket.label} / USD</strong><span className="muted">{isPlayable ? "Current round" : "Not open yet"}</span></div></div>
-        <div className="control-group">
+        <div className="control-group control-group--format">
           <span className="field-label">Pulse format</span>
           <strong className="muted">$100 bankroll</strong>
           <span className="muted">Stake + leverage in room</span>
         </div>
-        <div className="control-group">
+        <div className="control-group control-group--timer">
           <span className="field-label">Timer</span>
           <div className="segmented-control" role="group" aria-label="Choose round length">
             {TIMER_PRESETS.map((preset) => (
@@ -473,9 +484,9 @@ export default function Page() {
           )}
         </div>
         {activeMatch ? (
-          <span className="muted">Finish your live arena before starting another.</span>
+          <span className="muted play-panel-note">Finish your live arena before starting another.</span>
         ) : (
-          matchError && <span className="muted">{matchError}</span>
+          matchError && <span className="muted play-panel-note">{matchError}</span>
         )}
       </section>
       )}
