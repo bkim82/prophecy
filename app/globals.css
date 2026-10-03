@@ -172,6 +172,28 @@ button { cursor: pointer; }
 .feed-tabs button { min-height: 40px; border: 1px solid transparent; border-radius: 999px; background: transparent; color: var(--muted); padding: 9px 18px; font-size: 13px; font-weight: 600; transition: background .15s ease, color .15s ease, border-color .15s ease; }
 .feed-tabs button.active { border-color: color-mix(in srgb, var(--brand) 45%, transparent); background: var(--selected-bg); color: var(--brand-strong); font-weight: 700; }
 .feed-tabs button:hover:not(.active) { color: var(--text); }
+/* Reddit-style left rail on `/`: feeds as a vertical icon list. Above 960px only — below that .feed-nav falls back to the .feed-tabs pill/segmented styles. */
+.feed-nav-label, .feed-nav-icon { display: none; }
+@media (min-width: 961px) {
+  .feed-shell--nav { grid-template-columns: 200px minmax(0, 1fr) 340px; }
+  .feed-nav { position: sticky; top: 24px; align-self: start; padding: 4px 16px 4px 0; border-right: 1px solid var(--line); }
+  .feed-nav-label { display: block; margin: 6px 12px 8px; color: var(--muted-dim); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+  .feed-nav .feed-tabs { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; }
+  .feed-nav .feed-tabs button { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 40px; border: 0; border-radius: 8px; padding: 8px 12px; color: var(--text); font-weight: 500; text-align: left; }
+  .feed-nav .feed-tabs button:hover:not(.active) { background: var(--surface-hover); }
+  .feed-nav .feed-tabs button.active { border: 0; background: var(--selected-bg); color: var(--brand-strong); font-weight: 700; }
+  .feed-nav-icon { display: block; flex: none; width: 20px; height: 20px; }
+}
+@media (min-width: 961px) and (max-width: 1180px) { .feed-shell--nav { grid-template-columns: 180px minmax(0, 1fr) 280px; gap: 20px; } }
+/* ≤960px: flatten .feed-main so the tabs sit back under the "Omens" heading, as before the rail existed. */
+@media (max-width: 960px) {
+  .feed-shell--nav { row-gap: 0; }
+  .feed-shell--nav .feed-main { display: contents; }
+  .feed-shell--nav .feed-heading { order: -2; }
+  .feed-shell--nav .feed-nav { order: -1; }
+  .feed-shell--nav .feed-sidebar { margin-top: 28px; }
+}
+@media (max-width: 768px) { .feed-shell--nav .feed-sidebar { margin-top: 16px; } }
 .feed-list { display: grid; gap: 14px; }
 .feed-empty { padding: 24px 4px; }
 .post-card { display: flex; gap: 14px; padding: 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); transition: border-color .15s ease; }

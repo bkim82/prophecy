@@ -4,10 +4,8 @@ import { GLOBAL_POSTS } from "@/app/lib/mockPosts";
 
 export default function Page() {
   return (
-    <main className="feed-shell">
-      <div className="feed-main">
-        <FeedSwitcher posts={GLOBAL_POSTS} />
-      </div>
+    <main className="feed-shell feed-shell--nav">
+      <FeedSwitcher posts={GLOBAL_POSTS} />
       <aside className="feed-sidebar">
         <FeedSidebar />
       </aside>

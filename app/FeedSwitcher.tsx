@@ -3,13 +3,14 @@
 import { useMemo, useState } from "react";
 import { PostCard } from "@/app/PostCard";
 import { FOLLOWED_HANDLES, type Market, type Post } from "@/app/lib/mockPosts";
+import { FollowingIcon, ForYouIcon, LiveCallsIcon } from "@/app/icons";
 
 type FilterId = "forYou" | "following" | "live";
 
-const FILTERS: { id: FilterId; label: string }[] = [
-  { id: "forYou", label: "For You" },
-  { id: "following", label: "Following" },
-  { id: "live", label: "Live Calls" },
+const FILTERS: { id: FilterId; label: string; Icon: typeof ForYouIcon }[] = [
+  { id: "forYou", label: "For You", Icon: ForYouIcon },
+  { id: "following", label: "Following", Icon: FollowingIcon },
+  { id: "live", label: "Live Calls", Icon: LiveCallsIcon },
 ];
 
 type CommunityId = "all" | Market;
@@ -40,70 +41,76 @@ export function FeedSwitcher({ posts }: { posts: Post[] }) {
 
   return (
     <>
-      <section className="feed-heading">
-        <div className="feed-heading-row">
-          <h1 className="display-font">Omens</h1>
-          <div
-            className="community-dropdown"
-            onBlur={(e) => {
-              if (!e.currentTarget.contains(e.relatedTarget)) setCommunityOpen(false);
-            }}
-          >
+      <nav className="feed-nav" aria-label="Feeds">
+        <p className="feed-nav-label">Feeds</p>
+        <div className="feed-tabs" role="tablist" aria-label="Feed filter">
+          {FILTERS.map(({ id, label, Icon }) => (
             <button
+              key={id}
               type="button"
-              className="community-dropdown-trigger"
-              aria-haspopup="listbox"
-              aria-expanded={communityOpen}
-              onClick={() => setCommunityOpen((v) => !v)}
+              role="tab"
+              aria-selected={filter === id}
+              className={filter === id ? "active" : ""}
+              onClick={() => setFilter(id)}
             >
-              {activeCommunity.symbol && (
-                <span className={`market-symbol ${activeCommunity.symbolClass}`}>{activeCommunity.symbol}</span>
-              )}
-              {activeCommunity.label}
-              <span className="community-dropdown-caret" aria-hidden="true">▾</span>
+              <Icon className="feed-nav-icon" />
+              {label}
             </button>
-            {communityOpen && (
-              <div className="community-dropdown-menu" role="listbox">
-                {COMMUNITIES.map((c) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    role="option"
-                    aria-selected={community === c.id}
-                    className={community === c.id ? "active" : ""}
-                    onClick={() => {
-                      setCommunity(c.id);
-                      setCommunityOpen(false);
-                    }}
-                  >
-                    {c.symbol && <span className={`market-symbol ${c.symbolClass}`}>{c.symbol}</span>}
-                    {c.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          ))}
         </div>
-      </section>
-      <div className="feed-tabs" role="tablist" aria-label="Feed filter">
-        {FILTERS.map((f) => (
-          <button
-            key={f.id}
-            type="button"
-            role="tab"
-            aria-selected={filter === f.id}
-            className={filter === f.id ? "active" : ""}
-            onClick={() => setFilter(f.id)}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
-      <div className="feed-list">
-        {visible.map((post) => (
-          <PostCard key={post.id} post={post} />
-        ))}
-        {visible.length === 0 && <p className="muted feed-empty">Nothing here yet.</p>}
+      </nav>
+      <div className="feed-main">
+        <section className="feed-heading">
+          <div className="feed-heading-row">
+            <h1 className="display-font">Omens</h1>
+            <div
+              className="community-dropdown"
+              onBlur={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget)) setCommunityOpen(false);
+              }}
+            >
+              <button
+                type="button"
+                className="community-dropdown-trigger"
+                aria-haspopup="listbox"
+                aria-expanded={communityOpen}
+                onClick={() => setCommunityOpen((v) => !v)}
+              >
+                {activeCommunity.symbol && (
+                  <span className={`market-symbol ${activeCommunity.symbolClass}`}>{activeCommunity.symbol}</span>
+                )}
+                {activeCommunity.label}
+                <span className="community-dropdown-caret" aria-hidden="true">▾</span>
+              </button>
+              {communityOpen && (
+                <div className="community-dropdown-menu" role="listbox">
+                  {COMMUNITIES.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      role="option"
+                      aria-selected={community === c.id}
+                      className={community === c.id ? "active" : ""}
+                      onClick={() => {
+                        setCommunity(c.id);
+                        setCommunityOpen(false);
+                      }}
+                    >
+                      {c.symbol && <span className={`market-symbol ${c.symbolClass}`}>{c.symbol}</span>}
+                      {c.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+        <div className="feed-list">
+          {visible.map((post) => (
+            <PostCard key={post.id} post={post} />
+          ))}
+          {visible.length === 0 && <p className="muted feed-empty">Nothing here yet.</p>}
+        </div>
       </div>
     </>
   );

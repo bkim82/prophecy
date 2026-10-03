@@ -56,3 +56,29 @@ export function FlameIcon({ className }: { className?: string }) {
     </svg>
   );
 }
+
+export function ForYouIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" className={className} fill="none" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3.5 9 10 3.5 16.5 9v7.5h-4.2v-4.6H7.7v4.6H3.5V9Z" />
+    </svg>
+  );
+}
+
+export function FollowingIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" className={className} fill="none" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="7.5" cy="7" r="2.6" />
+      <path d="M2.8 16c.5-2.6 2.4-4.1 4.7-4.1s4.2 1.5 4.7 4.1" />
+      <path d="M13 4.6a2.5 2.5 0 0 1 0 4.8M14.6 11.9c1.4.5 2.3 1.8 2.6 4.1" />
+    </svg>
+  );
+}
+
+export function LiveCallsIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" className={className} fill="none" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M2.5 10.5h3l2-5 3 9 2-6 1.5 2h3.5" />
+    </svg>
+  );
+}
