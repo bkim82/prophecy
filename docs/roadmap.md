@@ -6,7 +6,6 @@ Deliberate gaps in a prototype scoped to the core loop. Not bugs.
 
 | Gap | Detail |
 | --- | --- |
-| ETH Duel (Pulse) | Lobby leaves ETH's Pulse mode inert (`app/duel/page.tsx`, no `href`/`matched` on `pulse`). The feed, `/api/price`, the match routes and `/duel/[market]/pulse/[matchId]` all already handle `eth` — only the lobby entry is missing. The 24h Portfolio is already live for all three market tabs, since it's asset-agnostic (see [portfolio.md](portfolio.md)) |
 | Portfolio cross-session history/leaderboard | `GET /api/portfolio/session` returns only the current session plus a short list of recent settled sessions (`lib/portfolio.ts sessionHistoryFor`) — no full history browsing UI, no leaderboard across users |
 | Real rank/tier system | `app/lib/rank.ts` is a hardcoded stub (`MOCK_CURRENT_RANK`/`MOCK_RANK_THRESHOLD`) gating `/exclusive` — no computation, no persistence, not tied to Clerk `userId` |
 | Rooms: real-time chat + rank gating | `/rooms` (`app/rooms/page.tsx`) is a static mock (`app/lib/roomsMocks.ts`) — no messaging backend, no per-user rank check, no room unlock logic, `⚔ Challenge` buttons are visual only (see [rooms.md](rooms.md)) |

@@ -82,15 +82,15 @@ const MARKETS: Record<MarketId, { label: string; symbol: string; name: string; t
   doge: { label: "DOGE", symbol: "Ð", name: "DOGE-USD", tickSize: 0.00001 },
 };
 
-// Games are only built out for BTC so far; ETH and DOGE get the same mode list
-// with no href, which the panel below renders as "soon" and leaves inert.
+// BTC and ETH Pulse go through matchmaking; DOGE gets the same mode list with
+// no href, which the panel below renders as "soon" and leaves inert.
 const MODES_BY_MARKET: Record<MarketId, { id: ModeId; label: string; meta: string; href?: string; matched?: boolean }[]> = {
   btc: [
     { id: "pulse", label: "Pulse", meta: "BTC · head to head · trade live", matched: true },
     { id: "battle-24h", label: "24h Portfolio", meta: "Base meme coins · spot & leverage · 24h session", href: "/duel/portfolio" },
   ],
   eth: [
-    { id: "pulse", label: "Pulse", meta: "ETH · solo · trade live for 60 seconds" },
+    { id: "pulse", label: "Pulse", meta: "ETH · head to head · trade live", matched: true },
     { id: "battle-24h", label: "24h Portfolio", meta: "Base meme coins · spot & leverage · 24h session", href: "/duel/portfolio" },
   ],
   doge: [
@@ -202,7 +202,7 @@ export default function Page() {
     ? `${matchHref(queue.market, queue.matchId)}?invite=1`
     : null;
 
-  const practiceHref = mode === "pulse" && market === "btc" ? "/duel/btc/pulse?practice=1" : null;
+  const practiceHref = mode === "pulse" && activeMode.matched ? `/duel/btc/pulse?practice=1&market=${market}` : null;
 
   const shareInvite = async () => {
     if (!inviteHref || !queue) return;
