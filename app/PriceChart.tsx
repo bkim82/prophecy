@@ -43,13 +43,7 @@ type Props = {
 
 const W = 880;
 const H = 400;
-const PRICE_AXIS_GAP = 16;
-const PAD = { top: 20, right: 86, bottom: 44, left: 12 };
-// Match the duel lobby chart: live data ends before the price axis, leaving a
-// forward-looking region between the head and the Y-axis labels/pill.
-const FORWARD_SPACE_FRAC = 0.16;
-const FUTURE_RAYS = [-1, -0.55, -0.2, 0.2, 0.55, 1];
-const FUTURE_BEAM_REACH_FRAC = 0.18;
+const PAD = { top: 20, right: 78, bottom: 44, left: 12 };
 
 const UP = "var(--chart-up)";
 const DOWN = "var(--chart-down)";
@@ -227,11 +221,9 @@ export default function PriceChart({
   const chartWidth = isCompact ? 520 : W;
   const chartHeight = isCompact ? 440 : H;
   const chartPad = isCompact
-    ? { top: 28, right: 100, bottom: 62, left: 18 }
+    ? { top: 28, right: 92, bottom: 62, left: 18 }
     : PAD;
   const chartInnerWidth = chartWidth - chartPad.left - chartPad.right;
-  const chartDataWidth = chartInnerWidth * (1 - FORWARD_SPACE_FRAC);
-  const chartDataRight = chartPad.left + chartDataWidth;
   const chartInnerHeight = chartHeight - chartPad.top - chartPad.bottom;
 
   // Derived rather than corrected in an effect, so a windowMs change takes
@@ -265,8 +257,6 @@ export default function PriceChart({
       : Math.max(clock, lastSample.t)
     : clock;
   const t0 = t1 - viewMs;
-  const futureMs = (viewMs * FORWARD_SPACE_FRAC) / (1 - FORWARD_SPACE_FRAC);
-  const axisT1 = t1 + futureMs;
 
   const visible = windowSlice(points, t0);
   const ready = visible.length >= 2;
@@ -342,7 +332,7 @@ export default function PriceChart({
   const low = midpoint - visibleSpan / 2;
   const high = midpoint + visibleSpan / 2;
 
-  const x = (t: number) => chartPad.left + ((t - t0) / viewMs) * chartDataWidth;
+  const x = (t: number) => chartPad.left + ((t - t0) / viewMs) * chartInnerWidth;
   const y = (p: number) => chartPad.top + ((high - p) / visibleSpan) * chartInnerHeight;
 
   const baseline = chartPad.top + chartInnerHeight;
@@ -371,26 +361,17 @@ export default function PriceChart({
   const majorMs = niceStep(viewMs / Math.max(1, xIntervals));
   const minorMs = majorMs / Math.max(1, xMinorPerInterval);
   const ticks: number[] = [];
-  for (let t = Math.ceil(t0 / minorMs) * minorMs; t <= axisT1; t += minorMs) {
+  for (let t = Math.ceil(t0 / minorMs) * minorMs; t <= t1; t += minorMs) {
     ticks.push(t);
   }
   // A tighter xIntervals would collide the clock labels, so thin them to
   // whatever multiple of the major step still fits.
-  const pxPerMajor = (majorMs / viewMs) * chartDataWidth;
+  const pxPerMajor = (majorMs / viewMs) * chartInnerWidth;
   const labelEvery =
     majorMs * Math.max(1, Math.ceil(MIN_LABEL_GAP / Math.max(1, pxPerMajor)));
 
   const bandVisible = roundStart !== null && roundStart <= t1;
   const bandX = bandVisible ? x(Math.max(roundStart, t0)) : 0;
-  const plotRight = chartPad.left + chartInnerWidth;
-  const futureReachUp = Math.min(
-    chartInnerHeight * FUTURE_BEAM_REACH_FRAC,
-    headY - chartPad.top,
-  );
-  const futureReachDown = Math.min(
-    chartInnerHeight * FUTURE_BEAM_REACH_FRAC,
-    baseline - headY,
-  );
 
   // Live price pill in the right gutter, sized the same way as the lobby
   // chart's — the gutter width minus a margin.
@@ -398,13 +379,12 @@ export default function PriceChart({
   const pillX = chartWidth - pillW - 2;
 
   // Hover crosshair: time + price at the cursor, like the lobby chart's scrub.
-  // The forward-space region clamps to the live point, matching the lobby
-  // chart; the crosshair hides only in the price-zoom gutter.
+  // Hidden once the pointer crosses into the price-zoom gutter on the right.
   const scrub = (() => {
     if (hoverX === null) return null;
     if (hoverX > chartPad.left + chartInnerWidth) return null;
-    const cx = clamp(hoverX, chartPad.left, chartDataRight);
-    const t = t0 + ((cx - chartPad.left) / chartDataWidth) * viewMs;
+    const cx = clamp(hoverX, chartPad.left, chartPad.left + chartInnerWidth);
+    const t = t0 + ((cx - chartPad.left) / chartInnerWidth) * viewMs;
     const p = valueAt(visible, t);
     if (p === null) return null;
     return { x: cx, y: y(clamp(p, low, high)), t, p };
@@ -454,19 +434,6 @@ export default function PriceChart({
             <stop offset="0" stopColor="var(--brand)" stopOpacity=".16" />
             <stop offset="1" stopColor="var(--brand)" stopOpacity="0" />
           </linearGradient>
-          <linearGradient id={`${uid}-cone-up`} gradientUnits="userSpaceOnUse" x1={headX} x2={plotRight} y1="0" y2="0">
-            <stop offset="0" stopColor="var(--positive)" stopOpacity=".2" />
-            <stop offset="1" stopColor="var(--positive)" stopOpacity="0" />
-          </linearGradient>
-          <linearGradient id={`${uid}-cone-down`} gradientUnits="userSpaceOnUse" x1={headX} x2={plotRight} y1="0" y2="0">
-            <stop offset="0" stopColor="var(--negative)" stopOpacity=".2" />
-            <stop offset="1" stopColor="var(--negative)" stopOpacity="0" />
-          </linearGradient>
-          <linearGradient id={`${uid}-now`} gradientUnits="userSpaceOnUse" x1="0" x2="0" y1={chartPad.top} y2={baseline}>
-            <stop offset="0" stopColor="var(--brand)" stopOpacity="0" />
-            <stop offset=".5" stopColor="var(--brand)" stopOpacity=".5" />
-            <stop offset="1" stopColor="var(--brand)" stopOpacity="0" />
-          </linearGradient>
           <radialGradient id={`${uid}-aura`}>
             <stop offset="0" stopColor={stroke} stopOpacity=".4" />
             <stop offset=".5" stopColor={stroke} stopOpacity=".12" />
@@ -501,8 +468,7 @@ export default function PriceChart({
           {priceScale === 1 ? "auto" : `${priceScale.toFixed(1)}×`}
         </text>
 
-        {/* Gridlines + price axis. Forward space keeps labels clear of the live
-            point; a label within 14px of the live pill is dropped. */}
+        {/* Gridlines + price axis. A label within 14px of the live pill is dropped. */}
         <g className="mc-grid">
           {gridValues.map((value, i) => {
             const gy = y(value);
@@ -518,7 +484,7 @@ export default function PriceChart({
                 />
                 {!nearPill && (
                   <text
-                    x={chartPad.left + chartInnerWidth + PRICE_AXIS_GAP}
+                    x={chartPad.left + chartInnerWidth + 8}
                     y={gy + 4}
                     fill="var(--muted)"
                     fontSize={isCompact ? 14 : 12}
@@ -543,7 +509,7 @@ export default function PriceChart({
           {ticks.map((t) => {
             const tx = x(t);
             // A label centred on the first tick can hang off the viewBox.
-            const labelled = t % labelEvery === 0 && tx > chartPad.left + 22 && tx < plotRight - 22;
+            const labelled = t % labelEvery === 0 && tx > 22;
             return (
               <g key={t}>
                 {labelled && (
@@ -584,7 +550,7 @@ export default function PriceChart({
             <rect
               x={bandX}
               y={chartPad.top}
-              width={Math.max(0, chartDataRight - bandX)}
+              width={Math.max(0, chartPad.left + chartInnerWidth - bandX)}
               height={chartInnerHeight}
               fill={`url(#${uid}-band)`}
             />
@@ -601,34 +567,12 @@ export default function PriceChart({
                 />
               )}
             {!frozen ? (
-              <g className="pc-chip is-live" transform={`translate(${chartDataRight - 78}, ${chartPad.top + 4})`}>
+              <g className="pc-chip is-live" transform={`translate(${chartPad.left + chartInnerWidth - 78}, ${chartPad.top + 4})`}>
                 <rect width="74" height="18" rx="9" />
                 <circle cx="11" cy="9" r="3" />
                 <text x="20" y="13">LIVE ROUND</text>
               </g>
             ) : null}
-          </>
-        )}
-
-        {/* Future time remains on the axis even without prices. The live point
-            projects a compact up/down possibility beam into that empty span. */}
-        {!frozen && (
-          <>
-            <g className="mc-future" style={{ transformOrigin: `${headX}px ${headY}px` }}>
-              <path d={`M${headX},${headY}L${plotRight},${headY - futureReachUp}L${plotRight},${headY}Z`} fill={`url(#${uid}-cone-up)`} />
-              <path d={`M${headX},${headY}L${plotRight},${headY + futureReachDown}L${plotRight},${headY}Z`} fill={`url(#${uid}-cone-down)`} />
-              {FUTURE_RAYS.map((k) => (
-                <line
-                  key={k}
-                  className={`mc-ray ${k < 0 ? "is-up" : "is-down"}`}
-                  x1={headX}
-                  y1={headY}
-                  x2={plotRight}
-                  y2={headY + k * (k < 0 ? futureReachUp : futureReachDown)}
-                />
-              ))}
-            </g>
-            <line className="mc-now" x1={chartDataRight} x2={chartDataRight} y1={chartPad.top} y2={baseline} stroke={`url(#${uid}-now)`} />
           </>
         )}
 
@@ -769,7 +713,7 @@ export default function PriceChart({
         </g>
 
         {frozen && (
-          <g className="pc-chip is-settled" transform={`translate(${chartDataRight - 64}, ${chartPad.top - 25})`}>
+          <g className="pc-chip is-settled" transform={`translate(${chartPad.left + chartInnerWidth - 64}, ${chartPad.top - 25})`}>
             <rect width="64" height="16" rx="8" />
             <text x="10" y="11">SETTLED</text>
           </g>
@@ -779,7 +723,7 @@ export default function PriceChart({
         {scrub && (() => {
           const delta = scrub.p - open;
           const tipW = 112;
-          const tipX = clamp(scrub.x - tipW / 2, chartPad.left, chartDataRight - tipW);
+          const tipX = clamp(scrub.x - tipW / 2, chartPad.left, chartPad.left + chartInnerWidth - tipW);
           return (
             <g className="market-chart-scrub" pointerEvents="none">
               <line x1={scrub.x} x2={scrub.x} y1={chartPad.top} y2={baseline} />

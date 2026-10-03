@@ -6,12 +6,12 @@
 
 - At rendered widths ≤560px, the chart switches to a 520×440 viewBox with expanded padding and label sizes (`app/PriceChart.tsx:213-220`, `:465-479`) so the full chart remains visible without shrinking mobile text to desktop scale.
 - Desktop `viewBox` is 880×400 and scales via CSS `h-auto w-full`; compact mode uses 520×440 (`:213-220`) — resolution-independent; DOM measurement is used only to route wheel events between axes.
-- `PAD` top 20 / right 86 / bottom 44 / left 12 (`app/PriceChart.tsx:47`). Compact right padding is 100 (`:225`). Right reserves price-label space and the live price pill; bottom reserves the time axis (ticks + clock labels).
-- `x()` maps ts→horizontal over the **fixed window**, not the data extent; the live edge lands at 84% of plot width, matching the lobby chart's 16% future-time region before the price axis; `y()` maps price→vertical (`app/PriceChart.tsx:345-346`).
+- `PAD` top 20 / right 78 / bottom 44 / left 12 (`:40`). Right reserves price-label space and the live price pill; bottom reserves the time axis (ticks + clock labels).
+- `x()` maps ts→horizontal over the **fixed window**, not the data extent; `y()` maps price→vertical (`:327-328`).
 
 ## Time window (fixed width, scrolling)
 
-- `t1` = `max(now, last point)`, `t0` = `t1 - viewMs`; the price history maps to the first 84% of the plot and the remaining 16% maps to future wall-clock time with axis ticks but no price data (`app/PriceChart.tsx:257-268`, `:373-379`). The domain width is constant from the first frame, so the axis scrolls left instead of compressing as points accumulate. `viewMs` is `windowMs` unless the wheel has zoomed in — see Zoom.
+- `t1` = `max(now, last point)`, `t0` = `t1 - viewMs` (`:147-152`). The domain width is constant from the first frame, so the axis scrolls left instead of compressing as points accumulate. `viewMs` is `windowMs` unless the wheel has zoomed in — see Zoom.
 - `now` comes in as a prop from `usePriceFeed` (`app/duel/[market]/pulse/[matchId]/page.tsx:201`), which ticks it every `CLOCK_MS`=100ms (`app/usePriceFeed.ts:11`, `:48-51`) — ~1px of travel per tick at the default window. A silent socket scrolls the axis past the last point rather than freezing the chart.
 - `frozen` pins `t1` to the last point so a settled chart stops scrolling (`:147-151`).
 - `windowSlice()` clips to `[t0, …]` and **interpolates** the price where the line crosses the left edge (`:104-112`), so a scrolled-past segment ends on the axis instead of floating in. Needs one sample of slack outside the window — supplied by `trim()` and `/api/history`, both cutting at `WINDOW_MS + SAMPLE_MS`.
@@ -56,27 +56,26 @@ Props, defaulting to `app/feedConfig.ts` (`:115-125`). A future settings UI over
 ## Time axis
 
 - `majorMs` = `niceStep(viewMs / xIntervals)` — snapped up to the next entry in `NICE_STEPS_MS` (1s…1h, `:63-72`, `:249`). Any `xIntervals` therefore lands on a round unit; the tick *count* can come out ±1 of what was asked (7 intervals over 1min → a 15s step → 4 labels). Round times beat an exact count. This is also what makes zoom cost nothing: the tick *count* holds across the range while the step walks 15s → 10s → 5s.
-- Minor step = `majorMs / xMinorPerInterval`. Ticks snap to wall-clock boundaries and continue through `axisT1`, so the 16% future region shows times even though it has no price samples (`app/PriceChart.tsx:369-377`).
+- Minor step = `majorMs / xMinorPerInterval`. Ticks snap to wall-clock boundaries (`Math.ceil(t0/minorMs)*minorMs`, `:249-254`), not to `t0`.
 - Because ticks are epoch-aligned and the window slides continuously, the visible count varies by ±1 as the window scrolls. Spacing never changes — that is the property that matters.
 - Labelled tick = `t % labelEvery === 0`; label = `HH:MM:SS` local, `hour12: false` (`:91-97`, `:324-356`).
 - `labelEvery` thins to a multiple of `majorMs` if labels would sit closer than `MIN_LABEL_GAP`=42px (`:255-259`). At the defaults → 132px apart → no thinning. `xIntervals=60` → thins to 18 labels.
 - Labelled ticks: 8px mark (`#a3a3a3`) + faint full-height gridline (`#f7f7f7`); unlabelled: 5px mark (`#d4d4d4`) (`:324-356`).
-- A label is dropped within 22px of either plot edge so centred text cannot hang into the frame or price axis (`app/PriceChart.tsx:541-565`).
+- A label is dropped when its tick sits `<22px` from the left edge — centred text would hang off the viewBox (`:327`).
 - SSR-safe: `toLocaleTimeString` never runs on the server — the server render has no points and hits the placeholder.
 
 ## Layers (back→front)
 
 1. Seeded starfield, `.mc-stars`/`.mc-star` (constant `:161-176`, rendered `:444-455`) — same twinkling field as the lobby chart, reused by class name (see bottom section).
 2. Zoom-level text, top-left (`:457-461`)
-3. Price gridlines + right-edge price labels beyond the 16% future-time region, with another 16 SVG-unit gutter offset; a label within 14px of the live pill is dropped (`app/PriceChart.tsx:504-531`).
-4. Time axis: baseline, minor ticks, major clock labels, including future wall-clock ticks (`app/PriceChart.tsx:534-570`).
-5. Round band: translucent brand-gradient rect `roundStart`→live edge, a pulsing "LIVE ROUND" chip (`.pc-chip.is-live`) pinned to the live edge while not frozen (`app/PriceChart.tsx:581-610`).
-6. Future projection: compact green-up/red-down cone and flowing rays from the live point across the future-time region, plus a vertical now line; hidden once frozen (`app/PriceChart.tsx:613-632`).
-7. Price line: monotone cubic curve (reveal-sweeps in via `.mc-reveal` on mount/round change), colour = direction (green if the latest value is ≥ the window's open, else red), stroke fades brighter toward the head, area fill + blurred glow duplicate beneath the crisp line (`app/PriceChart.tsx:635-640`).
-8. Trade markers — see below
-9. Current price: a pulsing orb (aura + shockwave + sparks + spinning halo + ping, `.mc-aura`/`.mc-head-pop`/`.mc-orb`) while live, a plain dot once `frozen` (`app/PriceChart.tsx:746-759`).
-10. Live price pill in the right gutter on a dashed line from the head; `settled` chip, top-right above the live-data region, only when `frozen` (`app/PriceChart.tsx:761-775`).
-11. Hover crosshair (`scrub`): dashed vertical line, dot, and a time/Δ-vs-open tooltip, following the pointer; hidden once it crosses into the price-zoom gutter (`app/PriceChart.tsx:778-797`).
+3. Price gridlines + right-edge price labels, a label within 14px of the live pill dropped (`:346-349`, `:464-490`)
+4. Time axis: baseline, minor ticks, major clock labels (`:493-537`)
+5. Round band: translucent brand-gradient rect `roundStart`→right edge, a pulsing "LIVE ROUND" chip (`.pc-chip.is-live`) pinned top-right of the band while not frozen (`:365-366`, `:540-566`)
+6. Price line: monotone cubic curve (reveal-sweeps in via `.mc-reveal` on mount/round change), colour = direction (green if the latest value is ≥ the window's open, else red), stroke fades brighter toward the head, area fill + blurred glow duplicate beneath the crisp line (`:334-344`, `:568-574`)
+7. Trade markers — see below
+8. Current price: a pulsing orb (aura + shockwave + sparks + spinning halo + ping, `.mc-aura`/`.mc-head-pop`/`.mc-orb`) while live, a plain dot once `frozen` (`:618-630`)
+9. Live price pill in the right gutter on a dashed line from the head (`:370-371`, `:632-639`); `settled` chip, top-right above the plot, only when `frozen` (`:643-647`)
+10. Hover crosshair (`scrub`): dashed vertical line, dot, and a time/Δ-vs-open tooltip, following the pointer; hidden once it crosses into the price-zoom gutter (`:375-383`, `:649-664`)
 
 ## Round band
 
