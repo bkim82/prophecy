@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, type FormEvent, type KeyboardEvent } from "react";
-import { ArenaIcon } from "@/app/icons";
+import { ArenaIcon, LockIcon } from "@/app/icons";
 import type { Market } from "@/app/lib/mockPosts";
-import type { RoomCall, RoomMessage } from "@/app/lib/roomsMocks";
+import type { Room, RoomCall } from "@/app/lib/roomsMocks";
 
 type RoomChatProps = {
-  initialMessages: RoomMessage[];
+  room: Room;
+  canChat: boolean;
+  userSubrank: string;
 };
 
 const MARKET_META: Record<Market, { symbol: string; symbolClass: string }> = {
@@ -25,14 +27,14 @@ function RoomCallChip({ call }: { call: RoomCall }) {
   );
 }
 
-export function RoomChat({ initialMessages }: RoomChatProps) {
-  const [messages, setMessages] = useState(initialMessages);
+export function RoomChat({ room, canChat, userSubrank }: RoomChatProps) {
+  const [messages, setMessages] = useState(room.messages);
   const [draft, setDraft] = useState("");
 
   const sendMessage = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const text = draft.trim();
-    if (!text) return;
+    if (!text || !canChat) return;
 
     setMessages((current) => [
       ...current,
@@ -49,7 +51,7 @@ export function RoomChat({ initialMessages }: RoomChatProps) {
   };
 
   return (
-    <section className="panel chat-panel" aria-label="Gold Room group chat">
+    <section className="panel chat-panel" aria-label={`${room.label} group chat`}>
       <div className="chat-stream" aria-live="polite">
         {messages.map((message) => (
           <div className={`chat-message${message.author === "You" ? " chat-message--self" : ""}`} key={message.id}>
@@ -77,21 +79,33 @@ export function RoomChat({ initialMessages }: RoomChatProps) {
         ))}
       </div>
 
-      <form className="chat-composer" onSubmit={sendMessage}>
-        <label className="sr-only" htmlFor="room-message">Message the Gold Room</label>
-        <textarea
-          id="room-message"
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          onKeyDown={handleDraftKeyDown}
-          placeholder="Share a prophecy with the room…"
-          rows={1}
-        />
-        <button type="submit" className="chat-send" disabled={!draft.trim()}>
-          Send
-        </button>
-      </form>
-      <p className="chat-composer-hint">Press Enter to send · Shift + Enter for a new line</p>
+      {canChat ? (
+        <>
+          <form className="chat-composer" onSubmit={sendMessage}>
+            <label className="sr-only" htmlFor="room-message">Message the {room.label}</label>
+            <textarea
+              id="room-message"
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={handleDraftKeyDown}
+              placeholder="Share a prophecy with the room…"
+              rows={1}
+            />
+            <button type="submit" className="chat-send" disabled={!draft.trim()}>
+              Send
+            </button>
+          </form>
+          <p className="chat-composer-hint">Press Enter to send · Shift + Enter for a new line</p>
+        </>
+      ) : (
+        <div className="chat-locked" role="status">
+          <span className="chat-locked-icon" aria-hidden="true"><LockIcon /></span>
+          <div className="chat-locked-copy">
+            <strong>View only · {room.rankLabel} rank required to chat</strong>
+            <span>You&apos;re {userSubrank}. Win Arenas to climb into the {room.label}.</span>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
