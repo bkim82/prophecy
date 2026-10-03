@@ -25,7 +25,9 @@ async function fromTrades(product: string, cutoff: number): Promise<Point[]> {
   );
   if (!res.ok) throw new Error("trades unavailable");
 
-  const buckets = new Map<number, Point>();
+  // Newest trade time per bucket, but the mean price: trades bounce between
+  // bid and ask, and the mean lands near the midpoint the socket plots.
+  const buckets = new Map<number, { t: number; sum: number; n: number }>();
 
   for (const trade of (await res.json()) as Trade[]) {
     const t = Date.parse(trade.time);
@@ -35,11 +37,17 @@ async function fromTrades(product: string, cutoff: number): Promise<Point[]> {
 
     const bucket = Math.floor(t / SAMPLE_MS);
     const existing = buckets.get(bucket);
-    // Keep the newest trade in the bucket, matching the socket's last-tick-wins.
-    if (!existing || t > existing.t) buckets.set(bucket, { t, p });
+    if (!existing) buckets.set(bucket, { t, sum: p, n: 1 });
+    else {
+      existing.t = Math.max(existing.t, t);
+      existing.sum += p;
+      existing.n += 1;
+    }
   }
 
-  return [...buckets.values()].sort((a, b) => a.t - b.t);
+  return [...buckets.values()]
+    .map(({ t, sum, n }) => ({ t, p: sum / n }))
+    .sort((a, b) => a.t - b.t);
 }
 
 /**

@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useUser } from "@clerk/nextjs";
+import { SignInButton, useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { DailyCoin, pickDailyCoin } from "@/app/DailyCoin";
 import { PortfolioGame } from "@/app/duel/portfolio/PortfolioGame";
 import {
@@ -14,6 +14,7 @@ import {
 } from "@/app/lib/activeMatch";
 import { getPlayerId } from "@/app/lib/playerId";
 import { usePriceFeed } from "@/app/usePriceFeed";
+import { clockLabel, MARKET_CHART_WINDOW_MS, MarketChart, priceAt, type ScrubPoint } from "@/app/MarketChart";
 
 const TIMER_PRESETS = [
   { label: "60s", value: 60 },
@@ -29,47 +30,23 @@ const LOBBY_POLL_MS = 3000;
 // very list it is waiting to be found in (lib/match.ts PRESENCE_MS).
 const QUEUE_POLL_MS = 1000;
 
-const usd = (value: number | null) =>
-  value === null
-    ? "—"
-    : value.toLocaleString("en-US", {
-        style: "currency",
-        currency: "USD",
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      });
+// Cents by default; pass the market's tick size so sub-dollar coins (DOGE
+// quotes to $0.00001) aren't rounded to $0.09.
+const usd = (value: number | null, tickSize = 0.01) => {
+  if (value === null) return "—";
+  const decimals = Math.max(2, Math.round(-Math.log10(tickSize)));
+  return value.toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+};
 
 const age = (since: number) => {
   const seconds = Math.max(0, Math.round((Date.now() - since) / 1000));
   return seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m`;
 };
-
-function MiniChart({ points }: { points: { t: number; p: number }[] }) {
-  const chart = useMemo(() => {
-    const fallback = [67110, 67142, 67125, 67188, 67164, 67230, 67208, 67276, 67254, 67318, 67304, 67355];
-    const values = points.length > 1 ? points.slice(-36).map((point) => point.p) : fallback;
-    const low = Math.min(...values);
-    const high = Math.max(...values);
-    const span = high - low || 1;
-    const linePoints = values.map((value, index) => {
-      const x = (index / Math.max(1, values.length - 1)) * 100;
-      const y = 90 - ((value - low) / span) * 74;
-      return `${x},${y}`;
-    });
-    return { line: linePoints.join(" "), last: linePoints.at(-1) ?? "100,50" };
-  }, [points]);
-
-  const [lastX, lastY] = chart.last.split(",");
-  return (
-    <svg className="mini-chart" viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label="BTC price movement over the last three minutes">
-      <line x1="0" x2="100" y1="24" y2="24" className="chart-grid" />
-      <line x1="0" x2="100" y1="57" y2="57" className="chart-grid" />
-      <line x1="0" x2="100" y1="90" y2="90" className="chart-grid" />
-      <polyline points={chart.line} className="chart-line" />
-      <circle cx={lastX} cy={lastY} r="1.8" className="chart-dot" />
-    </svg>
-  );
-}
 
 type Queue = {
   matchId: string;
@@ -99,10 +76,10 @@ const recentResults = [
 type ModeId = "pulse" | "battle-24h";
 type MarketId = "btc" | "eth" | "doge";
 
-const MARKETS: Record<MarketId, { label: string; symbol: string; name: string }> = {
-  btc: { label: "BTC", symbol: "₿", name: "BTC-USD" },
-  eth: { label: "ETH", symbol: "Ξ", name: "ETH-USD" },
-  doge: { label: "DOGE", symbol: "Ð", name: "DOGE-USD" },
+const MARKETS: Record<MarketId, { label: string; symbol: string; name: string; tickSize: number }> = {
+  btc: { label: "BTC", symbol: "₿", name: "BTC-USD", tickSize: 0.01 },
+  eth: { label: "ETH", symbol: "Ξ", name: "ETH-USD", tickSize: 0.01 },
+  doge: { label: "DOGE", symbol: "Ð", name: "DOGE-USD", tickSize: 0.00001 },
 };
 
 // Games are only built out for BTC so far; ETH and DOGE get the same mode list
@@ -134,7 +111,9 @@ export default function Page() {
   const [market, setMarket] = useState<MarketId>("btc");
   const dailyCoinId = pickDailyCoin().toLowerCase() as MarketId;
   const activeMarket = MARKETS[market];
-  const { price, points, status } = usePriceFeed(activeMarket.name);
+  const { price, points, status, now, day } = usePriceFeed(activeMarket.name);
+  // While the chart is being scrubbed, the headline reads the scrubbed point.
+  const [scrub, setScrub] = useState<ScrubPoint>(null);
   const [timer, setTimer] = useState(60);
   const [mode, setMode] = useState<ModeId>("pulse");
   const [playerId, setPlayerId] = useState<string | null>(null);
@@ -150,8 +129,23 @@ export default function Page() {
   const [activeMatch, setActiveMatchState] = useState<ActiveMatch | null>(null);
   const [inviteState, setInviteState] = useState<"idle" | "shared" | "copied" | "error">("idle");
   const modes = MODES_BY_MARKET[market];
-  const currentPrice = price ?? points.at(-1)?.p ?? null;
-  const firstPrice = points[0]?.p ?? currentPrice;
+  // The chart's head (bid/ask midpoint), so the headline matches the pill.
+  const livePrice = points.at(-1)?.p ?? price;
+  const currentPrice = scrub?.p ?? livePrice;
+  // Flash the headline green/red when the live price moves a whole tick.
+  const liveTicks = livePrice === null ? null : Math.round(livePrice / activeMarket.tickSize);
+  const prevTicks = useRef<number | null>(null);
+  const [priceFlash, setPriceFlash] = useState({ key: 0, dir: "up" as "up" | "down" });
+  useEffect(() => {
+    const prev = prevTicks.current;
+    prevTicks.current = liveTicks;
+    if (prev === null || liveTicks === null || prev === liveTicks) return;
+    setPriceFlash((f) => ({ key: f.key + 1, dir: liveTicks > prev ? "up" : "down" }));
+  }, [liveTicks]);
+  useEffect(() => { prevTicks.current = null; }, [market]);
+  // Change is measured from the chart's left edge so the % and the
+  // green/red fill above and below the open line always agree.
+  const firstPrice = priceAt(points, now - MARKET_CHART_WINDOW_MS) ?? currentPrice;
   const change = currentPrice !== null && firstPrice ? ((currentPrice - firstPrice) / firstPrice) * 100 : null;
   const activeMode = modes.find((option) => option.id === mode) ?? modes[0];
   const isPlayable = Boolean(activeMode.href || activeMode.matched);
@@ -394,6 +388,8 @@ export default function Page() {
       </nav>
       )}
 
+      {/* Pulse: market on the left, the call on the right. Portfolio: just the call. */}
+      <div className={mode === "pulse" ? "pulse-stage" : undefined}>
       {mode === "pulse" && (
       <section className="market-overview panel">
         <div className="ticker-copy">
@@ -401,18 +397,20 @@ export default function Page() {
             <span className="eyebrow">{activeMarket.label} / USD</span>
             <span className={`feed-status ${status === "live" ? "is-live" : ""}`}><span className="status-dot" /> {status === "live" ? "Live" : status}</span>
           </div>
-          <div className="ticker-price display-font">{usd(currentPrice)}</div>
-          <div className="ticker-change"><span className={change !== null && change >= 0 ? "change-up" : "change-down"}>{change === null ? "—" : `${change >= 0 ? "+" : ""}${change.toFixed(2)}%`}</span><span className="muted">3 min range</span></div>
+          <div className="ticker-price display-font"><span key={priceFlash.key} className={priceFlash.key > 0 && !scrub ? `price-flash is-${priceFlash.dir}` : undefined}>{usd(currentPrice, activeMarket.tickSize)}</span></div>
+          <div className="ticker-change"><span className={change !== null && change >= 0 ? "change-up" : "change-down"}>{change === null ? "—" : `${change >= 0 ? "+" : ""}${change.toFixed(Math.abs(change) < 0.1 ? 3 : 2)}%`}</span><span className="muted">{scrub ? clockLabel(scrub.t) : `last ${MARKET_CHART_WINDOW_MS / 1000}s`}</span></div>
         </div>
-        <div className="ticker-chart-wrap"><MiniChart points={points} /><div className="chart-caption"><span>−3m</span><span>now</span></div></div>
+        <div className="ticker-chart-wrap"><MarketChart points={points} now={now} label={activeMarket.label} tickSize={activeMarket.tickSize} height="fill" onScrub={setScrub} /></div>
         <dl className="market-stats">
-          <div><dt>24h high</dt><dd>{currentPrice === null ? "—" : usd(currentPrice * 1.018)}</dd></div>
-          <div><dt>24h low</dt><dd>{currentPrice === null ? "—" : usd(currentPrice * 0.982)}</dd></div>
+          <div><dt>24h high</dt><dd>{usd(day?.high ?? null, activeMarket.tickSize)}</dd></div>
+          <div><dt>24h low</dt><dd>{usd(day?.low ?? null, activeMarket.tickSize)}</dd></div>
+          <div><dt>24h change</dt><dd className={day && livePrice !== null ? (livePrice >= day.open ? "change-up" : "change-down") : ""}>{day && livePrice !== null ? `${livePrice >= day.open ? "+" : ""}${(((livePrice - day.open) / day.open) * 100).toFixed(2)}%` : "—"}</dd></div>
           <div><dt>Players</dt><dd>2,486</dd></div>
         </dl>
       </section>
       )}
 
+      <div className="call-box">
       <div className="section-heading">
         <div>
           <span className="eyebrow">Make a call</span>
@@ -461,7 +459,10 @@ export default function Page() {
         <div className="opponent-status"><span className="field-label">Opponent</span><strong><span className={`status-dot ${isPlayable ? "is-online" : ""}`} /> {takesCall ? "Open lobby" : isPlayable ? "Solo · NOVA AI" : "Unavailable"}</strong><span className="muted">{takesCall ? `${openMatches.length} Pulse match${openMatches.length === 1 ? "" : "es"} waiting` : isPlayable ? "Stake and leverage set in-round" : "Mode in development"}</span></div>
         <div className="play-actions">
           {activeMode.matched
-            ? <button type="button" className="play-button" onClick={play} disabled={!playerId || !isSignedIn || pending !== null || queue !== null || activeMatch !== null}>{pending === "play" ? "Finding a match…" : isSignedIn ? <>Play <span aria-hidden="true">→</span></> : "Sign in to play"}</button>
+            ? isSignedIn === false
+              // Signed out: still the bright call to action — it opens sign-in.
+              ? <SignInButton mode="modal"><button type="button" className="play-button">Sign in to play <span aria-hidden="true">→</span></button></SignInButton>
+              : <button type="button" className="play-button" onClick={play} disabled={!playerId || !isSignedIn || pending !== null || queue !== null || activeMatch !== null}>{pending === "play" ? "Finding a match…" : <>Play <span aria-hidden="true">→</span></>}</button>
             : isPlayable
               ? <Link href={playHref} className="play-button">Play <span aria-hidden="true">→</span></Link>
               : <button type="button" className="play-button" disabled>Soon</button>}
@@ -478,6 +479,8 @@ export default function Page() {
         )}
       </section>
       )}
+      </div>
+      </div>
 
       {mode !== "battle-24h" && (
       <section className="lower-grid">
