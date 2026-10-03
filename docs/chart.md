@@ -94,3 +94,25 @@ Settlement passes frozen snapshot + `frozen={true}` (`app/duel/[market]/pulse/[m
 ## Empty state
 
 Visible slice <2 points → fixed 400px placeholder "Waiting for price data…" (matches rendered chart height, prevents layout jump) (`:204-212`).
+
+## Lobby chart (`app/MarketChart.tsx`)
+
+Separate from `PriceChart`; renders in the lobby `market-overview` (`app/duel/page.tsx`).
+
+- Time-based x over a fixed `MARKET_CHART_WINDOW_MS`=30s window ending at `max(now, last point)`; left edge interpolated via `priceAt`/`windowSlice`. Not index-based.
+- Pixel viewBox from a `ResizeObserver` width × `height` prop (default 148, or `"fill"` = observed box height, `.market-chart.is-fill` min 220px). Lobby passes `"fill"` — no `preserveAspectRatio="none"` stretching.
+- Axis/pill/tooltip prices at the market's tick precision (`formatChartPrice(value, tickSize)`).
+- y fits the visible slice, padded `Y_PAD`=14% each side, span floored at `MIN_SPAN_TICKS`=10 × the market's `tickSize` prop (Coinbase quote_increment, set in `MARKETS` in `app/duel/page.tsx`: $0.01 BTC/ETH, $0.00001 DOGE) so a one-tick flicker doesn't fill the height.
+- Line: monotone cubic (Fritsch–Carlson, no overshoot) + blurred glow. Line, glow, area tint, orb, pill, sparks in the market colour (`--chart-line`/`--chart-point`, set per `[data-market]`: BTC soft amber `#f0a868` — pure `#f7931a` glared on navy; chips keep it —, ETH blue, DOGE gold), stroke faint at left → full at head; area fades to `--violet` and in from the left. Stars, fan, "now" line, loading beam stay brand teal/violet.
+- Seeded starfield (`STARS`, 54, twinkling) behind; panel gets teal/violet radial glows (`.pulse-stage .market-overview.panel`, `app/globals.css`).
+- Head at `1 - FUTURE_FRAC`=84% of plot width; right of it a fan of possible paths (green up / red down cone + flowing dashed `RAYS`) and a vertical "now" line. Head = orb (radial gradient) + aura + spinning halo + ping + trailing sparks.
+- Dashed open line at the window's first price.
+- Live price pill in the right gutter on a dashed line from the pulsing head; grid labels within 14px of the pill are dropped.
+- Clock ticks every 10s (`HH:MM:SS`), dropped within 24px of either edge.
+- Scrub (pointer move/down, touch with `touch-action: pan-y`): crosshair, dot, tooltip with time + Δ vs open. `onScrub` lifts the point so the lobby headline price/% shows the scrubbed value; 24h stats stay on the live price.
+- Lobby headline price = chart head (midpoint), not last trade, so it matches the pill. 24h high/low/change from feed `day` (were fabricated as price ×1.018/×0.982).
+- Lobby `change` % is measured from the chart's left edge (`priceAt(points, now - MARKET_CHART_WINDOW_MS)`), so it matches the fill colour.
+- No "waiting" text. <2 visible points → same starfield with a scanning beam (`.mc-loading`). Feed dead long enough that the live window is empty → window freezes on the last data, greyed, with a "Reconnecting…" chip (`is-stale`) — never blank.
+- Entrance (CSS, on SVG mount; `key={label}` replays it per market): stars → grid stagger → line/area sweep (`clip-path`, `backwards` fill so no clip remains) → orb pops + shockwave → fan unfolds → pill slides in (~1.9s). Lobby panels rise in (`stage-rise`).
+- Motion (`prefers-reduced-motion` disables all): own rAF clock (`useFrameClock`) scrolls per frame instead of the feed's 100ms steps; feed's live edge (within `EDGE_SLACK_MS`) re-pinned to the frame clock. Head price eased (`HEAD_TAU_MS`=140) and y-range eased (`RANGE_TAU_MS`=320), never clipping the line; ease state reset on market switch.
+- Live price change → pill flashes and head ripples green/red (keyed remount restarts the CSS animation). Lobby headline price flashes too, on whole-tick changes (`app/duel/page.tsx`).

@@ -15,7 +15,7 @@ app/layout.tsx (root shell: desktop header, compact mobile header, Clerk account
   ├── app/rooms/page.tsx (Rooms: rank-gated group chat placeholder, app/lib/roomsMocks.ts)
   ├── app/exclusive/page.tsx (Exclusive feed: rank-gated via app/lib/rank.ts stub, unlinked from nav)
   ├── app/wallet/page.tsx (wallet desk: injected EIP-1193 connection, BTC long/short ticket)
-  └── app/duel/page.tsx (live lobby: BTC ticker, mini-chart, Pulse controls, match rows)
+  └── app/duel/page.tsx (live lobby: Pulse = `.pulse-stage` grid — ticker + MarketChart (app/MarketChart.tsx) left, call box (format/timer/Play) right, stacks <1000px; match rows)
         └── usePriceFeed() → price, sampled series, status, now
 app/duel/[market]/pulse/[matchId]/page.tsx (multiplayer Pulse positions, countdown, result)
 app/duel/portfolio/page.tsx (solo 24h Portfolio: freely-tradeable spot/leverage positions on Base meme coins)
