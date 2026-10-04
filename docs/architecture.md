@@ -1,6 +1,6 @@
 # architecture
 
-- Root header (`app/layout.tsx`) is brand | `Omens`/`Arena`/`Sanctum`/`Wallet` nav | balance + avatar on desktop (see [feeds.md](feeds.md)), while `app/MobileBottomNav.tsx` supplies the dedicated phone navigation (`Omens`/`Arena`/`Sanctum`/`Wallet`) at or below 768px and the compact mobile header keeps the brand, balance, and account control (theme switch lives in the avatar menu; signed out it sits beside Sign in). Routes: `/` (Global feed), `/sanctum` (Oracle Room: rank-only live Pulse room with room feed + mini chat, `app/sanctum/page.tsx`), `/duel` (the market lobby, moved from `app/page.tsx`), `/wallet` (wallet desk with injected EIP-1193 connection and holdings). Outside `/duel` and its games, the root shell shows the compact bottom-right plus chip `QuickTicketBar`; an active match takes that slot instead. `/exclusive` (rank-gated feed) still exists but is no longer linked from the header nav. Live ticker on `/duel` reads the client-side BTC feed.
+- Root header (`app/layout.tsx`) is brand | `Omens`/`Arena`/`Sanctum`/`Wallet` nav | balance + avatar on desktop (see [feeds.md](feeds.md)), while `app/MobileBottomNav.tsx` supplies the dedicated phone navigation (`Omens`/`Arena`/`Sanctum`/`Wallet`) at or below 768px and the compact mobile header keeps the brand, balance, and account control (theme switch lives in the avatar menu; signed out it sits beside Sign in). Routes: `/` (Global feed), `/sanctum` (Oracle Room: rank-only live Pulse room with room feed + mini chat, `app/sanctum/page.tsx`), `/duel` (the market lobby, moved from `app/page.tsx`), `/wallet` (wallet desk: Coinbase Wallet SDK connection, Base network enforcement, and holdings). Outside `/duel` and its games, the root shell shows the compact bottom-right plus chip `QuickTicketBar`; an active match takes that slot instead. `/exclusive` (rank-gated feed) still exists but is no longer linked from the header nav. Live ticker on `/duel` reads the client-side BTC feed.
 - Multiplayer Pulse is server-authoritative: a `matches` row owns the round (`db/schema.ts:20`), `/api/match/*` routes own the transitions, clients poll. See [multiplayer-plan.md](multiplayer-plan.md).
 - Practice is client-only: Pulse practice reuses `app/duel/btc/pulse/page.tsx?practice=1` without creating a match or reserving a wager. See [practice-mode.md](practice-mode.md).
 - `/api/price` and `/api/history` remain stateless proxies to public exchange APIs. The price feed and chart stay client-side in every mode.
@@ -16,7 +16,7 @@ app/layout.tsx (root shell: desktop header, compact mobile header, Clerk account
   ├── app/page.tsx (Global feed: mock PostCard list, app/lib/mockPosts.ts)
   ├── app/sanctum/page.tsx (Sanctum: Oracle Room live Pulse + feed + chat, app/lib/roomsMocks.ts)
   ├── app/exclusive/page.tsx (Exclusive feed: rank-gated via app/lib/rank.ts stub, unlinked from nav)
-  ├── app/wallet/page.tsx (wallet desk: injected EIP-1193 connection, BTC long/short ticket)
+  ├── app/wallet/page.tsx (wallet desk: Coinbase Wallet SDK connection, BTC long/short ticket)
   └── app/duel/page.tsx (live lobby: screen-reader-only `Arena` h1 → Pulse/24h Portfolio `.feed-tabs.arena-mode-tabs` → market row (BTC/ETH left, `DailyCoin` "Daily · Ð DOGE" chip right (market symbol from `MARKETS`), selectable) → Pulse = `.pulse-stage` grid — ticker + MarketChart (app/MarketChart.tsx) left, call box (format/timer/Play) right, stacks <1000px; ≤640px: 220px plot, 24h stats behind `.market-stats-toggle`, call box reorders timer → Play first; match rows)
         └── usePriceFeed() → price, sampled series, status, now
 app/duel/[market]/pulse/[matchId]/page.tsx (multiplayer Pulse positions, countdown, result)
@@ -76,8 +76,9 @@ its stake and leverage in-round; so does the 24h Portfolio.
 | `app/lib/mockPosts.ts` | hardcoded `GLOBAL_POSTS`/`EXCLUSIVE_POSTS` mock data, no persistence |
 | `app/lib/rank.ts` | hardcoded mock rank/threshold stub gating `/exclusive` — no real rank system exists |
 | `app/duel/page.tsx` | live lobby, BTC ticker/chart, mode switcher, Pulse controls, matchmaking + open-match list (moved from `app/page.tsx`) |
-| `app/wallet/page.tsx` | wallet desk: injected EIP-1193 connection, wallet status, and BTC long/short ticket |
-| `app/lib/wallet.ts` | injected EIP-1193 provider helpers, chain labels, ETH formatting, and address shortening |
+| `app/wallet/page.tsx` | wallet desk: Coinbase Wallet SDK connection (no extension required), Base network enforcement/switch prompt, wallet status, and BTC long/short ticket |
+| `app/lib/wallet.ts` | memoized Coinbase Wallet SDK provider (`getWalletProvider`, `@coinbase/wallet-sdk`, appChainIds `[8453]`/Base), `isBaseChain`/`switchToBase` network helpers, chain labels, ETH formatting, and address shortening |
+| `lib/alchemy.ts` + `app/api/wallet/holdings/route.ts` | real Base ERC-20 holdings for a connected wallet: `alchemy_getTokenBalances`/`alchemy_getTokenMetadata` (needs `ALCHEMY_API_KEY`) priced via `lib/basePrices.ts getTokenSummaries`; `GET ?address=` returns `[]` on any failure (no key, rate limit) rather than erroring |
 | `app/duel/[market]/pulse/[matchId]/page.tsx` | multiplayer Pulse room: position actions, live P&L, countdown, result |
 | `app/duel/portfolio/PortfolioGame.tsx` + `SessionHeader.tsx`/`TokenSearch.tsx`/`TradeTicket.tsx`/`OpenPositions.tsx`/`ClosedPositions.tsx` | 24h Portfolio game: session start, live-priced token search, spot/leverage trade ticket, open/closed position lists — embedded inline in `app/duel/page.tsx`'s mode switcher and wrapped standalone by `app/duel/portfolio/page.tsx` |
 | `lib/portfolioRules.ts` | pure 24h Portfolio math/constants, no DB import — client-safe, mirrors `lib/pulse.ts` |

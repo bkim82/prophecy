@@ -155,6 +155,8 @@ button { cursor: pointer; }
 .wallet-connect-button:disabled { opacity: .7; cursor: wait; }
 .wallet-secondary-button { margin-top: 12px; border-color: var(--line); background: transparent; color: var(--muted); }
 .wallet-secondary-button:hover { border-color: var(--line-strong); color: var(--text); }
+.wallet-button-row { display: flex; gap: 8px; margin-top: 12px; }
+.wallet-button-row .wallet-secondary-button { flex: 1; width: auto; margin-top: 0; }
 .wallet-address { margin-top: 14px; color: var(--text); font-family: var(--font-mono), monospace; font-size: 16px; }
 .wallet-meta { display: flex; justify-content: space-between; gap: 12px; margin-top: 6px; color: var(--muted); font-family: var(--font-mono), monospace; font-size: 11px; }
 .wallet-ticket { position: sticky; top: 18px; border-color: color-mix(in srgb, var(--brand) 42%, var(--line)); box-shadow: 0 8px 28px rgba(0, 0, 0, .16); }

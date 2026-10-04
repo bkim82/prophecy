@@ -208,7 +208,7 @@ export function TokenDetail({
 
         {/* Chart */}
         <div className="mt-4">
-          <div className="mb-2 flex gap-1" role="group" aria-label="Chart period">
+          <div className="mb-2 flex justify-end gap-1" role="group" aria-label="Chart period">
             {CHART_PERIODS.map((option) => (
               <button
                 key={option}
