@@ -85,6 +85,33 @@ export function LiveCallsIcon({ className }: { className?: string }) {
   );
 }
 
+// Post action row (app/PostCard.tsx): reply, repost, like.
+export function ReplyIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M6.5 3.5 2.5 7.5l4 4" />
+      <path d="M2.5 7.5h6.8a4.2 4.2 0 0 1 4.2 4.2v.8" />
+    </svg>
+  );
+}
+
+export function RepostIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M13.2 6.6A5.4 5.4 0 0 0 3.4 5M2.8 9.4a5.4 5.4 0 0 0 9.8 1.6" />
+      <path d="M3.2 2.4v2.8H6M12.8 13.6v-2.8H10" />
+    </svg>
+  );
+}
+
+export function HeartIcon({ className, filled }: { className?: string; filled?: boolean }) {
+  return (
+    <svg viewBox="0 0 16 16" className={className} fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M8 13.6S2.2 10.2 2.2 6.1A2.9 2.9 0 0 1 8 4.8a2.9 2.9 0 0 1 5.8 1.3c0 4.1-5.8 7.5-5.8 7.5Z" />
+    </svg>
+  );
+}
+
 export function LockIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

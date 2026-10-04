@@ -1,5 +1,6 @@
 import type { Market } from "@/app/lib/mockPosts";
-import { LIVE_ARENAS, TRENDING_CALLS, TRENDING_PROPHECIES } from "@/app/lib/sidebarMocks";
+import { TRENDING_CALLS, TRENDING_PROPHECIES } from "@/app/lib/sidebarMocks";
+import { OraclesLeaderboard } from "@/app/OraclesLeaderboard";
 
 const MARKET_META: Record<Market, { symbol: string; symbolClass: string }> = {
   btc: { symbol: "₿", symbolClass: "btc-symbol" },
@@ -10,21 +11,7 @@ const MARKET_META: Record<Market, { symbol: string; symbolClass: string }> = {
 export function FeedSidebar() {
   return (
     <aside className="feed-sidebar">
-      <section className="panel sidebar-panel">
-        <h3>Leaderboard</h3>
-        {LIVE_ARENAS.map((arena) => {
-          const meta = MARKET_META[arena.market];
-          return (
-            <div className="sidebar-row" key={arena.id}>
-              <div className="sidebar-row-main">
-                <span className={`market-symbol ${meta.symbolClass}`}>{meta.symbol}</span>
-                <strong>{arena.players}</strong>
-              </div>
-              <span className="sidebar-value">{arena.timer}</span>
-            </div>
-          );
-        })}
-      </section>
+      <OraclesLeaderboard />
 
       <section className="panel sidebar-panel">
         <h3>Most Profitable Calls</h3>

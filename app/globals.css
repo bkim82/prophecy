@@ -373,11 +373,10 @@ button { cursor: pointer; }
 .promo-dot { flex: none; width: 6px; height: 6px; border-radius: 999px; background: var(--muted-dim); }
 .promo-text { flex: 1; margin: 0; }
 .promo-time { flex: none; }
-.feed-sidebar { display: grid; gap: 20px; position: sticky; top: 24px; }
+/* Sticky, so a rail taller than the viewport scrolls itself rather than
+   hiding its lower panels until the feed ends. */
+.feed-sidebar { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; position: sticky; top: 24px; max-height: calc(100vh - 48px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
 .sidebar-panel { padding: 18px 20px; }
-.feed-shell .feed-sidebar > .sidebar-panel:first-child { border-color: var(--structure-line); background: var(--structure); color: var(--structure-text); }
-.feed-shell .feed-sidebar > .sidebar-panel:first-child h3 { border-color: var(--structure-line); color: var(--brand-strong); }
-.feed-shell .feed-sidebar > .sidebar-panel:first-child .sidebar-row + .sidebar-row { border-color: var(--structure-line); }
 .sidebar-panel h3 { margin: 0 0 10px; padding-bottom: 10px; border-bottom: 1px solid var(--line); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .sidebar-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 0; font-size: 13px; }
 .sidebar-row + .sidebar-row { border-top: 1px solid var(--line); }
@@ -391,6 +390,115 @@ button { cursor: pointer; }
 .sidebar-row--prophecy { flex-direction: column; align-items: flex-start; gap: 5px; }
 .sidebar-prophecy-content { margin: 0; width: 100%; color: var(--violet-strong); font-size: 12px; line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .post-menu-dropdown svg { flex: none; width: 12px; height: 12px; }
+/* The Oracles leaderboard (app/OraclesLeaderboard.tsx). A night panel in both
+   themes, so it carries its own --o-* palette rather than theme tokens.
+   Choreography on mount, replayed on each period switch by a keyed remount:
+   cards rise face-down and flip III → II → I (--deal × --deal-step), rank I
+   flares and the beam opens, then list rows slide in (--enter, set inline).
+   Avatar rings draw their win-rate arc (--win) as each avatar lands.
+   overflow: clip, not hidden: a hidden-overflow grid item may shrink below its
+   content in the height-capped .feed-sidebar, cutting off the list. */
+@property --sweep { syntax: "<angle>"; inherits: false; initial-value: 360deg; }
+.sidebar-panel.oracles-panel { --o-bg: #100e1a; --o-line: #2a2643; --o-ink: #f3f0ff; --o-muted: #8a84a6; --o-violet: #b7a7f6; --o-frame: rgba(214, 206, 255, .26); --o-win: #5fd49c; --o-loss: #ec6872; --deal-step: 300ms; --landed: calc(2 * var(--deal-step) + 830ms); position: relative; overflow: clip; container-type: inline-size; border-color: var(--o-line); background: radial-gradient(120% 55% at 50% 0%, rgba(146, 120, 218, .2), transparent 70%), var(--o-bg); color: var(--o-ink); }
+.oracles-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 20px; }
+.oracles-panel .oracles-title { margin: 0; padding: 0; border: 0; color: var(--o-violet); font-family: var(--font-mono), monospace; font-size: 12px; font-weight: 600; letter-spacing: .32em; white-space: nowrap; }
+.oracles-title::before { content: "✦"; display: inline-block; margin-right: .5em; animation: oracle-twinkle 2.8s ease-in-out infinite; }
+.oracles-periods { display: flex; flex: none; gap: 2px; padding: 3px; border: 1px solid var(--o-line); border-radius: 999px; background: rgba(0, 0, 0, .25); }
+.oracles-periods button { border: 0; border-radius: 999px; background: transparent; color: var(--o-muted); padding: 5px 9px; font-family: var(--font-mono), monospace; font-size: 10px; font-weight: 600; letter-spacing: .06em; transition: color .2s, background .2s; }
+.oracles-periods button:hover { color: var(--o-ink); }
+.oracles-periods button[aria-pressed="true"] { background: #2a2547; color: var(--o-ink); }
+.oracles-periods button:focus-visible, .oracles-more:focus-visible { outline: 2px solid var(--o-violet); outline-offset: 2px; }
+.oracles-stage { position: relative; margin-bottom: 16px; }
+/* Light falling on rank I: a soft cone, screened over the cards, that opens once I lands and then breathes. */
+.oracles-stage::before { content: ""; position: absolute; z-index: 3; left: 50%; top: -26px; width: 100%; height: calc(100% + 26px); translate: -50% 0; background: conic-gradient(from 150deg at 50% 0, transparent, rgba(226, 218, 255, .2) 30deg, transparent 60deg); mask: linear-gradient(#000 35%, transparent 95%); mix-blend-mode: screen; pointer-events: none; transform-origin: 50% 0; opacity: .85; animation: oracle-fade 1.2s ease-out var(--landed) backwards, oracle-breathe 4.5s ease-in-out var(--landed) infinite; }
+.oracles-embers { position: absolute; inset: 0; pointer-events: none; }
+.oracle-ember { position: absolute; bottom: 0; left: var(--x); width: var(--size); height: var(--size); border-radius: 50%; background: #f0d89a; box-shadow: 0 0 6px 1px rgba(240, 200, 110, .55); opacity: 0; animation: oracle-ember var(--dur) linear var(--delay) infinite; }
+.oracle-ember:nth-child(even) { background: #d6cbff; box-shadow: 0 0 6px 1px rgba(183, 167, 246, .6); }
+.oracles-podium { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: end; gap: 8px; margin: 0; padding: 0; list-style: none; }
+/* Per card: --edge = frame color, --glow = halo. Place 1 is pale silver-violet, 2 amber, 3 amethyst. */
+.oracle-card { --edge: #8d78e3; --glow: rgba(141, 120, 227, .35); position: relative; z-index: 1; order: 3; perspective: 700px; animation: oracle-rise .55s cubic-bezier(.2, .8, .2, 1) calc(var(--deal) * var(--deal-step)) backwards; transition: translate .25s ease; }
+.oracle-card[data-place="1"] { --edge: #ddd5ff; --glow: rgba(206, 196, 255, .5); z-index: 2; order: 2; }
+.oracle-card[data-place="2"] { --edge: #d0912f; --glow: rgba(208, 145, 47, .38); order: 1; }
+.oracle-card:hover { translate: 0 -4px; }
+/* Flare: a burst of light behind rank I as it turns face-up. */
+.oracle-card[data-place="1"]::after { content: ""; position: absolute; z-index: -1; inset: -35%; border-radius: 50%; background: radial-gradient(closest-side, rgba(240, 236, 255, .75), rgba(183, 167, 246, .28) 45%, transparent); opacity: 0; pointer-events: none; animation: oracle-flare 1.2s ease-out calc(var(--landed) - 380ms) both; }
+/* The flip: no overflow/opacity/filter here or preserve-3d flattens and the back face shows through. */
+.oracle-card-flip { position: relative; transform-style: preserve-3d; animation: oracle-flip .9s cubic-bezier(.34, 1.4, .5, 1) calc(var(--deal) * var(--deal-step) + 380ms) backwards, oracle-float 6s ease-in-out calc(var(--deal) * -1.7s) infinite; }
+.oracle-card-face { --pad: 8px; position: relative; display: flex; flex-direction: column; align-items: center; overflow: hidden; padding: 13px var(--pad) 0; border: 1.5px solid var(--edge); border-radius: 10px; background: radial-gradient(90% 50% at 50% 42%, color-mix(in srgb, var(--edge) 14%, transparent), transparent), linear-gradient(180deg, #1b1730, #110f20); box-shadow: 0 0 18px -4px var(--glow); text-align: center; backface-visibility: hidden; }
+.oracle-card-face::before { content: ""; position: absolute; inset: 5px; border: 1px solid var(--o-frame); border-radius: 6px; pointer-events: none; }
+.oracle-card[data-place="1"] .oracle-card-face { padding-top: 18px; animation: oracle-aura 3.2s ease-in-out var(--landed) infinite; }
+/* Sheen: a pale band that sweeps rank I every few seconds. */
+.oracle-card[data-place="1"] .oracle-card-face::after { content: ""; position: absolute; inset: -20% -60%; background: linear-gradient(105deg, transparent 42%, rgba(255, 255, 255, .17) 48%, rgba(255, 255, 255, .05) 53%, transparent 58%); translate: -60% 0; pointer-events: none; animation: oracle-sheen 5.5s ease-in-out calc(var(--landed) + 500ms) infinite; }
+.oracle-card-back { position: absolute; inset: 0; display: grid; place-items: center; border: 1.5px solid var(--edge); border-radius: 10px; background: radial-gradient(circle, rgba(183, 167, 246, .28), transparent 55%), repeating-linear-gradient(45deg, rgba(183, 167, 246, .1) 0 1px, transparent 1px 9px), repeating-linear-gradient(-45deg, rgba(183, 167, 246, .1) 0 1px, transparent 1px 9px), #1a1530; color: var(--o-violet); font-size: 22px; rotate: y 180deg; backface-visibility: hidden; }
+.oracle-card-back::before { content: "✦"; }
+.oracle-card-back::after { content: ""; position: absolute; inset: 5px; border: 1px solid var(--o-frame); border-radius: 6px; }
+.oracle-corners { position: absolute; inset: 8px 9px auto; display: flex; justify-content: space-between; color: var(--o-frame); font-size: 7px; line-height: 1; }
+.oracle-corners::before, .oracle-corners::after { content: "✦"; display: inline-block; color: color-mix(in srgb, var(--edge) 50%, #fff); opacity: .6; animation: oracle-twinkle 3s ease-in-out infinite; }
+.oracle-corners::after { animation-delay: 1.5s; }
+.oracle-card-rank { display: grid; justify-items: center; gap: 2px; color: var(--o-ink); font-family: var(--font-cinzel), Cinzel, Georgia, serif; font-size: 22px; font-weight: 600; line-height: 1; }
+.oracle-card[data-place="1"] .oracle-card-rank { font-size: 30px; text-shadow: 0 0 14px var(--glow); }
+.oracle-card-rank small, .oracle-row-rank small { color: var(--o-muted); font-family: var(--font-mono), monospace; font-size: 7px; font-weight: 600; letter-spacing: .24em; text-transform: uppercase; }
+.oracle-sigil { position: relative; display: grid; place-items: center; width: 66px; height: 66px; margin: 8px 0 6px; }
+.oracle-card[data-place="1"] .oracle-sigil { width: 78px; height: 78px; margin-block: 10px 8px; }
+/* Sunburst behind the avatar; rank I's also swells. */
+.oracle-rays { position: absolute; inset: -12px; border-radius: 50%; background: repeating-conic-gradient(color-mix(in srgb, var(--edge) 70%, #fff) 0 1.2deg, transparent 1.2deg 9deg); mask: radial-gradient(closest-side, transparent 50%, #000 56%, transparent); opacity: .5; animation: oracle-spin 40s linear infinite; }
+.oracle-card[data-place="1"] .oracle-rays { opacity: .75; animation: oracle-spin 28s linear infinite, oracle-swell 3.2s ease-in-out var(--landed) infinite; }
+.oracle-avatar { --size: 34px; --ring-gap: 5px; position: relative; display: grid; flex: none; place-items: center; width: var(--size); height: var(--size); margin: var(--ring-gap); border-radius: 50%; background: var(--tint); color: #1a1530; font-size: calc(var(--size) * .42); font-weight: 800; line-height: 1; }
+.oracle-card[data-place="1"] .oracle-avatar { --size: 42px; box-shadow: 0 0 22px -2px var(--tint); }
+/* Win-rate ring: green arc = wins. The conic mask sweeps it in once the avatar lands. */
+.oracle-avatar::before { content: ""; position: absolute; inset: calc(-1 * var(--ring-gap)); border-radius: 50%; background: conic-gradient(var(--o-win) 0 calc(var(--win) * 1turn), var(--o-loss) 0); mask: radial-gradient(closest-side, transparent calc(100% - 3px), #000 calc(100% - 2.5px)), conic-gradient(#000 var(--sweep), transparent 0); mask-composite: intersect; animation: oracle-ring 1.1s cubic-bezier(.5, 0, .2, 1) var(--ring-at, 0ms) backwards; }
+.oracle-card .oracle-avatar { --ring-at: calc(var(--deal) * var(--deal-step) + 950ms); }
+.oracle-card-handle { max-width: 100%; overflow: hidden; color: var(--o-ink); font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.oracle-card[data-place="1"] .oracle-card-handle { font-size: 13px; }
+.oracle-card-tier { align-self: stretch; margin: 10px calc(5px - var(--pad)) 5px; padding: 7px 2px 6px; border-top: 1px solid var(--o-frame); color: color-mix(in srgb, var(--o-ink) 80%, var(--o-violet)); font-family: var(--font-cinzel), Cinzel, Georgia, serif; font-size: 9.5px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; white-space: nowrap; }
+.oracles-list { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.oracle-row { display: grid; grid-template-columns: 76px auto minmax(0, 1fr); align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px; animation: oracle-row-in .5s cubic-bezier(.2, .8, .2, 1) var(--enter) backwards; transition: background .2s; }
+.oracle-row:hover { background: rgba(183, 167, 246, .07); }
+.oracle-row .oracle-avatar { --size: 26px; --ring-gap: 4px; --ring-at: calc(var(--enter) + 150ms); }
+.oracle-row-rank { display: flex; align-items: baseline; gap: 6px; color: var(--o-ink); font-family: var(--font-cinzel), Cinzel, Georgia, serif; font-size: 17px; font-weight: 600; white-space: nowrap; }
+.oracle-row-who { display: grid; gap: 2px; min-width: 0; padding-left: 4px; }
+.oracle-row-handle { overflow: hidden; color: var(--o-ink); font-size: 14px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.oracle-row-tier { color: var(--o-violet); font-family: var(--font-mono), monospace; font-size: 9px; font-weight: 600; letter-spacing: .18em; text-transform: uppercase; }
+.oracles-more { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-top: 10px; padding: 8px; border: 0; border-radius: 8px; background: transparent; color: var(--o-violet); font-family: var(--font-mono), monospace; font-size: 11px; font-weight: 600; letter-spacing: .26em; text-transform: uppercase; animation: oracle-row-in .5s ease-out 1.9s backwards; transition: color .2s; }
+.oracles-more:hover { color: var(--o-ink); }
+.oracles-more span { display: inline-block; transition: translate .2s, rotate .2s; }
+.oracles-more:hover span { translate: 3px 0; }
+.oracles-more[aria-expanded="true"] span { rotate: -90deg; translate: 0; }
+@keyframes oracle-rise { from { opacity: 0; translate: 0 26px; } }
+@keyframes oracle-flip { from { rotate: y 180deg; } }
+@keyframes oracle-float { 50% { translate: 0 -3px; } }
+@keyframes oracle-flare { 0% { opacity: 0; scale: .4; } 25% { opacity: 1; } 100% { opacity: 0; scale: 1.5; } }
+@keyframes oracle-aura { 50% { box-shadow: 0 0 30px -2px var(--glow), 0 0 0 1px color-mix(in srgb, var(--edge) 40%, transparent); } }
+@keyframes oracle-sheen { 0% { translate: -60% 0; } 35%, 100% { translate: 60% 0; } }
+@keyframes oracle-spin { to { rotate: 1turn; } }
+@keyframes oracle-swell { 50% { scale: 1.12; } }
+@keyframes oracle-ring { from { --sweep: 0deg; } }
+@keyframes oracle-twinkle { 50% { opacity: .25; scale: .7; } }
+@keyframes oracle-ember { 0% { opacity: 0; translate: 0 0; } 15% { opacity: .9; } 100% { opacity: 0; translate: var(--drift) -210px; } }
+@keyframes oracle-fade { from { opacity: 0; } }
+@keyframes oracle-breathe { 50% { scale: 1.08 1; } }
+@keyframes oracle-row-in { from { opacity: 0; translate: 18px 0; } }
+/* Narrow rail (961–1180px gives ~240px of content). */
+@container (max-width: 270px) {
+  .oracles-panel .oracles-title { font-size: 11px; letter-spacing: .2em; }
+  .oracles-periods button { padding: 4px 7px; }
+  .oracles-podium { gap: 6px; }
+  .oracle-card-face { --pad: 6px; }
+  .oracle-card-rank { font-size: 19px; }
+  .oracle-card[data-place="1"] .oracle-card-rank { font-size: 25px; }
+  .oracle-sigil { width: 56px; height: 56px; }
+  .oracle-card .oracle-avatar { --size: 28px; --ring-gap: 4px; }
+  .oracle-card[data-place="1"] .oracle-sigil { width: 66px; height: 66px; }
+  .oracle-card[data-place="1"] .oracle-avatar { --size: 36px; }
+  .oracle-card-handle, .oracle-card[data-place="1"] .oracle-card-handle { font-size: 10.5px; }
+  .oracle-card-tier { font-size: 8px; letter-spacing: .08em; }
+  .oracle-row { grid-template-columns: 68px auto minmax(0, 1fr); gap: 6px; padding-inline: 4px; }
+  .oracle-row-rank { font-size: 15px; }
+  .oracle-row-handle { font-size: 13px; }
+  .oracles-more { font-size: 10px; letter-spacing: .2em; }
+}
+@media (max-width: 960px) { .sidebar-panel.oracles-panel { grid-column: 1 / -1; } .oracles-panel > * { max-width: 400px; margin-inline: auto; } }
+@media (prefers-reduced-motion: reduce) { .oracles-panel *, .oracles-panel *::before, .oracles-panel *::after { animation: none !important; } }
 /* Rooms: each rank is its own themed room. [data-room] sets --room (accent),
    --room-strong (text-safe accent) and --room-glow; set on the shell for the
    active theme and on each switcher tab / ladder row for its own gem colour. */
@@ -533,7 +641,7 @@ button { cursor: pointer; }
 }
 @media (prefers-reduced-motion: reduce) { .oracle-sigil-ring, .oracle-sigil-iris, .oracle-live-dot, .oracle-feed-status.is-live::before, .oracle-feed-row { animation: none; } }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
-@media (max-width: 960px) { .feed-shell { grid-template-columns: 1fr; } .feed-sidebar { position: static; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); } }
+@media (max-width: 960px) { .feed-shell { grid-template-columns: 1fr; } .feed-sidebar { position: static; max-height: none; overflow-y: visible; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); } }
 .locked-teaser { position: relative; padding: 28px 24px; text-align: center; display: grid; gap: 8px; justify-items: center; }
 .locked-teaser h2 { margin: 0; font-size: 16px; }
 .locked-rank-bar { width: 100%; max-width: 260px; height: 6px; border-radius: 999px; background: var(--field-bg); overflow: hidden; margin-top: 6px; }

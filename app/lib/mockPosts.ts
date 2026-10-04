@@ -47,10 +47,16 @@ export type PostImage =
   | { kind: "meme"; seed: string; emoji: string };
 
 // Every post renders through PostCard, which branches on `kind`:
-// "text" = plain take, "call"/"result" = market-call hero (pending vs
-// resolved), "streak" = compact highlight banner, "promo" = quiet system
-// line with no avatar/actions.
-export type PostKind = "text" | "call" | "result" | "streak" | "promo";
+// "text" = plain take, "call"/"result" = trade strip (pending vs resolved),
+// "clash" = Omen Clash head-to-head, "streak" = compact highlight banner,
+// "promo" = quiet system line with no avatar/actions.
+export type PostKind = "text" | "call" | "result" | "clash" | "streak" | "promo";
+
+// Omen Clash: two traders' opposing price calls on one market and deadline,
+// with the crowd split between them. `backers` is a hand-set % (the two sides
+// sum to 100) — siding in the feed is a local toggle that moves nothing.
+export type ClashSide = { author: string; handle: string; target: string; direction: "up" | "down"; backers: number };
+export type OmenClash = { market: Market; resolvesAt: string; sides: [ClashSide, ClashSide] };
 
 // Context line above a post meant to pull the eye (app/PostCard.tsx FLAIRS).
 // Hand-assigned in the mock — no engagement or recommendation signal
@@ -66,9 +72,12 @@ export type Post = {
   timestamp: string;
   likes: number;
   replies: number;
+  // Decorative like likes/replies; the repost action is a local toggle.
+  reposts: number;
   kind: PostKind;
   rank?: string;
   call?: MarketCall;
+  clash?: OmenClash;
   image?: PostImage;
   streakStat?: string;
   // Community tag for the feed's market pills (app/FeedSwitcher.tsx). Only
@@ -154,29 +163,8 @@ export const POST_REPLIES: Record<string, Reply[]> = {
   ],
 };
 
+// For You order (top to bottom). Hand-ordered, not ranked by any signal.
 export const GLOBAL_POSTS: Post[] = [
-  {
-    id: "g1",
-    author: "Nova",
-    handle: "@nova_trades",
-    avatarInitial: "N",
-    content: "Called BTC up 3 rounds in a row. Cast is printing today.",
-    timestamp: "2m ago",
-    likes: 41,
-    replies: 6,
-    kind: "result",
-    rank: "Gold II",
-    call: {
-      market: "btc",
-      side: "LONG",
-      leverage: 10,
-      entryPrice: "67,240",
-      currentPrice: "68,451",
-      changePct: 1.8,
-      spark: [66.8, 67.0, 67.4, 67.1, 67.6, 67.9, 68.1, 68.45],
-      outcome: { status: "won", amount: 4200 },
-    },
-  },
   {
     id: "g-oracle1",
     author: "Vesper",
@@ -186,6 +174,7 @@ export const GLOBAL_POSTS: Post[] = [
     timestamp: "4m ago",
     likes: 1284,
     replies: 216,
+    reposts: 88,
     kind: "call",
     rank: "Oracle",
     flair: "copying",
@@ -202,6 +191,118 @@ export const GLOBAL_POSTS: Post[] = [
     },
   },
   {
+    id: "g7",
+    author: "Marcus",
+    handle: "@marcus_calls",
+    avatarInitial: "M",
+    content: "BTC reclaiming 68k like it's nothing. Dip buyers eating good this week.",
+    timestamp: "14m ago",
+    likes: 134,
+    replies: 22,
+    reposts: 12,
+    kind: "text",
+    rank: "Gold I",
+    image: { kind: "chart", seed: "btc-reclaim", spark: [65.1, 65.6, 65.3, 66.2, 67.0, 66.8, 67.6, 68.4] },
+    market: "btc",
+  },
+  {
+    id: "g1",
+    author: "Nova",
+    handle: "@nova_trades",
+    avatarInitial: "N",
+    content: "Called BTC up 3 rounds in a row. Cast is printing today.",
+    timestamp: "2m ago",
+    likes: 41,
+    replies: 6,
+    reposts: 3,
+    kind: "result",
+    rank: "Gold II",
+    call: {
+      market: "btc",
+      side: "LONG",
+      leverage: 10,
+      entryPrice: "67,240",
+      currentPrice: "68,451",
+      changePct: 1.8,
+      spark: [66.8, 67.0, 67.4, 67.1, 67.6, 67.9, 68.1, 68.45],
+      outcome: { status: "won", amount: 4200 },
+    },
+  },
+  {
+    id: "g8",
+    author: "Priya",
+    handle: "@priya_p",
+    avatarInitial: "P",
+    content: "me explaining to my portfolio why I'm still long doge",
+    timestamp: "19m ago",
+    likes: 302,
+    replies: 41,
+    reposts: 140,
+    kind: "text",
+    rank: "Silver II",
+    flair: "engaging",
+    image: { kind: "meme", seed: "doge-cope", emoji: "🐕" },
+    market: "doge",
+  },
+  {
+    id: "g-clash1",
+    author: "Nova",
+    handle: "@nova_trades",
+    avatarInitial: "N",
+    content: "Nova vs Vesper: where BTC prints at 6:00 PM.",
+    timestamp: "17m ago",
+    likes: 0,
+    replies: 0,
+    reposts: 0,
+    kind: "clash",
+    market: "btc",
+    clash: {
+      market: "btc",
+      resolvesAt: "6:00 PM",
+      sides: [
+        { author: "Nova", handle: "@nova_trades", target: "69.5k", direction: "up", backers: 62 },
+        { author: "Vesper", handle: "@vesper", target: "67.6k", direction: "down", backers: 38 },
+      ],
+    },
+  },
+  {
+    id: "g-zane1",
+    author: "Zane",
+    handle: "@zane_lfg",
+    avatarInitial: "Z",
+    content: "Hot take: 1-minute pulse rounds teach you more than any trading course. Nothing humbles you faster than losing in public.",
+    timestamp: "21m ago",
+    likes: 640,
+    replies: 91,
+    reposts: 27,
+    kind: "text",
+    rank: "Gold I",
+  },
+  {
+    id: "g-kaito1",
+    author: "Kaito",
+    handle: "@kaito_sol",
+    avatarInitial: "K",
+    content: "Vesper fading the pump with a 69.2k stop is the most conviction I've seen all week. Tailing small.",
+    timestamp: "24m ago",
+    likes: 212,
+    replies: 18,
+    reposts: 9,
+    kind: "call",
+    rank: "Silver III",
+    call: {
+      market: "btc",
+      side: "SHORT",
+      leverage: 5,
+      entryPrice: "68,465",
+      currentPrice: "68,190",
+      changePct: -0.4,
+      spark: [68.46, 68.5, 68.41, 68.38, 68.3, 68.33, 68.24, 68.19],
+      expiresIn: "1h 52m",
+      copiedBy: 120,
+    },
+  },
+  {
     id: "g2",
     author: "Ren",
     handle: "@ren.eth",
@@ -210,6 +311,7 @@ export const GLOBAL_POSTS: Post[] = [
     timestamp: "6m ago",
     likes: 18,
     replies: 3,
+    reposts: 2,
     kind: "call",
     rank: "Silver I",
     call: {
@@ -235,6 +337,7 @@ My take is that Base Season will reward consistency over pure hype. The teams th
     timestamp: "11m ago",
     likes: 63,
     replies: 12,
+    reposts: 14,
     kind: "text",
     rank: "Bronze III",
     flair: "forYou",
@@ -248,6 +351,7 @@ My take is that Base Season will reward consistency over pure hype. The teams th
     timestamp: "9m ago",
     likes: 76,
     replies: 9,
+    reposts: 6,
     kind: "streak",
     rank: "Gold I",
     streakStat: "6-day streak",
@@ -262,6 +366,7 @@ My take is that Base Season will reward consistency over pure hype. The teams th
     timestamp: "12m ago",
     likes: 486,
     replies: 64,
+    reposts: 41,
     kind: "call",
     rank: "Diamond II",
     call: {
@@ -277,33 +382,28 @@ My take is that Base Season will reward consistency over pure hype. The teams th
     },
   },
   {
-    id: "g7",
-    author: "Marcus",
-    handle: "@marcus_calls",
-    avatarInitial: "M",
-    content: "BTC reclaiming 68k like it's nothing. Dip buyers eating good this week.",
-    timestamp: "14m ago",
-    likes: 134,
-    replies: 22,
-    kind: "text",
-    rank: "Gold I",
-    image: { kind: "chart", seed: "btc-reclaim", spark: [65.1, 65.6, 65.3, 66.2, 67.0, 66.8, 67.6, 68.4] },
-    market: "btc",
-  },
-  {
-    id: "g8",
-    author: "Priya",
-    handle: "@priya_p",
-    avatarInitial: "P",
-    content: "me explaining to my portfolio why I'm still long doge",
-    timestamp: "19m ago",
-    likes: 302,
-    replies: 41,
-    kind: "text",
-    rank: "Silver II",
-    flair: "engaging",
-    image: { kind: "meme", seed: "doge-cope", emoji: "🐕" },
-    market: "doge",
+    id: "g-doge1",
+    author: "Lena",
+    handle: "@lena_q",
+    avatarInitial: "L",
+    content: "DOGE lost the daily range low. Short with a tight stop — out if it reclaims 0.170.",
+    timestamp: "27m ago",
+    likes: 73,
+    replies: 11,
+    reposts: 4,
+    kind: "call",
+    rank: "Silver I",
+    call: {
+      market: "doge",
+      side: "SHORT",
+      leverage: 10,
+      entryPrice: "0.1652",
+      currentPrice: "0.1667",
+      changePct: 0.9,
+      spark: [0.1652, 0.1648, 0.1655, 0.1659, 0.1656, 0.1662, 0.1664, 0.1667],
+      expiresIn: "2h 05m",
+      copiedBy: 85,
+    },
   },
   {
     id: "g4",
@@ -314,6 +414,7 @@ My take is that Base Season will reward consistency over pure hype. The teams th
     timestamp: "24m ago",
     likes: 9,
     replies: 1,
+    reposts: 0,
     kind: "result",
     rank: "Gold I",
     call: {
@@ -335,9 +436,33 @@ My take is that Base Season will reward consistency over pure hype. The teams th
     timestamp: "33m ago",
     likes: 58,
     replies: 15,
+    reposts: 11,
     kind: "text",
     rank: "Silver I",
     flair: "followed",
+  },
+  {
+    id: "g-tobi1",
+    author: "Tobi",
+    handle: "@tobi.sol",
+    avatarInitial: "T",
+    content: "Called the ETH flush before the FOMC minutes. Took profit into the wick.",
+    timestamp: "41m ago",
+    likes: 158,
+    replies: 19,
+    reposts: 8,
+    kind: "result",
+    rank: "Gold III",
+    call: {
+      market: "eth",
+      side: "SHORT",
+      leverage: 8,
+      entryPrice: "3,468",
+      currentPrice: "3,402",
+      changePct: -1.9,
+      spark: [3468, 3471, 3455, 3449, 3431, 3426, 3410, 3402],
+      outcome: { status: "won", amount: 1650 },
+    },
   },
   {
     id: "g5",
@@ -348,6 +473,7 @@ My take is that Base Season will reward consistency over pure hype. The teams th
     timestamp: "38m ago",
     likes: 27,
     replies: 8,
+    reposts: 1,
     kind: "text",
     rank: "Silver II",
   },
@@ -360,6 +486,7 @@ My take is that Base Season will reward consistency over pure hype. The teams th
     timestamp: "1h ago",
     likes: 5,
     replies: 0,
+    reposts: 0,
     kind: "promo",
   },
 ];
@@ -374,6 +501,7 @@ export const EXCLUSIVE_POSTS: Post[] = [
     timestamp: "4m ago",
     likes: 112,
     replies: 21,
+    reposts: 17,
     kind: "call",
     rank: "Gold II",
     call: {
@@ -397,6 +525,7 @@ export const EXCLUSIVE_POSTS: Post[] = [
     timestamp: "17m ago",
     likes: 84,
     replies: 14,
+    reposts: 6,
     kind: "result",
     rank: "Silver I",
     call: {
@@ -419,6 +548,7 @@ export const EXCLUSIVE_POSTS: Post[] = [
     timestamp: "42m ago",
     likes: 56,
     replies: 9,
+    reposts: 4,
     kind: "text",
     rank: "Gold III",
   },
