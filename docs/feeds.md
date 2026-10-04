@@ -2,9 +2,9 @@
 
 Twitter-styled social feeds. UI-only pass: no backend, no persistence, no posting.
 
-- Routes: `/` = Global feed (`app/page.tsx`), `/exclusive` = rank-gated feed (`app/exclusive/page.tsx`, no longer linked from the header nav), `/rooms` = rank-gated group chat placeholder (`app/rooms/page.tsx`, see [rooms.md](rooms.md)), `/duel` = the market lobby (moved from `app/page.tsx`, see [architecture.md](architecture.md)).
+- Routes: `/` = Global feed (`app/page.tsx`), `/exclusive` = rank-gated feed (`app/exclusive/page.tsx`, no longer linked from the header nav), `/sanctum` = Oracle Room live Pulse room (`app/sanctum/page.tsx`, see [sanctum.md](sanctum.md)), `/duel` = the market lobby (moved from `app/page.tsx`, see [architecture.md](architecture.md)).
 - Desktop header (`app/layout.tsx`) is a 64px, 3-column grid: brand | `app/TabNav.tsx` | `.header-actions` (`app/BalancePill.tsx` + `app/AccountMenu.tsx`). `.app-header-inner` uses the page shells' width rule (`min(100% - 56px, --shell-max)`) so header edges align with content.
-- `app/TabNav.tsx` — desktop `Omens`/`Rooms`/`Arena`/`Wallet` (same order/icons as `app/MobileBottomNav.tsx`), active via `usePathname()` (exact on `/`, prefix otherwise), active = teal text + `--brand` 12% background. 769–1000px drops the icons.
+- `app/TabNav.tsx` — desktop `Omens`/`Arena`/`Sanctum`/`Wallet` (same order/icons as `app/MobileBottomNav.tsx`), active via `usePathname()` (exact on `/`, prefix otherwise), active = teal text + `--brand` 12% background. 769–1000px drops the icons.
 - `app/BalancePill.tsx` — signed-in only; ember icon + Embers count button, dropdown (`.balance-menu-popover`) lists Embers + wallet USD + link to `/wallet`.
 - `app/AccountMenu.tsx` — signed in: Clerk `UserButton` with a Light/Dark mode `UserButton.Action` (`useTheme()` from `app/ThemeToggle.tsx`); signed out: standalone `ThemeToggle` + Sign in. `compact` prop = mobile avatar-style sign-in.
 - `app/MobileBottomNav.tsx` replaces the header nav at or below 768px; the compact mobile header keeps brand, `BalancePill`, `AccountMenu compact`.

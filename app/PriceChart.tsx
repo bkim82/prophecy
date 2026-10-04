@@ -17,8 +17,9 @@ export type TradeMarker = {
   side: "long" | "short";
   action?: "entry" | "exit" | "reverse";
   /** Whose trade this is — distinguishes markers when two parties trade on
-   * the same chart. Defaults to "you" so existing callers are unaffected. */
-  owner?: "you" | "sibyl";
+   * the same chart. Defaults to "you" so existing callers are unaffected.
+   * Anyone other than "you" draws dashed. */
+  owner?: "you" | "sibyl" | "room";
   /** Realized P&L, shown as a transient toast on the newest closing marker. */
   pnl?: number;
 };
@@ -680,10 +681,10 @@ export default function PriceChart({
           const ty = y(Math.min(Math.max(trade.p, low), high));
           const color = trade.side === "long" ? UP : DOWN;
           const action = trade.action ?? "entry";
-          const isSibyl = trade.owner === "sibyl";
-          const dash = isSibyl ? "2 2" : undefined;
+          const isOther = trade.owner !== undefined && trade.owner !== "you";
+          const dash = isOther ? "2 2" : undefined;
           return (
-            <g key={i} style={{ filter: `drop-shadow(0 0 3px ${color})` }} opacity={isSibyl ? 0.85 : 1}>
+            <g key={i} style={{ filter: `drop-shadow(0 0 3px ${color})` }} opacity={isOther ? 0.85 : 1}>
               {action === "exit" ? (
                 <rect
                   x={tx - 5}

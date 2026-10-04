@@ -1,153 +1,79 @@
-// Mock content for the Rooms placeholder (app/rooms/page.tsx). Display-only,
-// no backend — establishes the rank-gated group-chat concept. See docs/rooms.md.
-import type { Market, Side } from "@/app/lib/mockPosts";
+// Mock content for the Oracle Room (app/sanctum/page.tsx): a real-money Pulse
+// room for your rank only. Display-only — no backend, no settlement, no
+// other players actually connected. See docs/rooms.md.
+import { pickDailyCoin } from "@/app/DailyCoin";
 
-export type RoomId = "bronze" | "silver" | "gold" | "diamond" | "oracle";
-export type RoomRankStatus = "cleared" | "current" | "locked";
+export type RoomCoin = "btc" | "eth" | "daily";
+export type RoomSide = "long" | "short";
 
-export type RoomCall = { market: Market; side: Side; price: string; window: string };
-
-export type RoomMessage = {
-  id: string;
-  author: string;
-  text: string;
-  time: string;
-  call?: RoomCall;
-  challengeLabel?: string;
+export type RoomCoinMeta = {
+  id: RoomCoin;
+  market: "btc" | "eth" | "doge"; // drives [data-market] accent colours
+  ticker: string;
+  product: string;
+  symbol: string;
+  symbolClass: string;
 };
 
-export type Room = {
-  id: RoomId;
-  label: string;
-  rankLabel: string; // tier name shown in permission copy, e.g. "Diamond"
-  eyebrow: string;
-  chip: string;
-  tagline: string;
-  online: number;
-  messages: RoomMessage[];
-};
+const DAILY = pickDailyCoin();
+const DAILY_MARKET = DAILY.toLowerCase() as "doge";
 
-// Hardcoded until a real per-user rank exists (see app/lib/rank.ts stub).
-export const USER_ROOM_ID: RoomId = "gold";
-export const USER_SUBRANK = "Gold II";
-
-export const ROOMS: Room[] = [
-  {
-    id: "bronze",
-    label: "Bronze Room",
-    rankLabel: "Bronze",
-    eyebrow: "The Forge",
-    chip: "Bronze Prophecies",
-    tagline: "Where every prophet strikes their first call.",
-    online: 412,
-    messages: [
-      { id: "b1", author: "Pip", text: "First duel today, went LONG on DOGE and it actually hit 😅", time: "7:12 PM" },
-      {
-        id: "b2",
-        author: "Marlo",
-        text: "DOGE pumping again, calling 20c by morning.",
-        time: "7:15 PM",
-        call: { market: "doge", side: "LONG", price: "$0.20", window: "By morning" },
-        challengeLabel: "Challenge",
-      },
-      { id: "b3", author: "Juno", text: "Anyone know how the 60s Pulse windows settle?", time: "7:19 PM" },
-    ],
-  },
-  {
-    id: "silver",
-    label: "Silver Room",
-    rankLabel: "Silver",
-    eyebrow: "The Mint",
-    chip: "Silver Prophecies",
-    tagline: "Sharper reads, steadier hands.",
-    online: 268,
-    messages: [
-      {
-        id: "s1",
-        author: "Wren",
-        text: "ETH reclaiming 3.5K feels clean. Short-term long.",
-        time: "8:02 PM",
-        call: { market: "eth", side: "LONG", price: "$3,500", window: "4h" },
-        challengeLabel: "Challenge",
-      },
-      { id: "s2", author: "Castor", text: "Volume's thin though. I'd wait for the retest.", time: "8:05 PM" },
-      { id: "s3", author: "Lio", text: "Two more wins and I'm out of Silver. Wish me luck.", time: "8:09 PM" },
-    ],
-  },
-  {
-    id: "gold",
-    label: "Gold Room",
-    rankLabel: "Gold",
-    eyebrow: "The Vault",
-    chip: "Gold Prophecies",
-    tagline: "Proven callers trading conviction.",
-    online: 131,
-    messages: [
-      {
-        id: "g1",
-        author: "Nova",
-        text: "BTC breaks 70K tonight.",
-        time: "8:41 PM",
-        call: { market: "btc", side: "LONG", price: "$70,000", window: "Tonight" },
-        challengeLabel: "Challenge",
-      },
-      { id: "g2", author: "Ren", text: "No shot. Taking the other side.", time: "8:43 PM", challengeLabel: "Challenge Ren" },
-      { id: "g3", author: "8bit Kay", text: "ETH still lagging majors, watching 3.4K support before I call anything.", time: "8:45 PM" },
-    ],
-  },
-  {
-    id: "diamond",
-    label: "Diamond Room",
-    rankLabel: "Diamond",
-    eyebrow: "The Facet",
-    chip: "Diamond Prophecies",
-    tagline: "Pressure-tested. Only the clearest reads survive.",
-    online: 38,
-    messages: [
-      {
-        id: "d1",
-        author: "Vega",
-        text: "Funding flipped negative on BTC while spot bid holds. Fading the shorts.",
-        time: "9:02 PM",
-        call: { market: "btc", side: "LONG", price: "$68,400", window: "1h" },
-        challengeLabel: "Challenge",
-      },
-      { id: "d2", author: "Sable", text: "Agreed on direction, disagree on timing. Liquidity sits 300 lower first.", time: "9:04 PM" },
-      { id: "d3", author: "Ixion", text: "Logged 14-3 this week. ETH/BTC ratio is the tell, not the chart.", time: "9:07 PM" },
-    ],
-  },
-  {
-    id: "oracle",
-    label: "Oracle Room",
-    rankLabel: "Oracle",
-    eyebrow: "The Sanctum",
-    chip: "Oracle Prophecies",
-    tagline: "The few whose words move the market.",
-    online: 7,
-    messages: [
-      {
-        id: "o1",
-        author: "Seraph",
-        text: "ETH sheds 5% before the weekly close. Mark it.",
-        time: "9:30 PM",
-        call: { market: "eth", side: "SHORT", price: "$3,230", window: "Weekly close" },
-        challengeLabel: "Challenge",
-      },
-      { id: "o2", author: "Thalia", text: "Seen. I'll take the other side for the season title.", time: "9:31 PM", challengeLabel: "Challenge Thalia" },
-      { id: "o3", author: "Morrow", text: "The quiet before the candle is always the loudest tell.", time: "9:36 PM" },
-    ],
-  },
+export const ROOM_COINS: RoomCoinMeta[] = [
+  { id: "btc", market: "btc", ticker: "BTC", product: "BTC-USD", symbol: "₿", symbolClass: "btc-symbol" },
+  { id: "eth", market: "eth", ticker: "ETH", product: "ETH-USD", symbol: "Ξ", symbolClass: "eth-symbol" },
+  { id: "daily", market: DAILY_MARKET, ticker: DAILY, product: `${DAILY}-USD`, symbol: DAILY === "DOGE" ? "Ð" : DAILY[0], symbolClass: `${DAILY_MARKET}-symbol` },
 ];
 
-const USER_ROOM_INDEX = ROOMS.findIndex((room) => room.id === USER_ROOM_ID);
+export const coinMeta = (coin: RoomCoin) => ROOM_COINS.find((c) => c.id === coin) ?? ROOM_COINS[0];
 
-export function roomStatus(roomId: RoomId): RoomRankStatus {
-  const index = ROOMS.findIndex((room) => room.id === roomId);
-  if (index === USER_ROOM_INDEX) return "current";
-  return index < USER_ROOM_INDEX ? "cleared" : "locked";
-}
+// Hardcoded until a real per-user rank exists (see app/lib/rank.ts stub).
+export const ROOM = {
+  rank: "Oracle",
+  subrank: "Oracle II",
+  label: "The Oracle Room",
+  eyebrow: "Rank · Oracle",
+  tagline: "Real stakes, read in the signs. Only Oracles trade here.",
+  online: 64,
+};
 
-// Every room is viewable; chatting requires the user's rank to reach the room's tier.
-export function canChatInRoom(roomId: RoomId): boolean {
-  return roomStatus(roomId) !== "locked";
-}
+// Who else is in the room. `bias` nudges their side so the feed has
+// personalities instead of coin flips; `size` is their typical USD stake.
+export type RoomMember = { name: string; bias: number; size: [number, number]; leverage: number[] };
+
+export const ROOM_MEMBERS: RoomMember[] = [
+  { name: "Brandon", bias: 0.7, size: [150, 500], leverage: [100, 1000] },
+  { name: "Seraph", bias: 0.35, size: [200, 900], leverage: [1000] },
+  { name: "Thalia", bias: 0.5, size: [50, 250], leverage: [100] },
+  { name: "Morrow", bias: 0.4, size: [80, 300], leverage: [100, 1000, 10000] },
+  { name: "Vega", bias: 0.6, size: [300, 1200], leverage: [100] },
+  { name: "Ixion", bias: 0.55, size: [100, 400], leverage: [1000, 10000] },
+  { name: "Nyx", bias: 0.45, size: [60, 220], leverage: [100, 1000] },
+  { name: "Cassia", bias: 0.5, size: [120, 600], leverage: [1000] },
+];
+
+export type RoomChatMessage = { id: string; author: string; text: string; time: number };
+
+const minutesAgo = (m: number) => Date.now() - m * 60_000;
+
+export const seedChat = (): RoomChatMessage[] => [
+  { id: "c1", author: "Seraph", text: "Funding's flipping. Shorts are about to pay rent.", time: minutesAgo(9) },
+  { id: "c2", author: "Brandon", text: "Longed BTC into the wick. Not letting go till 1%.", time: minutesAgo(6) },
+  { id: "c3", author: `Thalia`, text: `${DAILY} daily coin is moving like it heard something.`, time: minutesAgo(4) },
+  { id: "c4", author: "Morrow", text: "The quiet before the candle is always the loudest tell.", time: minutesAgo(2) },
+];
+
+// Lines a member might drop into chat after their own trade — grounded in the
+// trade that just appeared in the feed, never commentary on activity that
+// didn't happen.
+export const chatLineFor = (side: RoomSide, ticker: string, pnl?: number) => {
+  if (pnl !== undefined) {
+    return pnl >= 0
+      ? [`Took ${ticker} off the table. Green is green.`, `Booked it. ${ticker} gave what it promised.`]
+      : [`${ticker} stopped me out. The sign was false.`, `Cut ${ticker}. Living to read another candle.`];
+  }
+  return side === "long"
+    ? [`${ticker} looks heavy on the bid. I'm in.`, `Long ${ticker}. The signs point up.`]
+    : [`Fading ${ticker} here.`, `${ticker} short — that top won't hold.`];
+};
+
+export const pick = <T,>(items: readonly T[]) => items[Math.floor(Math.random() * items.length)];

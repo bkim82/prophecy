@@ -8,7 +8,7 @@ Deliberate gaps in a prototype scoped to the core loop. Not bugs.
 | --- | --- |
 | Portfolio cross-session history/leaderboard | `GET /api/portfolio/session` returns only the current session plus a short list of recent settled sessions (`lib/portfolio.ts sessionHistoryFor`) — no full history browsing UI, no leaderboard across users |
 | Real rank/tier system | `app/lib/rank.ts` is a hardcoded stub (`MOCK_CURRENT_RANK`/`MOCK_RANK_THRESHOLD`) gating `/exclusive` — no computation, no persistence, not tied to Clerk `userId` |
-| Rooms: real-time chat + rank gating | `/rooms` (`app/rooms/page.tsx`) is a static mock (`app/lib/roomsMocks.ts`) — no messaging backend, no per-user rank check, no room unlock logic, `⚔ Challenge` buttons are visual only (see [rooms.md](rooms.md)) |
+| Sanctum: real money, real players, rank gating | `/sanctum` (`app/sanctum/SanctumView.tsx`) is the Oracle Room on live prices but mock everything else (`app/lib/roomsMocks.ts`) — no USD wallet rail/settlement (preview $1,000 balance), simulated room players + feed, local-only chat, hardcoded Oracle rank, no server-side room membership (see [sanctum.md](sanctum.md)) |
 | Post composer / feed persistence | `/` and `/exclusive` render static arrays from `app/lib/mockPosts.ts` — no create/like/reply, no database table, no Clerk-backed authorship |
 | Daily BTC call | Feed's streak post (`app/lib/mockPosts.ts` `g-streak1`) implies a once-a-day BTC prediction settling at 11:59pm with a consecutive-day streak counter — no submission flow, settlement job, or streak computation exists anywhere in the app |
 | Pulse leverage control | Fixed 1×–100× chips (`app/duel/btc/pulse/page.tsx:11`); no custom multiplier |
