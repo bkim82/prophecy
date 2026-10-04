@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import PriceChart, { type TradeMarker } from "../../../PriceChart";
 import { usePriceFeed, type PricePoint } from "../../../usePriceFeed";
 import PulseMovementAlert from "../../../PulseMovementAlert";
+import PulseMarketTitle from "../../../PulseMarketTitle";
 import { productForMarket } from "@/lib/spotPrice";
 
 const ROUND_SECONDS = 60;
@@ -716,9 +717,9 @@ export default function Page() {
         ← Menu
       </Link>
 
-      <h1 className="mt-4 text-center text-sm font-medium uppercase tracking-[0.2em] text-[var(--muted)]">
-        {marketLabel} {isPractice ? "Practice" : "Arena"} · Pulse
-      </h1>
+      <PulseMarketTitle market={market}>
+        {isPractice ? "Practice" : "Arena"} · Pulse
+      </PulseMarketTitle>
 
       {/* Scoreboard: you, the clock, the AI rival */}
       <section className="arena-panel mt-4 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 py-2.5">
@@ -769,7 +770,7 @@ export default function Page() {
       {/* Market price + feed status, centered */}
       <section className="mt-6 text-center">
         <div className="flex items-center justify-center gap-2">
-          <p className="text-xs uppercase tracking-wider text-[var(--muted)]">
+          <p className="text-xs font-semibold uppercase tracking-wider text-[var(--market-accent-strong)]">
             {outcome ? `Final ${marketLabel} / USD` : `${marketLabel} / USD`}
           </p>
           {!outcome && (
@@ -951,8 +952,8 @@ function TradingDock(props: DockProps) {
     <section
       className={
         phase === "setup" || phase === "open"
-          ? "dock-bar mt-4"
-          : "mt-4 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5"
+          ? "arena-dock dock-bar mt-4"
+          : "arena-dock mt-4 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5"
       }
     >
       {phase === "setup" && (

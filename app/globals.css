@@ -48,7 +48,10 @@
      the line uses a softer, lighter amber (sits at ETH's #627eea weight). */
   --chart-line: #f0a868; --chart-point: #ffcb94;
 }
-[data-theme="light"] [data-market="btc"] { --chart-line: #d4823c; --chart-point: #b8692a; }
+[data-theme="light"] [data-market="btc"] { --chart-line: #d4823c; --chart-point: #b8692a; --market-accent-strong: #b8692a; }
+/* The dark-theme "strong" tints are lighter than the base and wash out on sand. */
+[data-theme="light"] [data-market="eth"] { --market-accent-strong: #3d58c9; }
+[data-theme="light"] [data-market="doge"] { --market-accent-strong: #8f7820; }
 [data-market="eth"] {
   --market-accent: #627eea; --market-accent-strong: #8296ef; --market-accent-contrast: #ffffff;
   --chart-line: #627eea; --chart-point: #8296ef;
@@ -648,6 +651,18 @@ button { cursor: pointer; }
   radial-gradient(90% 70% at 88% 92%, color-mix(in srgb, var(--brand) 11%, transparent), transparent 62%),
   radial-gradient(70% 60% at 6% 0%, color-mix(in srgb, var(--violet) 14%, transparent), transparent 60%),
   var(--surface) !important; }
+/* Market identity in the arena: a coin badge in the heading, and panels whose
+   border, top edge and corner glow take --market-accent instead of brand teal,
+   so a BTC room reads orange and an ETH room reads blue at a glance. */
+.arena-shell[data-market] .arena-panel { border-color: color-mix(in srgb, var(--market-accent) 32%, var(--line)) !important; box-shadow: inset 0 2px 0 color-mix(in srgb, var(--market-accent) 75%, transparent); background:
+  radial-gradient(90% 70% at 88% 92%, color-mix(in srgb, var(--market-accent) 12%, transparent), transparent 62%),
+  radial-gradient(70% 60% at 6% 0%, color-mix(in srgb, var(--violet) 12%, transparent), transparent 60%),
+  var(--surface) !important; }
+/* Chart and solo trading dock get the same market outline, minus the glow. */
+.arena-shell[data-market] .price-chart, .arena-shell[data-market] .arena-dock { border-color: color-mix(in srgb, var(--market-accent) 45%, var(--line)); box-shadow: 0 0 0 1px color-mix(in srgb, var(--market-accent) 12%, transparent), 0 0 24px color-mix(in srgb, var(--market-accent) 10%, transparent); }
+.arena-market-title { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 16px 0 0; color: var(--muted); font-size: 12px; font-weight: 500; letter-spacing: .2em; text-transform: uppercase; }
+.arena-market-badge { display: inline-flex; align-items: center; gap: 7px; padding: 4px 12px 4px 6px; border: 1px solid color-mix(in srgb, var(--market-accent) 55%, transparent); border-radius: 999px; background: color-mix(in srgb, var(--market-accent) 16%, transparent); color: var(--market-accent-strong); font-size: 14px; font-weight: 800; letter-spacing: .08em; box-shadow: 0 0 22px color-mix(in srgb, var(--market-accent) 28%, transparent); }
+.arena-market-badge .market-symbol { width: 22px; height: 22px; border: 0; font-size: 15px; }
 .arena-live-dot { animation: queue-pulse 1.4s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .arena-live-dot { animation: none; } }
 .arena-timer.is-urgent { color: var(--negative); text-shadow: 0 0 20px color-mix(in srgb, var(--negative) 55%, transparent); animation: queue-pulse .9s ease-in-out infinite; }
