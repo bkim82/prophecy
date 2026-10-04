@@ -107,7 +107,7 @@ button { cursor: pointer; }
 .theme-toggle svg { display: block; width: 15px; height: 15px; }
 .account-signed-out { display: flex; align-items: center; gap: 8px; }
 .account-menu-icon { width: 15px; height: 15px; }
-.header-actions .cl-avatarBox { width: 32px; height: 32px; }
+.header-actions .account-avatar-box { width: 32px; height: 32px; }
 .balance-menu { position: relative; }
 .balance-display { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; border: 1px solid var(--structure-line); border-radius: 999px; background: var(--structure-raised); color: var(--structure-text); padding: 0 10px 0 11px; font-size: 13px; font-weight: 500; transition: border-color .15s ease; }
 .balance-display:hover, .balance-display[aria-expanded="true"] { border-color: color-mix(in srgb, var(--ember) 55%, var(--structure-line)); }
@@ -155,6 +155,8 @@ button { cursor: pointer; }
 .wallet-connect-button:disabled { opacity: .7; cursor: wait; }
 .wallet-secondary-button { margin-top: 12px; border-color: var(--line); background: transparent; color: var(--muted); }
 .wallet-secondary-button:hover { border-color: var(--line-strong); color: var(--text); }
+.wallet-button-row { display: flex; gap: 8px; margin-top: 12px; }
+.wallet-button-row .wallet-secondary-button { flex: 1; width: auto; margin-top: 0; }
 .wallet-address { margin-top: 14px; color: var(--text); font-family: var(--font-mono), monospace; font-size: 16px; }
 .wallet-meta { display: flex; justify-content: space-between; gap: 12px; margin-top: 6px; color: var(--muted); font-family: var(--font-mono), monospace; font-size: 11px; }
 .wallet-ticket { position: sticky; top: 18px; border-color: color-mix(in srgb, var(--brand) 42%, var(--line)); box-shadow: 0 8px 28px rgba(0, 0, 0, .16); }
@@ -1275,10 +1277,10 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
   .mobile-header-actions .theme-toggle { width: 38px; height: 38px; }
   .mobile-account-control { display: flex; min-width: 40px; height: 40px; align-items: center; justify-content: center; flex: none; }
   .mobile-header-actions .balance-display { min-height: 34px; padding: 0 8px 0 9px; font-size: 12px; white-space: nowrap; }
-  .mobile-account-control .cl-userButtonBox,
-  .mobile-account-control .cl-userButtonTrigger,
-  .mobile-account-control .cl-avatarBox { width: 40px; height: 40px; }
-  .mobile-account-control .cl-userButtonTrigger { border-radius: 999px; }
+  .mobile-account-control .account-user-button-box,
+  .mobile-account-control .account-user-button-trigger,
+  .mobile-account-control .account-avatar-box { width: 40px; height: 40px; }
+  .mobile-account-control .account-user-button-trigger { border-radius: 999px; }
   .mobile-signin-avatar { display: grid; width: 40px; height: 40px; place-items: center; border: 1px solid var(--structure-line); border-radius: 999px; background: var(--structure-raised); color: var(--structure-muted); padding: 0; }
   .mobile-signin-avatar:hover { border-color: var(--brand); color: var(--structure-text); }
   .mobile-profile-icon { width: 18px; height: 18px; }
@@ -1523,4 +1525,134 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
   .pulse-stage .play-panel .opponent-status { order: 4; }
   .pulse-stage .play-panel .control-group--format { order: 5; }
   .pulse-stage .play-button { min-height: 52px; font-size: 18px; }
+}
+
+/* Wallet dashboard (app/wallet/*). `.wd-*` prefix, separate from the shared
+   `.wallet-*` rules above (still used by WalletDesk's connect card and the
+   QuickTicketBar ticket). Reuses .pf-flash-up/.pf-flash-down (price flash),
+   .pf-crossfade/.pf-live-dot/.pf-shimmer/.pf-select-indicator/.pf-row-star
+   (shared with app/duel/portfolio, since AdvancedTab embeds TokenExplorer
+   directly) and .panel/.eyebrow (shared chrome). */
+.wd-page { width: min(100% - 32px, 980px); margin: 0 auto; padding: 32px 0 64px; }
+.wd-dashboard { display: grid; gap: 18px; }
+
+.wd-connection-strip { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12px; font-family: var(--font-mono), monospace; }
+.wd-status-dot { width: 7px; height: 7px; border-radius: 999px; background: var(--positive); box-shadow: 0 0 0 0 color-mix(in srgb, var(--positive) 45%, transparent); animation: wd-live 2s ease-out infinite; }
+@keyframes wd-live { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--positive) 45%, transparent); } 70%, 100% { box-shadow: 0 0 0 6px transparent; } }
+.wd-strip-link { margin-left: auto; border: 0; background: none; color: var(--muted-dim); font-size: 11px; font-family: var(--font-sans), sans-serif; }
+.wd-strip-link + .wd-strip-link { margin-left: 14px; }
+.wd-strip-link:hover { color: var(--text); }
+
+/* Portfolio / Advanced switcher — plain underline tabs, Coinbase Wallet
+   home style (Coins/Collectibles/Orders), not the pill `.feed-tabs` look. */
+.wd-tabs { display: flex; gap: 22px; margin: 4px 2px 18px; border-bottom: 1px solid var(--line); }
+.wd-tabs button { position: relative; border: 0; background: none; color: var(--muted); padding: 10px 1px 12px; font-size: 14px; font-weight: 600; transition: color .15s ease; }
+.wd-tabs button:hover { color: var(--text); }
+.wd-tabs button.active { color: var(--text); }
+.wd-tabs button.active::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; border-radius: 2px; background: var(--brand); }
+
+/* Portfolio tab content (chip + table, or detail panel) stays a narrower
+   centered column instead of stretching to the full `.wd-page` width the
+   Advanced tab's explorer+detail layout uses. */
+.wd-portfolio { display: grid; gap: 18px; width: min(100%, 640px); margin: 0 auto; }
+
+/* Balance card: dotted backdrop fading toward the edges, big total, digit-diff
+   tint on change, Swap/Send/Deposit tiles — Coinbase Wallet home layout. */
+.wd-chip { position: relative; display: grid; justify-items: center; gap: 6px; padding: 40px 16px 28px; text-align: center; overflow: hidden; border-radius: 20px; border: 1px solid var(--line); background: var(--surface); }
+.wd-chip-grid { position: absolute; inset: 0; pointer-events: none; background-image: radial-gradient(circle, color-mix(in srgb, var(--line-strong) 75%, transparent) 1px, transparent 1.6px); background-size: 16px 16px; background-position: center; -webkit-mask-image: radial-gradient(ellipse 70% 100% at center, black 30%, transparent 85%); mask-image: radial-gradient(ellipse 70% 100% at center, black 30%, transparent 85%); }
+.wd-chip-total { position: relative; font-size: 44px; font-weight: 700; letter-spacing: -.01em; color: var(--text); }
+.wd-chip-change { position: relative; margin: 0; font-size: 13px; font-weight: 600; }
+.wd-chip-change span { font-weight: 500; color: var(--muted); }
+.wd-digit-up { animation: wd-digit-up .9s ease-out; }
+.wd-digit-down { animation: wd-digit-down .9s ease-out; }
+@keyframes wd-digit-up { from { color: var(--positive); } }
+@keyframes wd-digit-down { from { color: var(--negative); } }
+.wd-chip-tiles { position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 10px; margin-top: 20px; width: 100%; max-width: 360px; }
+.wd-tile { display: grid; justify-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-raised); color: var(--text); padding: 14px 8px 12px; font-size: 12px; font-weight: 600; transition: border-color .15s, background-color .15s, transform .15s; }
+.wd-tile:hover { border-color: var(--brand); background: var(--surface-hover); transform: translateY(-1px); }
+.wd-tile-icon { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 999px; background: color-mix(in srgb, var(--brand) 16%, transparent); color: var(--brand-strong); }
+
+/* Coin list: search + sort over a Coinbase-style table (Asset/Balance/Portfolio/Price). */
+.wd-list-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.wd-list-search { flex: 1; min-width: 160px; border: 1px solid var(--line); border-radius: 8px; background: var(--field-bg); padding: 8px 12px; font-size: 13px; color: var(--text); }
+.wd-list-sort { border: 1px solid var(--line); border-radius: 8px; background: var(--field-bg); padding: 8px 10px; font-size: 12px; font-weight: 600; color: var(--text); }
+.wd-table-head, .wd-coin-row-grid { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr) minmax(0, 0.4fr) minmax(0, 1fr); align-items: center; gap: 10px; }
+.wd-table-head { margin: 18px 2px 6px; padding: 0 14px; color: var(--muted-dim); font-size: 11px; text-transform: uppercase; letter-spacing: .07em; }
+.wd-table-head span:not(:first-child), .wd-coin-row-balance, .wd-coin-row-share, .wd-coin-row-price { text-align: right; justify-self: end; }
+.wd-coin-list { display: grid; gap: 6px; }
+.wd-coin-row { position: relative; border-radius: 10px; background: var(--surface); transition: background-color .15s; }
+.wd-coin-row:hover { background: var(--surface-hover); }
+.wd-coin-row-grid { width: 100%; padding: 10px 14px; text-align: left; }
+.wd-coin-row-asset { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.wd-coin-row-identity { display: grid; gap: 1px; min-width: 0; }
+.wd-coin-row-identity strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: var(--text); }
+.wd-coin-row-identity small { color: var(--muted-dim); font-size: 11px; }
+.wd-coin-row-balance, .wd-coin-row-price { display: grid; gap: 1px; }
+.wd-coin-row-balance > span:first-child { font-size: 14px; font-weight: 700; color: var(--text); }
+.wd-coin-row-balance small { color: var(--muted-dim); font-size: 11px; }
+.wd-coin-row-share { color: var(--muted); font-size: 12px; }
+.wd-coin-row-price > span:first-child { font-size: 13px; font-weight: 600; color: var(--text); }
+
+.wd-empty { margin: 8px 2px; color: var(--muted); font-size: 12px; }
+.wd-section-heading { margin: 0 0 10px; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .1em; }
+
+.wd-advanced { margin-top: 2px; }
+.wd-advanced [aria-label="Filter tokens"] button { font-size: 11px; }
+
+/* Coin detail panel */
+.wd-detail { display: grid; gap: 14px; border-radius: 16px; background: var(--surface); padding: 20px; }
+.wd-detail-back { justify-self: start; display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; color: var(--muted); font-size: 12px; font-weight: 600; }
+.wd-detail-back:hover { color: var(--text); }
+.wd-detail-head { display: flex; align-items: center; gap: 12px; }
+.wd-detail-head h2 { margin: 0; font-size: 18px; }
+.wd-detail-head p { margin: 2px 0 0; color: var(--muted); font-size: 12px; }
+.wd-detail-price { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.wd-detail-price > span:first-child { font-size: 28px; font-weight: 700; color: var(--text); }
+.wd-detail-periods { display: flex; justify-content: flex-end; gap: 4px; margin-bottom: 8px; }
+.wd-detail-periods button { border: 0; border-radius: 6px; background: none; color: var(--muted); padding: 5px 10px; font-size: 11px; font-weight: 600; text-transform: uppercase; }
+.wd-detail-periods button.is-selected { background: var(--surface-hover); color: var(--text); }
+.wd-detail-chart-empty { display: flex; align-items: center; justify-content: center; height: 260px; border-radius: 10px; background: var(--surface-raised); color: var(--muted-dim); font-size: 12px; }
+.wd-detail-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; border-top: 1px solid var(--line); padding-top: 12px; }
+.wd-detail-stats dt { color: var(--muted-dim); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
+.wd-detail-stats dd { margin: 2px 0 0; color: var(--text); font-size: 13px; font-weight: 600; }
+.wd-detail-note { margin: 0; color: var(--muted-dim); font-size: 11px; line-height: 1.5; }
+.wd-detail-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.wd-detail-secondary-button { border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--text); padding: 10px 12px; font-size: 13px; font-weight: 600; }
+.wd-detail-secondary-button:hover { border-color: var(--line-strong); }
+
+/* Action sheets (Deposit/Send/Swap) */
+.wd-sheet-backdrop { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; background: rgba(4, 10, 18, .5); padding: 16px; animation: wd-fade-in .15s ease-out; }
+@keyframes wd-fade-in { from { opacity: 0; } to { opacity: 1; } }
+.wd-sheet { width: min(100%, 360px); border-radius: 14px; background: var(--surface); padding: 18px; animation: wd-sheet-in .18s cubic-bezier(.2, .8, .2, 1); }
+@keyframes wd-sheet-in { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+.wd-sheet-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.wd-sheet-heading h2 { margin: 0; font-size: 16px; }
+.wd-sheet-close { border: 0; background: none; color: var(--muted); padding: 4px; }
+.wd-sheet-close:hover { color: var(--text); }
+.wd-sheet-copy { margin: 0 0 12px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.wd-sheet-address { display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--field-bg); padding: 10px 12px; }
+.wd-sheet-address code { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--text); }
+.wd-sheet-note { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.wd-sheet-form { display: grid; gap: 10px; }
+.wd-sheet-field { display: grid; gap: 4px; font-size: 11px; color: var(--muted); }
+.wd-sheet-field input, .wd-sheet-field select { border: 1px solid var(--line); border-radius: 6px; background: var(--field-bg); color: var(--text); padding: 8px 10px; font-size: 13px; }
+.wd-sheet-swap-flip { justify-self: center; display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-raised); color: var(--muted); }
+.wd-sheet-swap-flip:hover { color: var(--text); border-color: var(--line-strong); }
+.wd-sheet-primary-button { border: 1px solid var(--brand); border-radius: 6px; background: var(--brand); color: var(--brand-contrast); padding: 10px 12px; font-size: 13px; font-weight: 700; }
+.wd-sheet-primary-button:disabled { opacity: .6; cursor: not-allowed; }
+
+@media (max-width: 620px) {
+  .wd-page { width: min(100% - 24px, 980px); padding-top: 20px; }
+  .wd-chip-total { font-size: 34px; }
+  .wd-table-head, .wd-coin-row-grid { grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr) minmax(0, 1fr); }
+  .wd-table-head-portfolio, .wd-coin-row-share { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wd-status-dot, .wd-digit-up, .wd-digit-down, .wd-sheet-backdrop, .wd-sheet {
+    animation: none;
+  }
+  .wd-tile:hover {
+    transform: none;
+  }
 }

@@ -76,31 +76,48 @@ async function fetchTokens(url: string, init?: RequestInit): Promise<TokenSearch
   return data.results ?? data.tokens ?? [];
 }
 
-const fetchPrices = (addresses: string[]) =>
-  fetchTokens("/api/tokens/prices", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ addresses }),
-  });
+export type TokenExplorerEndpoints = { trending: string; new: string; search: string; prices: string };
+const DEFAULT_ENDPOINTS: TokenExplorerEndpoints = {
+  trending: "/api/tokens/trending",
+  new: "/api/tokens/new",
+  search: "/api/tokens/search",
+  prices: "/api/tokens/prices",
+};
 
 /**
  * Token discovery column: always-visible search (name, ticker or 0x address),
  * Trending · Watchlist · New · All filters, sorting, and scannable rows.
  * Prices refresh in place, but the order is frozen while browsing — a
  * "Refresh rankings" control re-sorts (and refetches the lists) on demand.
+ *
+ * `endpoints` defaults to the Clerk-gated /api/tokens/* routes this component
+ * was built for; the wallet's Advanced tab (no Clerk sign-in) passes the
+ * no-auth /api/wallet/* mirrors instead (see docs/wallet.md) — same lib
+ * functions underneath, just without the auth() gate.
  */
 export function TokenExplorer({
   selected,
   onSelect,
   onAutoSelect,
   ownedAddresses,
+  endpoints = DEFAULT_ENDPOINTS,
 }: {
   selected: TokenSearchResult | null;
   onSelect: (token: TokenSearchResult) => void;
   /** First load picks a token so the detail column isn't empty; must not navigate on mobile. */
   onAutoSelect: (token: TokenSearchResult) => void;
   ownedAddresses: string[];
+  endpoints?: TokenExplorerEndpoints;
 }) {
+  const fetchPrices = useCallback(
+    (addresses: string[]) =>
+      fetchTokens(endpoints.prices, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ addresses }),
+      }),
+    [endpoints.prices],
+  );
   const watch = useWatchlist();
   const [filter, setFilter] = useState<Filter>("trending");
   const [sort, setSort] = useState<Sort>("rank");
@@ -128,14 +145,14 @@ export function TokenExplorer({
   const loadList = useCallback(
     async (list: PoolList) => {
       try {
-        const results = await fetchTokens(`/api/tokens/${list}`);
+        const results = await fetchTokens(endpoints[list]);
         merge(results);
         setLists((prev) => ({ ...prev, [list]: results.map((token) => token.address) }));
       } catch {
         setLists((prev) => ({ ...prev, [list]: prev[list] ?? [] }));
       }
     },
-    [merge],
+    [merge, endpoints],
   );
 
   // Trending loads up front; New only once someone asks for it (it costs upstream budget).
@@ -161,7 +178,7 @@ export function TokenExplorer({
     setSearch((prev) => ({ query: trimmed, status: "loading", ids: prev?.ids ?? [] }));
     const timer = setTimeout(async () => {
       try {
-        const results = await fetchTokens(`/api/tokens/search?q=${encodeURIComponent(trimmed)}`);
+        const results = await fetchTokens(`${endpoints.search}?q=${encodeURIComponent(trimmed)}`);
         if (cancelled) return;
         merge(results);
         setSearch({ query: trimmed, status: "done", ids: results.map((token) => token.address) });
@@ -173,7 +190,7 @@ export function TokenExplorer({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [trimmed, searching, merge]);
+  }, [trimmed, searching, merge, endpoints.search]);
 
   const watchKey = watch.list.map((item) => item.address).join(",");
   const ownedKey = ownedAddresses.join(",");
@@ -209,7 +226,7 @@ export function TokenExplorer({
       cancelled = true;
       clearInterval(id);
     };
-  }, [idsKey, merge]);
+  }, [idsKey, merge, fetchPrices]);
 
   // Frozen ordering: re-rank only when the view (filter/sort/search) changes or on "Refresh rankings".
   const viewKey = `${searching ? `search:${search?.query ?? ""}` : filter}|${sort}`;
@@ -348,14 +365,19 @@ export function TokenExplorer({
           </div>
         ) : (
           <div className="grid grid-cols-4 gap-1 rounded-lg bg-[var(--field-bg)] p-1" role="group" aria-label="Filter tokens">
-            {FILTERS.map((option) => (
+            {FILTERS.map((option, i) => (
               <button
                 key={option.id}
                 type="button"
                 aria-pressed={filter === option.id}
                 onClick={() => setFilter(option.id)}
-                className={`min-h-8 rounded-md px-1 text-xs font-semibold transition ${
+                className={`relative min-h-8 rounded-md px-1 text-xs font-semibold transition ${
                   filter === option.id ? "bg-[var(--surface-hover)] text-[var(--text)]" : "text-[var(--muted)] hover:text-[var(--text)]"
+                } ${
+                  // Divider between segments; hidden next to the selected pill so it doesn't double up.
+                  i > 0 && filter !== option.id && filter !== FILTERS[i - 1].id
+                    ? "before:absolute before:-left-[2.5px] before:top-2 before:bottom-2 before:w-px before:bg-[var(--line)]"
+                    : ""
                 }`}
               >
                 {option.label}

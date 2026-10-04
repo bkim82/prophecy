@@ -1,31 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { MarketChart } from "@/app/MarketChart";
-import { OrderForm, type TradeInput } from "./OrderForm";
-import type { OpenPositionView, TokenSearchResult } from "./types";
-import {
-  CHART_PERIODS,
-  Change,
-  CoinImage,
-  LivePrice,
-  StarButton,
-  ageLabel,
-  compactOrDash,
-  pnlColor,
-  signed,
-  usd,
-  useTokenHistory,
-  type ChartPeriod,
-} from "./ui";
-import { useWatchlist } from "./watchlist";
+import type { TokenSearchResult } from "@/lib/basePrices";
+import { Change, CoinImage, LivePrice, StarButton, ageLabel, compactOrDash, usd } from "@/app/duel/portfolio/ui";
+import { useWatchlist } from "@/app/duel/portfolio/watchlist";
+import { WALLET_HISTORY_PERIODS, useWalletHistory, type WalletHistoryPeriod } from "./useWalletHistory";
 
 const QUOTE_REFRESH_MS = 5000;
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
-/** Window length, time-axis spacing and label style per chart period. */
-const CHART_WINDOWS: Record<ChartPeriod, { ms: number; tickMs: number; label: string; dates: boolean }> = {
+const CHART_WINDOWS: Record<WalletHistoryPeriod, { ms: number; tickMs: number; label: string; dates: boolean }> = {
   "1h": { ms: HOUR, tickMs: 10 * 60_000, label: "hour", dates: false },
   "24h": { ms: DAY, tickMs: 4 * HOUR, label: "24 hours", dates: false },
   "7d": { ms: 7 * DAY, tickMs: DAY, label: "7 days", dates: true },
@@ -45,6 +31,7 @@ const DEX_NAMES: Record<string, string> = {
 };
 const dexName = (id: string) => DEX_NAMES[id] ?? id.charAt(0).toUpperCase() + id.slice(1);
 const shortAddress = (address: string) => `${address.slice(0, 6)}…${address.slice(-4)}`;
+const qty = (n: number) => (n === 0 ? "0" : n < 0.0001 ? n.toExponential(2) : n.toLocaleString("en-US", { maximumFractionDigits: 4 }));
 
 /** A short, strictly factual blurb built only from the market data we have. */
 function describe(token: TokenSearchResult, now: number) {
@@ -61,49 +48,41 @@ function describe(token: TokenSearchResult, now: number) {
 }
 
 /**
- * The selected token: identity, live price, a chart with period switching,
- * factual context with its data source/time, a watchlist toggle, and the
- * compact order form. Crossfades when the selection changes.
+ * Advanced tab's selected token: identity, live price, a chart with period
+ * switching, factual context, a watchlist toggle, and Buy/Sell actions —
+ * modeled on app/duel/portfolio/TokenDetail.tsx, minus the Embers-based
+ * OrderForm (Buy/Sell here open the wallet's non-functional swap sheet).
  */
-export function TokenDetail({
+export function AdvancedTokenDetail({
   token,
   onQuote,
-  positions,
-  availableCash,
-  sessionEnded,
-  busy,
-  error,
-  onSubmit,
+  ownedQty,
   now,
   onBack,
-  onViewPortfolio,
+  onBuy,
+  onSell,
 }: {
   token: TokenSearchResult | null;
   onQuote: (fresh: TokenSearchResult) => void;
-  positions: OpenPositionView[];
-  availableCash: number;
-  sessionEnded: boolean;
-  busy: boolean;
-  error: string | null;
-  onSubmit: (input: TradeInput) => Promise<boolean>;
+  ownedQty: number | null;
   now: number;
   onBack: () => void;
-  onViewPortfolio: () => void;
+  onBuy: () => void;
+  onSell: () => void;
 }) {
-  const [period, setPeriod] = useState<ChartPeriod>("24h");
+  const [period, setPeriod] = useState<WalletHistoryPeriod>("24h");
   const [quotedAt, setQuotedAt] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
   const watch = useWatchlist();
   const tokenAddress = token?.address ?? null;
 
-  // Keep the selected coin's price live while it's on screen.
   useEffect(() => {
     if (!tokenAddress) return;
     let cancelled = false;
     setQuotedAt(null);
     const refresh = async () => {
       try {
-        const res = await fetch("/api/tokens/prices", {
+        const res = await fetch("/api/wallet/prices", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ addresses: [tokenAddress] }),
@@ -127,36 +106,33 @@ export function TokenDetail({
     };
   }, [tokenAddress, onQuote]);
 
-  const history = useTokenHistory(tokenAddress ? [tokenAddress] : [], false, period);
+  const history = useWalletHistory(tokenAddress ? [tokenAddress] : [], period);
   const closes = tokenAddress ? history.lookup(tokenAddress) : undefined;
   const livePrice = token?.priceUsd ?? 0;
   const chartWindow = CHART_WINDOWS[period];
-  // History is closes only, evenly spaced across the period; the live quote is the head at `now`.
-  const chartPoints = useMemo(() => {
+  const chartPoints = (() => {
     if (!closes || closes.length < 2) return [];
     const step = chartWindow.ms / closes.length;
     const start = now - chartWindow.ms;
     const points = closes.map((p, i) => ({ t: start + i * step, p }));
     points.push({ t: now, p: livePrice > 0 ? livePrice : closes[closes.length - 1] });
     return points;
-  }, [closes, chartWindow, now, livePrice]);
+  })();
 
   if (!token) {
     return (
-      <section className="flex min-h-[320px] flex-col items-center justify-center rounded-xl lg:h-full lg:min-h-[900px] bg-[var(--surface)] px-6 py-10 text-center" aria-label="Selected token">
+      <section className="flex min-h-[320px] flex-col items-center justify-center rounded-xl lg:h-full lg:min-h-[700px] bg-[var(--surface)] px-6 py-10 text-center" aria-label="Selected token">
         <span className="flex -space-x-2" aria-hidden="true">
           <CoinImage src={null} symbol="?" size={36} />
           <CoinImage src={null} symbol="B" size={36} />
         </span>
         <p className="mt-3 text-sm font-medium text-[var(--text)]">Pick a token to see what it is and how it’s moving.</p>
-        <p className="mt-1 text-xs text-[var(--muted)]">Search or browse the list — nothing trades until you place an order.</p>
+        <p className="mt-1 text-xs text-[var(--muted)]">Nothing here moves real funds until you confirm a swap.</p>
       </section>
     );
   }
 
   const periodChange = closes && closes.length >= 2 ? ((closes[closes.length - 1] - closes[0]) / closes[0]) * 100 : null;
-  const holdings = positions.filter((position) => position.tokenAddress === token.address);
-  const holdingsPnl = holdings.reduce((total, position) => total + position.unrealizedPnl, 0);
   const watched = watch.has(token.address);
   const quoteAge = quotedAt === null ? null : Math.max(0, Math.round((now - quotedAt) / 1000));
 
@@ -171,13 +147,12 @@ export function TokenDetail({
   };
 
   return (
-    <section className="rounded-xl bg-[var(--surface)] p-4 sm:p-5 lg:h-full lg:min-h-[900px]" aria-label={`${token.name} details`}>
+    <section className="rounded-xl bg-[var(--surface)] p-4 sm:p-5 lg:h-full lg:min-h-[700px]" aria-label={`${token.name} details`}>
       <button type="button" onClick={onBack} className="-ml-1 mb-3 flex min-h-9 items-center gap-1 rounded-md px-1 text-sm font-semibold text-[var(--muted)] hover:text-[var(--text)] lg:hidden">
         <span aria-hidden="true">←</span> Explore
       </button>
 
       <div key={token.address} className="pf-crossfade">
-        {/* Identity + live price */}
         <div className="flex items-start gap-3">
           <CoinImage src={token.imageUrl} symbol={token.symbol} size={48} />
           <div className="min-w-0 flex-1">
@@ -206,17 +181,21 @@ export function TokenDetail({
           </div>
         </div>
 
-        {/* Chart */}
         <div className="mt-4">
           <div className="mb-2 flex justify-end gap-1" role="group" aria-label="Chart period">
-            {CHART_PERIODS.map((option) => (
+            {WALLET_HISTORY_PERIODS.map((option, i) => (
               <button
                 key={option}
                 type="button"
                 aria-pressed={period === option}
                 onClick={() => setPeriod(option)}
-                className={`min-h-8 rounded-md px-2.5 text-xs font-semibold uppercase transition-colors ${
+                className={`relative min-h-8 rounded-md px-2.5 text-xs font-semibold uppercase transition-colors ${
                   period === option ? "bg-[var(--surface-hover)] text-[var(--text)]" : "text-[var(--muted)] hover:text-[var(--text)]"
+                } ${
+                  // Divider between segments; hidden next to the selected pill (same as TokenExplorer's filters).
+                  i > 0 && period !== option && period !== WALLET_HISTORY_PERIODS[i - 1]
+                    ? "before:absolute before:-left-[2.5px] before:top-2 before:bottom-2 before:w-px before:bg-[var(--line)]"
+                    : ""
                 }`}
               >
                 {option}
@@ -229,24 +208,23 @@ export function TokenDetail({
             </div>
           ) : (
             <div className="pf-coin-chart">
-            <MarketChart
-              points={chartPoints}
-              now={now}
-              label={`${token.symbol} ${period}`}
-              tickSize={livePrice > 0 ? livePrice * 1e-4 : 1e-12}
-              height={320}
-              windowMs={chartWindow.ms}
-              tickMs={chartWindow.tickMs}
-              windowLabel={chartWindow.label}
-              formatPrice={formatChartPrice}
-              formatTime={formatChartTime(chartWindow.dates)}
-              smooth={false}
-            />
+              <MarketChart
+                points={chartPoints}
+                now={now}
+                label={`${token.symbol} ${period}`}
+                tickSize={livePrice > 0 ? livePrice * 1e-4 : 1e-12}
+                height={320}
+                windowMs={chartWindow.ms}
+                tickMs={chartWindow.tickMs}
+                windowLabel={chartWindow.label}
+                formatPrice={formatChartPrice}
+                formatTime={formatChartTime(chartWindow.dates)}
+                smooth={false}
+              />
             </div>
           )}
         </div>
 
-        {/* Context */}
         <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2.5 sm:grid-cols-4">
           <Stat label="Market cap" value={compactOrDash(token.marketCapUsd)} />
           <Stat label="Liquidity" value={compactOrDash(token.liquidityUsd)} />
@@ -258,31 +236,16 @@ export function TokenDetail({
           Price &amp; market data: DexScreener{quoteAge !== null && ` · updated ${quoteAge < 5 ? "just now" : `${quoteAge}s ago`}`} · Chart: GeckoTerminal
         </p>
 
-        {holdings.length > 0 && (
-          <p className="mt-3 flex items-center justify-between gap-2 rounded-lg bg-[var(--selected-bg)] px-3 py-2 text-xs">
-            <span className="text-[var(--text)]">
-              You have {holdings.length} open position{holdings.length === 1 ? "" : "s"} in {token.symbol} ·{" "}
-              <span className="font-semibold tabular-nums" style={{ color: pnlColor(holdingsPnl) }}>
-                {signed(holdingsPnl)} Embers
-              </span>
-            </span>
-            <button type="button" onClick={onViewPortfolio} className="shrink-0 font-semibold text-[var(--brand-strong)] lg:hidden">
-              Manage
-            </button>
+        {ownedQty != null && ownedQty > 0 && (
+          <p className="mt-3 rounded-lg bg-[var(--selected-bg)] px-3 py-2 text-xs text-[var(--text)]">
+            You hold {qty(ownedQty)} {token.symbol} in this wallet.
           </p>
         )}
       </div>
 
-      <div className="mt-4">
-        <OrderForm
-          token={token}
-          availableCash={availableCash}
-          sessionEnded={sessionEnded}
-          busy={busy}
-          error={error}
-          onSubmit={onSubmit}
-          onViewPortfolio={onViewPortfolio}
-        />
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <button type="button" onClick={onBuy} className="wd-sheet-primary-button">Buy {token.symbol}</button>
+        <button type="button" onClick={onSell} disabled={!ownedQty} className="wd-detail-secondary-button">Sell {token.symbol}</button>
       </div>
     </section>
   );

@@ -6,6 +6,9 @@ Deliberate gaps in a prototype scoped to the core loop. Not bugs.
 
 | Gap | Detail |
 | --- | --- |
+| Real copy-trading / creator earnings | No ledger, fee split, or follower relationship exists anywhere; "Copy trade" on a feed post (`app/PostCard.tsx:107`) is just a button. The wallet briefly had a mock Creator earnings card, removed along with Recent activity when the dashboard was reworked into tabs (`docs/wallet.md`) |
+| Wallet Recent activity has no UI home | `getWalletActivity`/`GET /api/wallet/activity` (`lib/alchemy.ts`) reads real confirmed transfers (Received/Sent/Swapped) and still works, but nothing in `app/wallet/*` renders it since the Portfolio tab became a plain coin list |
+| Wallet Deposit/Send/Swap are UI-only | `app/wallet/ActionSheets.tsx` collects inputs but never calls `eth_sendTransaction` or a swap router, on either the Portfolio or Advanced tab; there is correspondingly no pending-transaction state |
 | Portfolio cross-session history/leaderboard | `GET /api/portfolio/session` returns only the current session plus a short list of recent settled sessions (`lib/portfolio.ts sessionHistoryFor`) — no full history browsing UI, no leaderboard across users |
 | Real rank/tier system | `app/lib/rank.ts` is a hardcoded stub (`MOCK_CURRENT_RANK`/`MOCK_RANK_THRESHOLD`) gating `/exclusive`, plus `VIEWER_RANK = "Gold II"` gating profile portfolios — no computation, no persistence, not tied to Clerk `userId`. Sanctum separately assumes the viewer is `Oracle II` (`app/lib/roomsMocks.ts` `ROOM.subrank`) |
 | Real profiles | `/profile/[handle]` reads `app/lib/mockProfiles.ts`/`mockPortfolios.ts` — no profile for the signed-in Clerk user, no header/menu entry point, follow toggle doesn't persist, no real follow graph (see [profiles.md](profiles.md)) |
