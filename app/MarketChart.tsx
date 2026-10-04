@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { FlameIcon } from "./icons";
 import type { PricePoint } from "./usePriceFeed";
 
 // Lobby ticker chart, in Prophecy's palette with the line in the market's own
@@ -152,7 +153,14 @@ const STARS = (() => {
 // fan of possible paths up and down — the call the player is about to make.
 const FUTURE_FRAC = 0.16;
 const RAYS = [-1, -0.55, -0.2, 0.2, 0.55, 1];
+// Nearest 1%/2%/3% label for each ray above, paired by index — the rays'
+// visual reach stays volatility-scaled (geo.reachUp/Down), this is only the
+// number shown in the confirm popup, not a recomputed geometry.
+const RAY_PCT = [3, 2, 1, 1, 2, 3];
 const SPARKS = 5;
+
+type RayConfirm = { side: "long" | "short"; pct: number; price: number };
+type RayToast = { key: number; side: "long" | "short"; price: number };
 
 type Props = {
   points: PricePoint[];
@@ -179,6 +187,17 @@ export function MarketChart({ points, now, label, tickSize, height = DEFAULT_HEI
   const anim = useRef<{ at: number; head: number; low: number; high: number } | null>(null);
   // A different market is a different price scale: never ease across it.
   useEffect(() => { anim.current = null; }, [label]);
+
+  // Clicking a future-ray is a side thing, not part of any game: no embers
+  // actually move, nothing is persisted — just a confirm popup and a toast.
+  const [rayConfirm, setRayConfirm] = useState<RayConfirm | null>(null);
+  const [rayToast, setRayToast] = useState<RayToast | null>(null);
+  useEffect(() => { setRayConfirm(null); setRayToast(null); }, [label]);
+  useEffect(() => {
+    if (!rayToast) return;
+    const id = setTimeout(() => setRayToast(null), 1800);
+    return () => clearTimeout(id);
+  }, [rayToast]);
 
   // Flash + ripple whenever the live price moves, coloured by direction.
   const liveP = points.at(-1)?.p;
@@ -311,6 +330,17 @@ export function MarketChart({ points, now, label, tickSize, height = DEFAULT_HEI
   const pillW = PAD.right - 8;
   const plotH = HEIGHT - PAD.top - PAD.bottom;
 
+  const openRayConfirm = (side: "long" | "short", pct: number) => {
+    if (!geo) return;
+    const price = geo.last.p * (1 + (side === "long" ? pct : -pct) / 100);
+    setRayConfirm({ side, pct, price });
+  };
+  const confirmRay = () => {
+    if (!rayConfirm) return;
+    setRayToast({ key: Date.now(), side: rayConfirm.side, price: rayConfirm.price });
+    setRayConfirm(null);
+  };
+
   const stars = (
     <g className="mc-stars" aria-hidden="true">
       {STARS.map((star, i) => (
@@ -437,16 +467,31 @@ export function MarketChart({ points, now, label, tickSize, height = DEFAULT_HEI
           <g className="mc-future" style={{ transformOrigin: `${geo.headX}px ${geo.headY}px` }}>
             <path d={`M${geo.headX},${geo.headY}L${geo.right},${geo.headY - geo.reachUp}L${geo.right},${geo.headY}Z`} fill={`url(#${uid}-cone-up)`} />
             <path d={`M${geo.headX},${geo.headY}L${geo.right},${geo.headY + geo.reachDown}L${geo.right},${geo.headY}Z`} fill={`url(#${uid}-cone-down)`} />
-            {RAYS.map((k) => (
-              <line
-                key={k}
-                className={`mc-ray ${k < 0 ? "is-up" : "is-down"}`}
-                x1={geo.headX}
-                y1={geo.headY}
-                x2={geo.right}
-                y2={geo.headY + k * (k < 0 ? geo.reachUp : geo.reachDown)}
-              />
-            ))}
+            {RAYS.map((k, i) => {
+              const side: "long" | "short" = k < 0 ? "long" : "short";
+              const pct = RAY_PCT[i];
+              const y2 = geo.headY + k * (k < 0 ? geo.reachUp : geo.reachDown);
+              return (
+                <g
+                  key={k}
+                  className="mc-ray-group"
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Confirm ${side} near ${side === "long" ? "+" : "-"}${pct}%`}
+                  onClick={() => openRayConfirm(side, pct)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      openRayConfirm(side, pct);
+                    }
+                  }}
+                >
+                  <title>{`Confirm ${side === "long" ? "Long" : "Short"} · ${side === "long" ? "+" : "-"}${pct}%`}</title>
+                  <line className="mc-ray-hit" x1={geo.headX} y1={geo.headY} x2={geo.right} y2={y2} />
+                  <line className={`mc-ray ${side === "long" ? "is-up" : "is-down"}`} x1={geo.headX} y1={geo.headY} x2={geo.right} y2={y2} />
+                </g>
+              );
+            })}
           </g>
           <line className="mc-now" x1={geo.headX} x2={geo.headX} y1={PAD.top} y2={geo.bottom} stroke={`url(#${uid}-now)`} />
 
@@ -509,6 +554,39 @@ export function MarketChart({ points, now, label, tickSize, height = DEFAULT_HEI
             );
           })()}
         </svg>
+      )}
+
+      {rayConfirm && (
+        <div
+          className="mc-ray-confirm-overlay"
+          onClick={() => setRayConfirm(null)}
+        >
+          <div
+            className={`mc-ray-confirm-card is-${rayConfirm.side === "long" ? "up" : "down"}`}
+            role="dialog"
+            aria-label={`Confirm ${rayConfirm.side}`}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <FlameIcon className="mc-ray-confirm-flame" />
+            <strong>Confirm {rayConfirm.side === "long" ? "Long" : "Short"}</strong>
+            <span className="muted">
+              {label} near {formatChartPrice(rayConfirm.price, tickSize)} ({rayConfirm.side === "long" ? "+" : "-"}{rayConfirm.pct}%)
+            </span>
+            <div className="mc-ray-confirm-actions">
+              <button type="button" onClick={() => setRayConfirm(null)}>Cancel</button>
+              <button type="button" className={`mc-ray-confirm-go is-${rayConfirm.side === "long" ? "up" : "down"}`} onClick={confirmRay}>
+                Confirm {rayConfirm.side === "long" ? "Long" : "Short"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {rayToast && (
+        <div key={rayToast.key} className={`mc-ray-toast is-${rayToast.side === "long" ? "up" : "down"}`}>
+          <FlameIcon className="mc-ray-toast-flame" />
+          {rayToast.side === "long" ? "Long" : "Short"} confirmed near {formatChartPrice(rayToast.price, tickSize)}
+        </div>
       )}
     </div>
   );

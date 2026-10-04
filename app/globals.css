@@ -466,6 +466,35 @@ button { cursor: pointer; }
 .mc-ray.is-up { stroke: var(--positive); }
 .mc-ray.is-down { stroke: var(--negative); }
 
+/* A ray is a quick side-bet affordance, not part of any game round: a wide
+   invisible hit-stroke makes the thin dashed line easy to click/tap, and the
+   visible ray brightens on hover/focus so it reads as clickable. */
+.mc-ray-group { cursor: pointer; }
+.mc-ray-group:hover .mc-ray, .mc-ray-group:focus-visible .mc-ray { opacity: 1; stroke-width: 1.75; }
+.mc-ray-hit { stroke: transparent; stroke-width: 16; }
+.mc-ray-group:focus-visible .mc-ray-hit { outline: none; }
+
+.mc-ray-confirm-overlay { position: absolute; inset: 0; z-index: 5; display: flex; align-items: center; justify-content: center; background: color-mix(in srgb, var(--surface) 55%, transparent); backdrop-filter: blur(2px); animation: mc-ray-overlay-in .12s ease-out; }
+.mc-ray-confirm-card { display: flex; flex-direction: column; align-items: center; gap: 6px; width: min(86%, 260px); padding: 16px; border: 1px solid var(--line-strong); border-radius: 14px; background: var(--surface-raised); box-shadow: 0 12px 28px rgba(0, 0, 0, .3); text-align: center; }
+.mc-ray-confirm-flame { width: 22px; height: 22px; color: var(--chart-line); }
+.mc-ray-confirm-card strong { font-size: 15px; }
+.mc-ray-confirm-card.is-up strong { color: var(--positive); }
+.mc-ray-confirm-card.is-down strong { color: var(--negative); }
+.mc-ray-confirm-actions { display: flex; gap: 8px; margin-top: 8px; width: 100%; }
+.mc-ray-confirm-actions button { flex: 1; padding: 8px 10px; border-radius: 9px; border: 1px solid var(--line-strong); background: transparent; color: var(--text); font-weight: 600; font-size: 13px; cursor: pointer; }
+.mc-ray-confirm-go.is-up { background: var(--positive); border-color: var(--positive); color: var(--surface); }
+.mc-ray-confirm-go.is-down { background: var(--negative); border-color: var(--negative); color: var(--surface); }
+
+.mc-ray-toast { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 6; display: flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 999px; background: var(--surface-raised); border: 1px solid var(--line-strong); box-shadow: 0 8px 20px rgba(0, 0, 0, .3); font-size: 12px; font-weight: 600; animation: pc-toast-fade 1.6s ease-out forwards; }
+.mc-ray-toast-flame { width: 14px; height: 14px; }
+.mc-ray-toast.is-up { color: var(--positive); }
+.mc-ray-toast.is-down { color: var(--negative); }
+.mc-ray-toast.is-up .mc-ray-toast-flame { color: var(--positive); }
+.mc-ray-toast.is-down .mc-ray-toast-flame { color: var(--negative); }
+
+@keyframes mc-ray-overlay-in { 0% { opacity: 0; } 100% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .mc-ray-confirm-overlay { animation: none; } .mc-ray-toast { animation: none; } }
+
 .market-chart-live { stroke: var(--chart-line); stroke-width: 1; stroke-dasharray: 2 4; opacity: .55; animation: mc-fade-in .5s ease-out 1.45s both; }
 .market-chart-pill { fill: var(--chart-line); filter: drop-shadow(0 0 10px color-mix(in srgb, var(--chart-line) 60%, transparent)); }
 .market-chart-pill-text { fill: var(--market-accent-contrast); font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
