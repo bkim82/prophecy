@@ -20,11 +20,13 @@ export function OmensIcon({ className }: { className?: string }) {
   );
 }
 
-export function RoomsIcon({ className }: { className?: string }) {
+// A small temple: pediment, three columns, plinth.
+export function SanctumIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 20 20" className={className} fill="none" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M3 4.5h14v9H8l-4.5 3v-12Z" />
-      <path d="M6.5 8.5h7M6.5 11h4.5" />
+      <path d="M2.5 7.5 10 3l7.5 4.5h-15Z" />
+      <path d="M5 10v4.5M10 10v4.5M15 10v4.5" />
+      <path d="M3 17h14" />
     </svg>
   );
 }

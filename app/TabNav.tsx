@@ -2,13 +2,13 @@
 
 import { useRouter, usePathname } from "next/navigation";
 import { useTransition } from "react";
-import { ArenaIcon, OmensIcon, RoomsIcon, WalletIcon } from "./icons";
+import { ArenaIcon, OmensIcon, SanctumIcon, WalletIcon } from "./icons";
 
 // Same four destinations, same order, as MobileBottomNav.
 const TABS = [
   { href: "/", label: "Omens", Icon: OmensIcon },
-  { href: "/rooms", label: "Rooms", Icon: RoomsIcon },
   { href: "/duel", label: "Arena", Icon: ArenaIcon },
+  { href: "/sanctum", label: "Sanctum", Icon: SanctumIcon },
   { href: "/wallet", label: "Wallet", Icon: WalletIcon },
 ];
 

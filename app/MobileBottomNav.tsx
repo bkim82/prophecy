@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArenaIcon, OmensIcon, RoomsIcon, WalletIcon } from "./icons";
+import { ArenaIcon, OmensIcon, SanctumIcon, WalletIcon } from "./icons";
 
 const NAV_ITEMS = [
   { href: "/", label: "Omens", Icon: OmensIcon },
-  { href: "/rooms", label: "Rooms", Icon: RoomsIcon },
   { href: "/duel", label: "Arena", Icon: ArenaIcon, className: "mobile-bottom-nav-link--arena" },
+  { href: "/sanctum", label: "Sanctum", Icon: SanctumIcon },
   { href: "/wallet", label: "Wallet", Icon: WalletIcon, className: "mobile-bottom-nav-link--wallet" },
 ];
 
