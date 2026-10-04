@@ -2,7 +2,7 @@
 
 Rank-gated group-chat placeholder. UI-only pass: the composer appends messages locally, with no backend, persistence, or real-time messaging. Establishes the nav + concept, not the full feature - see [roadmap.md](roadmap.md) "Not built".
 
-- Route: `/rooms` (`app/rooms/page.tsx`), linked from the header's `Feed`/`Rooms` tabs (`app/TabNav.tsx`).
+- Route: `/rooms` (`app/rooms/page.tsx`), linked from the header nav (`app/TabNav.tsx`).
 - Deliberately NOT a feed: no follower counts, reposts, or public engagement metrics - messages are plain author/time/text/optional-chip, not `PostCard`. The loop this stands in for is play Arenas -> improve rank -> unlock better Rooms -> play increasingly skilled players.
 - `app/lib/roomsMocks.ts` - `ROOMS` (Bronze -> Silver -> Gold -> Diamond -> Oracle), each with label/eyebrow/tagline/online count and its own `messages` (author, time, text, optional `RoomCall` chip, optional `challengeLabel`). User rank is hardcoded: `USER_ROOM_ID = "gold"`, `USER_SUBRANK = "Gold II"`. `roomStatus()` derives `"cleared" | "current" | "locked"` from ladder position; `canChatInRoom()` = not locked. No ties to `app/lib/rank.ts`.
 - `app/rooms/page.tsx` -> `app/rooms/RoomsView.tsx` (client) - holds the selected room in local state (defaults to the user's room; not in the URL). Every room is viewable from the `.room-switcher` pill strip above the hero. No sidebar: `.rooms-shell` overrides the feed grid to a single centered column (max 860px); still reuses `.feed-shell`/`.feed-main`/`.panel` from [feeds.md](feeds.md).

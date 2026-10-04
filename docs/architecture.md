@@ -1,6 +1,6 @@
 # architecture
 
-- Root header (`app/layout.tsx`) keeps the full `PROPHECY`/`Omens`/`Rooms`/`Arena`/`Wallet`/account desktop row, while `app/MobileBottomNav.tsx` supplies the dedicated phone navigation (`Omens`/`Rooms`/`Arena`/`Wallet`) at or below 768px and the compact mobile header keeps the brand, balances, theme toggle, and account control. Routes: `/` (Global feed), `/rooms` (rank-gated group chat placeholder, `app/rooms/page.tsx`), `/duel` (the market lobby, moved from `app/page.tsx`), `/wallet` (wallet desk with injected EIP-1193 connection and holdings). When not in a game, the root shell shows the compact bottom-right plus chip `QuickTicketBar`; an active match takes that slot instead. `/exclusive` (rank-gated feed) still exists but is no longer linked from the header nav. Live ticker on `/duel` reads the client-side BTC feed.
+- Root header (`app/layout.tsx`) is brand | `Omens`/`Rooms`/`Arena`/`Wallet` nav | balance + avatar on desktop (see [feeds.md](feeds.md)), while `app/MobileBottomNav.tsx` supplies the dedicated phone navigation (`Omens`/`Rooms`/`Arena`/`Wallet`) at or below 768px and the compact mobile header keeps the brand, balance, and account control (theme switch lives in the avatar menu; signed out it sits beside Sign in). Routes: `/` (Global feed), `/rooms` (rank-gated group chat placeholder, `app/rooms/page.tsx`), `/duel` (the market lobby, moved from `app/page.tsx`), `/wallet` (wallet desk with injected EIP-1193 connection and holdings). Outside `/duel` and its games, the root shell shows the compact bottom-right plus chip `QuickTicketBar`; an active match takes that slot instead. `/exclusive` (rank-gated feed) still exists but is no longer linked from the header nav. Live ticker on `/duel` reads the client-side BTC feed.
 - Multiplayer Pulse is server-authoritative: a `matches` row owns the round (`db/schema.ts:20`), `/api/match/*` routes own the transitions, clients poll. See [multiplayer-plan.md](multiplayer-plan.md).
 - Practice is client-only: Pulse practice reuses `app/duel/btc/pulse/page.tsx?practice=1` without creating a match or reserving a wager. See [practice-mode.md](practice-mode.md).
 - `/api/price` and `/api/history` remain stateless proxies to public exchange APIs. The price feed and chart stay client-side in every mode.
@@ -9,13 +9,15 @@
 
 ```
 app/layout.tsx (root shell: desktop header, compact mobile header, Clerk account controls)
-  ├── app/TabNav.tsx (desktop Omens / Rooms tab switcher, sliding underline)
+  ├── app/TabNav.tsx (desktop Omens / Rooms / Arena / Wallet nav, icons + active pill)
+  ├── app/BalancePill.tsx (ember balance button + balances dropdown)
+  ├── app/AccountMenu.tsx (Clerk avatar menu with theme action; signed-out toggle + Sign in)
   ├── app/MobileBottomNav.tsx (phone Omens / Rooms / Arena / Wallet navigation)
   ├── app/page.tsx (Global feed: mock PostCard list, app/lib/mockPosts.ts)
   ├── app/rooms/page.tsx (Rooms: rank-gated group chat placeholder, app/lib/roomsMocks.ts)
   ├── app/exclusive/page.tsx (Exclusive feed: rank-gated via app/lib/rank.ts stub, unlinked from nav)
   ├── app/wallet/page.tsx (wallet desk: injected EIP-1193 connection, BTC long/short ticket)
-  └── app/duel/page.tsx (live lobby: Pulse = `.pulse-stage` grid — ticker + MarketChart (app/MarketChart.tsx) left, call box (format/timer/Play) right, stacks <1000px; match rows)
+  └── app/duel/page.tsx (live lobby: `Arena` h1 (`.feed-heading`) → Pulse/24h Portfolio `.feed-tabs.arena-mode-tabs` → market row (BTC/ETH left, `DailyCoin` "Daily · Ð DOGE" chip right (market symbol from `MARKETS`), selectable) → Pulse = `.pulse-stage` grid — ticker + MarketChart (app/MarketChart.tsx) left, call box (format/timer/Play) right, stacks <1000px; ≤640px: 220px plot, 24h stats behind `.market-stats-toggle`, call box reorders timer → Play first; match rows)
         └── usePriceFeed() → price, sampled series, status, now
 app/duel/[market]/pulse/[matchId]/page.tsx (multiplayer Pulse positions, countdown, result)
 app/duel/portfolio/page.tsx (solo 24h Portfolio: freely-tradeable spot/leverage positions on Base meme coins)
@@ -45,11 +47,11 @@ portfolio room → POST /api/portfolio/session {stake}, POST /api/portfolio/posi
 duel/page.tsx Play controls → compact Practice action beside Play
 ```
 
-Multiplayer BTC Pulse is wired up. The 24h Portfolio (solo,
+Multiplayer BTC and ETH Pulse are wired up (same room, `/duel/[market]/pulse/[matchId]`; solo practice serves both via `app/duel/btc/pulse/page.tsx?practice=1&market=`). The 24h Portfolio (solo,
 DB-backed — see [portfolio.md](portfolio.md)) is wired up identically across
 all three market tabs, since it's asset-agnostic (token search picks the
-coin, not the lobby's market switcher). ETH's Cast/Pulse and DOGE's Cast/Pulse
-are still lobby-only placeholders — selectable in the mode switcher, which
+coin, not the lobby's market switcher). DOGE's Pulse
+is still a lobby-only placeholder — selectable in the mode switcher, which
 locks the play panel when the chosen mode has neither `href` nor `matched`
 (`app/duel/page.tsx:111-127`, `:163`). `matched` marks a mode that goes
 through matchmaking with no fixed URL: Play posts to `find-or-create` and
@@ -68,7 +70,7 @@ its stake and leverage in-round; so does the 24h Portfolio.
 | `app/page.tsx` | Global feed: static `PostCard` list from `app/lib/mockPosts.ts`, no backend |
 | `app/exclusive/page.tsx` | Exclusive feed: gates on `app/lib/rank.ts` mock rank, locked teaser vs. unlocked list; not linked from the header nav |
 | `app/rooms/page.tsx` | Rooms placeholder: current-room heading, mock group chat with market-call/challenge chips, subtle rank ladder — see [rooms.md](rooms.md) |
-| `app/TabNav.tsx` | desktop Feed/Rooms tab switcher in the header, active tab + sliding underline via `usePathname()` |
+| `app/TabNav.tsx` | desktop Omens/Rooms/Arena/Wallet header nav, active pill via `usePathname()` |
 | `app/MobileBottomNav.tsx` | dedicated sub-768px bottom navigation for Omens, Rooms, Arena, and Wallet |
 | `app/PostCard.tsx` | shared post rendering for both feed pages |
 | `app/lib/mockPosts.ts` | hardcoded `GLOBAL_POSTS`/`EXCLUSIVE_POSTS` mock data, no persistence |
@@ -87,7 +89,7 @@ its stake and leverage in-round; so does the 24h Portfolio.
 | `app/api/tokens/search/route.ts`, `app/api/tokens/prices/route.ts` | thin wrappers over `lib/basePrices.ts` |
 | `app/api/tokens/trending/route.ts`, `app/api/tokens/history/route.ts` | thin wrappers over `lib/tokenHistory.ts` |
 | `app/ActiveMatchBar.tsx` | global bottom pill for a match running off-page; mounts `PulseMiniDock` while the active match is Pulse in `countdown` |
-| `app/QuickTicketBar.tsx` | idle-state global bottom tab; expands the shared `WalletDesk` ticket upward when no match or queue is active |
+| `app/QuickTicketBar.tsx` | idle-state global bottom tab; expands the shared `WalletDesk` ticket upward when no match or queue is active; hidden on `/duel` and all `/duel/*` |
 | `app/PulseMiniDock.tsx` | condensed Pulse trading controls (stake/leverage/long/short/close) shown from `ActiveMatchBar` on hover (desktop) or tap (touch), same `/api/match/[id]/action` calls as the full room |
 | `app/lib/playerId.ts` | anonymous per-browser id in `localStorage` |
 | `lib/match.ts` | `MatchView` role-scoping, presence, guarded settlement — shared by every `/api/match/*` route |
@@ -103,14 +105,14 @@ its stake and leverage in-round; so does the 24h Portfolio.
 | `app/api/price/route.ts` | REST spot price, 2-source fallback chain |
 | `app/api/history/route.ts` | chart seed for the full window: trades + candle backfill, merged |
 | `app/layout.tsx` | root HTML, header shell, Clerk provider, metadata, Tailwind import, pre-paint theme script |
-| `app/ThemeToggle.tsx` | header light/dark button, writes `data-theme` + `localStorage` |
+| `app/ThemeToggle.tsx` | `useTheme()` hook (writes `data-theme` + `localStorage`), Sun/Moon icons, signed-out header toggle; signed-in toggle is in `app/AccountMenu.tsx` |
 | `app/theme.ts` | `THEME_STORAGE_KEY`, `THEME_INIT_SCRIPT` — shared by layout (server) and toggle (client) |
 
 ## Theming
 
 - Two themes, one token set. `:root` = dark (default), `[data-theme="light"]` redefines the same names (`app/globals.css:5-28`). No color literal belongs anywhere else — `PriceChart.tsx`, the match room and `pulse/page.tsx` use `var(--…)` in Tailwind arbitrary values, SVG presentation attributes and inline `style` alike.
 - Resolution order: `localStorage.theme` → dark (`app/theme.ts:9`, mirrored by `readTheme()` in `app/ThemeToggle.tsx:7-14`). Both readers must stay in sync.
-- `<html data-theme="dark" suppressHydrationWarning>` + the inline `<head>` script set the attribute during HTML parsing, before first paint (`app/layout.tsx:15-18`). `useLayoutEffect` in the toggle re-applies it after Strict Mode's dev remount clears `<html>`'s attributes.
+- `<html data-theme="dark" suppressHydrationWarning>` + the inline `<head>` script set the attribute during HTML parsing, before first paint (`app/layout.tsx:29-37`). `useLayoutEffect` in the toggle re-applies it after Strict Mode's dev remount clears `<html>`'s attributes.
 
 ## Invariants (do not violate silently)
 

@@ -48,7 +48,10 @@
      the line uses a softer, lighter amber (sits at ETH's #627eea weight). */
   --chart-line: #f0a868; --chart-point: #ffcb94;
 }
-[data-theme="light"] [data-market="btc"] { --chart-line: #d4823c; --chart-point: #b8692a; }
+[data-theme="light"] [data-market="btc"] { --chart-line: #d4823c; --chart-point: #b8692a; --market-accent-strong: #b8692a; }
+/* The dark-theme "strong" tints are lighter than the base and wash out on sand. */
+[data-theme="light"] [data-market="eth"] { --market-accent-strong: #3d58c9; }
+[data-theme="light"] [data-market="doge"] { --market-accent-strong: #8f7820; }
 [data-market="eth"] {
   --market-accent: #627eea; --market-accent-strong: #8296ef; --market-accent-contrast: #ffffff;
   --chart-line: #627eea; --chart-point: #8296ef;
@@ -67,46 +70,61 @@ button { cursor: pointer; }
 /* Prices, timers, balances, and other data readouts get the mono face across
    both the hand-rolled classes below and the Tailwind `tabular-nums` utility
    used on the duel/pulse match pages. */
-.tabular-nums, .ticker-price, .timer-value, .balance-display, .daily-coin,
+.tabular-nums, .ticker-price, .timer-value, .balance-display,
 .market-call-prices, .market-stats dd, .queue-elapsed, .entry-input-wrap input,
 .data-row, .result-row, .sidebar-value, .pulse-mini-dock-balance, .pulse-mini-dock-timer,
 .pulse-mini-dock-position .pnl, .pulse-mini-dock-row button {
   font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
 }
+/* Desktop header: three groups — wordmark | four destinations | balance + avatar.
+   The inner box uses the same width rule as the page shells below
+   (.feed-shell/.lobby-shell/.wallet-shell) so its edges line up with content. */
 .app-header { width: 100%; max-width: none; margin: 0; padding: 0; border-bottom: 1px solid var(--structure-line); background: var(--structure); }
-.app-header-inner { display: flex; width: min(100%, var(--shell-max)); align-items: center; justify-content: space-between; gap: 16px; margin-inline: auto; padding: 16px 28px; }
-.header-left { display: flex; align-items: center; gap: 22px; min-width: 0; }
-.brand { flex: none; font-family: var(--font-cinzel), Cinzel, Georgia, serif; color: var(--structure-text); font-size: 16px; font-weight: 600; letter-spacing: .3em; text-decoration: none; }
-.header-actions { display: flex; align-items: center; gap: 14px; }
-.arena-cta { display: inline-flex; align-items: center; gap: 7px; min-height: 40px; border: 1px solid var(--brand); border-radius: 7px; background: var(--brand); color: var(--brand-contrast); padding: 9px 16px; font-size: 13px; font-weight: 700; letter-spacing: .01em; text-decoration: none; box-shadow: 0 0 0 0 transparent; transition: background .15s ease, border-color .15s ease, box-shadow .2s ease; }
-.arena-cta:hover { background: var(--brand-strong); border-color: var(--brand-strong); box-shadow: 0 0 16px color-mix(in srgb, var(--brand) 45%, transparent); }
-.arena-cta-icon { width: 12px; height: 12px; }
-.wallet-cta { display: inline-flex; align-items: center; min-height: 40px; border: 1px solid var(--brand); border-radius: 7px; background: var(--brand); color: var(--brand-contrast); padding: 9px 16px; font-size: 13px; font-weight: 700; text-decoration: none; transition: background .15s ease, border-color .15s ease, box-shadow .2s ease; }
-.wallet-cta:hover { border-color: var(--brand-strong); background: var(--brand-strong); box-shadow: 0 0 16px color-mix(in srgb, var(--brand) 45%, transparent); }
-.signin-button { min-height: 40px; border: 1px solid var(--structure-line); border-radius: 7px; background: transparent; color: var(--structure-muted); padding: 9px 14px; font-size: 13px; }
+.app-header-inner { display: flex; width: min(100% - 56px, var(--shell-max)); height: 64px; align-items: center; justify-content: space-between; gap: 16px; margin-inline: auto; padding: 0; }
+.desktop-header-content { display: grid; width: 100%; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 24px; }
+.desktop-header-content > .brand { justify-self: start; }
+.brand { flex: none; font-family: var(--font-cinzel), Cinzel, Georgia, serif; color: var(--structure-text); font-size: 21px; font-weight: 600; letter-spacing: .3em; text-decoration: none; }
+.header-actions { display: flex; justify-self: end; align-items: center; gap: 12px; }
+.main-nav { display: flex; align-items: center; gap: 4px; font-family: var(--font-sans), Inter, system-ui, sans-serif; }
+.main-nav-link { display: inline-flex; align-items: center; gap: 7px; min-height: 36px; border-radius: 8px; padding: 0 12px; color: var(--structure-muted); font-size: 13px; font-weight: 600; text-decoration: none; -webkit-user-drag: none; user-select: none; transition: color .15s ease, background .15s ease; }
+.main-nav-link:hover { background: color-mix(in srgb, var(--structure-text) 6%, transparent); color: var(--structure-text); }
+.main-nav-link.active { background: color-mix(in srgb, var(--brand) 12%, var(--structure)); color: var(--brand); }
+.main-nav-icon { width: 15px; height: 15px; flex: none; }
+.main-nav[aria-busy="true"] { opacity: .8; }
+.signin-button { min-height: 36px; border: 1px solid var(--structure-line); border-radius: 8px; background: transparent; color: var(--structure-muted); padding: 0 14px; font-size: 13px; }
 .signin-button:hover { border-color: var(--brand); color: var(--structure-text); }
-.theme-toggle { display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid var(--structure-line); border-radius: 7px; background: transparent; color: var(--structure-muted); padding: 0; }
+.theme-toggle { display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid var(--structure-line); border-radius: 8px; background: transparent; color: var(--structure-muted); padding: 0; }
 .theme-toggle:hover { border-color: var(--brand); color: var(--structure-text); }
 .theme-toggle svg { display: block; width: 15px; height: 15px; }
-.balance-display { display: flex; align-items: center; gap: 9px; color: var(--structure-text); font-size: 13px; }
-.header-balance-block { display: inline-flex; align-items: baseline; gap: 6px; }
-.header-balance-block + .header-balance-block { border-left: 1px solid var(--structure-line); padding-left: 9px; }
+.account-signed-out { display: flex; align-items: center; gap: 8px; }
+.account-menu-icon { width: 15px; height: 15px; }
+.header-actions .cl-avatarBox { width: 32px; height: 32px; }
+.balance-menu { position: relative; }
+.balance-display { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; border: 1px solid var(--structure-line); border-radius: 999px; background: var(--structure-raised); color: var(--structure-text); padding: 0 10px 0 11px; font-size: 13px; font-weight: 500; transition: border-color .15s ease; }
+.balance-display:hover, .balance-display[aria-expanded="true"] { border-color: color-mix(in srgb, var(--ember) 55%, var(--structure-line)); }
+.balance-ember-icon { width: 14px; height: 14px; flex: none; color: var(--ember); }
+.balance-caret { width: 10px; height: 10px; color: var(--structure-muted); }
+.balance-menu-popover { position: absolute; top: calc(100% + 8px); right: 0; z-index: 40; width: 220px; padding: 6px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-raised); color: var(--text); box-shadow: 0 10px 28px rgba(0, 0, 0, .3); }
+.balance-menu-popover dl { display: grid; gap: 2px; margin: 0; }
+.balance-menu-popover dl > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 8px; }
+.balance-menu-popover dt { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
+.balance-menu-popover dd { margin: 0; font-size: 13px; font-weight: 600; }
+.balance-menu-link { display: flex; justify-content: space-between; margin-top: 4px; border-top: 1px solid var(--line); padding: 9px 8px 5px; color: var(--brand-strong); font-size: 12px; font-weight: 600; text-decoration: none; }
+.balance-menu-link:hover { color: var(--text); }
 .balance-label { color: var(--structure-muted); font-size: 10px; letter-spacing: .09em; text-transform: uppercase; }
 .coin-mark { display: none; }
-.daily-coin { position: relative; display: flex; align-items: center; gap: 9px; border: 1px solid transparent; border-radius: 6px; background: transparent; padding: 5px 8px; color: var(--structure-text); font-size: 13px; }
-.daily-coin:hover { color: var(--brand-strong); }
-.daily-coin.active { border-color: var(--structure-line); background: var(--structure-raised); }
-.daily-coin-tooltip { position: absolute; top: calc(100% + 8px); right: 0; width: 190px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--muted); font-size: 11px; line-height: 1.4; text-transform: none; letter-spacing: normal; opacity: 0; visibility: hidden; transform: translateY(-4px); transition: opacity .12s ease, transform .12s ease; pointer-events: none; z-index: 20; }
-.daily-coin:hover .daily-coin-tooltip,
-.daily-coin:focus-visible .daily-coin-tooltip { opacity: 1; visibility: visible; transform: translateY(0); }
-.main-nav { position: relative; display: flex; align-items: center; gap: 18px; }
-.main-nav-link { position: relative; padding: 4px 0; color: var(--structure-muted); font-size: 13px; font-weight: 600; text-decoration: none; -webkit-user-drag: none; user-select: none; transition: color .18s ease; }
-.main-nav-link:hover { color: var(--structure-text); }
-.main-nav-link.active { color: var(--brand); font-weight: 700; }
-.main-nav[aria-busy="true"] { opacity: .8; }
-.main-nav-underline { position: absolute; bottom: -1px; left: 0; height: 2px; border-radius: 999px; background: var(--brand); transition: transform .18s ease, width .18s ease; }
-.desktop-header-content { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 16px; }
+.market-switcher .daily-coin { border-color: var(--line); border-radius: 999px; }
+.market-switcher .daily-coin.active { border-color: color-mix(in srgb, var(--market-accent) 55%, var(--line)); }
+.daily-coin-label { color: var(--muted-dim); font-family: var(--font-sans), Inter, system-ui, sans-serif; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.daily-coin-sep { color: var(--muted-dim); }
+.daily-coin.active .daily-coin-label { color: var(--market-accent); }
 .mobile-header-content, .mobile-bottom-nav { display: none; }
+@media (min-width: 769px) and (max-width: 1000px) {
+  .desktop-header-content { gap: 12px; }
+  .main-nav { gap: 2px; }
+  .main-nav-link { padding: 0 9px; }
+  .main-nav-icon { display: none; }
+}
 .wallet-shell { width: min(100% - 56px, var(--shell-max)); margin: 0 auto; padding: 32px 0 64px; display: grid; grid-template-columns: minmax(0, 1fr) 340px; align-items: start; gap: 28px; }
 .wallet-page { width: min(100% - 48px, 520px); margin: 0 auto; padding: 40px 0 56px; }
 .wallet-page-content { display: grid; gap: 16px; width: min(100%, 380px); margin: 28px auto 0; }
@@ -395,7 +413,6 @@ button { cursor: pointer; }
 .eyebrow { color: var(--muted); font-size: 11px; letter-spacing: .11em; text-transform: uppercase; }
 .eyebrow-row { display: flex; align-items: center; gap: 12px; }
 .muted { color: var(--muted); }
-.mode-row { display: flex; justify-content: flex-end; margin: 0 2px 14px; }
 .market-nav { display: flex; align-items: center; justify-content: space-between; margin: 0 2px 14px; }
 .market-overview { display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.5fr) minmax(0, .65fr); gap: 26px; align-items: center; padding: 18px 24px; }
 .ticker-copy { min-width: 0; }
@@ -501,15 +518,24 @@ button { cursor: pointer; }
 @keyframes market-chart-ripple { 0% { opacity: .9; transform: scale(1); } 100% { opacity: 0; transform: scale(4.5); } }
 @keyframes market-chart-ping { 0% { opacity: .5; transform: scale(1); } 100% { opacity: 0; transform: scale(3.4); } }
 @media (prefers-reduced-motion: reduce) {
-  .market-chart *, .market-chart *::before { animation: none !important; }
+  .market-chart *, .market-chart *::before, .price-chart *, .price-chart *::before { animation: none !important; }
   .mc-shock, .mc-spark, .market-chart-pill-flash, .market-chart-ripple { display: none; }
 }
+/* In-round chart (app/PriceChart.tsx): same starfield/glow/orb vocabulary as
+   the lobby chart above (mc-* classes reused as-is — none of them are scoped
+   to .market-chart), plus its own round-status chip. */
+.price-chart svg { cursor: crosshair; }
+.pc-chip rect { fill: var(--surface-raised); stroke: var(--line-strong); }
+.pc-chip text { fill: var(--muted); font-size: 10px; font-weight: 600; }
+.pc-chip.is-live circle { fill: var(--positive); animation: mc-breathe 1.3s ease-in-out infinite; }
+.pc-chip.is-live rect { stroke: color-mix(in srgb, var(--positive) 45%, var(--line-strong)); }
+.pc-chip.is-live text { fill: var(--positive); }
 .market-stats { display: grid; gap: 13px; margin: 0; padding-left: 24px; border-left: 1px solid var(--line); }
 .market-stats div { display: flex; justify-content: space-between; gap: 12px; }
 .market-stats dt { color: var(--muted); font-size: 11px; }
 .market-stats dd { margin: 0; color: var(--text); font-size: 12px; font-variant-numeric: tabular-nums; }
 .section-heading { display: flex; justify-content: space-between; align-items: end; gap: 18px; margin: 22px 2px 10px; }
-.section-heading h1 { margin: 4px 0 0; font-size: 30px; line-height: 1; }
+.section-heading h1, .section-heading h2 { margin: 4px 0 0; font-size: 30px; line-height: 1; }
 .round-meta { display: block; margin-top: 7px; color: var(--muted); font-size: 12px; }
 .play-panel { display: grid; grid-template-columns: 1.2fr 1.3fr 1fr 1.2fr auto; align-items: center; column-gap: 28px; row-gap: 18px; padding: 19px 20px; }
 .play-panel-market, .row-market { display: flex; align-items: center; gap: 10px; }
@@ -612,6 +638,107 @@ button { cursor: pointer; }
 .queue-cancel { border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--muted); padding: 10px 16px; font-size: 13px; }
 @keyframes queue-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
 @media (prefers-reduced-motion: reduce) { .queue-pulse { animation: none; } }
+/* In-round Pulse arena (app/duel/btc/pulse/page.tsx practice,
+   app/duel/[market]/pulse/[matchId]/page.tsx multiplayer) — same entrance,
+   glow and pulse vocabulary as the lobby (.pulse-stage) and queue panel
+   above, reusing their keyframes rather than redefining them. */
+.arena-shell > * { animation: stage-rise .6s cubic-bezier(.2, .8, .2, 1) both; }
+.arena-shell > *:nth-child(2) { animation-delay: .06s; }
+.arena-shell > *:nth-child(3) { animation-delay: .12s; }
+.arena-shell > *:nth-child(4) { animation-delay: .18s; }
+.arena-shell > *:nth-child(5) { animation-delay: .24s; }
+@media (prefers-reduced-motion: reduce) { .arena-shell > * { animation: none; } }
+.arena-panel { position: relative; overflow: hidden; border-color: color-mix(in srgb, var(--violet) 22%, var(--line)) !important; background:
+  radial-gradient(90% 70% at 88% 92%, color-mix(in srgb, var(--brand) 11%, transparent), transparent 62%),
+  radial-gradient(70% 60% at 6% 0%, color-mix(in srgb, var(--violet) 14%, transparent), transparent 60%),
+  var(--surface) !important; }
+/* Market identity in the arena: a coin badge in the heading, and panels whose
+   border, top edge and corner glow take --market-accent instead of brand teal,
+   so a BTC room reads orange and an ETH room reads blue at a glance. */
+.arena-shell[data-market] .arena-panel { border-color: color-mix(in srgb, var(--market-accent) 32%, var(--line)) !important; box-shadow: inset 0 2px 0 color-mix(in srgb, var(--market-accent) 75%, transparent); background:
+  radial-gradient(90% 70% at 88% 92%, color-mix(in srgb, var(--market-accent) 12%, transparent), transparent 62%),
+  radial-gradient(70% 60% at 6% 0%, color-mix(in srgb, var(--violet) 12%, transparent), transparent 60%),
+  var(--surface) !important; }
+/* Chart and solo trading dock get the same market outline, minus the glow. */
+.arena-shell[data-market] .price-chart, .arena-shell[data-market] .arena-dock { border-color: color-mix(in srgb, var(--market-accent) 45%, var(--line)); box-shadow: 0 0 0 1px color-mix(in srgb, var(--market-accent) 12%, transparent), 0 0 24px color-mix(in srgb, var(--market-accent) 10%, transparent); }
+.arena-market-title { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 16px 0 0; color: var(--muted); font-size: 12px; font-weight: 500; letter-spacing: .2em; text-transform: uppercase; }
+.arena-market-badge { display: inline-flex; align-items: center; gap: 7px; padding: 4px 12px 4px 6px; border: 1px solid color-mix(in srgb, var(--market-accent) 55%, transparent); border-radius: 999px; background: color-mix(in srgb, var(--market-accent) 16%, transparent); color: var(--market-accent-strong); font-size: 14px; font-weight: 800; letter-spacing: .08em; box-shadow: 0 0 22px color-mix(in srgb, var(--market-accent) 28%, transparent); }
+.arena-market-badge .market-symbol { width: 22px; height: 22px; border: 0; font-size: 15px; }
+.arena-live-dot { animation: queue-pulse 1.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .arena-live-dot { animation: none; } }
+.arena-timer.is-urgent { color: var(--negative); text-shadow: 0 0 20px color-mix(in srgb, var(--negative) 55%, transparent); animation: queue-pulse .9s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .arena-timer.is-urgent { animation: none; } }
+/* Long/short CTAs glow in their own colour — the one choice that matters
+   each round, same way lobby Play is the one violet thing on its page. */
+.arena-choice { position: relative; overflow: hidden; }
+.arena-choice:not(:disabled)::after { content: ""; position: absolute; inset: 0; background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, .3) 50%, transparent 65%); transform: translateX(-100%); animation: play-sheen 3.2s ease-in-out .6s infinite; pointer-events: none; }
+.arena-choice.is-long:not(:disabled) { animation: arena-choice-up 2.6s ease-in-out infinite; }
+.arena-choice.is-short:not(:disabled) { animation: arena-choice-down 2.6s ease-in-out infinite; }
+@keyframes arena-choice-up { 0%, 100% { box-shadow: 0 10px 26px color-mix(in srgb, var(--chart-up) 35%, transparent); } 50% { box-shadow: 0 10px 40px color-mix(in srgb, var(--chart-up) 65%, transparent); } }
+@keyframes arena-choice-down { 0%, 100% { box-shadow: 0 10px 26px color-mix(in srgb, var(--chart-down) 35%, transparent); } 50% { box-shadow: 0 10px 40px color-mix(in srgb, var(--chart-down) 65%, transparent); } }
+@media (prefers-reduced-motion: reduce) { .arena-choice.is-long:not(:disabled), .arena-choice.is-short:not(:disabled), .arena-choice::after { animation: none; } }
+
+/* Solo Pulse trading dock (app/duel/btc/pulse/page.tsx TradingDock): a
+   compact two-row bar — small Amount/Leverage dropdowns + a gear row, then
+   equal-width primary actions below — instead of a tall settings panel.
+   Solid surface, no glow; only the action fills carry color. */
+.dock-bar { position: relative; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); padding: 10px; }
+.dock-last-note { margin: 0 0 8px; text-align: center; font-size: 11px; color: var(--muted); }
+.dock-row { display: flex; align-items: stretch; gap: 8px; }
+.dock-row + .dock-row { margin-top: 8px; }
+.dock-select { position: relative; flex: 1; min-width: 0; }
+.dock-select > summary { display: flex; height: 40px; align-items: center; justify-content: space-between; gap: 6px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-raised); padding: 0 10px; list-style: none; color: var(--text); font-size: 13px; cursor: pointer; }
+.dock-select > summary::-webkit-details-marker { display: none; }
+.dock-select > summary:hover { border-color: var(--line-strong); background: var(--surface-hover); }
+.dock-select[open] > summary { border-color: var(--brand); }
+.dock-select-label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .04em; }
+.dock-select-value { font-weight: 600; font-variant-numeric: tabular-nums; }
+.dock-select-chevron { color: var(--muted-dim); font-size: 10px; transition: transform .15s ease; }
+.dock-select[open] .dock-select-chevron { transform: rotate(180deg); }
+.dock-select-menu { position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 20; display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface-raised); padding: 8px; box-shadow: 0 10px 30px rgba(0, 0, 0, .3); }
+.dock-select-menu button { border-radius: 6px; border: 1px solid var(--line); padding: 6px 0; font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--muted); background: transparent; transition: border-color .15s ease, background .15s ease, color .15s ease; }
+.dock-select-menu button:hover:not(:disabled) { border-color: var(--line-strong); background: var(--surface-hover); }
+.dock-select-menu button.is-selected { border-color: var(--brand); background: var(--selected-bg); color: var(--brand-strong); }
+.dock-select-menu button:disabled { opacity: .4; cursor: not-allowed; }
+.dock-gear { flex: none; display: inline-flex; width: 40px; height: 40px; align-items: center; justify-content: center; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-raised); color: var(--muted); font-size: 15px; }
+.dock-action { flex: 1; height: 44px; border-radius: 8px; text-align: center; font-size: 15px; font-weight: 700; color: var(--trade-contrast); transition: filter .15s ease, transform .1s ease; }
+.dock-action:hover:not(:disabled) { filter: brightness(1.08); }
+.dock-action:active:not(:disabled) { transform: scale(.98); }
+.dock-action.is-long { background: color-mix(in srgb, var(--chart-up) 88%, black 12%); }
+.dock-action.is-short { background: color-mix(in srgb, var(--chart-down) 88%, black 12%); }
+.dock-action:disabled { background: var(--btn-disabled-bg); color: var(--btn-disabled-text); }
+.dock-action-secondary { flex: 1; height: 44px; border-radius: 8px; border: 1px solid var(--line); background: transparent; color: var(--text); font-size: 14px; font-weight: 600; transition: border-color .15s ease, background .15s ease; }
+.dock-action-secondary:hover:not(:disabled) { border-color: var(--line-strong); background: var(--surface-hover); }
+.dock-action-secondary:disabled { color: var(--btn-disabled-text); }
+.dock-chip { flex: none; display: inline-flex; height: 40px; align-items: center; border: 1px solid; border-radius: 8px; padding: 0 10px; font-size: 12px; font-weight: 700; letter-spacing: .04em; }
+.dock-live-pnl { flex: 1; display: flex; align-items: center; justify-content: center; height: 40px; font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.dock-meta { flex: none; display: flex; flex-direction: column; justify-content: center; height: 40px; text-align: right; font-size: 11px; color: var(--muted); }
+
+/* Sibyl duel: scoreboard avatars/ring/lead bar, dock hero P&L, result card. */
+.duel-avatar { position: relative; display: flex; flex-shrink: 0; align-items: center; justify-content: center; border-radius: 999px; font-weight: 700; color: #fff; box-shadow: 0 2px 10px rgba(0, 0, 0, .25); }
+.duel-avatar.is-lead { animation: duel-lead-pop .5s cubic-bezier(.2, .8, .2, 1); }
+@keyframes duel-lead-pop { 0% { transform: scale(1); } 40% { transform: scale(1.12); } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .duel-avatar.is-lead { animation: none; } }
+.sibyl-face-mouth { transition: opacity .2s ease; }
+.duel-ring-track { stroke: var(--line); fill: none; }
+.duel-ring-progress { stroke: var(--brand); fill: none; stroke-linecap: round; transform: rotate(-90deg); transform-origin: center; transition: stroke-dashoffset .18s linear; }
+.duel-ring-progress.is-urgent { stroke: var(--negative); animation: queue-pulse .9s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .duel-ring-progress.is-urgent { animation: none; } }
+.duel-lead-bar { position: relative; height: 6px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.duel-lead-fill { position: absolute; top: 0; bottom: 0; left: 0; width: 50%; border-radius: 999px; background: var(--brand); transition: width .35s cubic-bezier(.2, .8, .2, 1), background-color .35s ease; }
+.duel-lead-mid { position: absolute; top: -3px; bottom: -3px; left: 50%; width: 1px; background: var(--line-strong); }
+.sibyl-bubble { animation: duel-bubble-in .25s cubic-bezier(.2, .8, .2, 1) both; }
+@keyframes duel-bubble-in { from { opacity: 0; transform: translateY(4px) scale(.96); } }
+@media (prefers-reduced-motion: reduce) { .sibyl-bubble { animation: none; } }
+.dock-pnl-hero { transition: color .2s ease; }
+.result-burst { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.result-burst-particle { position: absolute; top: 50%; left: 50%; height: 7px; width: 7px; border-radius: 2px; background: var(--brand); opacity: 0; animation: result-burst-fly .85s ease-out forwards; }
+@keyframes result-burst-fly { 0% { opacity: 1; transform: translate(-50%, -50%) rotate(var(--rot, 0deg)) translateY(0); } 100% { opacity: 0; transform: translate(-50%, -50%) rotate(var(--rot, 0deg)) translateY(var(--dist, -90px)); } }
+@media (prefers-reduced-motion: reduce) { .result-burst { display: none; } }
+.pc-pnl-toast { animation: pc-toast-fade 1.6s ease-out forwards; }
+@keyframes pc-toast-fade { 0% { opacity: 0; transform: translateY(4px); } 15% { opacity: 1; transform: translateY(0); } 75% { opacity: 1; } 100% { opacity: 0; transform: translateY(-6px); } }
+@media (prefers-reduced-motion: reduce) { .pc-pnl-toast { animation: none; opacity: 0; } }
+
 .pulse-movement-alert { position: fixed; top: 50%; left: 50%; z-index: 50; pointer-events: none; transform: translate(-50%, -50%); border: 2px solid currentColor; border-radius: 14px; background: color-mix(in srgb, var(--surface) 84%, currentColor 16%); padding: 18px 26px; box-shadow: 0 16px 60px color-mix(in srgb, currentColor 42%, transparent), 0 0 18px color-mix(in srgb, currentColor 32%, transparent); font-size: clamp(42px, 9vw, 88px); font-weight: 800; line-height: 1; letter-spacing: -.04em; font-variant-numeric: tabular-nums; text-shadow: 0 0 18px color-mix(in srgb, currentColor 48%, transparent); animation: pulse-alert-pop 1.8s cubic-bezier(.2,.8,.2,1) both; }
 .pulse-movement-alert.is-positive { color: var(--chart-up); }
 .pulse-movement-alert.is-negative { color: var(--chart-down); }
@@ -675,46 +802,35 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
 .row-age { color: var(--muted-dim); }
 .result-row { grid-template-columns: minmax(110px, 1fr) 44px 55px 52px; }
 .result-row > span { text-align: right; font-size: 11px; }
-.market-switcher, .mode-switcher { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.market-switcher .field-label, .mode-switcher .field-label { margin-right: 5px; }
-.market-switcher button, .mode-switcher button { display: inline-flex; align-items: center; gap: 6px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--muted); padding: 5px 8px; font-size: 12px; }
-.market-switcher button.active, .mode-switcher button.active { border-color: var(--line); background: var(--surface); color: var(--text); }
-.market-switcher button:hover, .mode-switcher button:hover { color: var(--text); }
+.market-switcher { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.market-switcher .field-label { margin-right: 5px; }
+.market-switcher button { display: inline-flex; align-items: center; gap: 6px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--muted); padding: 5px 8px; font-size: 12px; }
+.market-switcher button.active { border-color: var(--line); background: var(--surface); color: var(--text); }
+.market-switcher button:hover { color: var(--text); }
 .market-switcher .market-symbol { width: 18px; height: 18px; border: 0; font-size: 13px; }
-.market-switcher small, .mode-switcher small { color: var(--muted-dim); font-size: 9px; }
-@media (max-width: 900px) { .market-overview { grid-template-columns: 1fr 1.4fr; } .market-stats { grid-column: 1 / -1; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--line); border-left: 0; padding: 15px 0 0; } .play-panel { grid-template-columns: repeat(3, 1fr); } .play-panel-market { grid-column: span 3; } .play-panel-market + .control-group { padding-left: 0; border-left: 0; } .opponent-status { grid-column: span 2; } .main-nav-link { font-size: 12px; } }
-@media (max-width: 640px) { .app-header-inner { padding: 12px 18px; } .lobby-shell { width: min(100% - 28px, 1080px); padding-top: 18px; } .market-overview { grid-template-columns: 1fr; gap: 18px; padding: 18px; } .ticker-chart-wrap { order: 3; } .market-stats { grid-template-columns: 1fr 1fr 1fr; } .market-stats div { display: grid; gap: 4px; } .section-heading { align-items: start; flex-direction: column; margin-top: 24px; gap: 7px; } .mode-switcher { gap: 6px; } .play-panel { grid-template-columns: 1fr 1fr; gap: 16px; } .play-panel-market, .opponent-status { grid-column: span 2; padding-left: 0; border-left: 0; } .play-panel-market + .control-group { padding-left: 0; border-left: 0; } .play-button { grid-column: span 2; } .queue-panel { align-items: start; flex-wrap: wrap; } .queue-copy { flex: 1 1 calc(100% - 24px); } .queue-elapsed { margin-left: 23px; } .queue-actions { margin-left: auto; } .queue-cancel { margin-left: 23px; } .lower-grid { grid-template-columns: 1fr; gap: 24px; margin-top: 24px; } .data-row { grid-template-columns: minmax(130px, 1fr) 55px 72px 35px; gap: 8px; padding-inline: 10px; } }
+.market-switcher small { color: var(--muted-dim); font-size: 9px; }
+@media (max-width: 900px) { .market-overview { grid-template-columns: 1fr 1.4fr; } .market-stats { grid-column: 1 / -1; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--line); border-left: 0; padding: 15px 0 0; } .play-panel { grid-template-columns: repeat(3, 1fr); } .play-panel-market { grid-column: span 3; } .play-panel-market + .control-group { padding-left: 0; border-left: 0; } .opponent-status { grid-column: span 2; } }
+@media (max-width: 640px) { .lobby-shell { width: min(100% - 28px, 1080px); padding-top: 18px; } .market-overview { grid-template-columns: 1fr; gap: 18px; padding: 18px; } .ticker-chart-wrap { order: 3; } .market-stats { grid-template-columns: 1fr 1fr 1fr; } .market-stats div { display: grid; gap: 4px; } .section-heading { align-items: start; flex-direction: column; margin-top: 24px; gap: 7px; } .play-panel { grid-template-columns: 1fr 1fr; gap: 16px; } .play-panel-market, .opponent-status { grid-column: span 2; padding-left: 0; border-left: 0; } .play-panel-market + .control-group { padding-left: 0; border-left: 0; } .play-button { grid-column: span 2; } .queue-panel { align-items: start; flex-wrap: wrap; } .queue-copy { flex: 1 1 calc(100% - 24px); } .queue-elapsed { margin-left: 23px; } .queue-actions { margin-left: auto; } .queue-cancel { margin-left: 23px; } .lower-grid { grid-template-columns: 1fr; gap: 24px; margin-top: 24px; } .data-row { grid-template-columns: minmax(130px, 1fr) 55px 72px 35px; gap: 8px; padding-inline: 10px; } }
 /* Phone-specific polish: keep every interactive target comfortable to tap and
    reflow the data rows into two readable lines instead of letting the desktop
    four-column grid create horizontal overflow. */
 @media (max-width: 640px) {
   body { overflow-x: hidden; }
-  .app-header-inner { padding-inline: 14px; }
-  .app-header-inner { min-height: 34px; flex-wrap: wrap; row-gap: 10px; }
-  .header-left { flex: 1 1 100%; min-width: 0; }
-  .header-actions { flex: 1 1 100%; min-width: 0; justify-content: flex-end; flex-wrap: wrap; gap: 8px; row-gap: 7px; }
-  .balance-display { gap: 5px; font-size: 12px; }
-  .balance-display .balance-label { display: none; }
   .signin-button { min-height: 40px; padding: 8px 11px; }
   .theme-toggle { width: 40px; height: 40px; }
   .lobby-shell { width: min(100% - 24px, var(--shell-max)); padding-top: 14px; padding-bottom: max(48px, env(safe-area-inset-bottom)); }
   .market-nav { align-items: stretch; gap: 6px; margin-inline: 0; }
   .market-switcher { min-width: 0; gap: 4px; }
   .market-switcher .field-label { display: none; }
-  .market-switcher button, .daily-coin { min-height: 40px; padding: 7px 9px; }
-  .daily-coin { gap: 5px; }
-  .daily-coin .balance-label { display: none; }
+  .market-switcher button { min-height: 40px; padding: 7px 9px; }
   .market-overview { gap: 15px; padding: 16px; border-radius: 10px; }
   .ticker-price { margin-top: 7px; font-size: clamp(34px, 12vw, 48px); }
   .ticker-change { margin-top: 8px; }
   .market-stats { gap: 9px; padding-top: 13px; }
   .market-stats dt { font-size: 9px; letter-spacing: .02em; }
   .market-stats dd { font-size: 11px; }
-  .section-heading h1 { font-size: 28px; }
+  .section-heading h1, .section-heading h2 { font-size: 28px; }
   .round-meta { max-width: 30ch; line-height: 1.4; }
-  .mode-switcher { max-width: 100%; flex-wrap: nowrap; overflow-x: auto; padding: 2px 1px 4px; scrollbar-width: none; }
-  .mode-switcher::-webkit-scrollbar { display: none; }
-  .mode-switcher button { flex: 0 0 auto; min-height: 40px; padding: 8px 10px; }
   .play-panel { gap: 14px; padding: 16px; border-radius: 10px; }
   .play-panel-market { padding-bottom: 2px; }
   .control-group { gap: 6px; }
@@ -742,10 +858,6 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
   .result-row > .row-detail { grid-column: 1; grid-row: 2; margin-left: 38px; text-align: left; }
   .result-row > .row-age { grid-column: 2; grid-row: 2; text-align: right; }
   .data-row .muted { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .header-left { gap: 14px; }
-  .main-nav { gap: 12px; }
-  .main-nav-link { font-size: 12px; }
-  .arena-cta, .wallet-cta { min-height: 40px; padding: 7px 10px; font-size: 12px; }
   .feed-shell { width: min(100% - 24px, var(--shell-max)); padding-top: 14px; gap: 20px; }
   .community-dropdown-trigger { font-size: 11px; padding: 7px 11px; }
   .post-card { padding: 14px; gap: 10px; border-radius: 12px; }
@@ -753,13 +865,6 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
   .market-call-prices { flex-wrap: wrap; row-gap: 2px; }
  }
 
-/* Mode switcher reads as a proper segmented control: filled active state,
-   distinct from the plain tab-style .market-switcher it shares a rule with
-   above. Higher in source order than that shared rule, so it wins the tie. */
-.mode-switcher { border: 1px solid var(--line); border-radius: 7px; padding: 3px; background: var(--surface); gap: 2px; }
-.mode-switcher button { border-radius: 5px; padding: 7px 12px; }
-.mode-switcher button.active { border-color: transparent; background: var(--brand); color: var(--brand-contrast); }
-.mode-switcher button.active:hover { color: var(--brand-contrast); }
 
 /* Purpose-built phone shell. The desktop header stays a single editorial row;
    phones get a calm utility header and a dedicated primary nav at the thumb
@@ -778,11 +883,11 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
   .app-header-inner { min-height: 60px; width: 100%; padding: 0 16px; flex-wrap: nowrap; }
   .desktop-header-content { display: none; }
   .mobile-header-content { display: flex; width: 100%; min-width: 0; align-items: center; justify-content: space-between; gap: 12px; }
-  .mobile-header-content .brand { min-width: 0; overflow: hidden; white-space: nowrap; font-size: 16px; letter-spacing: .22em; }
+  .mobile-header-content .brand { min-width: 0; overflow: hidden; white-space: nowrap; font-size: 19px; letter-spacing: .2em; line-height: 1; }
   .mobile-header-actions { display: flex; flex: none; align-items: center; gap: 8px; }
-  .mobile-header-actions .balance-display { gap: 6px; font-size: 11px; white-space: nowrap; }
   .mobile-header-actions .theme-toggle { width: 38px; height: 38px; }
-  .mobile-account-control { display: grid; width: 40px; height: 40px; place-items: center; flex: none; }
+  .mobile-account-control { display: flex; min-width: 40px; height: 40px; align-items: center; justify-content: center; flex: none; }
+  .mobile-header-actions .balance-display { min-height: 34px; padding: 0 8px 0 9px; font-size: 12px; white-space: nowrap; }
   .mobile-account-control .cl-userButtonBox,
   .mobile-account-control .cl-userButtonTrigger,
   .mobile-account-control .cl-avatarBox { width: 40px; height: 40px; }
@@ -881,7 +986,6 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
 @media (max-width: 340px) {
   .app-header { padding-inline: 16px; }
   .mobile-header-actions { gap: 8px; }
-  .mobile-header-actions .balance-display { gap: 4px; font-size: 10px; }
 }
 
 /* 24h Battle: a focused, single-purpose game screen rather than a dashboard
@@ -999,3 +1103,45 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
   .pf-sticky-submit { position: sticky; bottom: calc(72px + env(safe-area-inset-bottom)); z-index: 10; margin-inline: -16px; padding: 0 16px 6px; background: var(--surface); }
 }
 @media (prefers-reduced-motion: reduce) { .pf-live-dot, .pf-flash-up, .pf-flash-down, .pf-shimmer { animation: none; } }
+
+/* Arena lobby top: page heading → mode tabs → market row → chart, reusing the
+   Omens heading and .feed-tabs so both pages share one hierarchy. */
+.arena-heading { margin-bottom: 12px; }
+.arena-mode-tabs { margin: 0 2px 14px; }
+.arena-mode-tabs small { margin-left: 5px; color: var(--muted-dim); font-size: 9px; }
+.market-stats-toggle { display: none; }
+@media (max-width: 768px) {
+  .lobby-shell { width: min(calc(100% - 32px), var(--shell-max)); padding-top: 12px; }
+  .arena-heading { margin: 0 0 8px; }
+  .arena-mode-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0 0 12px; }
+  .lobby-shell .market-nav { align-items: center; gap: 8px; margin: 0 0 12px; }
+  .lobby-shell .market-switcher button { min-height: 36px; padding: 6px 10px; }
+  .lobby-shell .market-switcher .daily-coin { min-height: 30px; padding: 4px 10px; font-size: 11px; }
+}
+/* Phones: keep the timer and Play on the first screen — shorter plot, the
+   secondary stats behind a toggle, and the setup card's actions pulled up. */
+@media (max-width: 640px) {
+  .pulse-stage { gap: 12px; }
+  .pulse-stage .market-overview { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "copy toggle" "chart chart" "stats stats"; gap: 12px; padding: 14px; }
+  .pulse-stage .ticker-price { margin-top: 6px; font-size: 32px; }
+  .pulse-stage .ticker-change { margin-top: 6px; }
+  .pulse-stage .ticker-chart-wrap { height: 220px; }
+  .pulse-stage .market-chart.is-fill { min-height: 0; }
+  .market-stats-toggle { grid-area: toggle; display: inline-flex; align-self: start; justify-self: end; align-items: center; min-height: 32px; border: 0; background: transparent; color: var(--muted); padding: 0 2px; font-size: 12px; font-weight: 600; }
+  .market-stats-toggle::after { content: ""; width: 6px; height: 6px; margin-left: 8px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: translateY(-2px) rotate(45deg); }
+  .market-stats-toggle[aria-expanded="true"]::after { transform: translateY(1px) rotate(-135deg); }
+  .market-stats-toggle:hover { color: var(--text); }
+  .pulse-stage .market-stats { padding-top: 12px; }
+  .pulse-stage .market-stats.is-collapsed { display: none; }
+  .pulse-stage .call-box { gap: 12px; padding: 14px; }
+  /* The mode tabs and market row above already say what this card is. */
+  .pulse-stage .call-box .section-heading { display: none; }
+  .pulse-stage .play-panel { gap: 12px; }
+  .pulse-stage .play-panel .control-group, .pulse-stage .play-panel .opponent-status { padding-top: 12px; }
+  .pulse-stage .play-panel .control-group--timer { order: 1; padding-top: 0; border-top: 0; }
+  .pulse-stage .play-actions { order: 2; margin-top: 0; padding-top: 0; }
+  .pulse-stage .play-panel-note { order: 3; }
+  .pulse-stage .play-panel .opponent-status { order: 4; }
+  .pulse-stage .play-panel .control-group--format { order: 5; }
+  .pulse-stage .play-button { min-height: 52px; font-size: 18px; }
+}
