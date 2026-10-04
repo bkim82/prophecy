@@ -161,12 +161,12 @@ button { cursor: pointer; }
 .feed-main { min-width: 0; }
 .feed-heading { margin: 0 2px 16px; }
 .feed-heading h1 { margin: 4px 0 0; font-size: clamp(26px, 2.6vw, 34px); }
-.feed-heading-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.community-dropdown { position: relative; margin-top: 4px; }
-.community-dropdown-trigger { display: inline-flex; align-items: center; gap: 6px; min-height: 38px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--text); padding: 8px 14px; font-size: 12px; font-weight: 600; }
+.feed-heading-row { display: flex; align-items: flex-start; justify-content: flex-start; gap: 12px; }
+.community-dropdown { position: relative; }
+.community-dropdown-trigger { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--text); padding: 5px 12px; font-size: 12px; font-weight: 600; }
 .community-dropdown-trigger:hover, .community-dropdown-trigger[aria-expanded="true"] { border-color: var(--line-strong); background: var(--surface-hover); }
 .community-dropdown-caret { color: var(--muted); font-size: 10px; }
-.community-dropdown-menu { position: absolute; top: calc(100% + 6px); right: 0; z-index: 10; min-width: 140px; padding: 4px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-raised); box-shadow: 0 8px 24px rgba(0, 0, 0, .3); }
+.community-dropdown-menu { position: absolute; top: calc(100% + 6px); left: 0; z-index: 10; min-width: 140px; padding: 4px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-raised); box-shadow: 0 8px 24px rgba(0, 0, 0, .3); }
 .community-dropdown-menu button { display: flex; width: 100%; align-items: center; gap: 6px; border: 0; border-radius: 6px; background: transparent; color: var(--text); padding: 8px 10px; font-size: 13px; font-weight: 600; text-align: left; }
 .community-dropdown-menu button:hover { background: var(--surface-hover); }
 .community-dropdown-menu button.active { color: var(--brand-strong); }
@@ -179,6 +179,7 @@ button { cursor: pointer; }
 .feed-nav-label, .feed-nav-icon { display: none; }
 @media (min-width: 961px) {
   .feed-shell--nav { grid-template-columns: 200px minmax(0, 1fr) 340px; }
+  .feed-shell--nav .feed-heading { margin-bottom: 10px; }
   .feed-nav { position: sticky; top: 24px; align-self: start; padding: 4px 16px 4px 0; border-right: 1px solid var(--line); }
   .feed-nav-label { display: block; margin: 6px 12px 8px; color: var(--muted-dim); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
   .feed-nav .feed-tabs { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; }
@@ -807,7 +808,7 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
   .feed-heading-row { align-items: center; gap: 8px; }
   .feed-heading h1 { margin: 0; font-size: 22px; line-height: 1; text-transform: uppercase; }
   .community-dropdown { margin-top: 0; }
-  .community-dropdown-trigger { min-height: 36px; padding: 6px 10px; font-size: 11px; }
+  .community-dropdown-trigger { min-height: 32px; padding: 4px 10px; font-size: 11px; }
   .feed-tabs { display: grid; width: 100%; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px; margin: 0 0 10px; padding: 3px; border-radius: 8px; }
   .feed-tabs button { min-width: 0; min-height: 36px; padding: 6px 4px; font-size: 11px; white-space: nowrap; }
   .feed-list { gap: 8px; }

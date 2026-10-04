@@ -62,7 +62,6 @@ export function FeedSwitcher({ posts }: { posts: Post[] }) {
       <div className="feed-main">
         <section className="feed-heading">
           <div className="feed-heading-row">
-            <h1 className="display-font">Omens</h1>
             <div
               className="community-dropdown"
               onBlur={(e) => {
@@ -79,7 +78,7 @@ export function FeedSwitcher({ posts }: { posts: Post[] }) {
                 {activeCommunity.symbol && (
                   <span className={`market-symbol ${activeCommunity.symbolClass}`}>{activeCommunity.symbol}</span>
                 )}
-                {activeCommunity.label}
+                {community === "all" ? "Topics" : activeCommunity.label}
                 <span className="community-dropdown-caret" aria-hidden="true">▾</span>
               </button>
               {communityOpen && (
