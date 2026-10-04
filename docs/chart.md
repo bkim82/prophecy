@@ -117,6 +117,7 @@ Separate from `PriceChart`; renders in the lobby `market-overview` (`app/duel/pa
 - Line: monotone cubic (Fritsch–Carlson, no overshoot) + blurred glow. Line, glow, area tint, orb, pill, sparks in the market colour (`--chart-line`/`--chart-point`, set per `[data-market]`: BTC soft amber `#f0a868` — pure `#f7931a` glared on navy; chips keep it —, ETH blue, DOGE gold), stroke faint at left → full at head; area fades to `--violet` and in from the left. Stars, fan, "now" line, loading beam stay brand teal/violet.
 - Seeded starfield (`STARS`, 54, twinkling) behind; panel gets teal/violet radial glows (`.pulse-stage .market-overview.panel`, `app/globals.css`).
 - Head at `1 - FUTURE_FRAC`=84% of plot width; right of it a fan of possible paths (green up / red down cone + flowing dashed `RAYS`) and a vertical "now" line. Head = orb (radial gradient) + aura + spinning halo + ping + trailing sparks.
+- Each of the 6 rays is clickable/focusable (`RAY_PCT`, nearest 1%/2%/3% label per ray, `app/MarketChart.tsx:159`): opens a centered confirm card (`rayConfirm` state, `:333`, `:559-583`) showing the projected price at that %, then a fading "Long/Short confirmed" toast (`rayToast`, `:339-341`, `:585-590`) on confirm. Side-thing only — no embers move, nothing persists, unrelated to the Pulse round itself.
 - Dashed open line at the window's first price.
 - Live price pill in the right gutter on a dashed line from the pulsing head; grid labels within 14px of the pill are dropped.
 - Clock ticks every 10s (`HH:MM:SS`), dropped within 24px of either edge.
