@@ -11,6 +11,16 @@ export function ArenaIcon({ className }: { className?: string }) {
   );
 }
 
+// "Live in the Arena" header sigil: a triangle holding a smaller one (⟁).
+export function ArenaSigilIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M8 1.8 14.6 13.8H1.4L8 1.8Z" />
+      <path d="M8 7.6 10.6 12.2H5.4L8 7.6Z" />
+    </svg>
+  );
+}
+
 export function OmensIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 20 20" className={className} fill="none" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

@@ -387,9 +387,34 @@ button { cursor: pointer; }
 .sidebar-value { flex: none; color: var(--text); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .sidebar-value.is-up { color: var(--chart-up); }
 .sidebar-value.is-down { color: var(--chart-down); }
-.sidebar-avatar { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; background: var(--field-bg); color: var(--muted); flex: none; }
-.sidebar-row--prophecy { flex-direction: column; align-items: flex-start; gap: 5px; }
-.sidebar-prophecy-content { margin: 0; width: 100%; color: var(--violet-strong); font-size: 12px; line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* "Most Profitable Calls": 1H/24H/7D window tabs share the header row (wrapping under the title when narrow); rows rank by ROI, unnumbered — asset + direction and ROI lead, leverage · handle underneath. */
+.sidebar-calls-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 10px; margin-bottom: 4px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+.sidebar-calls-head h3 { margin: 0; padding: 0; border: 0; }
+.sidebar-window-tabs { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--line); border-radius: 999px; background: var(--field-bg); }
+.sidebar-window-tabs button { border: 0; border-radius: 999px; background: transparent; color: var(--muted); padding: 3px 8px; font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace; font-size: 10px; font-weight: 600; letter-spacing: .04em; transition: background .15s ease, color .15s ease; }
+.sidebar-window-tabs button:hover:not(.active) { color: var(--text); }
+.sidebar-window-tabs button.active { background: var(--selected-bg); color: var(--brand-strong); }
+.sidebar-calls-list { margin: 0; padding: 0; list-style: none; }
+.sidebar-row--call .sidebar-row-main { gap: 11px; }
+.sidebar-row--call .market-symbol { flex: none; }
+.sidebar-row--call .sidebar-row-main strong { font-weight: 700; letter-spacing: .01em; }
+.sidebar-call-text { display: grid; gap: 2px; min-width: 0; }
+.sidebar-call-detail { overflow: hidden; color: var(--muted-dim); font-size: 11px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.sidebar-call-roi { font-size: 14px; font-weight: 700; }
+/* "Live in the Arena": violet readout — sigil + spaced mono header, blinking red live dot, a bold circle per duel in its rank's colour (tier colours via data-rank); timers about to end turn red (.is-urgent). */
+.sidebar-panel--arena { border-color: color-mix(in srgb, var(--violet) 28%, var(--line)); background: linear-gradient(180deg, color-mix(in srgb, var(--violet) 8%, var(--surface)), var(--surface) 120px); }
+.sidebar-panel--arena h3 { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; border-bottom: 0; color: var(--violet-strong); font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace; letter-spacing: .24em; }
+.sidebar-arena-sigil { flex: none; width: 13px; height: 13px; opacity: .85; }
+.sidebar-live-dot { flex: none; width: 7px; height: 7px; margin-left: auto; border-radius: 999px; background: var(--negative); box-shadow: 0 0 8px color-mix(in srgb, var(--negative) 70%, transparent); animation: oracle-blink 1.6s ease-in-out infinite; }
+.sidebar-row--arena { padding: 10px 0; }
+.sidebar-row--arena + .sidebar-row--arena { border-top: 0; }
+.sidebar-row--arena .sidebar-row-main { gap: 12px; }
+.sidebar-arena-rank { flex: none; width: 22px; height: 22px; border: 3px solid var(--room); border-radius: 999px; background: color-mix(in srgb, var(--room) 30%, transparent); box-shadow: 0 0 10px -1px var(--room-glow); }
+.sidebar-row--arena .sidebar-value { color: var(--violet-strong); font-size: 13px; }
+.sidebar-row--arena.is-urgent .sidebar-value { color: var(--negative); }
+/* ≤960px the rail panels sit 3-up at ~220px; tighter tracking keeps the header on one line. */
+@media (max-width: 960px) { .sidebar-panel--arena h3 { gap: 8px; letter-spacing: .14em; white-space: nowrap; } }
+@media (prefers-reduced-motion: reduce) { .sidebar-live-dot { animation: none; } }
 .post-menu-dropdown svg { flex: none; width: 12px; height: 12px; }
 /* Rooms: each rank is its own themed room. [data-room] sets --room (accent),
    --room-strong (text-safe accent) and --room-glow; set on the shell for the
