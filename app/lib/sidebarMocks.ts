@@ -13,6 +13,34 @@ export const LIVE_ARENAS: LiveArena[] = [
   { id: "d3", market: "doge", players: "Marcus vs Priya", timer: "0:08", tier: "silver" },
 ];
 
+// "The Oracles" leaderboard (app/OraclesLeaderboard.tsx): top traders per
+// period, already in rank order. No score is shown; winRate (0–1) only drives
+// the avatar ring.
+export type LeaderboardPeriod = "24h" | "7d" | "all";
+export type TopTrader = { handle: string; tier: string; winRate: number };
+
+const TRADERS = {
+  vesper: { handle: "@vesper", tier: "Oracle I", winRate: 0.78 },
+  nova: { handle: "@nova_trades", tier: "Oracle II", winRate: 0.74 },
+  zane: { handle: "@zane_lfg", tier: "Oracle II", winRate: 0.71 },
+  bitkay: { handle: "@8bitkay", tier: "Oracle III", winRate: 0.69 },
+  tobi: { handle: "@tobi.sol", tier: "Oracle III", winRate: 0.66 },
+  lena: { handle: "@lena_q", tier: "Oracle III", winRate: 0.64 },
+  marcus: { handle: "@marcus_calls", tier: "Oracle III", winRate: 0.63 },
+  kaito: { handle: "@kaito_sol", tier: "Oracle III", winRate: 0.61 },
+  ren: { handle: "@ren.eth", tier: "Oracle III", winRate: 0.58 },
+  priya: { handle: "@priya_p", tier: "Oracle III", winRate: 0.57 },
+  juno: { handle: "@juno_dx", tier: "Oracle III", winRate: 0.55 },
+} satisfies Record<string, TopTrader>;
+
+const t = TRADERS;
+
+export const TOP_TRADERS: Record<LeaderboardPeriod, TopTrader[]> = {
+  "24h": [t.nova, t.kaito, t.vesper, t.marcus, t.zane, t.lena, t.bitkay, t.juno, t.tobi, t.ren],
+  "7d": [t.vesper, t.zane, t.nova, t.tobi, t.bitkay, t.marcus, t.kaito, t.ren, t.lena, t.priya],
+  all: [t.vesper, t.nova, t.ren, t.zane, t.lena, t.tobi, t.marcus, t.priya, t.kaito, t.bitkay],
+};
+
 export type CallWindow = "1h" | "24h" | "7d";
 
 export type ProfitableCall = { id: string; handle: string; market: Market; side: Side; leverage: number; changePct: number };
