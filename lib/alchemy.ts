@@ -9,6 +9,8 @@ import { getTokenSummaries } from "./basePrices";
 
 const BALANCE_TTL_MS = 15_000;
 const MAX_TOKENS = 25;
+const DISCOVERY_MAX_COUNT = 1000;
+const BALANCE_BATCH_SIZE = 1000;
 
 export type WalletTokenHolding = {
   address: string;
@@ -45,6 +47,42 @@ async function rpc<T>(method: string, params: unknown[]): Promise<T> {
 
 type TokenBalanceEntry = { contractAddress: string; tokenBalance: string | null };
 type TokenMetadata = { decimals: number | null; symbol: string | null; name: string | null; logo: string | null };
+type Erc20Transfer = { rawContract?: { address?: string | null } };
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
+
+/**
+ * Every ERC-20 contract this address has ever sent or received, via transfer-log
+ * scanning rather than Alchemy's `"erc20"` auto-discovery mode — that mode only
+ * covers a curated list of popular tokens by volume, so a real but thinly-traded
+ * holding (a new meme coin, say) can silently never appear. Scanning the address's
+ * own transfer history instead catches anything it has actually touched.
+ */
+async function discoverErc20Contracts(address: string): Promise<string[]> {
+  const fetchSide = async (direction: "fromAddress" | "toAddress") => {
+    const { transfers } = await rpc<{ transfers: Erc20Transfer[] }>("alchemy_getAssetTransfers", [
+      {
+        [direction]: address,
+        category: ["erc20"],
+        excludeZeroValue: false,
+        order: "desc",
+        maxCount: `0x${DISCOVERY_MAX_COUNT.toString(16)}`,
+      },
+    ]);
+    return transfers;
+  };
+  const [outgoing, incoming] = await Promise.all([fetchSide("fromAddress"), fetchSide("toAddress")]);
+  const addresses = new Set<string>();
+  for (const transfer of [...outgoing, ...incoming]) {
+    const contract = transfer.rawContract?.address;
+    if (contract) addresses.add(contract.toLowerCase());
+  }
+  return Array.from(addresses);
+}
 
 /** Real Base ERC-20 holdings for a wallet address, priced via DexScreener (lib/basePrices.ts). */
 export async function getWalletHoldings(address: string): Promise<WalletTokenHolding[]> {
@@ -53,13 +91,20 @@ export async function getWalletHoldings(address: string): Promise<WalletTokenHol
   if (cached && Date.now() - cached.at < BALANCE_TTL_MS) return cached.holdings;
 
   try {
-    const { tokenBalances } = await rpc<{ tokenBalances: TokenBalanceEntry[] }>(
-      "alchemy_getTokenBalances",
-      [address, "erc20"],
+    const contracts = await discoverErc20Contracts(normalized);
+    if (contracts.length === 0) {
+      cache.set(normalized, { at: Date.now(), holdings: [] });
+      return [];
+    }
+
+    const balanceBatches = await Promise.all(
+      chunk(contracts, BALANCE_BATCH_SIZE).map((batch) =>
+        rpc<{ tokenBalances: TokenBalanceEntry[] }>("alchemy_getTokenBalances", [normalized, batch]),
+      ),
     );
-    const nonZero = tokenBalances
-      .filter((token) => token.tokenBalance && BigInt(token.tokenBalance) > 0n)
-      .slice(0, MAX_TOKENS);
+    const nonZero = balanceBatches
+      .flatMap((result) => result.tokenBalances)
+      .filter((token) => token.tokenBalance && BigInt(token.tokenBalance) > 0n);
 
     if (nonZero.length === 0) {
       cache.set(normalized, { at: Date.now(), holdings: [] });
@@ -96,9 +141,10 @@ export async function getWalletHoldings(address: string): Promise<WalletTokenHol
       };
     });
     holdings.sort((a, b) => (b.valueUsd ?? 0) - (a.valueUsd ?? 0));
+    const limited = holdings.slice(0, MAX_TOKENS);
 
-    cache.set(normalized, { at: Date.now(), holdings });
-    return holdings;
+    cache.set(normalized, { at: Date.now(), holdings: limited });
+    return limited;
   } catch {
     return cached?.holdings ?? [];
   }
