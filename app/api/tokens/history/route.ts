@@ -1,12 +1,15 @@
 import { auth } from "@clerk/nextjs/server";
-import { getTokenHistories } from "@/lib/tokenHistory";
+import { getTokenHistories, isHistoryPeriod } from "@/lib/tokenHistory";
 
 export const dynamic = "force-dynamic";
 
 /**
- * POST { addresses, cachedOnly? } → ~24h of hourly closes per address
- * (oldest first) for sparklines/charts. Addresses with no history are
- * omitted. `cachedOnly` never triggers an upstream fetch (search results).
+ * POST { addresses, cachedOnly?, period? } → closes per address (oldest
+ * first) for sparklines/charts; `period` is 1h/24h/7d/30d, default 24h
+ * (hourly). Addresses with no history are omitted; `retry` lists the ones
+ * that couldn't be fetched right now (upstream budget/rate limit) and are
+ * worth asking for again, and `retryAfterMs` (when the budget is the cause)
+ * says when. `cachedOnly` never triggers an upstream fetch.
  */
 export async function POST(request: Request) {
   const { userId } = await auth();
@@ -19,6 +22,10 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid addresses" }, { status: 400 });
   }
 
-  const history = await getTokenHistories(addresses, body.cachedOnly === true);
-  return Response.json({ history }, { headers: { "Cache-Control": "no-store" } });
+  if (body.period !== undefined && !isHistoryPeriod(body.period)) {
+    return Response.json({ error: "Invalid period" }, { status: 400 });
+  }
+
+  const { history, retry, retryAfterMs } = await getTokenHistories(addresses, body.cachedOnly === true, body.period ?? "24h");
+  return Response.json({ history, retry, retryAfterMs }, { headers: { "Cache-Control": "no-store" } });
 }

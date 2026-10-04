@@ -17,7 +17,7 @@ app/layout.tsx (root shell: desktop header, compact mobile header, Clerk account
   ├── app/rooms/page.tsx (Rooms: rank-gated group chat placeholder, app/lib/roomsMocks.ts)
   ├── app/exclusive/page.tsx (Exclusive feed: rank-gated via app/lib/rank.ts stub, unlinked from nav)
   ├── app/wallet/page.tsx (wallet desk: injected EIP-1193 connection, BTC long/short ticket)
-  └── app/duel/page.tsx (live lobby: `Arena` h1 (`.feed-heading`) → Pulse/24h Portfolio `.feed-tabs.arena-mode-tabs` → market row (BTC/ETH left, `DailyCoin` "Daily · DOGE" chip right, selectable) → Pulse = `.pulse-stage` grid — ticker + MarketChart (app/MarketChart.tsx) left, call box (format/timer/Play) right, stacks <1000px; ≤640px: 220px plot, 24h stats behind `.market-stats-toggle`, call box reorders timer → Play first; match rows)
+  └── app/duel/page.tsx (live lobby: screen-reader-only `Arena` h1 → Pulse/24h Portfolio `.feed-tabs.arena-mode-tabs` → market row (BTC/ETH left, `DailyCoin` "Daily · DOGE" chip right, selectable) → Pulse = `.pulse-stage` grid — ticker + MarketChart (app/MarketChart.tsx) left, call box (format/timer/Play) right, stacks <1000px; ≤640px: 220px plot, 24h stats behind `.market-stats-toggle`, call box reorders timer → Play first; match rows)
         └── usePriceFeed() → price, sampled series, status, now
 app/duel/[market]/pulse/[matchId]/page.tsx (multiplayer Pulse positions, countdown, result)
 app/duel/portfolio/page.tsx (solo 24h Portfolio: freely-tradeable spot/leverage positions on Base meme coins)

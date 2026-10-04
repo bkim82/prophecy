@@ -368,11 +368,7 @@ export default function Page() {
 
   return (
     <main className="lobby-shell" data-market={market}>
-      <section className="feed-heading arena-heading">
-        <div className="feed-heading-row">
-          <h1 className="display-font">Arena</h1>
-        </div>
-      </section>
+      <h1 className="sr-only">Arena</h1>
 
       <div className="feed-tabs arena-mode-tabs" role="group" aria-label="Choose a mode">
         {modes.map((option) => (
@@ -422,6 +418,7 @@ export default function Page() {
       )}
 
       <div className="call-box">
+      {mode !== "battle-24h" && (
       <div className="section-heading">
         <div>
           <span className="eyebrow">Make a call</span>
@@ -429,6 +426,7 @@ export default function Page() {
           <span className="round-meta">{activeMode.meta}</span>
         </div>
       </div>
+      )}
 
       {queue ? (
         <section className="queue-panel panel" aria-live="polite">

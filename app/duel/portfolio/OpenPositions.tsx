@@ -1,7 +1,7 @@
 "use client";
 
 import type { OpenPositionView } from "./types";
-import { CoinImage, Sparkline, num, pct, pnlColor, signed, useFlash, useTokenHistory, usd } from "./ui";
+import { CoinImage, num, pct, pnlColor, signed, useFlash, usd } from "./ui";
 
 const edgeColor = (position: OpenPositionView) =>
   position.kind === "spot" ? "var(--spot)" : position.side === "long" ? "var(--brand)" : "var(--negative)";
@@ -23,14 +23,17 @@ export function OpenPositions({
   closeError,
   onClose,
   now,
+  freshId,
 }: {
   positions: OpenPositionView[];
   closingId: string | null;
   closeError: string | null;
   onClose: (id: string) => void;
   now: number;
+  /** A just-confirmed position: slides in and highlights its border once. */
+  freshId: string | null;
 }) {
-  const history = useTokenHistory(positions.map((position) => position.tokenAddress));
+  const newestFirst = positions.slice().sort((a, b) => new Date(b.openedAt).getTime() - new Date(a.openedAt).getTime());
 
   return (
     <section aria-label="Open positions">
@@ -46,20 +49,20 @@ export function OpenPositions({
       )}
 
       {positions.length === 0 ? (
-        <div className="mt-2 rounded-xl bg-[var(--surface)] px-5 py-8 text-center">
+        <div className="mt-2 rounded-xl bg-[var(--surface-raised)] px-5 py-8 text-center">
           <p className="text-sm font-medium text-[var(--text)]">No open positions</p>
-          <p className="mt-1 text-xs text-[var(--muted)]">Pick a coin and place your first trade — it’ll show up here with live P&L.</p>
+          <p className="mt-1 text-xs text-[var(--muted)]">Positions appear here once an order is filled, with live P&L.</p>
         </div>
       ) : (
         <ul className="mt-2 space-y-2">
-          {positions.map((position) => (
+          {newestFirst.map((position) => (
             <PositionCard
               key={position.id}
+              fresh={position.id === freshId}
               position={position}
               closing={closingId === position.id}
               disabled={closingId !== null}
               onClose={onClose}
-              history={history.lookup(position.tokenAddress)}
               now={now}
             />
           ))}
@@ -70,25 +73,25 @@ export function OpenPositions({
 }
 
 function PositionCard({
+  fresh,
   position,
   closing,
   disabled,
   onClose,
-  history,
   now,
 }: {
+  fresh: boolean;
   position: OpenPositionView;
   closing: boolean;
   disabled: boolean;
   onClose: (id: string) => void;
-  history: number[] | undefined;
   now: number;
 }) {
   const returnPct = position.committedCash > 0 ? (position.unrealizedPnl / position.committedCash) * 100 : 0;
   const flash = useFlash(position.unrealizedPnl);
 
   return (
-    <li className="relative overflow-hidden rounded-xl bg-[var(--surface)] py-3 pl-4 pr-3">
+    <li className={`relative overflow-hidden rounded-xl bg-[var(--surface-raised)] py-3 pl-4 pr-3 ${fresh ? "pf-position-enter" : ""}`}>
       <span className="absolute inset-y-0 left-0 w-[3px]" style={{ backgroundColor: edgeColor(position) }} aria-hidden="true" />
 
       <div className="flex items-center gap-2.5">
@@ -110,7 +113,7 @@ function PositionCard({
         </div>
       </div>
 
-      <dl className="mt-3 grid grid-cols-4 gap-2 text-xs">
+      <dl className="mt-3 grid grid-cols-4 gap-1.5 text-xs">
         <Cell label="Size" value={num(position.committedCash)} />
         <Cell label="Entry" value={usd(position.entryPrice)} />
         <Cell label="Current" value={usd(position.markPrice)} />
@@ -118,7 +121,6 @@ function PositionCard({
       </dl>
 
       <div className="mt-2.5 flex items-center gap-3">
-        <Sparkline values={history} width={64} height={20} />
         <p className="min-w-0 flex-1 truncate text-[11px] text-[var(--muted-dim)]">
           {openedAgo(position.openedAt, now)}
           {position.priceStale && <span className="ml-1.5 text-[var(--muted)]">· price delayed</span>}
@@ -129,7 +131,7 @@ function PositionCard({
           onClick={() => onClose(position.id)}
           className="min-h-11 shrink-0 rounded-lg px-3 text-xs font-semibold text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-2 focus-visible:outline-[var(--brand)] disabled:opacity-50 sm:min-h-9"
         >
-          {closing ? "Closing…" : "Close position"}
+          {position.kind === "spot" ? (closing ? "Selling…" : "Sell") : closing ? "Closing…" : "Close"}
         </button>
       </div>
     </li>

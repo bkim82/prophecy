@@ -1,17 +1,23 @@
 "use client";
 
 import { SignInButton, useUser } from "@clerk/nextjs";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ClosedPositions } from "./ClosedPositions";
 import { OpenPositions } from "./OpenPositions";
+import type { TradeInput } from "./OrderForm";
 import { PortfolioSummary } from "./PortfolioSummary";
-import { SessionHero, SessionHeroSkeleton, StartPanel } from "./SessionHero";
+import { BuyingPower, SessionStrip, SessionStripSkeleton, StartPanel } from "./SessionStrip";
 import { SessionHistory } from "./SessionHistory";
-import { TradeTicket, type TradeInput } from "./TradeTicket";
-import type { SessionState } from "./types";
+import { TokenDetail } from "./TokenDetail";
+import { TokenExplorer } from "./TokenExplorer";
+import type { OpenPositionView, SessionState, TokenSearchResult } from "./types";
 
 const POLL_MS = 3000;
 const TICK_MS = 1000;
+const FRESH_MS = 2200;
+
+/** Below `lg`, the three columns become Explore / Portfolio tabs plus a token detail screen. */
+type MobileView = "explore" | "detail" | "portfolio";
 
 const EMPTY_STATE: SessionState = { serverNow: Date.now(), session: null, positions: [], closedPositions: [], history: [] };
 
@@ -32,9 +38,29 @@ export function PortfolioGame() {
   const [tradeError, setTradeError] = useState<string | null>(null);
   const [closingId, setClosingId] = useState<string | null>(null);
   const [closeError, setCloseError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<TokenSearchResult | null>(null);
+  const [mobileView, setMobileView] = useState<MobileView>("explore");
+  const [freshId, setFreshId] = useState<string | null>(null);
 
   const skewRef = useRef(0);
   const wasActiveRef = useRef(false);
+  const pollNowRef = useRef<() => void>(() => {});
+
+  useEffect(() => {
+    if (!freshId) return;
+    const id = setTimeout(() => setFreshId(null), FRESH_MS);
+    return () => clearTimeout(id);
+  }, [freshId]);
+
+  const selectToken = useCallback((token: TokenSearchResult) => {
+    setSelected(token);
+    setMobileView("detail");
+  }, []);
+  const autoSelectToken = useCallback((token: TokenSearchResult) => setSelected((current) => current ?? token), []);
+  const applyQuote = useCallback(
+    (fresh: TokenSearchResult) => setSelected((current) => (current?.address === fresh.address ? { ...current, ...fresh } : current)),
+    [],
+  );
 
   useEffect(() => {
     const id = setInterval(() => setNowTick(Date.now()), TICK_MS);
@@ -65,6 +91,10 @@ export function PortfolioGame() {
       if (!cancelled) timer = setTimeout(poll, POLL_MS);
     };
 
+    pollNowRef.current = () => {
+      clearTimeout(timer);
+      poll();
+    };
     poll();
     return () => {
       cancelled = true;
@@ -115,13 +145,40 @@ export function PortfolioGame() {
           amount: input.amount,
         }),
       });
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
-      if (!res.ok) {
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        position?: { id: string; qty: number | null; entryPrice: number; openedAt: string };
+      };
+      if (!res.ok || !data.position) {
         setTradeError(data.error ?? "Could not open that position.");
         return false;
       }
-      // The 3s poll picks up the new position; nothing to merge locally since
-      // the response lacks the live mark price the list needs.
+      // Confirmed by the server: show the position now (marked at its fill
+      // price) and poll right away for live P&L and the new available cash.
+      const filled = data.position;
+      const view: OpenPositionView = {
+        id: filled.id,
+        kind: input.kind,
+        tokenAddress: input.token.address,
+        tokenSymbol: input.token.symbol,
+        tokenName: input.token.name,
+        side: input.side,
+        leverage: input.leverage,
+        qty: filled.qty,
+        entryPrice: filled.entryPrice,
+        committedCash: input.amount,
+        markPrice: filled.entryPrice,
+        unrealizedPnl: 0,
+        priceStale: false,
+        openedAt: filled.openedAt,
+        imageUrl: input.token.imageUrl,
+        change24h: input.token.change24h,
+      };
+      setState((prev) =>
+        prev.positions.some((position) => position.id === view.id) ? prev : { ...prev, positions: [view, ...prev.positions] },
+      );
+      setFreshId(view.id);
+      pollNowRef.current();
       return true;
     } catch {
       setTradeError("Could not reach the server. Try again.");
@@ -173,42 +230,86 @@ export function PortfolioGame() {
   const countdownMs = localEndAt === null ? 0 : localEndAt - nowTick;
   const session = state.session?.status === "active" ? state.session : null;
   const openPnl = state.positions.reduce((total, position) => total + position.unrealizedPnl, 0);
-  const recentAddresses = Array.from(
-    new Set([...state.positions, ...state.closedPositions].map((position) => position.tokenAddress)),
-  );
+  const ownedAddresses = Array.from(new Set(state.positions.map((position) => position.tokenAddress)));
+  const tab = (view: MobileView) => (mobileView === view ? "" : "max-lg:hidden");
 
   return (
-    <div className="portfolio-game space-y-6">
+    <div className="portfolio-game space-y-4">
       {!loaded ? (
-        <SessionHeroSkeleton />
+        <SessionStripSkeleton />
       ) : session ? (
-        <SessionHero session={session} openPnl={openPnl} countdownMs={countdownMs} />
+        <SessionStrip session={session} openPnl={openPnl} countdownMs={countdownMs} />
       ) : (
         <StartPanel busy={startBusy} error={startError} onStart={startSession} />
       )}
 
       {session && (
-        <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-[minmax(0,58fr)_minmax(0,42fr)]">
-          <TradeTicket
-            availableCash={session.availableCash}
-            sessionEnded={countdownMs <= 0}
-            busy={tradeBusy}
-            error={tradeError}
-            onSubmit={openPosition}
-            positions={state.positions}
-            closingId={closingId}
-            onClose={closePosition}
-            recentAddresses={recentAddresses}
-          />
-          <div className="space-y-4">
-            <OpenPositions positions={state.positions} closingId={closingId} closeError={closeError} onClose={closePosition} now={nowTick} />
+        <>
+          <div className="grid grid-cols-2 gap-1 rounded-lg bg-[var(--surface)] p-1 lg:hidden" role="tablist" aria-label="Portfolio view">
+            {(["explore", "portfolio"] as const).map((view) => {
+              const active = view === "portfolio" ? mobileView === "portfolio" : mobileView !== "portfolio";
+              return (
+                <button
+                  key={view}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setMobileView(view)}
+                  className={`min-h-10 rounded-md text-sm font-semibold transition-colors ${active ? "bg-[var(--surface-hover)] text-[var(--text)]" : "text-[var(--muted)]"}`}
+                >
+                  {view === "explore" ? "Explore" : `Portfolio${state.positions.length > 0 ? ` · ${state.positions.length}` : ""}`}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,28fr)_minmax(0,44fr)_minmax(0,28fr)]">
+            {/* Side columns take the token profile's height (absolute fill) and scroll inside it. */}
+            <div className={`lg:relative ${tab("explore")}`}>
+              <TokenExplorer selected={selected} onSelect={selectToken} onAutoSelect={autoSelectToken} ownedAddresses={ownedAddresses} />
+            </div>
+            <div className={tab("detail")}>
+              <TokenDetail
+                token={selected}
+                onQuote={applyQuote}
+                positions={state.positions}
+                availableCash={session.availableCash}
+                sessionEnded={countdownMs <= 0}
+                busy={tradeBusy}
+                error={tradeError}
+                onSubmit={openPosition}
+                now={nowTick}
+                onBack={() => setMobileView("explore")}
+                onViewPortfolio={() => setMobileView("portfolio")}
+              />
+            </div>
+            <div className={`lg:relative ${tab("portfolio")}`}>
+            <section className="flex min-h-0 flex-col rounded-xl bg-[var(--surface)] p-4 lg:absolute lg:inset-0" aria-label="Your portfolio">
+              <BuyingPower session={session} />
+              <div className="-mx-1 mt-4 min-h-0 flex-1 overflow-y-auto overscroll-contain px-1">
+                <OpenPositions
+                  positions={state.positions}
+                  closingId={closingId}
+                  closeError={closeError}
+                  onClose={closePosition}
+                  now={nowTick}
+                  freshId={freshId}
+                />
+              </div>
+            </section>
+            </div>
+          </div>
+
+          <div className={`grid grid-cols-1 items-start gap-4 lg:grid-cols-2 ${tab("portfolio")}`}>
             <PortfolioSummary positions={state.positions} availableCash={session.availableCash} openPnl={openPnl} />
             <ClosedPositions positions={state.closedPositions} />
           </div>
-        </div>
+        </>
       )}
 
-      <SessionHistory history={state.history} />
+      <div className={session ? tab("portfolio") : ""}>
+        <SessionHistory history={state.history} />
+      </div>
     </div>
   );
 }

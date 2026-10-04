@@ -48,11 +48,25 @@ function useReducedMotion() {
 // visible steps; a rAF clock scrolls it continuously.
 function useFrameClock(fallback: number, enabled: boolean) {
   const [frame, setFrame] = useState(fallback);
+  // Only queue the next frame once the last one has committed and run its
+  // effects. When a render outlasts a frame, queuing anyway nests each update
+  // inside the previous commit's effects and trips React's update-depth guard.
+  const committed = useRef(true);
+  const lastSet = useRef(0);
+  useEffect(() => {
+    committed.current = true;
+  });
   useEffect(() => {
     if (!enabled) return;
     let id = 0;
     const loop = () => {
-      setFrame(Date.now());
+      const t = Date.now();
+      // The time check covers a bailed-out update (same ms) that never commits.
+      if (committed.current || t - lastSet.current > 250) {
+        committed.current = false;
+        lastSet.current = t;
+        setFrame(t);
+      }
       id = requestAnimationFrame(loop);
     };
     id = requestAnimationFrame(loop);
@@ -163,9 +177,34 @@ type Props = {
   /** Pixel height, or "fill" to take the height CSS gives `.market-chart`. */
   height?: number | "fill";
   onScrub?: (point: ScrubPoint) => void;
+  /** Visible span ending at `now`; defaults to the lobby's 30s. */
+  windowMs?: number;
+  /** Spacing of the time-axis labels. */
+  tickMs?: number;
+  /** Axis/pill/tooltip price text; defaults to the market's tick precision. */
+  formatPrice?: (price: number) => string;
+  /** Axis/tooltip time text; defaults to a HH:MM:SS clock. */
+  formatTime?: (t: number) => string;
+  /** Spoken window for the chart's label, e.g. "24 hours". */
+  windowLabel?: string;
+  /** Scroll the axis every frame. Off for long windows where a frame is invisible. */
+  smooth?: boolean;
 };
 
-export function MarketChart({ points, now, label, tickSize, height = DEFAULT_HEIGHT, onScrub }: Props) {
+export function MarketChart({
+  points,
+  now,
+  label,
+  tickSize,
+  height = DEFAULT_HEIGHT,
+  onScrub,
+  windowMs = MARKET_CHART_WINDOW_MS,
+  tickMs = TICK_MS,
+  formatPrice = (price) => formatChartPrice(price, tickSize),
+  formatTime = clockLabel,
+  windowLabel = `${windowMs / 1000} seconds`,
+  smooth = true,
+}: Props) {
   const uid = useId().replace(/:/g, "");
   const wrapRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
@@ -174,7 +213,7 @@ export function MarketChart({ points, now, label, tickSize, height = DEFAULT_HEI
   const HEIGHT = fill ? boxHeight : height;
   const [hoverX, setHoverX] = useState<number | null>(null);
   const reduced = useReducedMotion();
-  const clock = useFrameClock(now, !reduced);
+  const clock = useFrameClock(now, smooth && !reduced);
   // Eased head price and y-range, advanced once per frame inside `geo`.
   const anim = useRef<{ at: number; head: number; low: number; high: number } | null>(null);
   // A different market is a different price scale: never ease across it.
@@ -213,10 +252,10 @@ export function MarketChart({ points, now, label, tickSize, height = DEFAULT_HEI
   // Live: the window ends now. Stale (feed dead long enough that nothing is left
   // in the live window): freeze the window on the last data instead of going
   // blank, and say so.
-  const liveSlice = useMemo(() => windowSlice(pinned, clock - MARKET_CHART_WINDOW_MS), [pinned, clock]);
+  const liveSlice = useMemo(() => windowSlice(pinned, clock - windowMs), [pinned, clock, windowMs]);
   const stale = liveSlice.length < 2 && pinned.length >= 2;
   const t1 = stale ? pinned[pinned.length - 1].t : Math.max(clock, pinned.at(-1)?.t ?? 0);
-  const t0 = t1 - MARKET_CHART_WINDOW_MS;
+  const t0 = t1 - windowMs;
   const visible = useMemo(
     () => (stale ? windowSlice(pinned, t0) : liveSlice),
     [stale, pinned, t0, liveSlice],
@@ -258,7 +297,7 @@ export function MarketChart({ points, now, label, tickSize, height = DEFAULT_HEI
     }
     anim.current = { at: t1, head, low, high };
 
-    const x = (t: number) => PAD.left + ((t - t0) / MARKET_CHART_WINDOW_MS) * pastW;
+    const x = (t: number) => PAD.left + ((t - t0) / windowMs) * pastW;
     const y = (p: number) => PAD.top + (1 - (p - low) / (high - low)) * plotH;
     const xs = visible.map((point) => x(point.t));
     const ys = visible.map((point, i) => y(i === visible.length - 1 ? head : point.p));
@@ -275,21 +314,21 @@ export function MarketChart({ points, now, label, tickSize, height = DEFAULT_HEI
       // The live price pill owns its row; a grid label under it is just noise.
       .filter((row) => Math.abs(row.y - headY) > 14);
     const ticks: number[] = [];
-    for (let t = Math.ceil(t0 / TICK_MS) * TICK_MS; t <= t1; t += TICK_MS) ticks.push(t);
+    for (let t = Math.ceil(t0 / tickMs) * tickMs; t <= t1; t += tickMs) ticks.push(t);
     // The fan opens from the head to the plot's right edge, clamped to the plot.
     const right = PAD.left + plotW;
     const reachUp = Math.min(plotH * 0.42, headY - PAD.top);
     const reachDown = Math.min(plotH * 0.42, bottom - headY);
     return { plotW, pastW, plotH, bottom, right, x, y, line, area, open, last, baseY, headX, headY, grid, ticks, reachUp, reachDown };
-  }, [ready, width, visible, t0, t1, tickSize, HEIGHT, reduced]);
+  }, [ready, width, visible, t0, t1, tickSize, HEIGHT, reduced, windowMs, tickMs]);
 
   const scrub = useMemo(() => {
     if (!geo || hoverX === null) return null;
     const clampedX = Math.min(Math.max(hoverX, PAD.left), geo.headX);
-    const t = t0 + ((clampedX - PAD.left) / geo.pastW) * MARKET_CHART_WINDOW_MS;
+    const t = t0 + ((clampedX - PAD.left) / geo.pastW) * windowMs;
     const p = priceAt(visible, t);
     return p === null ? null : { x: clampedX, y: geo.y(p), t, p };
-  }, [geo, hoverX, t0, visible]);
+  }, [geo, hoverX, t0, visible, windowMs]);
 
   // The axis scrolls every frame, so a held pointer drifts in time; 100ms
   // buckets keep that from re-rendering the page at 60fps.
@@ -356,7 +395,7 @@ export function MarketChart({ points, now, label, tickSize, height = DEFAULT_HEI
           height={HEIGHT}
           viewBox={`0 0 ${width} ${HEIGHT}`}
           role="img"
-          aria-label={`${label} price over the last ${MARKET_CHART_WINDOW_MS / 1000} seconds`}
+          aria-label={`${label} price over the last ${windowLabel}`}
           onPointerMove={pointerX}
           onPointerDown={pointerX}
           onPointerLeave={() => setHoverX(null)}
@@ -415,7 +454,7 @@ export function MarketChart({ points, now, label, tickSize, height = DEFAULT_HEI
             {geo.grid.map((row, i) => (
               <g key={i} style={{ "--i": i } as React.CSSProperties}>
                 <line className="market-chart-grid" x1={PAD.left} x2={geo.right} y1={row.y} y2={row.y} />
-                <text className="market-chart-axis" x={width - 6} y={row.y + 3.5} textAnchor="end">{formatChartPrice(row.p, tickSize)}</text>
+                <text className="market-chart-axis" x={width - 6} y={row.y + 3.5} textAnchor="end">{formatPrice(row.p)}</text>
               </g>
             ))}
           </g>
@@ -427,7 +466,7 @@ export function MarketChart({ points, now, label, tickSize, height = DEFAULT_HEI
               return (
                 <g key={t}>
                   <line className="market-chart-tick" x1={tx} x2={tx} y1={geo.bottom} y2={geo.bottom + 4} />
-                  <text className="market-chart-axis" x={tx} y={HEIGHT - 5} textAnchor="middle">{clockLabel(t)}</text>
+                  <text className="market-chart-axis" x={tx} y={HEIGHT - 5} textAnchor="middle">{formatTime(t)}</text>
                 </g>
               );
             })}
@@ -464,7 +503,7 @@ export function MarketChart({ points, now, label, tickSize, height = DEFAULT_HEI
             <g className="mc-pill-in">
               <rect className="market-chart-pill" width={pillW} height="22" rx="11" />
               {flash.key > 0 && <rect key={flash.key} className={`market-chart-pill-flash is-${flash.dir}`} width={pillW} height="22" rx="11" />}
-              <text className="market-chart-pill-text" x={pillW / 2} y="15" textAnchor="middle">{formatChartPrice(geo.last.p, tickSize)}</text>
+              <text className="market-chart-pill-text" x={pillW / 2} y="15" textAnchor="middle">{formatPrice(geo.last.p)}</text>
             </g>
           </g>
 
@@ -500,9 +539,9 @@ export function MarketChart({ points, now, label, tickSize, height = DEFAULT_HEI
                 <circle cx={scrub.x} cy={scrub.y} r="4.5" className="mc-scrub-dot" />
                 <g transform={`translate(${tipX}, 0)`}>
                   <rect className="market-chart-tip" width={tipW} height="18" rx="9" />
-                  <text className="market-chart-tip-text" x="9" y="12.5">{clockLabel(scrub.t)}</text>
+                  <text className="market-chart-tip-text" x="9" y="12.5">{formatTime(scrub.t)}</text>
                   <text className={`market-chart-tip-text ${delta >= 0 ? "change-up" : "change-down"}`} x={tipW - 9} y="12.5" textAnchor="end">
-                    {delta >= 0 ? "+" : "−"}{formatChartPrice(Math.abs(delta), tickSize)}
+                    {delta >= 0 ? "+" : "−"}{formatPrice(Math.abs(delta))}
                   </text>
                 </g>
               </g>

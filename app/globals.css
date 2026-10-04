@@ -498,7 +498,7 @@ button { cursor: pointer; }
 .market-chart-tip-text.change-down { fill: var(--negative); }
 
 .mc-loading-track { stroke: var(--line); stroke-width: 1; stroke-dasharray: 1 6; }
-.mc-loading-beam { animation: mc-scan 1.6s cubic-bezier(.45, 0, .55, 1) infinite; }
+.mc-loading-beam { transform-box: fill-box; animation: mc-scan 1.6s cubic-bezier(.45, 0, .55, 1) infinite; }
 
 @keyframes mc-twinkle { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
 @keyframes mc-fade-in { from { opacity: 0; } }
@@ -1086,32 +1086,58 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
 @keyframes pf-flash-down { from { background-color: color-mix(in srgb, var(--negative) 16%, transparent); } to { background-color: transparent; } }
 .pf-shimmer { display: block; background: var(--surface-hover); animation: pf-shimmer 1.4s ease-in-out infinite; }
 @keyframes pf-shimmer { 50% { opacity: .45; } }
-.pf-scroll-x { scrollbar-width: none; -webkit-overflow-scrolling: touch; scroll-snap-type: x proximity; }
-.pf-scroll-x::-webkit-scrollbar { display: none; }
-.pf-scroll-x > * { scroll-snap-align: start; }
-.pf-range { height: 24px; appearance: none; background: transparent; cursor: pointer; }
-.pf-range:disabled { cursor: not-allowed; opacity: .4; }
-.pf-range::-webkit-slider-runnable-track { height: 4px; border-radius: 999px; background: linear-gradient(to right, var(--brand) var(--pf-fill, 0%), var(--line) var(--pf-fill, 0%)); }
-.pf-range::-moz-range-track { height: 4px; border-radius: 999px; background: var(--line); }
-.pf-range::-moz-range-progress { height: 4px; border-radius: 999px; background: var(--brand); }
-.pf-range::-webkit-slider-thumb { appearance: none; width: 18px; height: 18px; margin-top: -7px; border: 3px solid var(--surface); border-radius: 999px; background: var(--brand-strong); }
-.pf-range::-moz-range-thumb { width: 12px; height: 12px; border: 3px solid var(--surface); border-radius: 999px; background: var(--brand-strong); }
-.pf-range:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 6px; }
 @media (max-width: 767px) {
   /* Valid order only: the submit button rides just above the mobile bottom nav. */
-  .pf-sticky-submit { position: sticky; bottom: calc(72px + env(safe-area-inset-bottom)); z-index: 10; margin-inline: -16px; padding: 0 16px 6px; background: var(--surface); }
+  .pf-sticky-submit { position: sticky; bottom: calc(72px + env(safe-area-inset-bottom)); z-index: 10; margin-inline: -14px; padding: 0 14px 6px; background: var(--surface-raised); }
 }
-@media (prefers-reduced-motion: reduce) { .pf-live-dot, .pf-flash-up, .pf-flash-down, .pf-shimmer { animation: none; } }
 
-/* Arena lobby top: page heading → mode tabs → market row → chart, reusing the
-   Omens heading and .feed-tabs so both pages share one hierarchy. */
-.arena-heading { margin-bottom: 12px; }
+/* Event-based motion: each animation answers one action and then stops. */
+/* Explorer: one selection indicator slides between rows (subtle teal + left accent). */
+.pf-select-indicator { background: var(--selected-bg); box-shadow: inset 3px 0 0 var(--brand); transition: opacity .15s ease; }
+.pf-select-indicator.is-animated { transition: transform .2s cubic-bezier(.2, .8, .2, 1), height .2s ease, opacity .15s ease; }
+/* Watchlist star appears on row hover/focus; always shown when on, or on touch screens. */
+.pf-row .pf-row-star { opacity: 0; transition: opacity .15s ease, background-color .15s ease, color .15s ease; }
+.pf-row:hover .pf-row-star, .pf-row:focus-within .pf-row-star, .pf-row .pf-row-star[aria-pressed="true"] { opacity: 1; }
+@media (hover: none) { .pf-row .pf-row-star { opacity: 1; } }
+.pf-star-pop { animation: pf-star-pop .42s cubic-bezier(.34, 1.56, .64, 1); }
+@keyframes pf-star-pop { 0% { transform: scale(.6); } 55% { transform: scale(1.3); } 100% { transform: scale(1); } }
+/* Detail panel crossfades in on a new selection. */
+.pf-crossfade { animation: pf-crossfade .18s ease-out; }
+/* Token detail chart: a neutral line (white on dark, text colour on light). */
+.pf-coin-chart { --chart-line: #ffffff; --chart-point: #ffffff; --market-accent-contrast: #111111; }
+[data-theme="light"] .pf-coin-chart { --chart-line: var(--text); --chart-point: var(--text); --market-accent-contrast: var(--surface); }
+@keyframes pf-crossfade { from { opacity: 0; } to { opacity: 1; } }
+/* Live prices: only changed digits tint, then settle. */
+.pf-digit-up { animation: pf-digit-up .9s ease-out; }
+.pf-digit-down { animation: pf-digit-down .9s ease-out; }
+@keyframes pf-digit-up { from { color: var(--positive); } }
+@keyframes pf-digit-down { from { color: var(--negative); } }
+/* Submit: compresses on press, then a pending spinner until the server confirms. */
+.pf-submit:not(:disabled):active { transform: scale(.97); }
+.pf-submit { transition-property: transform, background-color, color, opacity; transition-duration: .12s; }
+.pf-spinner { width: 16px; height: 16px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 999px; animation: pf-spin .7s linear infinite; }
+.pf-spin { animation: pf-spin .8s linear infinite; }
+@keyframes pf-spin { to { transform: rotate(360deg); } }
+/* A confirmed position slides into the portfolio; its border highlights once. */
+.pf-position-enter { animation: pf-position-in .32s cubic-bezier(.2, .8, .2, 1), pf-position-ring 1.8s ease-out; }
+@keyframes pf-position-in { from { opacity: 0; transform: translateY(-10px); } }
+@keyframes pf-position-ring { 0%, 30% { box-shadow: inset 0 0 0 1.5px var(--brand); } 100% { box-shadow: inset 0 0 0 1.5px transparent; } }
+/* Allocation / buying-power bars resize smoothly. */
+.pf-bar-segment { transition: width .3s ease; }
+
+@media (prefers-reduced-motion: reduce) {
+  .pf-live-dot, .pf-flash-up, .pf-flash-down, .pf-shimmer, .pf-star-pop, .pf-crossfade, .pf-digit-up, .pf-digit-down, .pf-spin, .pf-position-enter { animation: none; }
+  .pf-spinner { animation-duration: 1.6s; }
+  .pf-select-indicator.is-animated, .pf-bar-segment, .pf-submit { transition: none; }
+  .pf-submit:not(:disabled):active { transform: none; }
+}
+
+/* Arena lobby top: mode tabs → market row → chart, reusing .feed-tabs. */
 .arena-mode-tabs { margin: 0 2px 14px; }
 .arena-mode-tabs small { margin-left: 5px; color: var(--muted-dim); font-size: 9px; }
 .market-stats-toggle { display: none; }
 @media (max-width: 768px) {
   .lobby-shell { width: min(calc(100% - 32px), var(--shell-max)); padding-top: 12px; }
-  .arena-heading { margin: 0 0 8px; }
   .arena-mode-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0 0 12px; }
   .lobby-shell .market-nav { align-items: center; gap: 8px; margin: 0 0 12px; }
   .lobby-shell .market-switcher button { min-height: 36px; padding: 6px 10px; }

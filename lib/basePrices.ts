@@ -32,6 +32,10 @@ export type TokenSearchResult = {
   change24h: number | null; // percent
   marketCapUsd: number | null;
   pairAddress: string | null; // most-liquid pool, used for price history (lib/tokenHistory.ts)
+  volume24hUsd: number | null; // that pool's 24h volume
+  pairCreatedAt: number | null; // ms epoch the pool was created — a proxy for token age
+  dexId: string | null; // e.g. "uniswap", "aerodrome"
+  quoteSymbol: string | null; // the pool's other side, e.g. "WETH"
 };
 
 export type TokenMeta = Omit<TokenSearchResult, "priceUsd"> & { at: number };
@@ -46,8 +50,12 @@ type DexPair = {
   chainId: string;
   pairAddress?: string;
   baseToken: { address: string; symbol: string; name: string };
+  quoteToken?: { symbol?: string };
+  dexId?: string;
+  pairCreatedAt?: number;
   priceUsd?: string;
   liquidity?: { usd?: number };
+  volume?: { h24?: number };
   priceChange?: { h24?: number };
   marketCap?: number;
   fdv?: number;
@@ -82,6 +90,10 @@ function pairToResult(pair: DexPair, priceUsd: number): TokenSearchResult {
     change24h: typeof change === "number" && Number.isFinite(change) ? change : null,
     marketCapUsd: typeof marketCap === "number" && marketCap > 0 ? marketCap : null,
     pairAddress: pair.pairAddress ?? null,
+    volume24hUsd: typeof pair.volume?.h24 === "number" && Number.isFinite(pair.volume.h24) ? pair.volume.h24 : null,
+    pairCreatedAt: typeof pair.pairCreatedAt === "number" && pair.pairCreatedAt > 0 ? pair.pairCreatedAt : null,
+    dexId: pair.dexId ?? null,
+    quoteSymbol: pair.quoteToken?.symbol ?? null,
   };
 }
 

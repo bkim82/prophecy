@@ -39,7 +39,7 @@ export function PortfolioSummary({
         {coins.map((coin, i) => (
           <span
             key={coin.address}
-            className="h-full transition-[width] duration-500"
+            className="pf-bar-segment h-full"
             style={{ width: `${share(coin.committed)}%`, backgroundColor: "var(--brand)", opacity: SEGMENT_OPACITY[Math.min(i, SEGMENT_OPACITY.length - 1)] }}
           />
         ))}

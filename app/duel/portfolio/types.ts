@@ -75,4 +75,8 @@ export type TokenSearchResult = {
   change24h: number | null;
   marketCapUsd: number | null;
   pairAddress: string | null;
+  volume24hUsd: number | null;
+  pairCreatedAt: number | null;
+  dexId: string | null;
+  quoteSymbol: string | null;
 };
