@@ -16,7 +16,7 @@ export function pickDailyCoin(date: Date = new Date()) {
 
 // Rendered inside a .market-switcher so it selects exactly like BTC/ETH; the
 // "Daily" prefix is the only thing marking it as the rotating slot.
-export function DailyCoin({ active, onSelect }: { active: boolean; onSelect: () => void }) {
+export function DailyCoin({ active, symbol, symbolClass, onSelect }: { active: boolean; symbol: string; symbolClass: string; onSelect: () => void }) {
   const coin = pickDailyCoin();
 
   return (
@@ -29,7 +29,7 @@ export function DailyCoin({ active, onSelect }: { active: boolean; onSelect: () 
     >
       <span className="daily-coin-label">Daily</span>
       <span className="daily-coin-sep" aria-hidden="true">·</span>
-      {coin}
+      <span className={`market-symbol ${symbolClass}`}>{symbol}</span> {coin}
     </button>
   );
 }

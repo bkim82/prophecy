@@ -391,7 +391,7 @@ export default function Page() {
           <button className={market === "eth" ? "active" : ""} aria-pressed={market === "eth"} type="button" onClick={() => setMarket("eth")}><span className="market-symbol eth-symbol">Ξ</span> ETH</button>
         </div>
         <div className="market-switcher">
-          <DailyCoin active={market === dailyCoinId} onSelect={() => setMarket(dailyCoinId)} />
+          <DailyCoin active={market === dailyCoinId} symbol={MARKETS[dailyCoinId].symbol} symbolClass={SYMBOL_CLASS[dailyCoinId]} onSelect={() => setMarket(dailyCoinId)} />
         </div>
       </nav>
       )}

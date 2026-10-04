@@ -70,7 +70,7 @@ button { cursor: pointer; }
 /* Prices, timers, balances, and other data readouts get the mono face across
    both the hand-rolled classes below and the Tailwind `tabular-nums` utility
    used on the duel/pulse match pages. */
-.tabular-nums, .ticker-price, .timer-value, .balance-display, .daily-coin,
+.tabular-nums, .ticker-price, .timer-value, .balance-display,
 .market-call-prices, .market-stats dd, .queue-elapsed, .entry-input-wrap input,
 .data-row, .result-row, .sidebar-value, .pulse-mini-dock-balance, .pulse-mini-dock-timer,
 .pulse-mini-dock-position .pnl, .pulse-mini-dock-row button {
