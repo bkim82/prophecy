@@ -111,3 +111,22 @@ export function LockIcon({ className }: { className?: string }) {
     </svg>
   );
 }
+
+// Zigzag price line — a stock-chart glyph for trade actions (Copy trade).
+export function TrendIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M1.5 12 4.5 7.5 7 9.5 10 4.5 12.2 7 14.5 3" />
+    </svg>
+  );
+}
+
+// Nested triangles — the Omen Clash mark.
+export function ClashIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" aria-hidden="true">
+      <path d="M8 1.8 14.6 13.6H1.4Z" />
+      <path d="M8 6.6 11 12H5Z" />
+    </svg>
+  );
+}

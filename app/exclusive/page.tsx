@@ -14,7 +14,7 @@ export default function Page() {
           <span className="muted">Unlocked by rank</span>
         </section>
 
-        <div className="feed-list">
+        <div className="feed-list feed-panel">
           {EXCLUSIVE_POSTS.map((post) => (
             <PostCard key={post.id} post={post} />
           ))}

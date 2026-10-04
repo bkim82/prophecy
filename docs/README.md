@@ -4,6 +4,7 @@ Agent-readable fact sheets, not prose. Format: flat bullets, `file:line` refs, n
 
 - [architecture.md](architecture.md) — module map, data flow, invariants
 - [feeds.md](feeds.md) — Global/Exclusive Twitter-style feeds, header nav, rank stub
+- [profiles.md](profiles.md) — `/profile/[handle]`: avatar → rank → stats, Omens/Comments/Trades/Portfolio tabs, rank-locked portfolio
 - [sanctum.md](sanctum.md) — Oracle Room: rank-only live Pulse room (BTC/ETH/daily), room trade feed, mini chat — mock players/funds
 - [price-feed.md](price-feed.md) — socket/seed/REST sources, sampling, reconnect
 - [game-loop.md](game-loop.md) — phase machine, lock/settle/reset logic

@@ -2,18 +2,21 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { avatarGradient, PostCard } from "@/app/PostCard";
+import { CallStrip } from "@/app/CallStrip";
+import { FeedComposer } from "@/app/FeedComposer";
+import { avatarGradient } from "@/app/lib/avatar";
+import { PostCard } from "@/app/PostCard";
 import { FOLLOWED_HANDLES, LIVE_CALL_COUNT, type Market, type Post } from "@/app/lib/mockPosts";
 import { markViewed, useBookmarks, useRecentlyViewed } from "@/app/lib/postLists";
-import { BookmarkIcon, FollowingIcon, ForYouIcon, LiveCallsIcon } from "@/app/icons";
 
-type FilterId = "forYou" | "following" | "live" | "bookmarked";
+type FilterId = "forYou" | "following" | "live" | "clashes" | "bookmarked";
 
-const FILTERS: { id: FilterId; label: string; Icon: typeof ForYouIcon }[] = [
-  { id: "forYou", label: "For You", Icon: ForYouIcon },
-  { id: "following", label: "Following", Icon: FollowingIcon },
-  { id: "live", label: "Live Calls", Icon: LiveCallsIcon },
-  { id: "bookmarked", label: "Bookmarked", Icon: BookmarkIcon },
+const FILTERS: { id: FilterId; label: string }[] = [
+  { id: "forYou", label: "For You" },
+  { id: "following", label: "Following" },
+  { id: "live", label: "Live Calls" },
+  { id: "clashes", label: "Clashes" },
+  { id: "bookmarked", label: "Bookmarked" },
 ];
 
 // A post counts as viewed once it has sat at least half on screen (or filled
@@ -33,22 +36,25 @@ export function FeedSwitcher({ posts }: { posts: Post[] }) {
   const [filter, setFilter] = useState<FilterId>("forYou");
   const [community, setCommunity] = useState<CommunityId>("all");
   const [communityOpen, setCommunityOpen] = useState(false);
+  // Posts written in the composer this session, newest first. Never persisted.
+  const [localPosts, setLocalPosts] = useState<Post[]>([]);
   const { ids: bookmarkIds } = useBookmarks();
   const recent = useRecentlyViewed();
   const listRef = useRef<HTMLDivElement>(null);
 
   const visible = useMemo(() => {
-    let result = posts;
+    let result = [...localPosts, ...posts];
     if (filter === "following") result = result.filter((post) => FOLLOWED_HANDLES.includes(post.handle));
     if (filter === "live") result = result.filter((post) => post.kind === "call");
+    if (filter === "clashes") result = result.filter((post) => post.kind === "clash");
     if (filter === "bookmarked") result = result.filter((post) => bookmarkIds.includes(post.id));
     if (community !== "all") {
       result = result.filter((post) => (post.market ?? post.call?.market) === community);
     }
     return result;
-  }, [filter, community, posts, bookmarkIds]);
+  }, [filter, community, posts, localPosts, bookmarkIds]);
 
-  const recentPosts = recent.ids.flatMap((id) => posts.find((post) => post.id === id) ?? []);
+  const recentPosts = recent.ids.flatMap((id) => [...localPosts, ...posts].find((post) => post.id === id) ?? []);
 
   useEffect(() => {
     const list = listRef.current;
@@ -104,7 +110,7 @@ export function FeedSwitcher({ posts }: { posts: Post[] }) {
       <nav className="feed-nav" aria-label="Feeds">
         <p className="feed-nav-label">Feeds</p>
         <div className="feed-tabs" role="tablist" aria-label="Feed filter">
-          {FILTERS.map(({ id, label, Icon }) => (
+          {FILTERS.map(({ id, label }) => (
             <button
               key={id}
               type="button"
@@ -113,12 +119,10 @@ export function FeedSwitcher({ posts }: { posts: Post[] }) {
               className={filter === id ? "active" : ""}
               onClick={() => setFilter(id)}
             >
-              <Icon className="feed-nav-icon" />
               {label}
               {id === "live" && (
-                <span className="feed-nav-live" title={`${LIVE_CALL_COUNT.toLocaleString()} live calls`}>
-                  <span className="feed-nav-live-dot" aria-hidden="true" />
-                  {LIVE_CALL_COUNT.toLocaleString()}
+                <span className="feed-nav-live" aria-label={`${LIVE_CALL_COUNT} live`}>
+                  {LIVE_CALL_COUNT}
                 </span>
               )}
             </button>
@@ -197,15 +201,19 @@ export function FeedSwitcher({ posts }: { posts: Post[] }) {
             </div>
           </div>
         </section>
-        <div className="feed-list" ref={listRef}>
-          {visible.map((post) => (
-            <PostCard key={post.id} post={post} />
-          ))}
-          {visible.length === 0 && (
-            <p className="muted feed-empty">
-              {filter === "bookmarked" ? "No bookmarks yet — tap the bookmark on any post to save it here." : "Nothing here yet."}
-            </p>
-          )}
+        <div className="feed-panel">
+          <FeedComposer onPost={(post) => setLocalPosts((current) => [post, ...current])} />
+          <CallStrip posts={visible} />
+          <div className="feed-list" ref={listRef}>
+            {visible.map((post) => (
+              <PostCard key={post.id} post={post} />
+            ))}
+            {visible.length === 0 && (
+              <p className="muted feed-empty">
+                {filter === "bookmarked" ? "No bookmarks yet — tap the bookmark on any post to save it here." : "Nothing here yet."}
+              </p>
+            )}
+          </div>
         </div>
       </div>
     </>
