@@ -428,6 +428,51 @@ button { cursor: pointer; }
 .oracle-chip.is-wallet { font-family: var(--font-mono), ui-monospace, monospace; font-weight: 500; }
 .oracle-chip.is-disconnected { border-style: dashed; background: transparent; color: var(--muted); font-family: inherit; font-weight: 600; }
 .oracle-chip.is-disconnected:hover { color: var(--text); border-color: var(--room); }
+/* Sanctum gate (app/sanctum/SanctumGate.tsx): rank doors swing inward on entry.
+   Timeline: seal glows in (0–.6s) → doors open + seam light (.65–1.65s) →
+   overlay fades (1.6–2.1s), then unmounts. Colours come from the [data-rank]
+   tokens; each tier swaps --door-pattern for its own material. */
+.sanctum-gate { --door-base: color-mix(in srgb, var(--room) 20%, var(--bg)); --door-edge: color-mix(in srgb, var(--room) 34%, var(--bg)); --door-line: color-mix(in srgb, var(--room) 55%, transparent); position: fixed; inset: 0; z-index: 100; overflow: hidden; perspective: 1800px; cursor: pointer; animation: gate-out .5s ease 1.6s forwards; }
+.sanctum-gate-light { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(30% 80% at 50% 50%, color-mix(in srgb, var(--room-strong) 80%, transparent), var(--room-glow) 45%, transparent 80%); opacity: 0; animation: gate-light 1.3s ease-out .55s forwards; }
+.sanctum-door { position: absolute; top: 0; bottom: 0; width: 50.2%; overflow: hidden; backface-visibility: hidden; background: var(--door-pattern, linear-gradient(transparent, transparent)), linear-gradient(var(--door-dir), var(--door-edge), var(--door-base) 35%, var(--door-base) 80%, var(--door-edge)); }
+.sanctum-door.is-left { --door-dir: 90deg; left: 0; transform-origin: left center; box-shadow: inset -1px 0 0 var(--door-line), inset -10px 0 18px -10px rgba(0, 0, 0, .55); animation: gate-door-left 1s cubic-bezier(.6, 0, .2, 1) .65s forwards; }
+.sanctum-door.is-right { --door-dir: 270deg; right: 0; transform-origin: right center; box-shadow: inset 1px 0 0 var(--door-line), inset 10px 0 18px -10px rgba(0, 0, 0, .55); animation: gate-door-right 1s cubic-bezier(.6, 0, .2, 1) .65s forwards; }
+/* Inner panel: the two halves meet in a pointed arch over the seam. */
+.sanctum-door::before { content: ""; position: absolute; top: 9%; bottom: 7%; border: 2px solid var(--door-line); box-shadow: inset 0 0 0 7px color-mix(in srgb, var(--room) 8%, transparent), inset 0 0 0 8px color-mix(in srgb, var(--room) 30%, transparent), 0 0 26px -8px var(--room-glow); pointer-events: none; }
+.sanctum-door.is-left::before { left: 14%; right: 7%; border-right: 0; border-radius: 100% 0 0 0 / 30% 0 0 0; }
+.sanctum-door.is-right::before { right: 14%; left: 7%; border-left: 0; border-radius: 0 100% 0 0 / 0 30% 0 0; }
+.sanctum-seal { position: absolute; top: 50%; width: 148px; height: 148px; margin-top: -74px; color: var(--room-strong); filter: drop-shadow(0 0 14px var(--room-glow)); animation: gate-seal .6s ease-out both; }
+.is-left .sanctum-seal { right: -74px; }
+.is-right .sanctum-seal { left: -74px; }
+.sanctum-seal-disc { fill: color-mix(in srgb, var(--room) 14%, var(--bg)); stroke: var(--room); stroke-width: 1.5; }
+.sanctum-seal-ring { transform-box: view-box; transform-origin: center; animation: gate-ring 1.2s cubic-bezier(.3, 0, .2, 1) both; }
+.sanctum-gate-caption { position: absolute; left: 0; right: 0; top: calc(50% + 92px); display: grid; justify-items: center; gap: 4px; pointer-events: none; text-align: center; animation: gate-caption 1.1s ease both; }
+.sanctum-gate-caption .eyebrow { color: var(--room-strong); }
+.sanctum-gate-caption .display-font { color: var(--text); font-size: 22px; text-shadow: 0 0 18px var(--room-glow); }
+/* Tier materials. */
+.sanctum-gate[data-rank="bronze"] { --door-pattern: radial-gradient(circle, color-mix(in srgb, var(--room-strong) 55%, transparent) 0 2.5px, color-mix(in srgb, var(--room) 25%, transparent) 3px, transparent 4px) 22px 22px / 64px 64px, linear-gradient(transparent 21%, var(--door-line) 21% 21.4%, color-mix(in srgb, var(--room) 16%, transparent) 21.4% 24.6%, var(--door-line) 24.6% 25%, transparent 25% 75%, var(--door-line) 75% 75.4%, color-mix(in srgb, var(--room) 16%, transparent) 75.4% 78.6%, var(--door-line) 78.6% 79%, transparent 79%); }
+.sanctum-gate[data-rank="silver"] { --door-pattern: repeating-linear-gradient(0deg, rgba(255, 255, 255, .035) 0 1px, transparent 1px 3px), linear-gradient(115deg, transparent 40%, color-mix(in srgb, var(--room-strong) 12%, transparent) 50%, transparent 60%); }
+.sanctum-gate[data-rank="gold"] { --door-pattern: repeating-linear-gradient(45deg, color-mix(in srgb, var(--room) 16%, transparent) 0 1px, transparent 1px 30px), repeating-linear-gradient(-45deg, color-mix(in srgb, var(--room) 16%, transparent) 0 1px, transparent 1px 30px), radial-gradient(60% 50% at 50% 50%, color-mix(in srgb, var(--room-glow) 60%, transparent), transparent 70%); }
+.sanctum-gate[data-rank="diamond"] { --door-pattern: linear-gradient(60deg, rgba(255, 255, 255, .05) 25%, transparent 25% 50%, color-mix(in srgb, var(--room-strong) 8%, transparent) 50% 75%, transparent 75%) 0 0 / 90px 156px, linear-gradient(-60deg, color-mix(in srgb, var(--room) 10%, transparent) 25%, transparent 25% 50%, rgba(255, 255, 255, .04) 50% 75%, transparent 75%) 0 0 / 90px 156px; }
+.sanctum-gate[data-rank="oracle"] { --door-pattern: radial-gradient(circle at 22% 18%, var(--room-strong) 0 1px, transparent 1.6px), radial-gradient(circle at 70% 30%, var(--room-strong) 0 .8px, transparent 1.4px), radial-gradient(circle at 40% 64%, var(--violet-strong) 0 1px, transparent 1.6px), radial-gradient(circle at 82% 84%, var(--room-strong) 0 .8px, transparent 1.4px), radial-gradient(circle at 12% 88%, var(--violet-strong) 0 1px, transparent 1.6px), radial-gradient(70% 50% at 50% 50%, color-mix(in srgb, var(--room) 22%, transparent), transparent 75%); }
+.sanctum-gate[data-rank="oracle"] .sanctum-seal-ring { animation: gate-ring 1.2s cubic-bezier(.3, 0, .2, 1) both, oracle-spin 24s linear 1.2s infinite; }
+@keyframes gate-seal { from { opacity: 0; transform: scale(.82); filter: drop-shadow(0 0 0 transparent); } 70% { transform: scale(1.04); filter: drop-shadow(0 0 26px var(--room-glow)); } }
+@keyframes gate-ring { from { transform: rotate(-120deg); opacity: 0; } }
+@keyframes gate-caption { from { opacity: 0; transform: translateY(6px); } 30%, 60% { opacity: 1; transform: none; } to { opacity: 0; } }
+@keyframes gate-light { 30% { opacity: 1; } to { opacity: 0; } }
+@keyframes gate-door-left { to { transform: rotateY(86deg); filter: brightness(.45); } }
+@keyframes gate-door-right { to { transform: rotateY(-86deg); filter: brightness(.45); } }
+@keyframes gate-out { to { opacity: 0; visibility: hidden; } }
+@media (prefers-reduced-motion: reduce) {
+  .sanctum-gate { animation: gate-out .4s ease .5s forwards; }
+  .sanctum-gate *, .sanctum-gate-caption { animation: none !important; }
+}
+@media (max-width: 760px) {
+  .sanctum-seal { width: 112px; height: 112px; margin-top: -56px; }
+  .is-left .sanctum-seal { right: -56px; }
+  .is-right .sanctum-seal { left: -56px; }
+  .sanctum-gate-caption { top: calc(50% + 72px); }
+}
 .oracle-chip-dot { width: 6px; height: 6px; border-radius: 999px; background: var(--positive); box-shadow: 0 0 8px color-mix(in srgb, var(--positive) 70%, transparent); }
 
 /* Chat | chart | feed. ≤1180px the feed drops under the chart; ≤760px one column (chart, feed, chat). */

@@ -11,3 +11,9 @@ export const MOCK_RANK_THRESHOLD_LABEL = "Gold I";
 export function isExclusiveUnlocked(rank: number = MOCK_CURRENT_RANK): boolean {
   return rank >= MOCK_RANK_THRESHOLD;
 }
+
+// Rank tiers, lowest first. Each keys a [data-room]/[data-rank] colour set in
+// globals.css and a door style in the Sanctum entry gate.
+export const RANK_TIERS = ["bronze", "silver", "gold", "diamond", "oracle"] as const;
+export type RoomId = (typeof RANK_TIERS)[number];
+export const isRoomId = (v: unknown): v is RoomId => RANK_TIERS.includes(v as RoomId);

@@ -2,9 +2,11 @@
 // room for your rank only. Display-only — no backend, no settlement, no
 // other players actually connected. See docs/rooms.md.
 import { pickDailyCoin } from "@/app/DailyCoin";
+import type { RoomId } from "@/app/lib/rank";
 
 export type RoomCoin = "btc" | "eth" | "daily";
 export type RoomSide = "long" | "short";
+export { RANK_TIERS, isRoomId, type RoomId } from "@/app/lib/rank";
 
 export type RoomCoinMeta = {
   id: RoomCoin;
@@ -28,6 +30,7 @@ export const coinMeta = (coin: RoomCoin) => ROOM_COINS.find((c) => c.id === coin
 
 // Hardcoded until a real per-user rank exists (see app/lib/rank.ts stub).
 export const ROOM = {
+  tier: "oracle" as RoomId,
   rank: "Oracle",
   subrank: "Oracle II",
   label: "The Oracle Room",

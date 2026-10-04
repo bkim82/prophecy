@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { POST_REPLIES, type Market, type MarketCall, type Outcome, type Post, type PostFlair, type PostImage as PostImageData, type Reply } from "@/app/lib/mockPosts";
-import type { RoomId } from "@/app/lib/roomsMocks";
+import { RANK_TIERS, type RoomId } from "@/app/lib/roomsMocks";
 import { FlameIcon, FollowingIcon, ForYouIcon, LiveCallsIcon } from "@/app/icons";
 import { PostMenu } from "@/app/PostMenu";
 
@@ -37,8 +37,6 @@ function sparkPath(values: number[], width = 56, height = 18): string {
 
 // "Gold II" -> "gold". Drives the post's data-rank outline, which reuses the
 // Rooms tier color tokens in app/globals.css.
-const RANK_TIERS: RoomId[] = ["bronze", "silver", "gold", "diamond", "oracle"];
-
 function rankTier(rank?: string): RoomId | undefined {
   const tier = rank?.split(" ")[0].toLowerCase();
   return RANK_TIERS.find((t) => t === tier);

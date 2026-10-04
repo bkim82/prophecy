@@ -11,6 +11,7 @@ import {
   ROOM_MEMBERS,
   chatLineFor,
   coinMeta,
+  isRoomId,
   pick,
   seedChat,
   type RoomChatMessage,
@@ -18,6 +19,7 @@ import {
   type RoomSide,
 } from "@/app/lib/roomsMocks";
 import { RoomChat } from "@/app/sanctum/RoomChat";
+import { SanctumGate } from "@/app/sanctum/SanctumGate";
 import { RoomFeed, formatPrice, type RoomEvent } from "@/app/sanctum/RoomFeed";
 
 // No USD rail yet: without a wallet the room trades against preview funds so
@@ -91,7 +93,8 @@ function useWalletAddress() {
   return address;
 }
 
-export function SanctumView() {
+export function SanctumView({ previewRank }: { previewRank?: string }) {
+  const gateTier = isRoomId(previewRank) ? previewRank : ROOM.tier;
   const feeds = {
     btc: usePriceFeed(coinMeta("btc").product),
     eth: usePriceFeed(coinMeta("eth").product),
@@ -246,6 +249,11 @@ export function SanctumView() {
 
   return (
     <main className="oracle-shell" data-room="oracle">
+      <SanctumGate
+        tier={gateTier}
+        title={gateTier === ROOM.tier ? ROOM.label : `The ${gateTier[0].toUpperCase()}${gateTier.slice(1)} Room`}
+        subtitle={gateTier === ROOM.tier ? ROOM.subrank : "Rank preview"}
+      />
       <header className="oracle-hero">
         <OracleSigil />
         <div className="oracle-hero-copy">
