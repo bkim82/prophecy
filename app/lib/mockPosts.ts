@@ -32,6 +32,10 @@ export type MarketCall = {
   // Only meaningful while `outcome` is unset — a resolved call has nothing
   // left to count down. Static display string, not a live countdown.
   expiresIn?: string;
+  // Shown beside the Copy trade button (pending calls only). Hand-picked to
+  // scale with the author's rank — the button copies nothing and nothing
+  // increments this.
+  copiedBy?: number;
 };
 
 // Placeholder art standing in for real image uploads (no asset pipeline
@@ -47,6 +51,11 @@ export type PostImage =
 // resolved), "streak" = compact highlight banner, "promo" = quiet system
 // line with no avatar/actions.
 export type PostKind = "text" | "call" | "result" | "streak" | "promo";
+
+// Context line above a post meant to pull the eye (app/PostCard.tsx FLAIRS).
+// Hand-assigned in the mock — no engagement or recommendation signal
+// computes it.
+export type PostFlair = "forYou" | "engaging" | "copying" | "followed";
 
 export type Post = {
   id: string;
@@ -66,6 +75,7 @@ export type Post = {
   // needed on posts without a `call` — a call post's own `call.market`
   // already implies its community.
   market?: Market;
+  flair?: PostFlair;
 };
 
 // Drives the "Following" feed filter (app/FeedSwitcher.tsx) — not a real
@@ -121,6 +131,15 @@ export const POST_REPLIES: Record<string, Reply[]> = {
     { id: "g5-r1", author: "8bit Kay", handle: "@8bitkay", avatarInitial: "K", content: "same, been checking every patch note", timestamp: "30m ago", likes: 3 },
     { id: "g5-r2", author: "ArenaBot", handle: "@arenabot", avatarInitial: "A", content: "still cooking, no ETA yet", timestamp: "20m ago", likes: 8 },
   ],
+  "g-oracle1": [
+    { id: "g-oracle1-r1", author: "Nova", handle: "@nova_trades", avatarInitial: "N", content: "tailing this, stop's tight enough to size", timestamp: "3m ago", likes: 48 },
+    { id: "g-oracle1-r2", author: "Marcus", handle: "@marcus_calls", avatarInitial: "M", content: "that 68.5k wall has been sitting there all morning", timestamp: "2m ago", likes: 31 },
+    { id: "g-oracle1-r3", author: "Lena", handle: "@lena_q", avatarInitial: "L", content: "18k people on one side is either genius or the top", timestamp: "1m ago", likes: 22 },
+  ],
+  "g-diamond1": [
+    { id: "g-diamond1-r1", author: "Ren", handle: "@ren.eth", avatarInitial: "R", content: "spot volume is the tell, agreed", timestamp: "9m ago", likes: 14 },
+    { id: "g-diamond1-r2", author: "Tobi", handle: "@tobi.sol", avatarInitial: "T", content: "copied at 3,410 lfg", timestamp: "6m ago", likes: 9 },
+  ],
   e1: [
     { id: "e1-r1", author: "Ren", handle: "@ren.eth", avatarInitial: "R", content: "exclusive feed reads different fr", timestamp: "3m ago", likes: 6 },
     { id: "e1-r2", author: "Lena", handle: "@lena_q", avatarInitial: "L", content: "watching for the same pullback", timestamp: "2m ago", likes: 2 },
@@ -159,6 +178,30 @@ export const GLOBAL_POSTS: Post[] = [
     },
   },
   {
+    id: "g-oracle1",
+    author: "Vesper",
+    handle: "@vesper",
+    avatarInitial: "V",
+    content: "Funding flipped hot and the 68.5k wall hasn't moved in six hours. Fading this pump — stop above 69.2k.",
+    timestamp: "4m ago",
+    likes: 1284,
+    replies: 216,
+    kind: "call",
+    rank: "Oracle",
+    flair: "copying",
+    call: {
+      market: "btc",
+      side: "SHORT",
+      leverage: 20,
+      entryPrice: "68,420",
+      currentPrice: "68,190",
+      changePct: -0.34,
+      spark: [68.42, 68.47, 68.39, 68.33, 68.36, 68.27, 68.22, 68.19],
+      expiresIn: "1h 55m",
+      copiedBy: 18400,
+    },
+  },
+  {
     id: "g2",
     author: "Ren",
     handle: "@ren.eth",
@@ -178,6 +221,7 @@ export const GLOBAL_POSTS: Post[] = [
       changePct: -0.4,
       spark: [3440, 3435, 3430, 3422, 3418, 3415, 3413, 3412],
       expiresIn: "3h 40m",
+      copiedBy: 340,
     },
   },
   {
@@ -193,6 +237,7 @@ My take is that Base Season will reward consistency over pure hype. The teams th
     replies: 12,
     kind: "text",
     rank: "Bronze III",
+    flair: "forYou",
   },
   {
     id: "g-streak1",
@@ -207,6 +252,29 @@ My take is that Base Season will reward consistency over pure hype. The teams th
     rank: "Gold I",
     streakStat: "6-day streak",
     market: "btc",
+  },
+  {
+    id: "g-diamond1",
+    author: "Juno",
+    handle: "@juno_dx",
+    avatarInitial: "J",
+    content: "ETH reclaimed the weekly open on real spot volume. Riding it to 3.5k, invalidation under 3,380.",
+    timestamp: "12m ago",
+    likes: 486,
+    replies: 64,
+    kind: "call",
+    rank: "Diamond II",
+    call: {
+      market: "eth",
+      side: "LONG",
+      leverage: 15,
+      entryPrice: "3,402",
+      currentPrice: "3,436",
+      changePct: 1.0,
+      spark: [3398, 3401, 3410, 3407, 3418, 3425, 3431, 3436],
+      expiresIn: "4h 20m",
+      copiedBy: 7200,
+    },
   },
   {
     id: "g7",
@@ -233,6 +301,7 @@ My take is that Base Season will reward consistency over pure hype. The teams th
     replies: 41,
     kind: "text",
     rank: "Silver II",
+    flair: "engaging",
     image: { kind: "meme", seed: "doge-cope", emoji: "🐕" },
     market: "doge",
   },
@@ -268,6 +337,7 @@ My take is that Base Season will reward consistency over pure hype. The teams th
     replies: 15,
     kind: "text",
     rank: "Silver I",
+    flair: "followed",
   },
   {
     id: "g5",
@@ -315,6 +385,7 @@ export const EXCLUSIVE_POSTS: Post[] = [
       changePct: 1.8,
       spark: [66.8, 67.0, 67.4, 67.1, 67.6, 67.9, 68.1, 68.45],
       expiresIn: "5h 10m",
+      copiedBy: 1900,
     },
   },
   {

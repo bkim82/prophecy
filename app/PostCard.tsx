@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { POST_REPLIES, type Market, type MarketCall, type Outcome, type Post, type PostImage as PostImageData, type Reply } from "@/app/lib/mockPosts";
-import { FlameIcon } from "@/app/icons";
+import { POST_REPLIES, type Market, type MarketCall, type Outcome, type Post, type PostFlair, type PostImage as PostImageData, type Reply } from "@/app/lib/mockPosts";
+import type { RoomId } from "@/app/lib/roomsMocks";
+import { FlameIcon, FollowingIcon, ForYouIcon, LiveCallsIcon } from "@/app/icons";
 import { PostMenu } from "@/app/PostMenu";
 
 // Deterministic hash so the same handle always gets the same gradient —
@@ -34,6 +35,24 @@ function sparkPath(values: number[], width = 56, height = 18): string {
     .join(" ");
 }
 
+// "Gold II" -> "gold". Drives the post's data-rank outline, which reuses the
+// Rooms tier color tokens in app/globals.css.
+const RANK_TIERS: RoomId[] = ["bronze", "silver", "gold", "diamond", "oracle"];
+
+function rankTier(rank?: string): RoomId | undefined {
+  const tier = rank?.split(" ")[0].toLowerCase();
+  return RANK_TIERS.find((t) => t === tier);
+}
+
+const FLAIRS: Record<PostFlair, { label: string; Icon: typeof FlameIcon }> = {
+  forYou: { label: "You might like this post", Icon: ForYouIcon },
+  engaging: { label: "People are engaging with this post", Icon: FlameIcon },
+  copying: { label: "Traders are piling into this call", Icon: LiveCallsIcon },
+  followed: { label: "Popular with people you follow", Icon: FollowingIcon },
+};
+
+const compactCount = new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 });
+
 const MARKET_META: Record<Market, { label: string; symbol: string; symbolClass: string }> = {
   btc: { label: "BTC", symbol: "₿", symbolClass: "btc-symbol" },
   eth: { label: "ETH", symbol: "Ξ", symbolClass: "eth-symbol" },
@@ -50,28 +69,47 @@ function OutcomeBadge({ outcome }: { outcome: Outcome }) {
   return <div className="call-outcome call-outcome--close">◐ {outcome.diff}</div>;
 }
 
+function CopierCount({ count, seed }: { count: number; seed: string }) {
+  return (
+    <span className="market-call-copiers">
+      <span className="copier-stack" aria-hidden="true">
+        {[0, 1, 2].map((i) => (
+          <span key={i} style={{ background: avatarGradient(`copier${i}:${seed}`) }} />
+        ))}
+      </span>
+      <span className="copiers-text">
+        <strong>{compactCount.format(count).toLowerCase()}</strong> people copied this trade
+      </span>
+    </span>
+  );
+}
+
 function MarketCallCard({ call }: { call: MarketCall }) {
   const meta = MARKET_META[call.market];
   const isLong = call.side === "LONG";
   const isChangeUp = call.changePct >= 0;
   return (
-    <div className="market-call">
+    <div className={`market-call${call.outcome ? "" : " market-call--open"}`}>
       <div className="market-call-head">
         <span className={`market-symbol ${meta.symbolClass}`}>{meta.symbol}</span>
         <strong>
           {meta.label} {isLong ? "↑" : "↓"} {call.side}
           {call.leverage ? ` · ${call.leverage}x` : ""}
         </strong>
-        {!call.outcome ? (
-          <button type="button" className="market-call-copy" aria-label={`Copy ${meta.label} trade`}>
-            ↗ Copy trade
-          </button>
-        ) : (
+        {call.outcome && (
           <svg className={`call-spark ${isChangeUp ? "is-up" : "is-down"}`} viewBox="0 0 56 18" preserveAspectRatio="none" aria-hidden="true">
             <path d={sparkPath(call.spark)} />
           </svg>
         )}
       </div>
+      {!call.outcome && (
+        <div className="market-call-copy-wrap">
+          <button type="button" className="market-call-copy" aria-label={`Copy ${meta.label} trade`}>
+            ↗ Copy trade
+          </button>
+          {call.copiedBy !== undefined && <CopierCount count={call.copiedBy} seed={`${call.market}-${call.entryPrice}`} />}
+        </div>
+      )}
       <div className="market-call-prices">
         <span>${call.entryPrice}</span>
         <span className="call-arrow" aria-hidden="true">→</span>
@@ -206,19 +244,33 @@ export function PostCard({ post }: { post: Post }) {
 
   const firstName = post.author.split(" ")[0];
   const isLongPost = post.content.length > 220;
+  const flair = post.flair && FLAIRS[post.flair];
 
   return (
-    <article className="post-card">
+    <article className="post-card" data-rank={rankTier(post.rank)}>
       <div className="post-avatar" aria-hidden="true" style={{ background: avatarGradient(post.handle) }}>
         {post.avatarInitial}
       </div>
       <div className="post-body">
+        {flair && (
+          <p className={`post-flair post-flair--${post.flair}`}>
+            <flair.Icon className="post-flair-icon" />
+            {flair.label}
+          </p>
+        )}
         <div className="post-meta">
           <strong>{post.author}</strong>
           <span className="muted">{post.handle}</span>
           <span className="muted">· {post.timestamp}</span>
           <span className="post-meta-trail">
-            {post.rank && <span className="rank-badge">{post.rank}</span>}
+            {post.rank && (
+              <span
+                className="rank-badge"
+                style={{ "--shine-delay": `-${(hueFromHandle(post.handle) % 24) / 10}s` } as React.CSSProperties}
+              >
+                {post.rank}
+              </span>
+            )}
             <PostMenu firstName={firstName} />
           </span>
         </div>
