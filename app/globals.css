@@ -203,7 +203,7 @@ button { cursor: pointer; }
 .feed-tabs button.active { border-color: color-mix(in srgb, var(--brand) 45%, transparent); background: var(--selected-bg); color: var(--brand-strong); font-weight: 700; }
 .feed-tabs button:hover:not(.active) { color: var(--text); }
 /* Reddit-style left rail on `/`: feeds as a vertical icon list. Above 960px only — below that .feed-nav falls back to the .feed-tabs pill/segmented styles. */
-.feed-nav-label, .feed-nav-icon { display: none; }
+.feed-nav-label, .feed-nav-icon, .feed-nav-live, .feed-recent { display: none; }
 @media (min-width: 961px) {
   .feed-shell--nav { grid-template-columns: 200px minmax(0, 1fr) 340px; }
   .feed-shell--nav .feed-heading { margin-bottom: 10px; }
@@ -214,8 +214,27 @@ button { cursor: pointer; }
   .feed-nav .feed-tabs button:hover:not(.active) { background: var(--surface-hover); }
   .feed-nav .feed-tabs button.active { border: 0; background: var(--selected-bg); color: var(--brand-strong); font-weight: 700; }
   .feed-nav-icon { display: block; flex: none; width: 20px; height: 20px; }
+  .feed-nav-live { display: inline-flex; align-items: center; gap: 5px; margin-left: auto; white-space: nowrap; color: var(--chart-up); font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .feed-nav-live-dot { flex: none; width: 7px; height: 7px; border-radius: 999px; background: var(--chart-up); box-shadow: 0 0 0 3px color-mix(in srgb, var(--chart-up) 24%, transparent); }
+  /* Recently viewed: section break under the feed tabs, rail-only. */
+  .feed-recent { display: block; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+  .feed-recent-clear { border: 0; border-radius: 6px; background: transparent; color: var(--muted); padding: 4px 6px; margin: 4px 0 0 6px; font-size: 11px; font-weight: 600; }
+  .feed-recent-clear:hover { background: var(--surface-hover); color: var(--brand-strong); }
+  .feed-recent-empty { margin: 0 12px; color: var(--muted); font-size: 12px; line-height: 1.4; }
+  .feed-recent-list { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+  .feed-recent-list button { display: flex; align-items: center; gap: 10px; width: 100%; border: 0; border-radius: 8px; background: transparent; padding: 7px 12px; color: var(--text); text-align: left; }
+  .feed-recent-list button:hover { background: var(--surface-hover); }
+  .feed-recent-avatar { flex: none; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 999px; color: #fff; font-size: 10px; font-weight: 700; text-shadow: 0 1px 2px rgba(0, 0, 0, .35); }
+  .feed-recent-text { min-width: 0; display: grid; gap: 1px; }
+  .feed-recent-text strong, .feed-recent-text span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .feed-recent-text strong { font-size: 12px; font-weight: 600; }
+  .feed-recent-text span { color: var(--muted); font-size: 11.5px; }
 }
-@media (min-width: 961px) and (max-width: 1180px) { .feed-shell--nav { grid-template-columns: 180px minmax(0, 1fr) 280px; gap: 20px; } }
+@media (min-width: 961px) and (max-width: 1180px) {
+  .feed-shell--nav { grid-template-columns: 180px minmax(0, 1fr) 280px; gap: 20px; }
+  /* Keeps "Live Calls" + its count badge on one line in the 180px rail. */
+  .feed-nav .feed-tabs button { gap: 10px; white-space: nowrap; }
+}
 /* ≤960px: flatten .feed-main so the tabs sit back under the "Omens" heading, as before the rail existed. */
 @media (max-width: 960px) {
   .feed-shell--nav { row-gap: 0; }
@@ -227,6 +246,9 @@ button { cursor: pointer; }
 @media (max-width: 768px) { .feed-shell--nav .feed-sidebar { margin-top: 16px; } }
 .feed-list { display: grid; gap: 14px; }
 .feed-empty { padding: 24px 4px; }
+/* Set by FeedSwitcher's jumpToPost when a Recently viewed row scrolls back to a post. */
+.post-card.is-flash { animation: post-flash 1.6s ease-out; }
+@keyframes post-flash { 0%, 35% { outline: 2px solid var(--brand); outline-offset: 3px; } 100% { outline: 2px solid transparent; outline-offset: 3px; } }
 /* No backdrop-filter: the page behind is flat, and it would make each card a
    stacking context that traps .post-menu-dropdown under the next card.
    --rank-tint is an optional extra background layer set per rank tier below. */
@@ -301,9 +323,11 @@ button { cursor: pointer; }
 .post-image--chart svg.is-down path { stroke: var(--chart-down); }
 .post-image--meme { display: grid; place-items: center; height: 120px; font-size: 44px; }
 .post-actions { display: flex; align-items: center; gap: 6px; margin: 0 -10px -6px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.post-actions .action-like, .post-actions .action-reply { display: inline-flex; align-items: center; gap: 5px; min-height: 30px; border: 1px solid transparent; border-radius: 999px; background: transparent; padding: 0 10px; margin: 0; color: var(--muted); font: inherit; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; transition: background .15s ease, color .15s ease, border-color .15s ease; }
-.post-actions .action-like:hover, .post-actions .action-reply:hover, .post-actions .action-reply[aria-expanded="true"] { color: var(--brand-strong); background: var(--surface-hover); border-color: var(--line); }
-.post-actions .action-like.is-active { color: var(--brand-strong); }
+.post-actions .action-like, .post-actions .action-reply, .post-actions .action-bookmark { display: inline-flex; align-items: center; gap: 5px; min-height: 30px; border: 1px solid transparent; border-radius: 999px; background: transparent; padding: 0 10px; margin: 0; color: var(--muted); font: inherit; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; transition: background .15s ease, color .15s ease, border-color .15s ease; }
+.post-actions .action-like:hover, .post-actions .action-reply:hover, .post-actions .action-bookmark:hover, .post-actions .action-reply[aria-expanded="true"] { color: var(--brand-strong); background: var(--surface-hover); border-color: var(--line); }
+.post-actions .action-like.is-active, .post-actions .action-bookmark.is-active { color: var(--brand-strong); }
+.post-actions .action-bookmark { justify-content: center; width: 30px; margin-left: auto; padding: 0; }
+.action-bookmark svg { width: 15px; height: 15px; }
 .action-reply-caret { font-size: 9px; color: var(--muted-dim); }
 .post-actions .action-reply:hover .action-reply-caret, .post-actions .action-reply[aria-expanded="true"] .action-reply-caret { color: var(--brand-strong); }
 .reply-thread { display: grid; gap: 12px; margin: 8px 0 2px; padding-left: 14px; border-left: 2px solid var(--line); }
@@ -1138,6 +1162,7 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
   .community-dropdown-trigger { min-height: 32px; padding: 4px 10px; font-size: 11px; }
   .feed-tabs { display: grid; width: 100%; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px; margin: 0 0 10px; padding: 3px; border-radius: 8px; }
   .feed-tabs button { min-width: 0; min-height: 36px; padding: 6px 4px; font-size: 11px; white-space: nowrap; }
+  .feed-nav .feed-tabs { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .feed-list { gap: 8px; }
   .post-card { padding: 12px; gap: 8px; border-radius: 9px; }
   .post-avatar { width: 32px; height: 32px; font-size: 11px; }

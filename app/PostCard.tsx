@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { POST_REPLIES, type Market, type MarketCall, type Outcome, type Post, type PostFlair, type PostImage as PostImageData, type Reply } from "@/app/lib/mockPosts";
 import { RANK_TIERS, type RoomId } from "@/app/lib/roomsMocks";
-import { FlameIcon, FollowingIcon, ForYouIcon, LiveCallsIcon } from "@/app/icons";
+import { BookmarkIcon, FlameIcon, FollowingIcon, ForYouIcon, LiveCallsIcon } from "@/app/icons";
+import { useBookmarks } from "@/app/lib/postLists";
 import { PostMenu } from "@/app/PostMenu";
 
 // Deterministic hash so the same handle always gets the same gradient —
@@ -17,7 +18,7 @@ function hueFromHandle(handle: string): number {
   return Math.abs(hash) % 360;
 }
 
-function avatarGradient(handle: string): string {
+export function avatarGradient(handle: string): string {
   const hue = hueFromHandle(handle);
   return `linear-gradient(135deg, hsl(${hue} 70% 45%), hsl(${(hue + 45) % 360} 70% 32%))`;
 }
@@ -236,6 +237,7 @@ export function PostCard({ post }: { post: Post }) {
   const [repliesOpen, setRepliesOpen] = useState(false);
   const [liked, setLiked] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const bookmarks = useBookmarks();
 
   if (post.kind === "streak") return <StreakCard post={post} />;
   if (post.kind === "promo") return <PromoCard post={post} />;
@@ -243,9 +245,10 @@ export function PostCard({ post }: { post: Post }) {
   const firstName = post.author.split(" ")[0];
   const isLongPost = post.content.length > 220;
   const flair = post.flair && FLAIRS[post.flair];
+  const bookmarked = bookmarks.has(post.id);
 
   return (
-    <article className="post-card" data-rank={rankTier(post.rank)}>
+    <article className="post-card" data-rank={rankTier(post.rank)} data-post-id={post.id}>
       <div className="post-avatar" aria-hidden="true" style={{ background: avatarGradient(post.handle) }}>
         {post.avatarInitial}
       </div>
@@ -301,6 +304,15 @@ export function PostCard({ post }: { post: Post }) {
           >
             💬 Reply {post.replies}
             <span className="action-reply-caret" aria-hidden="true">{repliesOpen ? "▴" : "▾"}</span>
+          </button>
+          <button
+            type="button"
+            className={`action-bookmark${bookmarked ? " is-active" : ""}`}
+            aria-pressed={bookmarked}
+            aria-label={bookmarked ? "Remove bookmark" : "Bookmark post"}
+            onClick={() => bookmarks.toggle(post.id)}
+          >
+            <BookmarkIcon filled={bookmarked} />
           </button>
         </div>
         {repliesOpen && <ReplyThread postId={post.id} />}

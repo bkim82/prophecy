@@ -85,6 +85,14 @@ export function LiveCallsIcon({ className }: { className?: string }) {
   );
 }
 
+export function BookmarkIcon({ className, filled = false }: { className?: string; filled?: boolean }) {
+  return (
+    <svg viewBox="0 0 20 20" className={className} fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M5.5 3.5h9v13L10 13.2l-4.5 3.3v-13Z" />
+    </svg>
+  );
+}
+
 export function LockIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

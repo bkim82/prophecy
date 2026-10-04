@@ -82,6 +82,10 @@ export type Post = {
 // social graph, just a hardcoded handle allowlist for the mock.
 export const FOLLOWED_HANDLES = ["@nova_trades", "@ren.eth", "@zane_lfg"];
 
+// Platform-wide open-call count for the "Live Calls" rail badge
+// (app/FeedSwitcher.tsx) — display-only, not derived from the posts above.
+export const LIVE_CALL_COUNT = 214;
+
 export type Reply = {
   id: string;
   author: string;
