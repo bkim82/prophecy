@@ -58,8 +58,9 @@ function Seal({ tier }: { tier: RoomId }) {
 }
 
 /**
- * Entry animation for /sanctum: two doors in the player's rank material, sealed
- * with the rank's sigil, swing inward to reveal the room. Click / Esc skips.
+ * Entry animation for /sanctum: two heavy doors in the player's rank material,
+ * set in a stone doorway and sealed with the rank's sigil, swing out toward the
+ * viewer, then the view pushes through into the room. Click / Esc skips.
  * Timing lives in globals.css ("Sanctum gate"); this unmounts on the overlay's
  * own fade-out, with a timer fallback in case animations never fire.
  */
@@ -89,15 +90,20 @@ export function SanctumGate({ tier, title, subtitle }: { tier: RoomId; title: st
         if (e.target === e.currentTarget) setDone(true);
       }}
     >
-      <div className="sanctum-gate-light" />
-      {(["left", "right"] as const).map((side) => (
-        <div key={side} className={`sanctum-door is-${side}`}>
-          <Seal tier={tier} />
+      <div className="sanctum-gate-way">
+        <div className="sanctum-gate-light" />
+        {(["left", "right"] as const).map((side) => (
+          <div key={side} className={`sanctum-door is-${side}`}>
+            <div className="sanctum-door-face">
+              <Seal tier={tier} />
+            </div>
+            <div className="sanctum-door-edge" />
+          </div>
+        ))}
+        <div className="sanctum-gate-caption">
+          <span className="eyebrow">{subtitle}</span>
+          <span className="display-font">{title}</span>
         </div>
-      ))}
-      <div className="sanctum-gate-caption">
-        <span className="eyebrow">{subtitle}</span>
-        <span className="display-font">{title}</span>
       </div>
     </div>
   );
