@@ -6,6 +6,9 @@ Deliberate gaps in a prototype scoped to the core loop. Not bugs.
 
 | Gap | Detail |
 | --- | --- |
+| Real copy-trading / creator earnings | No ledger, fee split, or follower relationship exists anywhere; "Copy trade" on a feed post (`app/PostCard.tsx:107`) is just a button. The wallet briefly had a mock Creator earnings card, removed along with Recent activity when the dashboard was reworked into tabs (`docs/wallet.md`) |
+| Wallet Recent activity has no UI home | `getWalletActivity`/`GET /api/wallet/activity` (`lib/alchemy.ts`) reads real confirmed transfers (Received/Sent/Swapped) and still works, but nothing in `app/wallet/*` renders it since the Portfolio tab became a plain coin list |
+| Wallet Deposit/Send/Swap are UI-only | `app/wallet/ActionSheets.tsx` collects inputs but never calls `eth_sendTransaction` or a swap router, on either the Portfolio or Advanced tab; there is correspondingly no pending-transaction state |
 | Portfolio cross-session history/leaderboard | `GET /api/portfolio/session` returns only the current session plus a short list of recent settled sessions (`lib/portfolio.ts sessionHistoryFor`) — no full history browsing UI, no leaderboard across users |
 | Real rank/tier system | `app/lib/rank.ts` is a hardcoded stub (`MOCK_CURRENT_RANK`/`MOCK_RANK_THRESHOLD`) gating `/exclusive` — no computation, no persistence, not tied to Clerk `userId` |
 | Sanctum: real money, real players, rank gating | `/sanctum` (`app/sanctum/SanctumView.tsx`) is the Oracle Room on live prices but mock everything else (`app/lib/roomsMocks.ts`) — no USD wallet rail/settlement (preview $1,000 balance), simulated room players + feed, local-only chat, hardcoded Oracle rank, no server-side room membership (see [sanctum.md](sanctum.md)) |

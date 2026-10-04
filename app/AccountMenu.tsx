@@ -29,7 +29,15 @@ export function AccountMenu({ compact = false }: { compact?: boolean }) {
         </div>
       }
     >
-      <UserButton>
+      <UserButton
+        appearance={{
+          elements: {
+            userButtonBox: "account-user-button-box",
+            userButtonTrigger: "account-user-button-trigger",
+            avatarBox: "account-avatar-box",
+          },
+        }}
+      >
         <UserButton.MenuItems>
           <UserButton.Action
             label={theme === "dark" ? "Light mode" : "Dark mode"}

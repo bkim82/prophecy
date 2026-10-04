@@ -1,15 +1,14 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
-import { chainName, formatEth, getWalletProvider, isBaseChain, shortenAddress, switchToBase, type EthereumProvider } from "@/app/lib/wallet";
+import { useEffect, useState } from "react";
+import { isBaseChain, shortenAddress } from "@/app/lib/wallet";
+import { useWalletConnection } from "@/app/lib/useWalletConnection";
 import type { WalletTokenHolding } from "@/lib/alchemy";
 
-type WalletState = { address: string | null; chainId: string | null; chain: string | null; balance: string | null };
 type TicketKind = "directional" | "spot";
 type Side = "long" | "short" | "buy" | "sell";
 
-const EMPTY_WALLET: WalletState = { address: null, chainId: null, chain: null, balance: null };
 const ASSETS = ["BTC", "ETH", "Other"];
 
 const formatQty = (n: number) => (n === 0 ? "0" : n < 0.0001 ? n.toExponential(2) : n.toLocaleString("en-US", { maximumFractionDigits: 4 }));
@@ -17,52 +16,13 @@ const formatUsd = (n: number) => n.toLocaleString("en-US", { style: "currency", 
 
 export function WalletDesk({ showHoldings = false, showConnection = true, showTicket = true }: { showHoldings?: boolean; showConnection?: boolean; showTicket?: boolean }) {
   const router = useRouter();
-  const [wallet, setWallet] = useState<WalletState>(EMPTY_WALLET);
+  const { wallet, notice, setNotice, connecting, switching, connect, disconnectWallet: disconnectConnection, switchWallet, switchNetwork } = useWalletConnection();
   const [tokenHoldings, setTokenHoldings] = useState<WalletTokenHolding[]>([]);
   const [holdingsLoading, setHoldingsLoading] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [connecting, setConnecting] = useState(false);
-  const [switching, setSwitching] = useState(false);
   const [asset, setAsset] = useState("BTC");
   const [kind, setKind] = useState<TicketKind>("directional");
   const [stake, setStake] = useState("25");
   const [leverage, setLeverage] = useState("100");
-  // Coinbase Wallet SDK's Smart Wallet signer throws (code 4100) if `eth_accounts` is
-  // called before `eth_requestAccounts` has ever succeeded this session, and it also
-  // can't handle a second request while one is already in flight — set while a
-  // connect/switch handshake is running so the chainChanged listener doesn't race it.
-  const handshakeInFlight = useRef(false);
-
-  const refreshWallet = async (provider: EthereumProvider, address?: string) => {
-    let accounts: string[];
-    if (address) {
-      accounts = [address];
-    } else {
-      try { accounts = await provider.request({ method: "eth_accounts" }) as string[]; }
-      catch { setWallet(EMPTY_WALLET); return; }
-    }
-    if (!accounts[0]) { setWallet(EMPTY_WALLET); return; }
-    let chainId: string;
-    let balance: string;
-    try {
-      chainId = await provider.request({ method: "eth_chainId" }) as string;
-      balance = await provider.request({ method: "eth_getBalance", params: [accounts[0], "latest"] }) as string;
-    } catch { return; } // mid-handshake race (SDK not yet marked authorized) — the next event/poll retries
-    const eth = formatEth(balance);
-    setWallet({ address: accounts[0], chainId, chain: chainName(chainId), balance: eth });
-    window.dispatchEvent(new Event("wallet-updated"));
-  };
-
-  useEffect(() => {
-    const provider = getWalletProvider();
-    if (!provider) return;
-    void refreshWallet(provider);
-    const onAccountsChanged = (...args: unknown[]) => { if (!handshakeInFlight.current) void refreshWallet(provider, (args[0] as string[])[0]); };
-    const onChainChanged = () => { if (!handshakeInFlight.current) void refreshWallet(provider); };
-    provider.on?.("accountsChanged", onAccountsChanged);
-    provider.on?.("chainChanged", onChainChanged);
-    return () => { provider.removeListener?.("accountsChanged", onAccountsChanged); provider.removeListener?.("chainChanged", onChainChanged); };
-  }, []);
 
   useEffect(() => {
     if (!wallet.address || !wallet.chainId || !isBaseChain(wallet.chainId)) { setTokenHoldings([]); return; }
@@ -76,41 +36,9 @@ export function WalletDesk({ showHoldings = false, showConnection = true, showTi
     return () => { cancelled = true; };
   }, [wallet.address, wallet.chainId]);
 
-  const connect = async () => {
-    const provider = getWalletProvider();
-    if (!provider) { setNotice("Wallet connection isn't available right now."); return; }
-    setConnecting(true); setNotice(null); handshakeInFlight.current = true;
-    try {
-      const accounts = await provider.request({ method: "eth_requestAccounts" }) as string[];
-      await refreshWallet(provider, accounts[0]);
-    } catch (error) { setNotice(error instanceof Error ? error.message : "Wallet connection was cancelled."); }
-    finally { setConnecting(false); handshakeInFlight.current = false; }
-  };
-
   const disconnectWallet = async () => {
-    const provider = getWalletProvider();
-    if (provider) { try { await provider.disconnect?.(); } catch { /* already disconnected */ } }
-    setWallet(EMPTY_WALLET);
+    await disconnectConnection();
     setTokenHoldings([]);
-    setNotice(null);
-    window.dispatchEvent(new Event("wallet-updated"));
-  };
-
-  const switchWallet = async () => {
-    const provider = getWalletProvider();
-    if (!provider) return;
-    try { await provider.disconnect?.(); } catch { /* already disconnected */ }
-    setWallet(EMPTY_WALLET);
-    await connect();
-  };
-
-  const switchNetwork = async () => {
-    const provider = getWalletProvider();
-    if (!provider) return;
-    setSwitching(true); setNotice(null); handshakeInFlight.current = true;
-    try { await switchToBase(provider); await refreshWallet(provider); }
-    catch (error) { setNotice(error instanceof Error ? error.message : "Couldn't switch to Base. Switch networks from your wallet instead."); }
-    finally { setSwitching(false); handshakeInFlight.current = false; }
   };
 
   const trade = (side: Side) => {

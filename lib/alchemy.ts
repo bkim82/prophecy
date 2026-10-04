@@ -19,6 +19,7 @@ export type WalletTokenHolding = {
   priceUsd: number | null;
   valueUsd: number | null;
   imageUrl: string | null;
+  change24h: number | null;
 };
 
 type CacheEntry = { at: number; holdings: WalletTokenHolding[] };
@@ -91,6 +92,7 @@ export async function getWalletHoldings(address: string): Promise<WalletTokenHol
         priceUsd,
         valueUsd: priceUsd != null ? balance * priceUsd : null,
         imageUrl: summary?.imageUrl ?? meta?.logo ?? null,
+        change24h: summary?.change24h ?? null,
       };
     });
     holdings.sort((a, b) => (b.valueUsd ?? 0) - (a.valueUsd ?? 0));
@@ -99,5 +101,109 @@ export async function getWalletHoldings(address: string): Promise<WalletTokenHol
     return holdings;
   } catch {
     return cached?.holdings ?? [];
+  }
+}
+
+const ACTIVITY_TTL_MS = 15_000;
+const ACTIVITY_MAX_PER_SIDE = 25;
+const ACTIVITY_LIMIT = 15;
+
+export type WalletActivityKind = "received" | "sent" | "swapped";
+export type WalletActivityItem = {
+  hash: string;
+  kind: WalletActivityKind;
+  asset: string;
+  value: number | null;
+  /** Set only for a "swapped" row: the other leg of the same transaction. */
+  toAsset: string | null;
+  toValue: number | null;
+  timestamp: number | null; // ms epoch
+};
+
+type AssetTransfer = {
+  hash: string;
+  from: string;
+  to: string | null;
+  value: number | null;
+  asset: string | null;
+  metadata?: { blockTimestamp?: string };
+};
+
+const activityCache = new Map<string, { at: number; items: WalletActivityItem[] }>();
+
+async function fetchTransfers(address: string, direction: "fromAddress" | "toAddress"): Promise<AssetTransfer[]> {
+  const { transfers } = await rpc<{ transfers: AssetTransfer[] }>("alchemy_getAssetTransfers", [
+    {
+      [direction]: address,
+      category: ["external", "erc20"],
+      withMetadata: true,
+      excludeZeroValue: true,
+      order: "desc",
+      maxCount: `0x${ACTIVITY_MAX_PER_SIDE.toString(16)}`,
+    },
+  ]);
+  return transfers;
+}
+
+/**
+ * Recent on-chain activity for a wallet, newest first. Two same-hash legs (one
+ * out, one in, different assets) collapse into one "swapped" row — a same-tx
+ * DEX swap always shows this way. A lone leg is "sent"/"received". Real
+ * confirmed transfers only: Alchemy has no mempool/pending view here, so
+ * there is no "pending" row — never throws, same invariant as getWalletHoldings.
+ */
+export async function getWalletActivity(address: string): Promise<WalletActivityItem[]> {
+  const normalized = address.toLowerCase();
+  const cached = activityCache.get(normalized);
+  if (cached && Date.now() - cached.at < ACTIVITY_TTL_MS) return cached.items;
+
+  try {
+    const [outgoing, incoming] = await Promise.all([
+      fetchTransfers(normalized, "fromAddress"),
+      fetchTransfers(normalized, "toAddress"),
+    ]);
+
+    const byHash = new Map<string, { out?: AssetTransfer; in?: AssetTransfer }>();
+    for (const transfer of outgoing) {
+      const entry = byHash.get(transfer.hash) ?? {};
+      entry.out = transfer;
+      byHash.set(transfer.hash, entry);
+    }
+    for (const transfer of incoming) {
+      const entry = byHash.get(transfer.hash) ?? {};
+      entry.in = transfer;
+      byHash.set(transfer.hash, entry);
+    }
+
+    const timeOf = (transfer: AssetTransfer) => {
+      const stamp = transfer.metadata?.blockTimestamp;
+      return stamp ? Date.parse(stamp) : null;
+    };
+
+    const items: WalletActivityItem[] = [];
+    for (const [hash, { out, in: incomingLeg }] of byHash) {
+      if (out && incomingLeg && out.asset !== incomingLeg.asset) {
+        items.push({
+          hash,
+          kind: "swapped",
+          asset: out.asset ?? "?",
+          value: out.value,
+          toAsset: incomingLeg.asset ?? "?",
+          toValue: incomingLeg.value,
+          timestamp: timeOf(out) ?? timeOf(incomingLeg),
+        });
+      } else if (out) {
+        items.push({ hash, kind: "sent", asset: out.asset ?? "?", value: out.value, toAsset: null, toValue: null, timestamp: timeOf(out) });
+      } else if (incomingLeg) {
+        items.push({ hash, kind: "received", asset: incomingLeg.asset ?? "?", value: incomingLeg.value, toAsset: null, toValue: null, timestamp: timeOf(incomingLeg) });
+      }
+    }
+    items.sort((a, b) => (b.timestamp ?? 0) - (a.timestamp ?? 0));
+    const limited = items.slice(0, ACTIVITY_LIMIT);
+
+    activityCache.set(normalized, { at: Date.now(), items: limited });
+    return limited;
+  } catch {
+    return cached?.items ?? [];
   }
 }
