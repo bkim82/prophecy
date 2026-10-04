@@ -1,16 +1,18 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { CallStrip } from "@/app/CallStrip";
+import { FeedComposer } from "@/app/FeedComposer";
 import { PostCard } from "@/app/PostCard";
-import { FOLLOWED_HANDLES, type Market, type Post } from "@/app/lib/mockPosts";
-import { FollowingIcon, ForYouIcon, LiveCallsIcon } from "@/app/icons";
+import { FOLLOWED_HANDLES, LIVE_CALL_COUNT, type Market, type Post } from "@/app/lib/mockPosts";
 
-type FilterId = "forYou" | "following" | "live";
+type FilterId = "forYou" | "following" | "live" | "clashes";
 
-const FILTERS: { id: FilterId; label: string; Icon: typeof ForYouIcon }[] = [
-  { id: "forYou", label: "For You", Icon: ForYouIcon },
-  { id: "following", label: "Following", Icon: FollowingIcon },
-  { id: "live", label: "Live Calls", Icon: LiveCallsIcon },
+const FILTERS: { id: FilterId; label: string }[] = [
+  { id: "forYou", label: "For You" },
+  { id: "following", label: "Following" },
+  { id: "live", label: "Live Calls" },
+  { id: "clashes", label: "Clashes" },
 ];
 
 type CommunityId = "all" | Market;
@@ -26,16 +28,19 @@ export function FeedSwitcher({ posts }: { posts: Post[] }) {
   const [filter, setFilter] = useState<FilterId>("forYou");
   const [community, setCommunity] = useState<CommunityId>("all");
   const [communityOpen, setCommunityOpen] = useState(false);
+  // Posts written in the composer this session, newest first. Never persisted.
+  const [localPosts, setLocalPosts] = useState<Post[]>([]);
 
   const visible = useMemo(() => {
-    let result = posts;
+    let result = [...localPosts, ...posts];
     if (filter === "following") result = result.filter((post) => FOLLOWED_HANDLES.includes(post.handle));
     if (filter === "live") result = result.filter((post) => post.kind === "call");
+    if (filter === "clashes") result = result.filter((post) => post.kind === "clash");
     if (community !== "all") {
       result = result.filter((post) => (post.market ?? post.call?.market) === community);
     }
     return result;
-  }, [filter, community, posts]);
+  }, [filter, community, posts, localPosts]);
 
   const activeCommunity = COMMUNITIES.find((c) => c.id === community)!;
 
@@ -44,7 +49,7 @@ export function FeedSwitcher({ posts }: { posts: Post[] }) {
       <nav className="feed-nav" aria-label="Feeds">
         <p className="feed-nav-label">Feeds</p>
         <div className="feed-tabs" role="tablist" aria-label="Feed filter">
-          {FILTERS.map(({ id, label, Icon }) => (
+          {FILTERS.map(({ id, label }) => (
             <button
               key={id}
               type="button"
@@ -53,8 +58,12 @@ export function FeedSwitcher({ posts }: { posts: Post[] }) {
               className={filter === id ? "active" : ""}
               onClick={() => setFilter(id)}
             >
-              <Icon className="feed-nav-icon" />
               {label}
+              {id === "live" && (
+                <span className="feed-nav-live" aria-label={`${LIVE_CALL_COUNT} live`}>
+                  {LIVE_CALL_COUNT}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -104,11 +113,15 @@ export function FeedSwitcher({ posts }: { posts: Post[] }) {
             </div>
           </div>
         </section>
-        <div className="feed-list">
-          {visible.map((post) => (
-            <PostCard key={post.id} post={post} />
-          ))}
-          {visible.length === 0 && <p className="muted feed-empty">Nothing here yet.</p>}
+        <div className="feed-panel">
+          <FeedComposer onPost={(post) => setLocalPosts((current) => [post, ...current])} />
+          <CallStrip posts={visible} />
+          <div className="feed-list">
+            {visible.map((post) => (
+              <PostCard key={post.id} post={post} />
+            ))}
+            {visible.length === 0 && <p className="muted feed-empty">Nothing here yet.</p>}
+          </div>
         </div>
       </div>
     </>
