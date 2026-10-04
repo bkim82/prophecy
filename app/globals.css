@@ -21,6 +21,11 @@
   --shell-max: 1220px;
   --btn-bg: var(--brand); --btn-bg-hover: var(--brand-strong); --btn-text: var(--brand-contrast); --btn-disabled-bg: #20364a; --btn-disabled-text: #718595;
   --ember: #f2994a; --spot: #7d9bc4;
+  /* Feed post glass: translucent fill with a faint top-left sheen. */
+  --glass-fill: color-mix(in srgb, var(--surface) 58%, transparent); --glass-sheen: rgba(255, 255, 255, .045);
+  --glass-edge: var(--line); --glass-edge-hover: var(--line-strong);
+  --glass-shadow: 0 10px 30px rgba(2, 8, 18, .28);
+  --hud-fill: color-mix(in srgb, var(--field-bg) 55%, transparent); --hud-edge: color-mix(in srgb, var(--brand) 20%, var(--line)); --hud-grid: color-mix(in srgb, var(--brand) 9%, transparent);
 }
 [data-theme="light"] {
   color-scheme: light;
@@ -39,6 +44,10 @@
   --chart-grid: #e6dcc8; --chart-axis: #cbb99a; --chart-up: #3f7d52; --chart-down: #a83f3f;
   --btn-bg: var(--brand); --btn-bg-hover: var(--brand-strong); --btn-text: var(--brand-contrast); --btn-disabled-bg: #e6dcc8; --btn-disabled-text: #a49a88;
   --ember: #c4621c; --spot: #4f6f99;
+  --glass-fill: color-mix(in srgb, var(--surface) 62%, transparent); --glass-sheen: rgba(255, 255, 255, .55);
+  --glass-edge: var(--line); --glass-edge-hover: var(--line-strong);
+  --glass-shadow: 0 10px 26px rgba(80, 58, 28, .08);
+  --hud-fill: color-mix(in srgb, var(--surface-raised) 55%, transparent); --hud-edge: color-mix(in srgb, var(--brand) 22%, var(--line)); --hud-grid: color-mix(in srgb, var(--brand-strong) 9%, transparent);
 }
 /* Market identity and market chart accents are scoped by data-market. Shared
    brand actions, live states, and interaction tokens stay turquoise. */
@@ -218,10 +227,55 @@ button { cursor: pointer; }
 @media (max-width: 768px) { .feed-shell--nav .feed-sidebar { margin-top: 16px; } }
 .feed-list { display: grid; gap: 14px; }
 .feed-empty { padding: 24px 4px; }
-.post-card { display: flex; gap: 14px; padding: 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); transition: border-color .15s ease; }
-.post-card:hover { border-color: var(--line-strong); }
-.post-avatar { flex: none; display: grid; place-items: center; width: 42px; height: 42px; border-radius: 999px; color: #fff; font-size: 15px; font-weight: 700; text-shadow: 0 1px 2px rgba(0, 0, 0, .35); }
-.post-body { min-width: 0; display: grid; gap: 8px; }
+/* No backdrop-filter: the page behind is flat, and it would make each card a
+   stacking context that traps .post-menu-dropdown under the next card.
+   --rank-tint is an optional extra background layer set per rank tier below. */
+.post-card { position: relative; display: flex; gap: 12px; padding: 14px 16px; border: 1px solid var(--glass-edge); border-radius: 14px; background: var(--rank-tint, none), linear-gradient(135deg, var(--glass-sheen), transparent 42%) padding-box, var(--glass-fill) padding-box; box-shadow: var(--glass-shadow); transition: border-color .15s ease; }
+.post-card:hover { border-color: var(--glass-edge-hover); }
+/* Rank outlines reuse the Rooms tier tokens (--room/--room-strong/--room-glow,
+   keyed by data-rank as well as data-room). Gold and up escalate: glow, tint,
+   avatar ring; Oracle gets edge stars (kept to the top/right gutters so they never sit on text) and a slow breathing glow. */
+.post-card[data-rank] { border-color: color-mix(in srgb, var(--room) 40%, var(--line)); }
+.post-card[data-rank]:hover { border-color: color-mix(in srgb, var(--room) 78%, var(--line)); }
+.post-card[data-rank] .rank-badge { border-color: color-mix(in srgb, var(--room) 48%, var(--line)); background: color-mix(in srgb, var(--room) 12%, transparent); color: var(--room-strong); }
+.post-card[data-rank="gold"], .post-card[data-rank="diamond"] { border-color: color-mix(in srgb, var(--room) 60%, var(--line)); box-shadow: var(--glass-shadow), 0 0 24px -8px var(--room-glow); }
+.post-card[data-rank="gold"] .post-avatar, .post-card[data-rank="diamond"] .post-avatar { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3px color-mix(in srgb, var(--room) 70%, transparent); }
+.post-card[data-rank="gold"] { --rank-tint: radial-gradient(70% 120% at 100% 0%, color-mix(in srgb, var(--room-glow) 50%, transparent), transparent 62%); }
+.post-card[data-rank="diamond"] { --rank-tint: linear-gradient(118deg, transparent 50%, color-mix(in srgb, var(--room-strong) 8%, transparent) 62%, transparent 74%), radial-gradient(70% 120% at 100% 0%, var(--room-glow), transparent 60%); }
+.post-card[data-rank="diamond"], .post-card[data-rank="oracle"] { --hud-edge: color-mix(in srgb, var(--room) 42%, var(--line)); --hud-grid: color-mix(in srgb, var(--room) 13%, transparent); }
+.post-card[data-rank="oracle"] { border-color: color-mix(in srgb, var(--room) 74%, var(--line)); box-shadow: var(--glass-shadow), 0 0 0 1px color-mix(in srgb, var(--room) 20%, transparent), 0 0 36px -6px var(--room-glow); --rank-tint: radial-gradient(circle at 78% 3%, var(--room-strong) 0 .8px, transparent 1.3px), radial-gradient(circle at 90% 6%, var(--room-strong) 0 1.1px, transparent 1.7px), radial-gradient(circle at 97% 22%, var(--room-strong) 0 .9px, transparent 1.4px), radial-gradient(circle at 98.5% 52%, var(--room-strong) 0 1px, transparent 1.6px), radial-gradient(circle at 96.5% 80%, var(--room-strong) 0 .7px, transparent 1.2px), radial-gradient(85% 120% at 100% 0%, var(--room-glow), transparent 62%), radial-gradient(60% 90% at 0% 100%, color-mix(in srgb, var(--brand) 11%, transparent), transparent 70%); }
+.post-card[data-rank="oracle"]::after { content: ""; position: absolute; inset: -1px; border-radius: inherit; pointer-events: none; box-shadow: 0 0 30px -2px var(--room-glow); opacity: 0; animation: oracle-breathe 4s ease-in-out infinite; }
+@keyframes oracle-breathe { 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .post-card[data-rank="oracle"]::after { animation: none; opacity: .5; } }
+.post-card[data-rank="oracle"] .post-avatar { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3.5px var(--room), 0 0 18px var(--room-glow); }
+/* Shiny high-tier badges. Gold: metallic fill + a sheen sweep every few
+   seconds. Diamond: brighter, faster sweep and a twinkling ◆. Oracle: drifting
+   holographic fill, pulsing glow, fastest sweep and a spinning ✦. The sheen is
+   a z-index:-1 ::after inside the isolated badge, so it passes behind the text.
+   --shine-delay (per post, app/PostCard.tsx) staggers same-tier badges. */
+.post-card:is([data-rank="gold"], [data-rank="diamond"], [data-rank="oracle"]) .rank-badge { position: relative; overflow: hidden; isolation: isolate; font-weight: 700; letter-spacing: .02em; }
+.post-card:is([data-rank="gold"], [data-rank="diamond"], [data-rank="oracle"]) .rank-badge::after { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, .45) 50%, transparent 70%); transform: translateX(-130%); animation: rank-sheen 3.6s ease-in-out var(--shine-delay, 0s) infinite; }
+.post-card[data-rank="gold"] .rank-badge { border-color: color-mix(in srgb, var(--room) 75%, transparent); background: linear-gradient(135deg, color-mix(in srgb, var(--room) 34%, transparent), color-mix(in srgb, var(--room-strong) 12%, transparent) 50%, color-mix(in srgb, var(--room) 30%, transparent)); box-shadow: 0 0 10px -3px var(--room-glow); }
+.post-card[data-rank="diamond"] .rank-badge { border-color: color-mix(in srgb, var(--room) 80%, transparent); background: linear-gradient(120deg, color-mix(in srgb, var(--room) 30%, transparent), color-mix(in srgb, var(--room-strong) 20%, transparent) 50%, color-mix(in srgb, var(--room) 30%, transparent)); box-shadow: 0 0 12px -2px var(--room-glow); }
+.post-card[data-rank="diamond"] .rank-badge::after { background: linear-gradient(100deg, transparent 25%, rgba(255, 255, 255, .65) 50%, transparent 75%); animation-duration: 2.8s; }
+.post-card[data-rank="diamond"] .rank-badge::before { content: "◆"; display: inline-block; margin-right: .3em; animation: rank-twinkle 1.8s ease-in-out infinite; }
+.post-card[data-rank="oracle"] .rank-badge { border-color: var(--room); background: linear-gradient(110deg, color-mix(in srgb, var(--room) 36%, transparent), color-mix(in srgb, var(--brand) 24%, transparent), color-mix(in srgb, var(--room-strong) 26%, transparent), color-mix(in srgb, var(--room) 36%, transparent)) 0 0 / 200% 100%; box-shadow: 0 0 12px -2px var(--room-glow); animation: rank-holo 6s linear infinite, rank-glow 2.4s ease-in-out infinite; }
+.post-card[data-rank="oracle"] .rank-badge::after { background: linear-gradient(100deg, transparent 25%, rgba(255, 255, 255, .7) 50%, transparent 75%); animation-duration: 2.4s; }
+.post-card[data-rank="oracle"] .rank-badge::before { content: "✦"; display: inline-block; margin-right: .3em; animation: rank-spin 5s linear infinite; }
+@keyframes rank-sheen { 0% { transform: translateX(-130%); } 40%, 100% { transform: translateX(130%); } }
+@keyframes rank-twinkle { 0%, 100% { opacity: .55; transform: scale(.8); } 50% { opacity: 1; transform: scale(1.15); } }
+@keyframes rank-spin { to { transform: rotate(360deg); } }
+@keyframes rank-holo { to { background-position: 200% 0; } }
+@keyframes rank-glow { 50% { box-shadow: 0 0 18px 0 var(--room-glow); } }
+@media (prefers-reduced-motion: reduce) { .post-card[data-rank] .rank-badge, .post-card[data-rank] .rank-badge::before, .post-card[data-rank] .rank-badge::after { animation: none; } }
+.post-flair { justify-self: start; display: inline-flex; align-items: center; gap: 6px; margin: 0; padding: 3px 10px 3px 8px; border: 1px solid color-mix(in srgb, currentColor 28%, transparent); border-radius: 999px; background: color-mix(in srgb, currentColor 11%, transparent); font-size: 11px; font-weight: 700; letter-spacing: .01em; }
+.post-flair-icon { flex: none; width: 13px; height: 13px; }
+.post-flair--forYou { color: var(--brand-strong); }
+.post-flair--engaging { color: var(--ember); }
+.post-flair--copying { color: var(--violet-strong); }
+.post-flair--followed { color: var(--spot); }
+.post-avatar { flex: none; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 999px; color: #fff; font-size: 15px; font-weight: 700; text-shadow: 0 1px 2px rgba(0, 0, 0, .35); }
+.post-body { min-width: 0; display: grid; gap: 6px; }
 .post-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 7px; font-size: 13px; }
 .post-meta strong { font-size: 15px; font-weight: 700; color: var(--text); }
 .post-meta .muted { font-size: 12.5px; }
@@ -233,18 +287,21 @@ button { cursor: pointer; }
 .post-menu-dropdown { position: absolute; top: calc(100% + 6px); right: 0; z-index: 10; min-width: 160px; padding: 4px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-raised); box-shadow: 0 8px 24px rgba(0, 0, 0, .3); }
 .post-menu-dropdown button { display: flex; width: 100%; align-items: center; gap: 6px; border: 0; border-radius: 6px; background: transparent; color: var(--text); padding: 8px 10px; font-size: 13px; font-weight: 600; text-align: left; }
 .post-menu-dropdown button:hover { background: var(--surface-hover); color: var(--brand-strong); }
-.post-content { display: grid; gap: 10px; margin: 0; max-width: 68ch; color: var(--text); font-size: 15px; line-height: 1.55; }
+.post-content { display: grid; gap: 10px; margin: 0; max-width: 68ch; color: var(--text); font-size: 15px; line-height: 1.5; }
 .post-content p { margin: 0; }
-.post-read-more { display: none; }
+.post-content.is-collapsed { display: block; max-height: calc(1.5em * 5); overflow: hidden; }
+.post-content.is-collapsed p + p { margin-top: 10px; }
+.post-read-more { display: inline-flex; min-height: 28px; align-items: center; align-self: start; justify-self: start; border: 0; background: transparent; color: var(--brand-strong); padding: 0 2px; margin-top: -4px; font-size: 12px; font-weight: 700; }
+.post-read-more:hover { color: var(--text); }
 .post-image { margin-top: 1px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
-.post-image--chart { padding: 10px 4px; background: var(--surface-raised); }
-.post-image--chart svg { display: block; width: 100%; height: 96px; }
+.post-image--chart { padding: 8px 4px; background: var(--hud-fill); }
+.post-image--chart svg { display: block; width: 100%; height: 72px; }
 .post-image--chart svg path { fill: none; stroke-width: 1.8; vector-effect: non-scaling-stroke; }
 .post-image--chart svg.is-up path { stroke: var(--chart-up); }
 .post-image--chart svg.is-down path { stroke: var(--chart-down); }
-.post-image--meme { display: grid; place-items: center; height: 160px; font-size: 56px; }
-.post-actions { display: flex; align-items: center; gap: 6px; margin: 2px -10px -8px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.post-actions .action-like, .post-actions .action-reply { display: inline-flex; align-items: center; gap: 5px; min-height: 36px; border: 1px solid transparent; border-radius: 999px; background: transparent; padding: 0 10px; margin: 0; color: var(--muted); font: inherit; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; transition: background .15s ease, color .15s ease, border-color .15s ease; }
+.post-image--meme { display: grid; place-items: center; height: 120px; font-size: 44px; }
+.post-actions { display: flex; align-items: center; gap: 6px; margin: 0 -10px -6px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.post-actions .action-like, .post-actions .action-reply { display: inline-flex; align-items: center; gap: 5px; min-height: 30px; border: 1px solid transparent; border-radius: 999px; background: transparent; padding: 0 10px; margin: 0; color: var(--muted); font: inherit; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; transition: background .15s ease, color .15s ease, border-color .15s ease; }
 .post-actions .action-like:hover, .post-actions .action-reply:hover, .post-actions .action-reply[aria-expanded="true"] { color: var(--brand-strong); background: var(--surface-hover); border-color: var(--line); }
 .post-actions .action-like.is-active { color: var(--brand-strong); }
 .action-reply-caret { font-size: 9px; color: var(--muted-dim); }
@@ -262,35 +319,56 @@ button { cursor: pointer; }
 .reply-actions .action-like.is-active { color: var(--brand-strong); }
 .reply-thread-more { justify-self: start; min-height: 30px; border: 0; background: transparent; padding: 0 4px; color: var(--brand); font-size: 12px; font-weight: 600; }
 .reply-thread-more:hover { color: var(--brand-strong); }
-.market-call { display: grid; gap: 9px; margin-top: 2px; padding: 14px 16px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--surface-raised); }
-.market-call-head { display: flex; align-items: center; gap: 9px; }
-.market-call-head .market-symbol { width: 22px; height: 22px; border: 0; font-size: 14px; }
-.market-call-head strong { flex: 1; min-width: 0; font-size: 14px; font-weight: 700; letter-spacing: .01em; }
+.market-call { position: relative; isolation: isolate; overflow: hidden; display: grid; gap: 6px; margin-top: 2px; padding: 10px 12px; border: 1px solid var(--hud-edge); border-radius: 10px; background: var(--hud-fill); }
+/* HUD readout grid behind the numbers, fading out before the copy/spark column. */
+.market-call::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: repeating-linear-gradient(0deg, var(--hud-grid) 0 1px, transparent 1px 12px), repeating-linear-gradient(90deg, var(--hud-grid) 0 1px, transparent 1px 12px); -webkit-mask-image: linear-gradient(90deg, #000 25%, transparent 85%); mask-image: linear-gradient(90deg, #000 25%, transparent 85%); }
+.market-call-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 9px; }
+.market-call-head .market-symbol { width: 18px; height: 18px; border: 0; font-size: 12px; }
+.market-call-head strong { flex: 1 0 auto; font-size: 13px; font-weight: 700; letter-spacing: .01em; white-space: nowrap; }
 .call-spark { flex: none; width: 58px; height: 20px; }
 .call-spark path { fill: none; stroke-width: 1.6; vector-effect: non-scaling-stroke; }
 .call-spark.is-up path { stroke: var(--chart-up); }
 .call-spark.is-down path { stroke: var(--chart-down); }
-.market-call-copy { flex: none; display: inline-flex; align-items: center; justify-content: center; min-height: 38px; border: 1px solid var(--brand); border-radius: 8px; background: var(--selected-bg); color: var(--brand-strong); padding: 0 14px; font-size: 12px; font-weight: 800; letter-spacing: .01em; white-space: nowrap; transition: background .15s ease, border-color .15s ease; }
+/* Unresolved calls: a right column pinned to the top-right corner holds Copy
+   trade with the copier count under it; head/prices/expiry stay in column 1. */
+.market-call--open { grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; }
+.market-call--open > * { grid-column: 1; }
+.market-call--open > .market-call-copy-wrap { grid-column: 2; grid-row: 1 / span 2; align-self: start; }
+.market-call-copy-wrap { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+.market-call-copiers { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.market-call-copiers strong { color: var(--text); font-weight: 700; }
+.copiers-text { line-height: 1.25; white-space: nowrap; }
+.copier-stack { flex: none; display: inline-flex; }
+.copier-stack span { width: 16px; height: 16px; border: 1.5px solid var(--surface); border-radius: 999px; }
+.copier-stack span + span { margin-left: -6px; }
+@media (max-width: 768px) {
+  .market-call-copy-wrap { gap: 4px; }
+  .market-call-copiers { gap: 5px; font-size: 10px; }
+  .copiers-text { max-width: 8em; white-space: normal; text-align: right; }
+  .copier-stack span { width: 13px; height: 13px; }
+  .copier-stack span + span { margin-left: -5px; }
+}
+.market-call-copy { flex: none; display: inline-flex; align-items: center; justify-content: center; min-height: 30px; border: 1px solid var(--brand); border-radius: 8px; background: var(--selected-bg); color: var(--brand-strong); padding: 0 12px; font-size: 12px; font-weight: 800; letter-spacing: .01em; white-space: nowrap; transition: background .15s ease, border-color .15s ease; }
 .market-call-copy:hover { background: color-mix(in srgb, var(--brand) 28%, var(--surface-raised)); border-color: var(--brand-strong); }
-.market-call-prices { display: flex; align-items: baseline; gap: 8px; font-size: 14px; font-variant-numeric: tabular-nums; color: var(--muted); }
+.market-call-prices { display: flex; align-items: baseline; gap: 8px; font-size: 13px; font-variant-numeric: tabular-nums; color: var(--muted); }
 .market-call-prices > span:first-child, .market-call-prices > span:nth-child(3) { color: var(--text); font-weight: 600; }
 .call-arrow { color: var(--muted-dim); }
 .call-change { font-weight: 700; }
 .call-change.is-up { color: var(--chart-up); }
 .call-change.is-down { color: var(--chart-down); }
-.call-outcome { justify-self: start; padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 800; letter-spacing: .01em; }
+.call-outcome { justify-self: start; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 800; letter-spacing: .01em; }
 .call-outcome--won { color: var(--chart-up); background: color-mix(in srgb, var(--chart-up) 16%, transparent); }
 .call-outcome--lost { color: var(--chart-down); background: color-mix(in srgb, var(--chart-down) 16%, transparent); }
 .call-outcome--close { color: var(--muted); background: var(--surface-hover); }
 .call-expiry { justify-self: start; color: var(--muted-dim); font-size: 11px; }
-.post-card--streak { padding: 4px 2px; border-color: transparent; background: transparent; }
+.post-card--streak { padding: 4px 2px; border-color: transparent; background: transparent; box-shadow: none; }
 .post-card--streak:hover { border-color: transparent; }
 .streak-banner { display: flex; align-items: center; gap: 10px; width: 100%; padding: 12px 16px; border-radius: 12px; background: color-mix(in srgb, var(--brand) 9%, var(--surface)); border: 1px solid color-mix(in srgb, var(--brand) 28%, var(--line)); }
 .streak-icon { display: inline-flex; flex: none; width: 15px; height: 15px; color: var(--brand-strong); }
 .streak-copy { flex: 1; min-width: 0; font-size: 13px; }
 .streak-copy p { margin: 2px 0 0; color: var(--text); font-size: 13px; }
 .streak-stat { flex: none; font-size: 12px; font-weight: 700; color: var(--brand-strong); font-variant-numeric: tabular-nums; }
-.post-card--promo { align-items: center; gap: 8px; padding: 6px 4px; border-color: transparent; background: transparent; color: var(--muted); font-size: 12px; }
+.post-card--promo { align-items: center; gap: 8px; padding: 6px 4px; border-color: transparent; background: transparent; box-shadow: none; color: var(--muted); font-size: 12px; }
 .post-card--promo:hover { border-color: transparent; }
 .promo-dot { flex: none; width: 6px; height: 6px; border-radius: 999px; background: var(--muted-dim); }
 .promo-text { flex: 1; margin: 0; }
@@ -315,16 +393,16 @@ button { cursor: pointer; }
 /* Rooms: each rank is its own themed room. [data-room] sets --room (accent),
    --room-strong (text-safe accent) and --room-glow; set on the shell for the
    active theme and on each switcher tab / ladder row for its own gem colour. */
-[data-room="bronze"] { --room: #c27a45; --room-strong: #e8a571; --room-glow: rgba(194, 122, 69, .35); }
-[data-room="silver"] { --room: #9fb0c2; --room-strong: #dbe5ef; --room-glow: rgba(190, 206, 222, .3); }
-[data-room="gold"] { --room: #d9a937; --room-strong: #f5cd62; --room-glow: rgba(217, 169, 55, .38); }
-[data-room="diamond"] { --room: #5fd3f0; --room-strong: #b4f0ff; --room-glow: rgba(95, 211, 240, .38); }
-[data-room="oracle"] { --room: #a07cf0; --room-strong: #d2bdff; --room-glow: rgba(160, 124, 240, .42); }
-[data-theme="light"] [data-room="bronze"] { --room: #b0662f; --room-strong: #8a4a1d; --room-glow: rgba(176, 102, 47, .22); }
-[data-theme="light"] [data-room="silver"] { --room: #7d8fa3; --room-strong: #4c5e72; --room-glow: rgba(125, 143, 163, .22); }
-[data-theme="light"] [data-room="gold"] { --room: #c1921d; --room-strong: #82600c; --room-glow: rgba(193, 146, 29, .24); }
-[data-theme="light"] [data-room="diamond"] { --room: #2aa9cb; --room-strong: #116f8a; --room-glow: rgba(42, 169, 203, .22); }
-[data-theme="light"] [data-room="oracle"] { --room: #8158d6; --room-strong: #5a36a4; --room-glow: rgba(129, 88, 214, .24); }
+[data-room="bronze"], [data-rank="bronze"] { --room: #c27a45; --room-strong: #e8a571; --room-glow: rgba(194, 122, 69, .35); }
+[data-room="silver"], [data-rank="silver"] { --room: #9fb0c2; --room-strong: #dbe5ef; --room-glow: rgba(190, 206, 222, .3); }
+[data-room="gold"], [data-rank="gold"] { --room: #d9a937; --room-strong: #f5cd62; --room-glow: rgba(217, 169, 55, .38); }
+[data-room="diamond"], [data-rank="diamond"] { --room: #5fd3f0; --room-strong: #b4f0ff; --room-glow: rgba(95, 211, 240, .38); }
+[data-room="oracle"], [data-rank="oracle"] { --room: #a07cf0; --room-strong: #d2bdff; --room-glow: rgba(160, 124, 240, .42); }
+[data-theme="light"] [data-room="bronze"], [data-theme="light"] [data-rank="bronze"] { --room: #b0662f; --room-strong: #8a4a1d; --room-glow: rgba(176, 102, 47, .22); }
+[data-theme="light"] [data-room="silver"], [data-theme="light"] [data-rank="silver"] { --room: #7d8fa3; --room-strong: #4c5e72; --room-glow: rgba(125, 143, 163, .22); }
+[data-theme="light"] [data-room="gold"], [data-theme="light"] [data-rank="gold"] { --room: #c1921d; --room-strong: #82600c; --room-glow: rgba(193, 146, 29, .24); }
+[data-theme="light"] [data-room="diamond"], [data-theme="light"] [data-rank="diamond"] { --room: #2aa9cb; --room-strong: #116f8a; --room-glow: rgba(42, 169, 203, .22); }
+[data-theme="light"] [data-room="oracle"], [data-theme="light"] [data-rank="oracle"] { --room: #8158d6; --room-strong: #5a36a4; --room-glow: rgba(129, 88, 214, .24); }
 
 .room-gem { flex: none; width: 9px; height: 9px; transform: rotate(45deg); border-radius: 2px; background: linear-gradient(135deg, var(--room-strong), var(--room)); box-shadow: 0 0 8px var(--room-glow); }
 
@@ -860,7 +938,7 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
   .data-row .muted { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .feed-shell { width: min(100% - 24px, var(--shell-max)); padding-top: 14px; gap: 20px; }
   .community-dropdown-trigger { font-size: 11px; padding: 7px 11px; }
-  .post-card { padding: 14px; gap: 10px; border-radius: 12px; }
+  .post-card { padding: 12px 14px; gap: 10px; border-radius: 12px; }
   .post-avatar { width: 36px; height: 36px; font-size: 13px; }
   .market-call-prices { flex-wrap: wrap; row-gap: 2px; }
  }
@@ -923,8 +1001,6 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
   .post-meta strong { font-size: 11px; }
   .post-meta .muted { font-size: 8px; }
   .post-content { font-size: 15px; line-height: 1.42; }
-  .post-content.is-collapsed { display: block; max-height: calc(1.42em * 7); overflow: hidden; }
-  .post-content.is-collapsed p + p { margin-top: 10px; }
   .post-content.is-collapsed { max-height: calc(1.42em * 7); }
   .post-actions { font-size: 9px; }
   .post-actions .action-like, .post-actions .action-reply { font-size: 9px; }
@@ -940,8 +1016,7 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
   .streak-copy, .streak-copy p { font-size: 10px; }
   .streak-stat { font-size: 9px; }
   .promo-text, .post-card--promo { font-size: 9px; }
-  .post-read-more { display: inline-flex; min-height: 36px; align-items: center; align-self: start; border: 0; background: transparent; color: var(--brand-strong); padding: 0 2px; font-size: 12px; font-weight: 700; }
-  .post-read-more:hover { color: var(--text); }
+  .post-read-more { min-height: 36px; margin-top: 0; }
 
   .quick-ticket-bar, .active-match-bar { bottom: calc(80px + env(safe-area-inset-bottom)); }
   .quick-ticket-bar { padding-bottom: 0; }
