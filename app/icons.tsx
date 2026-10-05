@@ -103,6 +103,33 @@ export function BookmarkIcon({ className, filled = false }: { className?: string
   );
 }
 
+export function SwapIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" className={className} fill="none" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 7h11.5M12.5 3.5 16 7l-3.5 3.5" />
+      <path d="M16 13H4.5M7.5 9.5 4 13l3.5 3.5" />
+    </svg>
+  );
+}
+
+export function SendIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" className={className} fill="none" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M17 3 3 9.2l6 2.3 2.3 6L17 3Z" />
+      <path d="M17 3 9.3 11.5" />
+    </svg>
+  );
+}
+
+export function DepositIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" className={className} fill="none" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M10 3v9.5M6 9l4 4 4-4" />
+      <path d="M3.5 14.5v1.3A1.2 1.2 0 0 0 4.7 17h10.6a1.2 1.2 0 0 0 1.2-1.2v-1.3" />
+    </svg>
+  );
+}
+
 export function LockIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

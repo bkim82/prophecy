@@ -82,13 +82,18 @@ function useWalletAddress() {
     const provider = getWalletProvider();
     if (!provider) return;
     // eth_accounts never prompts — it only reports an already-granted connection.
-    provider.request({ method: "eth_accounts" }).then(
+    const refresh = () => provider.request({ method: "eth_accounts" }).then(
       (accounts) => setAddress((accounts as string[])[0] ?? null),
       () => {},
     );
+    void refresh();
     const onAccounts = (...args: unknown[]) => setAddress(((args[0] as string[]) ?? [])[0] ?? null);
     provider.on?.("accountsChanged", onAccounts);
-    return () => provider.removeListener?.("accountsChanged", onAccounts);
+    // Coinbase Wallet SDK's disconnect() only emits "disconnect", not "accountsChanged" —
+    // the Wallet tab's Disconnect button dispatches this app-level event instead so every
+    // wallet-aware component (here, BalancePill) stays in sync.
+    window.addEventListener("wallet-updated", refresh);
+    return () => { provider.removeListener?.("accountsChanged", onAccounts); window.removeEventListener("wallet-updated", refresh); };
   }, []);
   return address;
 }

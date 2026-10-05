@@ -2,61 +2,43 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { chainName, formatEth, getWalletProvider, shortenAddress, type EthereumProvider } from "@/app/lib/wallet";
+import { isBaseChain, shortenAddress } from "@/app/lib/wallet";
+import { useWalletConnection } from "@/app/lib/useWalletConnection";
+import type { WalletTokenHolding } from "@/lib/alchemy";
 
-type WalletAsset = { symbol: string; balance: string; name?: string };
-type WalletState = { address: string | null; chain: string | null; balance: string | null; assets: WalletAsset[] };
 type TicketKind = "directional" | "spot";
 type Side = "long" | "short" | "buy" | "sell";
 
-const EMPTY_WALLET: WalletState = { address: null, chain: null, balance: null, assets: [] };
 const ASSETS = ["BTC", "ETH", "Other"];
+
+const formatQty = (n: number) => (n === 0 ? "0" : n < 0.0001 ? n.toExponential(2) : n.toLocaleString("en-US", { maximumFractionDigits: 4 }));
+const formatUsd = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: n < 1 ? 4 : 2 });
 
 export function WalletDesk({ showHoldings = false, showConnection = true, showTicket = true }: { showHoldings?: boolean; showConnection?: boolean; showTicket?: boolean }) {
   const router = useRouter();
-  const [wallet, setWallet] = useState<WalletState>(EMPTY_WALLET);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [connecting, setConnecting] = useState(false);
+  const { wallet, notice, setNotice, connecting, switching, connect, disconnectWallet: disconnectConnection, switchWallet, switchNetwork } = useWalletConnection();
+  const [tokenHoldings, setTokenHoldings] = useState<WalletTokenHolding[]>([]);
+  const [holdingsLoading, setHoldingsLoading] = useState(false);
   const [asset, setAsset] = useState("BTC");
   const [kind, setKind] = useState<TicketKind>("directional");
   const [stake, setStake] = useState("25");
   const [leverage, setLeverage] = useState("100");
 
-  const refreshWallet = async (provider: EthereumProvider, address?: string) => {
-    const accounts = address ? [address] : await provider.request({ method: "eth_accounts" }) as string[];
-    if (!accounts[0]) { setWallet(EMPTY_WALLET); return; }
-    const chainId = await provider.request({ method: "eth_chainId" }) as string;
-    const balance = await provider.request({ method: "eth_getBalance", params: [accounts[0], "latest"] }) as string;
-    const eth = formatEth(balance);
-    let assets: WalletAsset[] = [{ symbol: "ETH", name: "Ether", balance: eth }];
-    try {
-      const discovered = await provider.request({ method: "wallet_getAssets", params: [{ account: accounts[0], chainIds: [chainId] }] }) as { assets?: { symbol?: string; name?: string; balance?: string }[] };
-      if (discovered.assets?.length) assets = discovered.assets.filter((item) => item.symbol && item.balance).map((item) => ({ symbol: item.symbol!, name: item.name, balance: item.balance! }));
-    } catch { /* Most injected wallets do not expose token discovery. ETH remains available. */ }
-    setWallet({ address: accounts[0], chain: chainName(chainId), balance: eth, assets });
-    window.dispatchEvent(new Event("wallet-updated"));
-  };
-
   useEffect(() => {
-    const provider = getWalletProvider();
-    if (!provider) return;
-    void refreshWallet(provider);
-    const onAccountsChanged = (...args: unknown[]) => void refreshWallet(provider, (args[0] as string[])[0]);
-    const onChainChanged = () => void refreshWallet(provider);
-    provider.on?.("accountsChanged", onAccountsChanged);
-    provider.on?.("chainChanged", onChainChanged);
-    return () => { provider.removeListener?.("accountsChanged", onAccountsChanged); provider.removeListener?.("chainChanged", onChainChanged); };
-  }, []);
+    if (!wallet.address || !wallet.chainId || !isBaseChain(wallet.chainId)) { setTokenHoldings([]); return; }
+    let cancelled = false;
+    setHoldingsLoading(true);
+    fetch(`/api/wallet/holdings?address=${wallet.address}`)
+      .then((res) => (res.ok ? res.json() : { holdings: [] }))
+      .then((data: { holdings?: WalletTokenHolding[] }) => { if (!cancelled) setTokenHoldings(data.holdings ?? []); })
+      .catch(() => { if (!cancelled) setTokenHoldings([]); })
+      .finally(() => { if (!cancelled) setHoldingsLoading(false); });
+    return () => { cancelled = true; };
+  }, [wallet.address, wallet.chainId]);
 
-  const connect = async () => {
-    const provider = getWalletProvider();
-    if (!provider) { setNotice("No injected wallet found. Install MetaMask or another EVM wallet."); return; }
-    setConnecting(true); setNotice(null);
-    try {
-      const accounts = await provider.request({ method: "eth_requestAccounts" }) as string[];
-      await refreshWallet(provider, accounts[0]);
-    } catch (error) { setNotice(error instanceof Error ? error.message : "Wallet connection was cancelled."); }
-    finally { setConnecting(false); }
+  const disconnectWallet = async () => {
+    await disconnectConnection();
+    setTokenHoldings([]);
   };
 
   const trade = (side: Side) => {
@@ -69,10 +51,22 @@ export function WalletDesk({ showHoldings = false, showConnection = true, showTi
   return <>
     {showConnection && <section className="panel wallet-card wallet-connect-card">
       <div className="wallet-card-heading"><div><span className="eyebrow">Connection</span><h2>{wallet.address ? "Wallet connected" : "Connect a wallet"}</h2></div><span className={`wallet-status-dot${wallet.address ? " is-connected" : ""}`} aria-hidden="true" /></div>
-      {wallet.address ? <><div className="wallet-address">{shortenAddress(wallet.address)}</div><div className="wallet-meta"><span>{wallet.chain}</span><span>{wallet.balance ?? "—"} ETH</span></div><button type="button" className="wallet-secondary-button" onClick={connect}>Switch wallet</button></> : <><p className="wallet-card-copy">Use your browser wallet. Prophecy never asks for your seed phrase.</p><button type="button" className="wallet-connect-button" onClick={connect} disabled={connecting}>{connecting ? "Connecting…" : "Connect wallet"}</button></>}
+      {wallet.address ? <><div className="wallet-address">{shortenAddress(wallet.address)}</div><div className="wallet-meta"><span>{wallet.chain}</span><span>{wallet.balance ?? "—"} ETH</span></div>
+        {wallet.chainId && !isBaseChain(wallet.chainId) && <div className="wallet-notice" role="status"><span>Prophecy runs on Base — you&apos;re connected to {wallet.chain}.</span><button type="button" className="wallet-secondary-button" onClick={switchNetwork} disabled={switching}>{switching ? "Switching…" : "Switch to Base"}</button></div>}
+        <div className="wallet-button-row"><button type="button" className="wallet-secondary-button" onClick={switchWallet}>Switch wallet</button><button type="button" className="wallet-secondary-button" onClick={disconnectWallet}>Disconnect</button></div></> : <><p className="wallet-card-copy">Scan with Coinbase Wallet, or create one instantly with a passkey. Prophecy never asks for your seed phrase.</p><button type="button" className="wallet-connect-button" onClick={connect} disabled={connecting}>{connecting ? "Connecting…" : "Connect wallet"}</button></>}
+      {notice && <p className="wallet-notice" role="status">{notice}</p>}
     </section>}
 
-    {showHoldings && wallet.address && <section className="panel wallet-card wallet-holdings"><div className="wallet-ticket-heading"><div><span className="eyebrow">Portfolio</span><h2>Current holdings</h2></div><span className="wallet-live-dot">Wallet</span></div><div className="wallet-holding-list">{wallet.assets.map((item) => <div className="wallet-holding-row" key={`${item.symbol}-${item.name}`}><span><strong>{item.symbol}</strong><small>{item.name ?? "Asset"}</small></span><span className="wallet-ticket-value">{item.balance}</span></div>)}</div><p className="wallet-ticket-note">Token discovery depends on your wallet provider; native ETH is always shown.</p></section>}
+    {showHoldings && wallet.address && <section className="panel wallet-card wallet-holdings">
+      <div className="wallet-ticket-heading"><div><span className="eyebrow">Portfolio</span><h2>Current holdings</h2></div><span className="wallet-live-dot">Wallet</span></div>
+      <div className="wallet-holding-list">
+        <div className="wallet-holding-row"><span><strong>ETH</strong><small>Ether</small></span><span className="wallet-ticket-value">{wallet.balance ?? "—"}</span></div>
+        {tokenHoldings.map((item) => <div className="wallet-holding-row" key={item.address}><span><strong>{item.symbol}</strong><small>{item.name}</small></span><span className="wallet-ticket-value">{formatQty(item.balance)}{item.valueUsd != null && <small> · {formatUsd(item.valueUsd)}</small>}</span></div>)}
+      </div>
+      {!wallet.chainId || !isBaseChain(wallet.chainId) ? <p className="wallet-ticket-note">Switch to Base to see your token holdings.</p>
+        : holdingsLoading ? <p className="wallet-ticket-note">Loading token holdings…</p>
+        : tokenHoldings.length === 0 && <p className="wallet-ticket-note">No Base tokens found for this wallet yet.</p>}
+    </section>}
 
     {showTicket && <section className="panel wallet-card wallet-ticket">
       <div className="wallet-ticket-heading"><div><span className="eyebrow">Quick ticket</span><h2>{asset} / USD</h2></div></div>

@@ -11,6 +11,8 @@ Agent-readable fact sheets, not prose. Format: flat bullets, `file:line` refs, n
 - [pulse-mode.md](pulse-mode.md) — solo trading state, leveraged P&L, settlement
 - [practice-mode.md](practice-mode.md) — client-only Pulse practice round
 - [portfolio.md](portfolio.md) — 24h Portfolio: solo, freely-tradeable spot/leverage positions on Base meme coins, lazy settlement
+- [wallet.md](wallet.md) — Wallet dashboard: connected-wallet balance/holdings/activity, no-auth data routes, mock creator earnings
+- [wallet-trading-plan.md](wallet-trading-plan.md) — plan to make Send/Swap real (not built): phases, security protocols, open decisions
 - [chart.md](chart.md) — SVG chart geometry, layers, scaling
 - [roadmap.md](roadmap.md) — unbuilt features, known gaps
 - [multiplayer-plan.md](multiplayer-plan.md) — server-authoritative multiplayer Pulse: match lifecycle, guarded updates, presence
