@@ -26,7 +26,7 @@ without `auth()`:
 
 | Route | Wraps | Notes |
 | --- | --- | --- |
-| `GET /api/wallet/holdings?address=` | `lib/alchemy.ts getWalletHoldings` | `WalletTokenHolding` carries `change24h` |
+| `GET /api/wallet/holdings?address=` | `lib/alchemy.ts getWalletHoldings` | `WalletTokenHolding` carries `change24h`; balances cached 20s + in-flight dedupe, contract discovery cached 5 min and rescanned incrementally from last block, token metadata cached permanently (all per-instance, in-memory) — a newly received token can take up to 5 min to appear |
 | `GET /api/wallet/eth` | `lib/basePrices.ts getTokenSummaries` | native ETH has no pool of its own — priced via its WETH proxy (`0x4200…0006`), relabeled `address: "eth"`, `symbol: "ETH"` |
 | `POST /api/wallet/history {addresses, period?}` | `lib/tokenHistory.ts getTokenHistories` | mirrors `/api/tokens/history`; the `"eth"` sentinel is swapped for the WETH address before the lookup and swapped back in the response |
 | `GET /api/wallet/search?q=` | `lib/basePrices.ts searchTokens` | mirrors `/api/tokens/search` |
@@ -38,7 +38,7 @@ All: `force-dynamic`, `Cache-Control: no-store`, never throw — same invariants
 
 ## Client (`app/wallet/`)
 
-- `WalletDashboard.tsx` — orchestrator: polls holdings (~10s) and the ETH quote (~10s); builds one unified `Coin[]` (native ETH + ERC-20, `types.ts`); derives the chip's 24h $/% change from each coin's own real `change24h`; holds the Portfolio/Advanced tab, expanded-coin, and action-sheet state.
+- `WalletDashboard.tsx` — orchestrator: polls holdings (~30s, paused while the tab is hidden, refetched on return) and the ETH quote (~10s); builds one unified `Coin[]` (native ETH + ERC-20, `types.ts`); derives the chip's 24h $/% change from each coin's own real `change24h`; holds the Portfolio/Advanced tab, expanded-coin, and action-sheet state.
 - A Portfolio/Advanced switcher uses its own `.wd-tabs` underline style (Coinbase Wallet home's Coins/Collectibles/Orders look), not the shared `.feed-tabs` pill used elsewhere in the app.
 - **Portfolio tab**: `BalanceChip.tsx` (big centerpiece total on a dotted-grid card + 24h change + Swap/Send/Deposit tiles, digit-diff tint on change) above `CoinList.tsx` (search + sort over a Coinbase-style table — `CoinRow.tsx` rows under an Asset/Balance/Portfolio/Price header, portfolio % computed from each coin's share of `totalUsd`; no per-row charts; the Portfolio column and its header drop out under 620px. Frozen ordering — re-sorted only when the sort/search view or the coin set changes, never on a price tick, same idiom as `app/duel/portfolio/TokenExplorer.tsx`). Selecting a row expands into `CoinDetailPanel.tsx` (its own big chart via `app/MarketChart.tsx`, same usage as `app/duel/portfolio/TokenDetail.tsx`; states plainly that avg-entry/return aren't tracked rather than faking them).
 - **Advanced tab**: `AdvancedTab.tsx` lays out `app/duel/portfolio/TokenExplorer.tsx` (reused directly, not forked — see its `endpoints` prop, `docs/portfolio.md`) next to `AdvancedTokenDetail.tsx` (chart + market stats + factual description + Buy/Sell, modeled on `app/duel/portfolio/TokenDetail.tsx` minus its Embers-based `OrderForm`). Below `lg` only one pane shows (no tab switcher): tapping a row opens the detail, its "← Explore" button returns to the table. Explorer rows aren't limited to owned coins — Buy/Sell on any Base token opens the Swap sheet with that token preselected (`SwapSheet`'s `initialFrom`/`initialTo`/`extraToken` props cover a token that isn't in the wallet's own holdings yet).

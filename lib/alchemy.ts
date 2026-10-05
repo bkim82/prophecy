@@ -7,7 +7,13 @@
 
 import { getTokenSummaries } from "./basePrices";
 
-const BALANCE_TTL_MS = 15_000;
+// Shorter than the client's 30s poll so one open tab still gets fresh balances each
+// tick; the cache only collapses concurrent callers (several tabs, WalletDesk + dashboard).
+const BALANCE_TTL_MS = 20_000;
+// The contract list (the two expensive alchemy_getAssetTransfers scans) changes only
+// when the wallet touches a new token, so it refreshes far less often than balances,
+// and incrementally from the last block seen.
+const DISCOVERY_TTL_MS = 5 * 60_000;
 const MAX_TOKENS = 25;
 const DISCOVERY_MAX_COUNT = 1000;
 const BALANCE_BATCH_SIZE = 1000;
@@ -26,6 +32,7 @@ export type WalletTokenHolding = {
 
 type CacheEntry = { at: number; holdings: WalletTokenHolding[] };
 const cache = new Map<string, CacheEntry>();
+const inflight = new Map<string, Promise<WalletTokenHolding[]>>();
 
 const rpcUrl = () => {
   const key = process.env.ALCHEMY_API_KEY;
@@ -47,7 +54,27 @@ async function rpc<T>(method: string, params: unknown[]): Promise<T> {
 
 type TokenBalanceEntry = { contractAddress: string; tokenBalance: string | null };
 type TokenMetadata = { decimals: number | null; symbol: string | null; name: string | null; logo: string | null };
-type Erc20Transfer = { rawContract?: { address?: string | null } };
+type Erc20Transfer = { blockNum?: string; rawContract?: { address?: string | null } };
+
+type DiscoveryEntry = { at: number; contracts: Set<string>; lastBlock: number | null };
+const discoveryCache = new Map<string, DiscoveryEntry>();
+
+// A token's decimals/symbol/name never change, so a successful lookup is kept for
+// the life of the instance instead of being re-fetched every refresh.
+const metadataCache = new Map<string, TokenMetadata>();
+
+async function getTokenMetadata(contract: string): Promise<TokenMetadata | null> {
+  const key = contract.toLowerCase();
+  const hit = metadataCache.get(key);
+  if (hit) return hit;
+  try {
+    const meta = await rpc<TokenMetadata>("alchemy_getTokenMetadata", [contract]);
+    metadataCache.set(key, meta);
+    return meta;
+  } catch {
+    return null;
+  }
+}
 
 function chunk<T>(items: T[], size: number): T[][] {
   const out: T[][] = [];
@@ -61,12 +88,18 @@ function chunk<T>(items: T[], size: number): T[][] {
  * covers a curated list of popular tokens by volume, so a real but thinly-traded
  * holding (a new meme coin, say) can silently never appear. Scanning the address's
  * own transfer history instead catches anything it has actually touched.
+ * Cached for DISCOVERY_TTL_MS; a refresh only scans blocks after the last one seen.
  */
 async function discoverErc20Contracts(address: string): Promise<string[]> {
+  const prev = discoveryCache.get(address);
+  if (prev && Date.now() - prev.at < DISCOVERY_TTL_MS) return Array.from(prev.contracts);
+
+  const fromBlock = prev?.lastBlock != null ? `0x${prev.lastBlock.toString(16)}` : undefined;
   const fetchSide = async (direction: "fromAddress" | "toAddress") => {
     const { transfers } = await rpc<{ transfers: Erc20Transfer[] }>("alchemy_getAssetTransfers", [
       {
         [direction]: address,
+        ...(fromBlock ? { fromBlock } : {}),
         category: ["erc20"],
         excludeZeroValue: false,
         order: "desc",
@@ -76,12 +109,18 @@ async function discoverErc20Contracts(address: string): Promise<string[]> {
     return transfers;
   };
   const [outgoing, incoming] = await Promise.all([fetchSide("fromAddress"), fetchSide("toAddress")]);
-  const addresses = new Set<string>();
+  const contracts = new Set(prev?.contracts);
+  let lastBlock = prev?.lastBlock ?? null;
   for (const transfer of [...outgoing, ...incoming]) {
     const contract = transfer.rawContract?.address;
-    if (contract) addresses.add(contract.toLowerCase());
+    if (contract) contracts.add(contract.toLowerCase());
+    if (transfer.blockNum) {
+      const block = parseInt(transfer.blockNum, 16);
+      if (lastBlock == null || block > lastBlock) lastBlock = block;
+    }
   }
-  return Array.from(addresses);
+  discoveryCache.set(address, { at: Date.now(), contracts, lastBlock });
+  return Array.from(contracts);
 }
 
 /** Real Base ERC-20 holdings for a wallet address, priced via DexScreener (lib/basePrices.ts). */
@@ -90,6 +129,15 @@ export async function getWalletHoldings(address: string): Promise<WalletTokenHol
   const cached = cache.get(normalized);
   if (cached && Date.now() - cached.at < BALANCE_TTL_MS) return cached.holdings;
 
+  // Concurrent callers for the same wallet share one fetch instead of each missing the cache.
+  const pending = inflight.get(normalized);
+  if (pending) return pending;
+  const promise = fetchWalletHoldings(normalized, cached).finally(() => inflight.delete(normalized));
+  inflight.set(normalized, promise);
+  return promise;
+}
+
+async function fetchWalletHoldings(normalized: string, cached: CacheEntry | undefined): Promise<WalletTokenHolding[]> {
   try {
     const contracts = await discoverErc20Contracts(normalized);
     if (contracts.length === 0) {
@@ -112,11 +160,7 @@ export async function getWalletHoldings(address: string): Promise<WalletTokenHol
     }
 
     const [metas, summaries] = await Promise.all([
-      Promise.all(
-        nonZero.map((token) =>
-          rpc<TokenMetadata>("alchemy_getTokenMetadata", [token.contractAddress]).catch(() => null),
-        ),
-      ),
+      Promise.all(nonZero.map((token) => getTokenMetadata(token.contractAddress))),
       getTokenSummaries(nonZero.map((token) => token.contractAddress)),
     ]);
     const bySummary = new Map(summaries.map((summary) => [summary.address.toLowerCase(), summary]));

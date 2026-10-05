@@ -11,7 +11,9 @@ import { CoinDetailPanel } from "./CoinDetailPanel";
 import { CoinList } from "./CoinList";
 import { ETH_SENTINEL, type Coin } from "./types";
 
-const HOLDINGS_POLL_MS = 10_000;
+// Holdings hit Alchemy (metered), so they poll slower than the ETH quote and only while the tab is visible.
+const HOLDINGS_POLL_MS = 30_000;
+const ETH_POLL_MS = 10_000;
 
 type EthSummary = { priceUsd: number; change24h: number | null; imageUrl: string | null };
 type Tab = "portfolio" | "advanced";
@@ -48,8 +50,11 @@ export function WalletDashboard({
       .then((data: { holdings?: WalletTokenHolding[] }) => { if (!cancelled) setTokenHoldings(data.holdings ?? []); })
       .catch(() => { if (!cancelled) setTokenHoldings([]); });
     load();
-    const id = setInterval(load, HOLDINGS_POLL_MS);
-    return () => { cancelled = true; clearInterval(id); };
+    const id = setInterval(() => { if (document.visibilityState === "visible") load(); }, HOLDINGS_POLL_MS);
+    // Catch up immediately when the tab comes back instead of waiting out the interval.
+    const onVisible = () => { if (document.visibilityState === "visible") load(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { cancelled = true; clearInterval(id); document.removeEventListener("visibilitychange", onVisible); };
   }, [address, onBase]);
 
   useEffect(() => {
@@ -60,7 +65,7 @@ export function WalletDashboard({
       .then((data: { eth?: EthSummary | null }) => { if (!cancelled) setEth(data.eth ?? null); })
       .catch(() => { if (!cancelled) setEth(null); });
     load();
-    const id = setInterval(load, HOLDINGS_POLL_MS);
+    const id = setInterval(load, ETH_POLL_MS);
     return () => { cancelled = true; clearInterval(id); };
   }, [onBase]);
 
