@@ -15,8 +15,8 @@ const PERIODS: { id: LeaderboardPeriod; label: string }[] = [
   { id: "all", label: "ALL" },
 ];
 const PODIUM_COUNT = 3;
-// Podium + ranks IV–VII; "Full leaderboard" expands to the rest.
-const PREVIEW_COUNT = 7;
+// Podium + ranks IV–V; "View full leaderboard" expands to the rest.
+const PREVIEW_COUNT = 5;
 // List rows wait for rank I to land, then cascade. Rows revealed by
 // expanding skip the wait.
 const LIST_ENTER_MS = 1450;
@@ -157,7 +157,7 @@ export function OraclesLeaderboard() {
           aria-controls={`${id}-list`}
           onClick={() => setExpanded((open) => !open)}
         >
-          {expanded ? "Show less" : "Full leaderboard"} <span aria-hidden="true">→</span>
+          {expanded ? "Show less" : "View full leaderboard"} <span aria-hidden="true">→</span>
         </button>
       )}
     </section>
