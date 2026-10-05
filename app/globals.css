@@ -1,7 +1,8 @@
 @import "tailwindcss";
 
-/* Every color in the app resolves through these tokens. Dark is the default;
-   [data-theme="light"] swaps the same names for a warm sand counterpart.
+/* Every color in the app resolves through these tokens. :root is Navy;
+   [data-theme="light"] swaps the same names for Moonstone (pearl + violet) and
+   [data-theme="obsidian"] (the default, app/theme.ts) for black + violet.
    Brand, market, and chart colors stay separate. See app/ThemeToggle.tsx. */
 :root {
   color-scheme: dark;
@@ -29,26 +30,46 @@
 }
 [data-theme="light"] {
   color-scheme: light;
-  --bg: #f1e7d5; --surface: #fffaf0; --surface-raised: #f8f0e3; --surface-hover: #eee1cd; --field-bg: #fffdf8;
-  --line: #ddcdb4; --line-strong: #c5ad8c;
-  --text: #11243a; --muted: #637084; --muted-dim: #778294;
-  --brand: #0aa896; --brand-strong: #087c72; --brand-contrast: #f5fffb;
-  --violet: #7652b5; --violet-strong: #62409b;
-  --positive: #3b9b70; --negative: #c64e5a;
-  --structure: #102842; --structure-raised: #183653; --structure-line: #31536f; --structure-text: #fffaf0; --structure-muted: #bdcbd4;
-  --selected-bg: color-mix(in srgb, var(--brand) 14%, var(--surface)); --selection: rgba(10, 168, 150, .18);
+  --bg: #f4f2f9; --surface: #ffffff; --surface-raised: #eeeaf8; --surface-hover: #e9e4f5; --field-bg: #fbfaff;
+  --line: #e3def0; --line-strong: #cbc3e0;
+  --text: #16132b; --muted: #625c7a; --muted-dim: #767090;
+  --brand: #6d4fd8; --brand-strong: #5634c4; --brand-contrast: #ffffff;
+  --violet: #7c5ce0; --violet-strong: #5b3fc4;
+  --positive: #18935f; --negative: #cc3f55;
+  --structure: #ffffff; --structure-raised: #f4f1fb; --structure-line: #e3def0; --structure-text: #16132b; --structure-muted: #5e5975;
+  --selected-bg: color-mix(in srgb, var(--brand) 10%, var(--surface)); --selection: rgba(109, 79, 216, .18);
   --market-accent: var(--brand); --market-accent-strong: var(--brand-strong); --market-accent-contrast: var(--brand-contrast);
   --market-btc: #f7931a; --market-eth: #627eea; --market-doge: #c2a633;
-  --chart-accent: #a8452a; --chart-accent-strong: #832f1a; --trade-contrast: #fff8f0;
+  --chart-accent: #a8452a; --chart-accent-strong: #832f1a; --trade-contrast: #ffffff;
   --accent: var(--brand); --accent-strong: var(--brand-strong); --accent-contrast: var(--trade-contrast);
-  --chart-grid: #e6dcc8; --chart-axis: #cbb99a; --chart-up: #3f7d52; --chart-down: #a83f3f;
-  --btn-bg: var(--brand); --btn-bg-hover: var(--brand-strong); --btn-text: var(--brand-contrast); --btn-disabled-bg: #e6dcc8; --btn-disabled-text: #a49a88;
-  --ember: #c4621c; --spot: #4f6f99; --gold: #a87c12;
-  --glass-fill: color-mix(in srgb, var(--surface) 62%, transparent); --glass-sheen: rgba(255, 255, 255, .55);
+  --chart-grid: #ebe7f4; --chart-axis: #cfc8e0; --chart-up: #18935f; --chart-down: #cc3f55;
+  --btn-bg: var(--brand); --btn-bg-hover: var(--brand-strong); --btn-text: var(--brand-contrast); --btn-disabled-bg: #e9e5f2; --btn-disabled-text: #a29cb6;
+  --ember: #c4621c; --spot: #4d6bb3; --gold: #a87c12;
+  --glass-fill: color-mix(in srgb, var(--surface) 70%, transparent); --glass-sheen: rgba(255, 255, 255, .6);
   --glass-edge: var(--line); --glass-edge-hover: var(--line-strong);
-  --glass-shadow: 0 10px 26px rgba(80, 58, 28, .08);
-  --hud-fill: color-mix(in srgb, var(--surface-raised) 55%, transparent); --hud-edge: color-mix(in srgb, var(--brand) 22%, var(--line)); --hud-grid: color-mix(in srgb, var(--brand-strong) 9%, transparent);
+  --glass-shadow: 0 10px 26px rgba(48, 30, 110, .08);
+  --hud-fill: color-mix(in srgb, var(--surface-raised) 70%, transparent); --hud-edge: color-mix(in srgb, var(--brand) 22%, var(--line)); --hud-grid: color-mix(in srgb, var(--brand-strong) 8%, transparent);
 }
+/* Obsidian: near-black surfaces, violet brand. Only overrides what differs
+   from Navy; win/loss greens and reds match the Oracles panel's --o-win/--o-loss. */
+[data-theme="obsidian"] {
+  --bg: #09090c; --surface: #111116; --surface-raised: #1a1824; --surface-hover: #1f1d2b; --field-bg: #0b0b0f;
+  --line: #24222e; --line-strong: #363346;
+  --text: #eeedf4; --muted: #a3a1b2; --muted-dim: #7d7a8d;
+  --brand: #a78bfa; --brand-strong: #c4b5fd; --brand-contrast: #150b2e;
+  --violet: #9d86f5; --violet-strong: #ab96fb;
+  --positive: #5fd49c; --negative: #ec6872;
+  --structure: #09090c; --structure-raised: #16151d; --structure-line: #1e1d27; --structure-text: #f3f1f9; --structure-muted: #a7a4b6;
+  --selection: rgba(167, 139, 250, .28);
+  --chart-grid: #1c1a24; --chart-axis: #34303f; --chart-up: #5fd49c; --chart-down: #ec6872;
+  --btn-disabled-bg: #1f1d29; --btn-disabled-text: #6f6c80;
+  --glass-shadow: 0 10px 30px rgba(0, 0, 0, .45);
+}
+[data-theme="obsidian"] .main-nav-link.active { background: color-mix(in srgb, var(--brand) 16%, var(--structure)); color: var(--structure-text); }
+[data-theme="obsidian"] .main-nav-link.active .main-nav-icon { color: var(--brand-strong); }
+/* Moonstone: a faint violet dawn behind the header so the light page reads as Prophecy, not stock white. */
+[data-theme="light"] body { background: radial-gradient(1100px 440px at 50% 0, rgba(124, 92, 224, .09), transparent 70%) no-repeat, var(--bg); }
+:is([data-theme="obsidian"], [data-theme="light"]) .feed-composer-trade { border-color: color-mix(in srgb, var(--violet) 60%, var(--line)); }
 /* Market identity and market chart accents are scoped by data-market. Shared
    brand actions, live states, and interaction tokens stay turquoise. */
 [data-market="btc"] {
@@ -58,7 +79,7 @@
   --chart-line: #f0a868; --chart-point: #ffcb94;
 }
 [data-theme="light"] [data-market="btc"] { --chart-line: #d4823c; --chart-point: #b8692a; --market-accent-strong: #b8692a; }
-/* The dark-theme "strong" tints are lighter than the base and wash out on sand. */
+/* The dark-theme "strong" tints are lighter than the base and wash out on light surfaces. */
 [data-theme="light"] [data-market="eth"] { --market-accent-strong: #3d58c9; }
 [data-theme="light"] [data-market="doge"] { --market-accent-strong: #8f7820; }
 [data-market="eth"] {
@@ -104,7 +125,21 @@ button { cursor: pointer; }
 .signin-button:hover { border-color: var(--brand); color: var(--structure-text); }
 .theme-toggle { display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid var(--structure-line); border-radius: 8px; background: transparent; color: var(--structure-muted); padding: 0; }
 .theme-toggle:hover { border-color: var(--brand); color: var(--structure-text); }
-.theme-toggle svg { display: block; width: 15px; height: 15px; }
+.theme-menu { position: relative; }
+.theme-toggle[aria-expanded="true"] { border-color: var(--brand); }
+/* Fixed colors on purpose: each swatch previews its own theme, whatever theme is active. */
+.theme-swatch { display: block; flex: none; width: 16px; height: 16px; border-radius: 999px; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .22); }
+.theme-swatch[data-swatch="obsidian"] { background: linear-gradient(135deg, #09090c 50%, #a78bfa 50%); }
+.theme-swatch[data-swatch="navy"] { background: linear-gradient(135deg, #0b1728 50%, #18d4c0 50%); }
+.theme-swatch[data-swatch="light"] { background: linear-gradient(135deg, #f4f2f9 50%, #6d4fd8 50%); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .18); }
+.theme-menu-popover { position: absolute; top: calc(100% + 8px); right: 0; z-index: 40; display: grid; gap: 2px; width: 210px; padding: 6px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-raised); color: var(--text); box-shadow: 0 10px 28px rgba(0, 0, 0, .3); }
+.theme-menu-popover button { display: flex; align-items: center; gap: 10px; width: 100%; border: 0; border-radius: 7px; background: transparent; color: inherit; padding: 8px; text-align: left; }
+.theme-menu-popover button:hover { background: var(--surface-hover); }
+.theme-menu-popover .theme-swatch { width: 20px; height: 20px; }
+.theme-menu-text { display: grid; gap: 1px; min-width: 0; }
+.theme-menu-text strong { font-size: 13px; font-weight: 600; }
+.theme-menu-text small { color: var(--muted); font-size: 11px; }
+.theme-menu-check { margin-left: auto; color: var(--brand-strong); font-size: 12px; font-weight: 700; }
 .account-signed-out { display: flex; align-items: center; gap: 8px; }
 .account-menu-icon { width: 15px; height: 15px; }
 .header-actions .account-avatar-box { width: 32px; height: 32px; }
@@ -569,6 +604,26 @@ button { cursor: pointer; }
 .oracles-more span { display: inline-block; transition: translate .2s, rotate .2s; }
 .oracles-more:hover span { translate: 3px 0; }
 .oracles-more[aria-expanded="true"] span { rotate: -90deg; translate: 0; }
+/* Moonstone: the tarot spread turns light — --o-* map onto the theme tokens, the panel
+   takes the Live in the Arena violet wash, and every glow that relied on light-on-dark
+   (cone, flare, sheen, rays, embers, card faces) is re-inked in violet/gold on pearl. */
+[data-theme="light"] .sidebar-panel.oracles-panel { --o-bg: var(--surface); --o-line: color-mix(in srgb, var(--violet) 28%, var(--line)); --o-ink: var(--text); --o-muted: var(--muted); --o-violet: var(--brand); --o-frame: rgba(109, 79, 216, .2); --o-win: var(--chart-up); --o-loss: var(--chart-down); background: radial-gradient(120% 55% at 50% 0%, rgba(124, 92, 224, .12), transparent 70%), var(--o-bg); }
+[data-theme="light"] .oracles-periods { border-color: var(--line); background: var(--field-bg); }
+[data-theme="light"] .oracles-periods button[aria-pressed="true"] { background: var(--selected-bg); color: var(--brand-strong); }
+[data-theme="light"] .oracles-stage::before { background: conic-gradient(from 150deg at 50% 0, transparent, rgba(124, 92, 224, .12) 30deg, transparent 60deg); mix-blend-mode: multiply; }
+[data-theme="light"] .oracle-ember { background: #d9a937; box-shadow: 0 0 6px 1px rgba(217, 169, 55, .4); }
+[data-theme="light"] .oracle-ember:nth-child(even) { background: #9d86f5; box-shadow: 0 0 6px 1px rgba(124, 92, 224, .4); }
+[data-theme="light"] .oracle-card { --edge: #a08cf0; --glow: rgba(124, 92, 224, .22); }
+[data-theme="light"] .oracle-card[data-place="1"] { --edge: #6d4fd8; --glow: rgba(109, 79, 216, .32); }
+[data-theme="light"] .oracle-card[data-place="2"] { --edge: #c08a26; --glow: rgba(192, 138, 38, .28); }
+[data-theme="light"] .oracle-card[data-place="1"]::after { background: radial-gradient(closest-side, rgba(124, 92, 224, .24), rgba(124, 92, 224, .08) 45%, transparent); }
+[data-theme="light"] .oracle-card-face { background: radial-gradient(90% 50% at 50% 42%, color-mix(in srgb, var(--edge) 12%, transparent), transparent), linear-gradient(180deg, #ffffff, #f5f2fd); }
+[data-theme="light"] .oracle-card[data-place="1"] .oracle-card-face::after { background: linear-gradient(105deg, transparent 42%, rgba(124, 92, 224, .1) 48%, rgba(124, 92, 224, .03) 53%, transparent 58%); }
+[data-theme="light"] .oracle-card-back { background: radial-gradient(circle, rgba(124, 92, 224, .16), transparent 55%), repeating-linear-gradient(45deg, rgba(124, 92, 224, .08) 0 1px, transparent 1px 9px), repeating-linear-gradient(-45deg, rgba(124, 92, 224, .08) 0 1px, transparent 1px 9px), #f3effc; }
+[data-theme="light"] .oracle-corners::before, [data-theme="light"] .oracle-corners::after { color: var(--edge); }
+[data-theme="light"] .oracle-rays { background: repeating-conic-gradient(var(--edge) 0 1.2deg, transparent 1.2deg 9deg); opacity: .3; }
+[data-theme="light"] .oracle-card[data-place="1"] .oracle-rays { opacity: .45; }
+[data-theme="light"] .oracle-row:hover { background: var(--surface-hover); }
 @keyframes oracle-rise { from { opacity: 0; translate: 0 26px; } }
 @keyframes oracle-flip { from { rotate: y 180deg; } }
 @keyframes oracle-float { 50% { translate: 0 -3px; } }

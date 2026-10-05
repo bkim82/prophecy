@@ -1,6 +1,6 @@
 # architecture
 
-- Root header (`app/layout.tsx`) is brand | `Omens`/`Arena`/`Sanctum`/`Wallet` nav | balance + avatar on desktop (see [feeds.md](feeds.md)), while `app/MobileBottomNav.tsx` supplies the dedicated phone navigation (`Omens`/`Arena`/`Sanctum`/`Wallet`) at or below 768px and the compact mobile header keeps the brand, balance, and account control (theme switch lives in the avatar menu; signed out it sits beside Sign in). Routes: `/` (Global feed), `/sanctum` (Oracle Room: rank-only live Pulse room with room feed + mini chat, `app/sanctum/page.tsx`), `/duel` (the market lobby, moved from `app/page.tsx`), `/wallet` (wallet dashboard: Coinbase Wallet SDK connection, Portfolio/Advanced tabs — [wallet.md](wallet.md)). Outside `/duel` and its games, the root shell shows the compact bottom-right plus chip `QuickTicketBar`; an active match takes that slot instead. `/exclusive` (rank-gated feed) still exists but is no longer linked from the header nav. Live ticker on `/duel` reads the client-side BTC feed.
+- Root header (`app/layout.tsx`) is brand | `Omens`/`Arena`/`Sanctum`/`Wallet` nav | balance + avatar on desktop (see [feeds.md](feeds.md)), while `app/MobileBottomNav.tsx` supplies the dedicated phone navigation (`Omens`/`Arena`/`Sanctum`/`Wallet`) at or below 768px and the compact mobile header keeps the brand, theme picker, balance, and account control. Routes: `/` (Global feed), `/sanctum` (Oracle Room: rank-only live Pulse room with room feed + mini chat, `app/sanctum/page.tsx`), `/duel` (the market lobby, moved from `app/page.tsx`), `/wallet` (wallet dashboard: Coinbase Wallet SDK connection, Portfolio/Advanced tabs — [wallet.md](wallet.md)). Outside `/duel` and its games, the root shell shows the compact bottom-right plus chip `QuickTicketBar`; an active match takes that slot instead. `/exclusive` (rank-gated feed) still exists but is no longer linked from the header nav. Live ticker on `/duel` reads the client-side BTC feed.
 - Multiplayer Pulse is server-authoritative: a `matches` row owns the round (`db/schema.ts:20`), `/api/match/*` routes own the transitions, clients poll. See [multiplayer-plan.md](multiplayer-plan.md).
 - Practice is client-only: Pulse practice reuses `app/duel/btc/pulse/page.tsx?practice=1` without creating a match or reserving a wager. See [practice-mode.md](practice-mode.md).
 - `/api/price` and `/api/history` remain stateless proxies to public exchange APIs. The price feed and chart stay client-side in every mode.
@@ -11,7 +11,7 @@
 app/layout.tsx (root shell: desktop header, compact mobile header, Clerk account controls)
   ├── app/TabNav.tsx (desktop Omens / Arena / Sanctum / Wallet nav, icons + active pill)
   ├── app/BalancePill.tsx (ember balance button + balances dropdown)
-  ├── app/AccountMenu.tsx (Clerk avatar menu with theme action; signed-out toggle + Sign in)
+  ├── app/AccountMenu.tsx (Clerk avatar menu; signed-out Sign in)
   ├── app/MobileBottomNav.tsx (phone Omens / Arena / Sanctum / Wallet navigation)
   ├── app/page.tsx (Global feed: mock PostCard list, app/lib/mockPosts.ts)
   ├── app/sanctum/page.tsx (Sanctum: Oracle Room live Pulse + feed + chat, app/lib/roomsMocks.ts)
@@ -107,14 +107,14 @@ its stake and leverage in-round; so does the 24h Portfolio.
 | `app/api/price/route.ts` | REST spot price, 2-source fallback chain |
 | `app/api/history/route.ts` | chart seed for the full window: trades + candle backfill, merged |
 | `app/layout.tsx` | root HTML, header shell, Clerk provider, metadata, Tailwind import, pre-paint theme script |
-| `app/ThemeToggle.tsx` | `useTheme()` hook (writes `data-theme` + `localStorage`), Sun/Moon icons, signed-out header toggle; signed-in toggle is in `app/AccountMenu.tsx` |
-| `app/theme.ts` | `THEME_STORAGE_KEY`, `THEME_INIT_SCRIPT` — shared by layout (server) and toggle (client) |
+| `app/ThemeToggle.tsx` | `useTheme()` hook (`theme`/`setTheme`, writes `data-theme` + `localStorage`, `MutationObserver` keeps header copies in sync), `ThemeToggle` header picker (swatch → Obsidian/Navy/Moonstone menu) |
+| `app/theme.ts` | `Theme`, `DEFAULT_THEME` (`obsidian`), `THEMES` (picker copy), `normalizeTheme()`, `THEME_STORAGE_KEY`, `THEME_INIT_SCRIPT` — shared by layout (server) and toggle (client) |
 
 ## Theming
 
-- Two themes, one token set. `:root` = dark (default), `[data-theme="light"]` redefines the same names (`app/globals.css:5-28`). No color literal belongs anywhere else — `PriceChart.tsx`, the match room and `pulse/page.tsx` use `var(--…)` in Tailwind arbitrary values, SVG presentation attributes and inline `style` alike.
-- Resolution order: `localStorage.theme` → dark (`app/theme.ts:9`, mirrored by `readTheme()` in `app/ThemeToggle.tsx:7-14`). Both readers must stay in sync.
-- `<html data-theme="dark" suppressHydrationWarning>` + the inline `<head>` script set the attribute during HTML parsing, before first paint (`app/layout.tsx:29-37`). `useLayoutEffect` in the toggle re-applies it after Strict Mode's dev remount clears `<html>`'s attributes.
+- Three themes, one token set. `:root` = Navy, `[data-theme="light"]` (Moonstone: pearl/white surfaces, white header, violet brand) redefines the same names (`app/globals.css:31`) plus a faint violet body glow (`:71`), `[data-theme="obsidian"]` (default) overrides only what differs from Navy (`app/globals.css:55`) plus a few obsidian-scoped rules right after it (active nav pill; `+ Trade` violet outline, shared with Moonstone). No color literal belongs anywhere else — `PriceChart.tsx`, the match room and `pulse/page.tsx` use `var(--…)` in Tailwind arbitrary values, SVG presentation attributes and inline `style` alike.
+- Resolution order: `localStorage.theme` (`navy`/`light`) → `obsidian`; legacy stored `"dark"` maps to `obsidian` (`normalizeTheme()` `app/theme.ts:15`, inlined in `THEME_INIT_SCRIPT` `app/theme.ts:23`). Both must stay in sync.
+- `<html data-theme={DEFAULT_THEME} suppressHydrationWarning>` + the inline `<head>` script set the attribute during HTML parsing, before first paint (`app/layout.tsx:30-37`). `useLayoutEffect` in the toggle re-applies it after Strict Mode's dev remount clears `<html>`'s attributes.
 
 ## Invariants (do not violate silently)
 
@@ -128,7 +128,7 @@ its stake and leverage in-round; so does the 24h Portfolio.
 - `matches` timestamps are `timestamptz`; a bare `timestamp` column stores the writer's local time and silently breaks presence across timezones (`db/schema.ts:29-35`).
 - All fetch paths degrade, never throw to the user: history → trades ∪ candles → `[]` (`app/api/history/route.ts:88-110`); price → Coinbase → Binance → 502 (`lib/spotPrice.ts:39-52`); match poll failure → keep polling, never eject the player (`app/duel/[market]/pulse/[matchId]/page.tsx:111-114`); settlement price outage → row stays in `countdown`, next poll retries (`lib/match.ts:103-106`).
 - `PriceChart` holds only its time and price wheel zoom levels (`docs/chart.md` → Zoom), and otherwise stays a pure function of props — including its clock, which arrives as the `now` prop rather than a `Date.now()` read or an interval of its own (`app/duel/[market]/pulse/[matchId]/page.tsx:201`). Round/freeze logic belongs in the match room (`app/duel/[market]/pulse/[matchId]/page.tsx:132`), not the chart. Same for server timestamps: the room converts them off the server clock (`app/duel/[market]/pulse/[matchId]/page.tsx:55-62`, `:121`), and the chart just draws whatever `roundStart`/`trades` it gets.
-- Color literals stay out of components: add a token to `app/globals.css` and define it in both blocks, or the toggle silently breaks in one theme.
+- Color literals stay out of components: add a token to `app/globals.css` and define it in the `:root` and light blocks (and obsidian if Navy's value doesn't fit), or the toggle silently breaks in one theme.
 - The arena lobby may read `usePriceFeed()` for live market display (`app/duel/page.tsx:139`), but settlement logic stays out of it — multiplayer Pulse settles on the server (`lib/match.ts:98`), solo Pulse in its own page.
 - Pulse long/short reuse `--chart-up`/`--chart-down` (`app/duel/btc/pulse/page.tsx:16-17`), so a chart marker matches the control that placed it. P&L sign uses `--positive`/`--negative` (`:71`).
 

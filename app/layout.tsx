@@ -8,7 +8,8 @@ import { BalancePill } from "./BalancePill";
 import { MobileBottomNav } from "./MobileBottomNav";
 import { QuickTicketBar } from "./QuickTicketBar";
 import { TabNav } from "./TabNav";
-import { THEME_INIT_SCRIPT } from "./theme";
+import { DEFAULT_THEME, THEME_INIT_SCRIPT } from "./theme";
+import { ThemeToggle } from "./ThemeToggle";
 import "./globals.css";
 
 // Cinzel carries the ancient-inscription weight for headings/brand; Inter
@@ -28,7 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html
       lang="en"
-      data-theme="dark"
+      data-theme={DEFAULT_THEME}
       suppressHydrationWarning
       className={`${cinzel.variable} ${inter.variable} ${plexMono.variable}`}
     >
@@ -43,6 +44,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <Link href="/" className="brand">PROPHECY</Link>
                 <TabNav />
                 <div className="header-actions">
+                  <ThemeToggle />
                   <Show when="signed-in"><BalancePill /></Show>
                   <AccountMenu />
                 </div>
@@ -50,6 +52,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <div className="mobile-header-content">
                 <Link href="/" className="brand">PROPHECY</Link>
                 <div className="mobile-header-actions">
+                  <ThemeToggle />
                   <Show when="signed-in"><BalancePill /></Show>
                   <div className="mobile-account-control">
                     <AccountMenu compact />

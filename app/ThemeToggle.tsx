@@ -1,73 +1,103 @@
 "use client";
 
-import { useLayoutEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
-import { THEME_STORAGE_KEY, type Theme } from "./theme";
+import { DEFAULT_THEME, THEME_STORAGE_KEY, THEMES, normalizeTheme, type Theme } from "./theme";
 
 function readTheme(): Theme {
   try {
-    const stored = localStorage.getItem(THEME_STORAGE_KEY);
-    if (stored === "light" || stored === "dark") return stored;
-    return "dark";
+    return normalizeTheme(localStorage.getItem(THEME_STORAGE_KEY));
   } catch {
-    return "dark";
+    return DEFAULT_THEME;
   }
 }
 
-/** Shared by the standalone toggle and the avatar-menu action (AccountMenu.tsx). */
 export function useTheme() {
-  const [theme, setTheme] = useState<Theme>("dark");
+  const [theme, setThemeState] = useState<Theme>(DEFAULT_THEME);
 
   // The inline script already set the attribute; this syncs React's state to it
   // and re-applies it after Strict Mode's dev remount clears <html>'s attributes.
+  // The observer keeps the desktop and mobile header copies in step.
   useLayoutEffect(() => {
+    const root = document.documentElement;
     const current = readTheme();
-    document.documentElement.setAttribute("data-theme", current);
-    setTheme(current);
+    root.setAttribute("data-theme", current);
+    setThemeState(current);
+    const observer = new MutationObserver(() => setThemeState(normalizeTheme(root.getAttribute("data-theme"))));
+    observer.observe(root, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => observer.disconnect();
   }, []);
 
-  function toggle() {
-    const next: Theme = readTheme() === "dark" ? "light" : "dark";
+  function setTheme(next: Theme) {
     document.documentElement.setAttribute("data-theme", next);
     try {
       localStorage.setItem(THEME_STORAGE_KEY, next);
     } catch {}
-    setTheme(next);
+    setThemeState(next);
   }
 
-  return { theme, toggle };
+  return { theme, setTheme };
 }
 
-export function SunIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-      <circle cx="12" cy="12" r="4.5" />
-      <path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M19.1 4.9l-1.8 1.8M6.7 17.3l-1.8 1.8" />
-    </svg>
-  );
-}
-
-export function MoonIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true">
-      <path d="M20.5 14.4A8.6 8.6 0 0 1 9.6 3.5a8.6 8.6 0 1 0 10.9 10.9Z" />
-    </svg>
-  );
-}
-
-// Signed-out fallback only; signed-in users switch theme from the avatar menu.
+// Header theme picker (top right, signed in or out): swatch button → menu.
 export function ThemeToggle() {
-  const { theme, toggle } = useTheme();
-  const label = theme === "dark" ? "Switch to light mode" : "Switch to dark mode";
+  const { theme, setTheme } = useTheme();
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const current = THEMES.find((option) => option.id === theme) ?? THEMES[0];
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
   return (
-    <button
-      type="button"
-      className="theme-toggle"
-      onClick={toggle}
-      title={label}
-      aria-label={label}
-    >
-      {theme === "dark" ? <SunIcon /> : <MoonIcon />}
-    </button>
+    <div ref={rootRef} className="theme-menu">
+      <button
+        type="button"
+        className="theme-toggle"
+        title={`Theme: ${current.label}`}
+        aria-label={`Theme: ${current.label} — change theme`}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+      >
+        <span className="theme-swatch" data-swatch={theme} aria-hidden="true" />
+      </button>
+      {open && (
+        <div className="theme-menu-popover" role="menu" aria-label="Theme">
+          {THEMES.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              role="menuitemradio"
+              aria-checked={option.id === theme}
+              onClick={() => {
+                setTheme(option.id);
+                setOpen(false);
+              }}
+            >
+              <span className="theme-swatch" data-swatch={option.id} aria-hidden="true" />
+              <span className="theme-menu-text">
+                <strong>{option.label}</strong>
+                <small>{option.hint}</small>
+              </span>
+              {option.id === theme && <span className="theme-menu-check" aria-hidden="true">✓</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
