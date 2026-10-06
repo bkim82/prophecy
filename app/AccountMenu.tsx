@@ -4,8 +4,9 @@ import { Show, SignInButton, UserButton } from "@clerk/nextjs";
 import { ProfileIcon } from "./icons";
 
 /**
- * Header avatar: Clerk's menu when signed in, Sign in otherwise. The theme
- * picker sits beside it in the header (app/ThemeToggle.tsx).
+ * Header avatar: Clerk's menu when signed in (with a Profile link to the
+ * viewer's own /profile ahead of Clerk's defaults), Sign in otherwise. The
+ * theme picker sits beside it in the header (app/ThemeToggle.tsx).
  */
 export function AccountMenu({ compact = false }: { compact?: boolean }) {
   return (
@@ -33,7 +34,12 @@ export function AccountMenu({ compact = false }: { compact?: boolean }) {
             avatarBox: "account-avatar-box",
           },
         }}
-      />
+      >
+        <UserButton.MenuItems>
+          <UserButton.Link label="Profile" labelIcon={<ProfileIcon className="account-menu-icon" />} href="/profile" />
+          <UserButton.Action label="manageAccount" />
+        </UserButton.MenuItems>
+      </UserButton>
     </Show>
   );
 }

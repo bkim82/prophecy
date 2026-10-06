@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { matches } from "@/db/schema";
 import { pulsePositionsPnl, type PulsePosition } from "@/lib/pulse";
@@ -221,6 +221,91 @@ export function viewFor(row: MatchRow, you: 1 | 2): MatchView {
         : row.pulseProfit1
       : null,
     serverNow: Date.now(),
+  };
+}
+
+const settledFor = (userId: string) =>
+  and(eq(matches.status, "settled"), or(eq(matches.player1UserId, userId), eq(matches.player2UserId, userId)));
+
+/** Newest-first settled matches a Clerk user played in — the profile Matches tab. */
+export async function settledMatchesFor(userId: string, limit = 20): Promise<MatchRow[]> {
+  return getDb().select().from(matches).where(settledFor(userId)).orderBy(desc(matches.createdAt)).limit(limit);
+}
+
+/** Lifetime W/L/T and net Embers across every settled match, not just the listed page. */
+export type MatchRecord = { played: number; won: number; lost: number; tied: number; net: number };
+
+export async function matchRecordFor(userId: string): Promise<MatchRecord> {
+  const won = sql`((${matches.winner} = '1' AND ${matches.player1UserId} = ${userId}) OR (${matches.winner} = '2' AND ${matches.player2UserId} = ${userId}))`;
+  const tied = sql`${matches.winner} = 'tie'`;
+  const [row] = await getDb()
+    .select({
+      played: sql<number>`count(*)::int`,
+      won: sql<number>`(count(*) FILTER (WHERE ${won}))::int`,
+      tied: sql<number>`(count(*) FILTER (WHERE ${tied}))::int`,
+      net: sql<number>`coalesce(sum(CASE WHEN ${won} THEN ${matches.wager} WHEN ${tied} THEN 0 ELSE -${matches.wager} END), 0)::int`,
+    })
+    .from(matches)
+    .where(settledFor(userId));
+  const played = row?.played ?? 0;
+  const wins = row?.won ?? 0;
+  const ties = row?.tied ?? 0;
+  return { played, won: wins, lost: played - wins - ties, tied: ties, net: row?.net ?? 0 };
+}
+
+/**
+ * Per-market accuracy for the profile hero: a round counts as a call when
+ * you finished it with non-zero P&L, and as right when that P&L was positive
+ * (Pulse leverage/side are cleared at settlement, so P&L is what's left).
+ */
+export async function marketAccuracyFor(userId: string): Promise<{ market: string; right: number; calls: number }[]> {
+  const profit = sql`CASE WHEN ${matches.player1UserId} = ${userId} THEN ${matches.pulseProfit1} ELSE ${matches.pulseProfit2} END`;
+  return getDb()
+    .select({
+      market: matches.market,
+      right: sql<number>`(count(*) FILTER (WHERE ${profit} > 0))::int`,
+      calls: sql<number>`(count(*) FILTER (WHERE ${profit} <> 0))::int`,
+    })
+    .from(matches)
+    .where(settledFor(userId))
+    .groupBy(matches.market);
+}
+
+/** Settled matches by id that the user played in — pinned highlights, which may be older than the listed page. */
+export async function settledMatchesByIds(userId: string, ids: string[]): Promise<MatchRow[]> {
+  if (ids.length === 0) return [];
+  return getDb().select().from(matches).where(and(inArray(matches.id, ids), settledFor(userId)));
+}
+
+/** One settled match from one player's side, safe to hand to the client. */
+export type MatchHistoryEntry = {
+  id: string;
+  market: string;
+  timerSeconds: number;
+  wager: number;
+  playedAt: number;
+  result: "won" | "lost" | "tie";
+  /** Embers back from the wager net of the stake: +wager won, −wager lost, 0 tie (settleFundsIfNeeded). */
+  net: number;
+  yourProfit: number | null;
+  opponentProfit: number | null;
+  opponentUserId: string | null;
+};
+
+export function historyEntryFor(row: MatchRow, userId: string): MatchHistoryEntry {
+  const you = row.player1UserId === userId ? 1 : 2;
+  const result = row.winner === "tie" ? "tie" : row.winner === String(you) ? "won" : "lost";
+  return {
+    id: row.id,
+    market: row.market,
+    timerSeconds: row.timerSeconds,
+    wager: row.wager,
+    playedAt: (row.roundStartAt ?? row.createdAt).getTime(),
+    result,
+    net: result === "won" ? row.wager : result === "lost" ? -row.wager : 0,
+    yourProfit: you === 1 ? row.pulseProfit1 : row.pulseProfit2,
+    opponentProfit: you === 1 ? row.pulseProfit2 : row.pulseProfit1,
+    opponentUserId: you === 1 ? row.player2UserId : row.player1UserId,
   };
 }
 

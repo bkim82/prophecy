@@ -15,7 +15,7 @@
   --structure: #0a1a31; --structure-raised: #102742; --structure-line: #27435d; --structure-text: #f7f0e2; --structure-muted: #a5b6c2;
   --selected-bg: color-mix(in srgb, var(--brand) 18%, var(--surface)); --selection: rgba(24, 212, 192, .24);
   --market-accent: var(--brand); --market-accent-strong: var(--brand-strong); --market-accent-contrast: var(--brand-contrast);
-  --market-btc: #f7931a; --market-eth: #627eea; --market-doge: #c2a633;
+  --market-btc: #f7931a; --market-eth: #627eea; --market-doge: #c2a633; --market-sol: #9b5cff;
   --chart-accent: #c0603a; --chart-accent-strong: #e08655; --chart-line: var(--chart-accent); --chart-point: var(--chart-accent-strong); --trade-contrast: #1a0d06;
   --accent: var(--brand); --accent-strong: var(--brand-strong); --accent-contrast: var(--trade-contrast);
   --chart-grid: #241f1c; --chart-axis: #3d3530; --chart-up: #6fae7a; --chart-down: #c94f4f;
@@ -39,7 +39,7 @@
   --structure: #ffffff; --structure-raised: #f4f1fb; --structure-line: #e3def0; --structure-text: #16132b; --structure-muted: #5e5975;
   --selected-bg: color-mix(in srgb, var(--brand) 10%, var(--surface)); --selection: rgba(109, 79, 216, .18);
   --market-accent: var(--brand); --market-accent-strong: var(--brand-strong); --market-accent-contrast: var(--brand-contrast);
-  --market-btc: #f7931a; --market-eth: #627eea; --market-doge: #c2a633;
+  --market-btc: #f7931a; --market-eth: #627eea; --market-doge: #c2a633; --market-sol: #9b5cff;
   --chart-accent: #a8452a; --chart-accent-strong: #832f1a; --trade-contrast: #ffffff;
   --accent: var(--brand); --accent-strong: var(--brand-strong); --accent-contrast: var(--trade-contrast);
   --chart-grid: #ebe7f4; --chart-axis: #cfc8e0; --chart-up: #18935f; --chart-down: #cc3f55;
@@ -933,6 +933,220 @@ a.post-avatar { text-decoration: none; }
 .profile-locked-card p { margin: 0; font-size: 13px; line-height: 1.8; }
 .profile-locked-cta { margin-top: 4px; padding: 8px 16px; border: 1px solid var(--brand); border-radius: 8px; background: var(--selected-bg); color: var(--brand-strong); font-size: 12px; font-weight: 800; text-decoration: none; transition: background .15s ease; }
 .profile-locked-cta:hover { background: color-mix(in srgb, var(--brand) 28%, var(--surface-raised)); }
+/* Profile banner + meta (own profile only for now): the banner bleeds to the hero's edges (overflow clips it to the radius) and the avatar rides up over it; location/website sit on their own line above the follower stats. */
+.profile-hero.has-banner { padding-top: 0; overflow: hidden; }
+.profile-banner { justify-self: stretch; height: 168px; margin-inline: -20px; }
+.profile-hero.has-banner .profile-avatar { margin-top: -62px; }
+.profile-bio { white-space: pre-line; overflow-wrap: anywhere; }
+.profile-meta { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 16px; margin: 0; color: var(--muted); font-size: 13px; }
+.profile-meta span, .profile-meta a { display: inline-flex; align-items: center; gap: 5px; min-width: 0; overflow-wrap: anywhere; }
+.profile-meta a { color: var(--brand-strong); text-decoration: none; }
+.profile-meta a:hover { text-decoration: underline; }
+.profile-meta svg { flex: none; width: 14px; height: 14px; }
+.profile-handle-prompt { padding: 0; border: 0; background: none; color: var(--brand-strong); font-size: 13px; font-weight: 700; }
+.profile-handle-prompt:hover { text-decoration: underline; }
+.profile-follow:disabled { opacity: .5; cursor: default; }
+/* How they trade (app/lib/profileTraits.ts): archetype chip under the name, tinted per archetype; signature asset + top-three accuracy line under the stats (≥60% up, <45% down). */
+.profile-archetype { --tone: var(--violet-strong); display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 8px; margin: 0; padding: 4px 12px 4px 9px; border: 1px solid color-mix(in srgb, var(--tone) 40%, var(--line)); border-radius: 999px; background: color-mix(in srgb, var(--tone) 10%, transparent); font-size: 12px; }
+.profile-archetype[data-archetype="patient"] { --tone: var(--gold); }
+.profile-archetype[data-archetype="contrarian"] { --tone: var(--negative); }
+.profile-archetype[data-archetype="daredevil"] { --tone: var(--ember); }
+.profile-archetype svg { flex: none; width: 14px; height: 14px; color: var(--tone); }
+.profile-archetype strong { color: var(--tone); font-family: var(--font-cinzel), Cinzel, Georgia, serif; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.profile-dossier { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 22px; margin: 0; font-size: 13px; font-variant-numeric: tabular-nums; }
+.profile-dossier-item { display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; }
+.profile-dossier-item .eyebrow { font-size: 10px; }
+.profile-dossier-item .market-symbol { width: 18px; height: 18px; border: 0; font-size: 14px; }
+.profile-dossier strong { font-weight: 700; }
+.profile-dossier strong.is-up { color: var(--chart-up); }
+.profile-dossier strong.is-down { color: var(--chart-down); }
+/* Highlight reel (app/profile/[handle]/HighlightReel.tsx): up to three gold "fulfilled" cards — same --gold edge/wash as .market-call[data-state="fulfilled"] — above the tabs. auto-fit: one pin spans the row, three split it. ≤620px it becomes a swipeable row. Own profile adds dashed empty slots and Unpin. */
+.profile-reel { display: grid; gap: 10px; margin-bottom: 14px; }
+.profile-reel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 0 2px; }
+.profile-reel-head .eyebrow { color: var(--gold); font-weight: 700; }
+.profile-reel-head .muted { font-size: 12px; font-variant-numeric: tabular-nums; }
+.profile-reel-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; }
+.profile-reel-card { position: relative; display: flex; flex-direction: column; gap: 10px; min-width: 0; padding: 14px; border: 1px solid color-mix(in srgb, var(--gold) 50%, var(--line)); border-radius: 14px; background: radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, var(--gold) 12%, transparent), transparent 60%), var(--hud-fill); box-shadow: 0 0 22px -12px var(--gold); }
+.profile-reel-card.is-empty { align-items: center; justify-content: center; gap: 6px; min-height: 132px; border-style: dashed; border-color: var(--line-strong); background: none; box-shadow: none; color: var(--muted); font-size: 12px; text-align: center; }
+.profile-reel-card.is-empty span { color: var(--gold); font-size: 16px; opacity: .6; }
+.profile-reel-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11px; }
+.profile-reel-chip { padding: 3px 9px; border: 1px solid color-mix(in srgb, var(--gold) 45%, transparent); border-radius: 999px; background: color-mix(in srgb, var(--gold) 14%, transparent); color: var(--gold); font-family: var(--font-mono), ui-monospace, monospace; font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; white-space: nowrap; }
+.profile-reel-text { display: -webkit-box; flex: 1; margin: 0; overflow: hidden; font-size: 13px; line-height: 1.45; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+.profile-reel-text strong { display: block; font-size: 14px; }
+.profile-reel-text .muted { font-size: 12px; }
+.profile-reel-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.profile-reel-terms { display: inline-flex; align-items: center; gap: 6px; min-width: 0; color: var(--muted); font-size: 12px; font-weight: 700; white-space: nowrap; }
+.profile-reel-terms .market-symbol { flex: none; width: 16px; height: 16px; border: 0; font-size: 13px; }
+.profile-reel-result { color: var(--gold); font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.profile-reel-unpin { position: absolute; top: 10px; right: 10px; padding: 2px 8px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface-raised); color: var(--muted); font-size: 11px; font-weight: 700; opacity: 0; transition: opacity .15s ease; }
+.profile-reel-card:hover .profile-reel-unpin, .profile-reel-unpin:focus-visible, .profile-reel-unpin:disabled { opacity: 1; }
+.profile-reel-unpin:hover { color: var(--text); }
+/* Touch screens have no hover to reveal Unpin. */
+@media (hover: none) { .profile-reel-unpin { position: static; align-self: flex-end; opacity: 1; } }
+.profile-pin-error { margin: -6px 2px 14px; color: var(--negative); font-size: 12px; }
+.profile-match-pin { display: flex; justify-content: flex-end; }
+.profile-pin { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border: 1px solid var(--line-strong); border-radius: 999px; background: transparent; color: var(--muted); font-size: 11px; font-weight: 700; white-space: nowrap; transition: color .15s ease, border-color .15s ease, background .15s ease; }
+.profile-pin:hover:not(:disabled) { border-color: color-mix(in srgb, var(--gold) 55%, var(--line)); color: var(--gold); }
+.profile-pin.is-pinned { border-color: color-mix(in srgb, var(--gold) 55%, var(--line)); background: color-mix(in srgb, var(--gold) 14%, transparent); color: var(--gold); }
+.profile-pin:disabled { cursor: default; opacity: .45; }
+.profile-pin.is-pinned:disabled { opacity: 1; }
+@media (max-width: 620px) {
+  .profile-reel-list { grid-template-columns: none; grid-auto-columns: 82%; grid-auto-flow: column; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; }
+  .profile-reel-list > * { scroll-snap-align: start; }
+  .profile-match { grid-template-columns: 30px minmax(0, 1fr) auto 34px; }
+  .profile-pin { padding: 5px 8px; }
+  .profile-pin-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+}
+/* Challenge (app/profile/[handle]/ChallengeDialog.tsx): secondary to Follow in the hero — an Arena-gradient outline with ember swords. Locked (rank gate) goes grey with a lock and a reason line; pending goes gold "Challenge sent" with Cancel. The dialog reuses the Edit profile dialog shell (.profile-edit*). */
+.profile-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px; margin-top: 4px; }
+.profile-actions .profile-follow { margin-top: 0; }
+/* Fixed vivid Arena gradient rather than theme tokens: it has to read as the call to action in every theme. */
+.profile-challenge-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 42px; padding: 0 26px; border: 1px solid rgba(255, 255, 255, .14); border-radius: 999px; background: linear-gradient(135deg, #6d4bd8 0%, #b0479c 55%, #e0743a 100%); color: #fff; font-size: 15px; font-weight: 800; letter-spacing: .02em; text-shadow: 0 1px 2px rgba(0, 0, 0, .25); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .18), 0 8px 26px -8px rgba(176, 71, 156, .75); cursor: pointer; transition: transform .15s ease, filter .15s ease, box-shadow .15s ease; }
+.profile-challenge-button:hover:not(:disabled):not(.is-pending):not(.is-locked) { filter: brightness(1.08); transform: translateY(-1px); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .22), 0 12px 30px -8px rgba(176, 71, 156, .9); }
+/* In the hero, Follow is primary and Challenge secondary: an outline in the Arena gradient (padding-box/border-box trick) with ember swords. The filled version above stays for the dialog's Send challenge. */
+/* Same footprint as Follow (.profile-follow: 34px, 0 22px, 13px/700, 1px border). */
+.profile-actions .profile-challenge-button { gap: 6px; min-height: 34px; padding: 0 20px; font-size: 13px; font-weight: 700; letter-spacing: 0; border: 1px solid transparent; background: linear-gradient(var(--surface-raised), var(--surface-raised)) padding-box, linear-gradient(135deg, #6d4bd8 0%, #b0479c 55%, #e0743a 100%) border-box; color: var(--text); text-shadow: none; box-shadow: 0 6px 22px -16px rgba(176, 71, 156, .9); }
+.profile-actions .profile-challenge-button:hover:not(:disabled):not(.is-pending):not(.is-locked) { filter: none; background: linear-gradient(color-mix(in srgb, #b0479c 12%, var(--surface-raised)), color-mix(in srgb, #b0479c 12%, var(--surface-raised))) padding-box, linear-gradient(135deg, #6d4bd8 0%, #b0479c 55%, #e0743a 100%) border-box; }
+.profile-actions .profile-challenge-button svg { width: 14px; height: 14px; }
+.profile-actions .profile-challenge-button:not(.is-locked):not(.is-pending) svg { color: #e0743a; }
+.profile-challenge-button:focus-visible { outline: 2px solid var(--brand-strong); outline-offset: 2px; }
+.profile-challenge-button:disabled { cursor: default; opacity: .6; }
+.profile-challenge-button svg { flex: none; width: 16px; height: 16px; }
+.profile-challenge-button.is-locked, .profile-actions .profile-challenge-button.is-locked { border-color: var(--line-strong); background: var(--surface-hover); color: var(--muted); text-shadow: none; box-shadow: none; opacity: 1; cursor: not-allowed; }
+.profile-challenge-button.is-pending, .profile-actions .profile-challenge-button.is-pending { border-color: color-mix(in srgb, var(--gold) 55%, var(--line)); background: color-mix(in srgb, var(--gold) 12%, transparent); color: var(--gold); text-shadow: none; box-shadow: none; cursor: default; }
+.profile-challenge-note { max-width: 52ch; margin: -2px 0 0; font-size: 12px; line-height: 1.8; }
+.profile-challenge-note strong { color: var(--text); }
+/* Rendered inside the hero, so undo its text-align: center. */
+.profile-challenge-dialog { width: min(540px, calc(100% - 32px)); text-align: left; }
+.challenge-versus { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; font-size: 13px; }
+.challenge-group { min-width: 0; margin: 0; padding: 0; border: 0; }
+.challenge-group legend { margin-bottom: 8px; padding: 0; color: var(--muted); font-size: 12px; font-weight: 600; }
+.challenge-modes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.challenge-mode { display: grid; justify-items: start; align-content: start; gap: 4px; padding: 12px 14px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--field-bg); color: var(--text); text-align: left; transition: border-color .15s ease, background .15s ease; }
+.challenge-mode:hover { border-color: color-mix(in srgb, var(--brand) 50%, var(--line-strong)); }
+.challenge-mode svg { width: 18px; height: 18px; color: var(--violet-strong); }
+.challenge-mode strong { font-size: 14px; }
+.challenge-mode .muted { font-size: 12px; line-height: 1.4; }
+.challenge-mode[aria-pressed="true"] { border-color: var(--brand); background: var(--selected-bg); box-shadow: inset 0 0 0 1px var(--brand); }
+.challenge-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.challenge-options { display: flex; flex-wrap: wrap; gap: 6px; }
+.challenge-options button { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 999px; background: transparent; color: var(--muted); font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; transition: color .15s ease, border-color .15s ease, background .15s ease; }
+.challenge-options button:hover { color: var(--text); }
+.challenge-options button[aria-pressed="true"] { border-color: var(--brand); background: var(--selected-bg); color: var(--brand-strong); }
+.challenge-options .market-symbol { width: 16px; height: 16px; border: 0; font-size: 13px; }
+.challenge-summary { display: grid; gap: 4px; margin: 0; padding: 12px 14px; border: 1px dashed var(--line-strong); border-radius: 12px; font-size: 13px; }
+.challenge-summary .muted { font-size: 12px; }
+/* Sent challenges, above the own-profile match history; same row grid as .profile-match. */
+.profile-sent { margin-bottom: 14px; }
+.profile-match.profile-sent-row { --tone: var(--violet-strong); grid-template-columns: 30px minmax(0, 1fr) auto auto; }
+.profile-sent-icon svg { width: 15px; height: 15px; }
+.profile-sent-row .profile-match-main strong a { color: inherit; text-decoration: none; }
+.profile-sent-row .profile-match-main strong a:hover { text-decoration: underline; }
+.profile-sent-status { padding: 3px 9px; border: 1px solid color-mix(in srgb, var(--gold) 45%, transparent); border-radius: 999px; color: var(--gold); font-family: var(--font-mono), ui-monospace, monospace; font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+@media (max-width: 620px) {
+  .challenge-modes, .challenge-row { grid-template-columns: minmax(0, 1fr); }
+  .profile-sent-status { display: none; }
+}
+/* Edit profile dialog (app/profile/EditProfileDialog.tsx): native <dialog> (top layer, focus trap, Esc). Banner preview at 3:1 with the avatar overlapping its bottom-left like the hero; preset swatches; 2-col field grid. Full-screen sheet ≤620px. */
+/* margin: auto restores native dialog centering that Tailwind's preflight margin reset removes. */
+.profile-edit { width: min(600px, calc(100% - 32px)); max-width: none; margin: auto; max-height: min(92vh, 880px); padding: 0; border: 1px solid var(--line-strong); border-radius: 16px; background: var(--surface-raised); color: var(--text); box-shadow: var(--glass-shadow); }
+.profile-edit::backdrop { background: rgba(5, 4, 12, .62); backdrop-filter: blur(3px); }
+.profile-edit-panel { display: flex; flex-direction: column; max-height: inherit; }
+.profile-edit-head { display: flex; flex: none; align-items: center; justify-content: space-between; padding: 12px 14px 12px 18px; border-bottom: 1px solid var(--line); }
+.profile-edit-head h2 { margin: 0; font-size: 16px; }
+.profile-edit-close { width: 34px; height: 34px; border: 0; border-radius: 999px; background: transparent; color: var(--muted); font-size: 22px; line-height: 1; }
+.profile-edit-close:hover { background: var(--surface-hover); color: var(--text); }
+.profile-edit-body { display: grid; gap: 18px; padding: 18px; overflow-y: auto; }
+.profile-edit-media { display: grid; gap: 8px; }
+.profile-edit-banner { position: relative; aspect-ratio: 3 / 1; overflow: hidden; border: 1px dashed var(--line-strong); border-radius: 12px; background: var(--surface-hover); }
+.profile-edit-banner-actions { position: absolute; right: 10px; bottom: 10px; display: flex; gap: 6px; }
+.profile-edit-banner-actions button { display: inline-flex; align-items: center; gap: 6px; padding: 6px 11px; border: 0; border-radius: 999px; background: rgba(8, 7, 16, .66); color: #fff; font-size: 12px; font-weight: 700; backdrop-filter: blur(4px); }
+.profile-edit-banner-actions button:hover { background: rgba(8, 7, 16, .85); }
+.profile-edit-banner-actions svg { width: 14px; height: 14px; }
+.profile-edit-avatar-row { display: flex; align-items: flex-end; gap: 12px; margin: -46px 0 0 16px; }
+.profile-edit-avatar { position: relative; display: grid; flex: none; place-items: center; width: 84px; height: 84px; padding: 0; border: 0; border-radius: 999px; color: #fff; font-size: 32px; font-weight: 700; box-shadow: 0 0 0 4px var(--surface-raised); }
+.profile-edit-avatar img { width: 100%; height: 100%; border-radius: inherit; object-fit: cover; }
+.profile-edit-avatar-overlay { position: absolute; right: -2px; bottom: 2px; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 999px; background: rgba(8, 7, 16, .8); box-shadow: 0 0 0 2px var(--surface-raised); transition: background .15s ease; }
+.profile-edit-avatar:hover .profile-edit-avatar-overlay, .profile-edit-avatar:focus-visible .profile-edit-avatar-overlay { background: var(--brand-strong); color: var(--bg); }
+.profile-edit-avatar-overlay svg { width: 15px; height: 15px; }
+.profile-edit-text-button { padding: 4px 2px; border: 0; background: none; color: var(--brand-strong); font-size: 12px; font-weight: 700; }
+.profile-edit-text-button:hover { text-decoration: underline; }
+.profile-edit-presets { min-width: 0; margin: 0; padding: 0; border: 0; }
+.profile-edit-presets legend { margin-bottom: 8px; padding: 0; color: var(--muted); font-size: 12px; font-weight: 600; }
+.profile-edit-presets > div { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+.profile-edit-swatch { position: relative; aspect-ratio: 2 / 1; padding: 0; overflow: hidden; border: 2px solid transparent; border-radius: 8px; background: #100e1a; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .1); }
+.profile-edit-swatch > span { position: absolute; top: 0; left: 0; width: 400%; height: 400%; transform: scale(.25); transform-origin: 0 0; pointer-events: none; }
+.profile-edit-swatch[aria-pressed="true"] { border-color: var(--brand-strong); }
+.profile-edit-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 12px; }
+.profile-edit-field { display: grid; align-content: start; gap: 6px; min-width: 0; }
+.profile-edit-field.is-wide { grid-column: 1 / -1; }
+.profile-edit-label { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; font-weight: 600; }
+.profile-edit-label .muted { font-weight: 500; font-variant-numeric: tabular-nums; }
+.profile-edit-field input, .profile-edit-field textarea { width: 100%; min-width: 0; padding: 9px 11px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--field-bg); color: var(--text); font: inherit; font-size: 14px; }
+.profile-edit-field textarea { resize: vertical; line-height: 1.45; }
+.profile-edit-field input:focus, .profile-edit-field textarea:focus, .profile-edit-prefixed:focus-within { border-color: var(--brand); outline: none; }
+.profile-edit-prefixed { display: flex; align-items: center; padding-left: 11px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--field-bg); color: var(--muted); font-size: 14px; }
+.profile-edit-field .profile-edit-prefixed input { padding-left: 2px; border: 0; background: transparent; }
+.profile-edit-field.has-error input, .profile-edit-field.has-error textarea, .profile-edit-field.has-error .profile-edit-prefixed { border-color: var(--negative); }
+.profile-edit-field.has-error .profile-edit-prefixed input { border: 0; }
+.profile-edit-error { margin: 0; color: var(--negative); font-size: 12px; }
+.profile-edit-hint { margin: 0; font-size: 12px; }
+.profile-edit-foot { display: flex; flex: none; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 18px; border-top: 1px solid var(--line); }
+.profile-edit-buttons { display: flex; gap: 8px; margin-left: auto; }
+.profile-edit-buttons .profile-follow { margin-top: 0; }
+@media (max-width: 620px) {
+  .profile-edit { width: 100%; height: 100%; max-height: none; border: 0; border-radius: 0; }
+  .profile-edit-panel { height: 100%; max-height: none; }
+  .profile-edit-body { flex: 1; align-content: start; padding: 16px; }
+  .profile-edit-grid { grid-template-columns: minmax(0, 1fr); }
+  .profile-edit-presets > div { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .profile-edit-avatar-row { margin: -36px 0 0 12px; }
+  .profile-edit-avatar { width: 72px; height: 72px; font-size: 26px; }
+}
+/* Own profile (/profile): Clerk avatar fills the ring; copy-earnings card under the hero (violet, like the Copy button it pays out from); Matches tab rows — W/L/T tile, opponent + round terms, net Embers and both players' round P&L, tinted by result via --tone. */
+.profile-avatar img { width: 100%; height: 100%; border-radius: inherit; object-fit: cover; }
+.profile-empty-link { color: var(--brand-strong); font-weight: 700; text-decoration: none; }
+.profile-empty-link:hover { text-decoration: underline; }
+.profile-copy { display: grid; gap: 12px; margin-bottom: 14px; padding: 14px 18px 16px; border: 1px solid color-mix(in srgb, var(--violet) 30%, var(--line)); border-radius: 14px; background: linear-gradient(135deg, color-mix(in srgb, var(--violet) 10%, var(--surface)), var(--surface) 70%); }
+.profile-copy-head { display: flex; align-items: center; gap: 8px; color: var(--violet-strong); }
+.profile-copy-head svg { flex: none; width: 14px; height: 14px; }
+.profile-copy-head .eyebrow { color: inherit; font-weight: 700; }
+.profile-copy-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; }
+.profile-copy-stats div { display: flex; flex-direction: column-reverse; justify-content: flex-end; gap: 4px; min-width: 0; }
+.profile-copy-stats dt { color: var(--muted); font-size: 12px; }
+.profile-copy-stats dd { margin: 0; font-size: 24px; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.profile-copy-stats dd.is-up { color: var(--chart-up); }
+.profile-matches { display: grid; margin: 0; padding: 0; overflow: hidden; border: 1px solid var(--glass-edge); border-radius: 14px; background: var(--glass-fill); list-style: none; }
+.profile-match { --tone: var(--muted); display: grid; grid-template-columns: 30px minmax(0, 1fr) auto 72px; align-items: center; gap: 12px; padding: 12px 16px; }
+.profile-match + .profile-match { border-top: 1px solid var(--line); }
+.profile-match[data-result="won"] { --tone: var(--chart-up); }
+.profile-match[data-result="lost"] { --tone: var(--chart-down); }
+.profile-match-result { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; background: color-mix(in srgb, var(--tone) 16%, transparent); color: var(--tone); font-family: var(--font-mono), ui-monospace, monospace; font-size: 13px; font-weight: 800; }
+.profile-match-main, .profile-match-side { display: grid; gap: 3px; min-width: 0; }
+.profile-match-main strong { overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.profile-match-main .muted { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.profile-match-side { justify-items: end; font-variant-numeric: tabular-nums; text-align: right; }
+.profile-match-side .muted { font-size: 11px; white-space: nowrap; }
+.profile-match-net { display: inline-flex; align-items: center; gap: 4px; color: var(--tone); font-size: 15px; }
+.profile-match-net svg { width: 13px; height: 13px; }
+/* Profile right rail (app/profile/[handle]/ProfileAchievements.tsx): two hero records (Highest Elo tinted by peak tier via data-rank, Biggest ROI) over sidebar-row stats. */
+.profile-records-empty { margin: 0; font-size: 13px; }
+.profile-record-heroes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 6px; }
+.profile-record-hero { display: grid; justify-items: start; align-content: start; gap: 6px; min-width: 0; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-raised); }
+.profile-record-hero[data-rank] { border-color: color-mix(in srgb, var(--room) 40%, var(--line)); background: radial-gradient(90% 70% at 0% 0%, color-mix(in srgb, var(--room-glow) 70%, transparent), transparent 80%), var(--surface-raised); }
+.profile-record-hero .eyebrow { font-size: 10px; }
+.profile-record-big { font-size: 24px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+.profile-record-big.is-up { color: var(--chart-up); }
+.profile-record-big.is-down { color: var(--chart-down); }
+.profile-record-trade { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; color: var(--text); font-size: 12px; font-weight: 700; }
+.profile-record-trade .market-symbol { flex: none; width: 16px; height: 16px; border: 0; font-size: 12px; }
+.profile-record-date { font-size: 11px; }
+.profile-record-list { margin: 0; }
+.profile-record-list dt { color: var(--muted); }
+.profile-record-list dd { margin: 0; }
+.profile-record-list dd .muted { font-weight: 500; }
+/* ≤960px the rail packs 220px panels side by side, too narrow for the two hero records — the panel takes its own row. */
+@media (max-width: 960px) { .profile-records { grid-column: 1 / -1; } }
 .panel { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
 .eyebrow { color: var(--muted); font-size: 11px; letter-spacing: .11em; text-transform: uppercase; }
 .eyebrow-row { display: flex; align-items: center; gap: 12px; }
@@ -1104,6 +1318,7 @@ a.post-avatar { text-decoration: none; }
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 1.75 4.2 12.4 12 16.9l7.8-4.5L12 1.75Z' fill='black'/%3E%3Cpath d='M12 16.9v5.35l7.8-10.95-7.8 5.6Z' fill='black' fill-opacity='.62'/%3E%3Cpath d='M12 16.9 4.2 11.3 12 22.25V16.9Z' fill='black' fill-opacity='.82'/%3E%3Cpath d='m12 8.65-7.8 3.75 7.8 4.5 7.8-4.5L12 8.65Z' fill='black' fill-opacity='.45'/%3E%3C/svg%3E") center / 68% 68% no-repeat;
 }
 .doge-symbol { color: var(--market-doge); }
+.sol-symbol { color: var(--market-sol); }
 .control-group { display: grid; gap: 7px; min-width: 0; padding-left: 22px; border-left: 1px solid var(--line); }
 .field-label { color: var(--muted); font-size: 10px; letter-spacing: .09em; text-transform: uppercase; }
 .segmented-control { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; overflow: hidden; border: 1px solid var(--line); border-radius: 6px; }
@@ -1470,9 +1685,16 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
   .feed-tabs button { min-width: 0; min-height: 36px; padding: 6px 4px; font-size: 11px; white-space: nowrap; }
   .feed-nav .feed-tabs { display: flex; overflow-x: auto; scrollbar-width: none; }
   .feed-nav .feed-tabs button { flex: none; padding: 6px 12px; }
-  .profile-tabs { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  /* One column per tab: 4 on others' profiles, 5 (+ Matches) on your own. */
+  .profile-tabs { grid-template-columns: none; grid-auto-columns: minmax(0, 1fr); grid-auto-flow: column; }
+  .profile-copy { padding: 12px 14px 14px; }
+  .profile-copy-stats { gap: 8px; }
+  .profile-copy-stats dd { font-size: 19px; }
+  .profile-match { gap: 10px; padding: 11px 12px; }
   .profile-hero { padding: 22px 14px 18px; }
   .profile-avatar { width: 84px; height: 84px; font-size: 32px; }
+  .profile-banner { height: 120px; margin-inline: -14px; }
+  .profile-hero.has-banner .profile-avatar { margin-top: -50px; }
   .profile-identity h1 { font-size: 20px; }
   .profile-lot { grid-template-columns: 24px auto minmax(0, 1fr) auto 56px; column-gap: 8px; font-size: 12px; }
   .profile-lot-icon { width: 24px; height: 24px; font-size: 11px; }
