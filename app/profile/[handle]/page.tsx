@@ -8,6 +8,7 @@ import { getProfile, profileActivity } from "@/app/lib/mockProfiles";
 import { archetypeFor } from "@/app/lib/profileTraits";
 import { VIEWER_RANK, canChallenge, canViewPortfolio, challengeTierNeeded } from "@/app/lib/rank";
 import type { ChallengeState } from "@/app/profile/[handle]/ChallengeDialog";
+import { HighlightReel } from "@/app/profile/[handle]/HighlightReel";
 import { ProfileAchievements } from "@/app/profile/[handle]/ProfileAchievements";
 import { ProfileView } from "@/app/profile/[handle]/ProfileView";
 import { pendingChallengeTo } from "@/lib/challenges";
@@ -44,10 +45,11 @@ export default async function ProfilePage({ params }: { params: Promise<{ handle
         viewerRank={VIEWER_RANK}
         initiallyFollowing={FOLLOWED_HANDLES.includes(profile.handle)}
         traits={{ accuracy: ACCURACY[profile.handle] ?? [], archetype: archetypeFor(STYLES[profile.handle]) }}
-        highlights={PINNED_OMENS[profile.handle] ?? []}
         challenge={challenge}
       />
-      <ProfileAchievements records={RECORDS[profile.handle] ?? null} seed={profile.handle} />
+      <ProfileAchievements records={RECORDS[profile.handle] ?? null} seed={profile.handle}>
+        <HighlightReel highlights={PINNED_OMENS[profile.handle] ?? []} />
+      </ProfileAchievements>
     </main>
   );
 }

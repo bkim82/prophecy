@@ -107,7 +107,7 @@ export async function saveProfile(formData: FormData): Promise<SaveProfileResult
  */
 export async function togglePinnedMatch(matchId: string): Promise<{ ok: true } | { ok: false; error: string }> {
   const { userId } = await auth();
-  if (!userId) return { ok: false, error: "Sign in to pin matches." };
+  if (!userId) return { ok: false, error: "Sign in to manage your highlight reel." };
 
   const pinned = (await storedProfileFor(userId))?.pinnedMatches ?? [];
   let next: string[];
