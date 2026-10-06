@@ -137,3 +137,52 @@ export const portfolioPayouts = pgTable("portfolio_payouts", {
   userId: text("user_id").notNull(),
   amount: integer("amount").notNull(),
 });
+
+// One row per Clerk user who has edited their profile (/profile's Edit
+// profile dialog, app/profile/actions.ts). Avatar lives in Clerk, not here.
+// `handle` is stored lowercase without the "@"; NULLs don't collide in a
+// Postgres unique index, so any number of users can have no handle. The
+// banner is either a preset id (app/lib/profileEdit.ts BANNER_PRESETS) or an
+// uploaded image (base64, ≤ BANNER_MAX_BYTES decoded), never both — served
+// by GET /api/profile/banner rather than inlined into the page.
+export const profiles = pgTable("profiles", {
+  userId: text("user_id").primaryKey(),
+  displayName: text("display_name"),
+  handle: text("handle"),
+  bio: text("bio"),
+  location: text("location"),
+  website: text("website"),
+  bannerPreset: text("banner_preset"),
+  bannerImage: text("banner_image"),
+  bannerMime: text("banner_mime"),
+  // Highlight reel: up to 3 won `matches` ids, in pin order (app/profile/actions.ts togglePinnedMatch).
+  pinnedMatches: jsonb("pinned_matches").$type<string[]>(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  handleUnique: uniqueIndex("profiles_handle_unique").on(table.handle),
+}));
+
+// One row per challenge sent from a profile (app/profile/challengeActions.ts).
+// Requests only for now: profiles you can open are mock traders who can't
+// reply, so nothing reserves Embers or creates a `matches` row yet — that
+// happens on accept, once real accounts can receive challenges. The target
+// is a profile handle ("@vesper"); ranks are snapshots from send time, which
+// is when the one-tier-up gate (app/lib/rank.ts canChallenge) was checked.
+export const challenges = pgTable("challenges", {
+  id: text("id").primaryKey(),
+  challengerId: text("challenger_id").notNull(), // Clerk user id
+  challengerRank: text("challenger_rank").notNull(),
+  targetHandle: text("target_handle").notNull(),
+  targetRank: text("target_rank").notNull(),
+  mode: text("mode").notNull(), // "pulse" | "portfolio"
+  market: text("market"), // pulse only: "btc" | "eth"
+  timerSeconds: integer("timer_seconds"), // pulse only
+  stake: integer("stake").notNull(), // Embers, proposed — not reserved
+  status: text("status").notNull().default("pending"), // "pending" | "canceled"
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  // One open challenge per challenger → target, so a double-submit can't send two.
+  onePending: uniqueIndex("challenges_one_pending")
+    .on(table.challengerId, table.targetHandle)
+    .where(sql`${table.status} = 'pending'`),
+}));

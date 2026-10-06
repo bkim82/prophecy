@@ -212,3 +212,66 @@ export function BackIcon({ className }: { className?: string }) {
     </svg>
   );
 }
+
+export function PinIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M8 14.5s4.5-4.1 4.5-7.7a4.5 4.5 0 0 0-9 0c0 3.6 4.5 7.7 4.5 7.7Z" />
+      <circle cx="8" cy="6.8" r="1.6" />
+    </svg>
+  );
+}
+
+export function LinkIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M6.6 9.4a2.8 2.8 0 0 0 4 0l2.2-2.2a2.8 2.8 0 0 0-4-4l-.7.7" />
+      <path d="M9.4 6.6a2.8 2.8 0 0 0-4 0L3.2 8.8a2.8 2.8 0 0 0 4 4l.7-.7" />
+    </svg>
+  );
+}
+
+export function CameraIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M2 5.5A1.5 1.5 0 0 1 3.5 4h1.6l1.1-1.5h3.6L10.9 4h1.6A1.5 1.5 0 0 1 14 5.5v6a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 11.5Z" />
+      <circle cx="8" cy="8.4" r="2.4" />
+    </svg>
+  );
+}
+
+// Trading archetypes (app/lib/profileTraits.ts ARCHETYPES).
+export function SwiftIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M9.2 1.5 3.5 9h4.3l-1 5.5L12.5 7H8.2Z" />
+    </svg>
+  );
+}
+
+export function PatientIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 1.5h8M4 14.5h8" />
+      <path d="M5 1.5c0 3.4 6 3.4 6 6.5s-6 3.1-6 6.5M11 1.5c0 3.4-6 3.4-6 6.5s6 3.1 6 6.5" />
+    </svg>
+  );
+}
+
+export function ContrarianIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M5 2v11M2.5 10.5 5 13l2.5-2.5" />
+      <path d="M11 14V3M8.5 5.5 11 3l2.5 2.5" />
+    </svg>
+  );
+}
+
+export function DaredevilIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="11" cy="5" r="2.5" />
+      <path d="M9.2 6.8 2 14M8.3 4.4 3.5 9.2M11.6 7.7 6.8 12.5" />
+    </svg>
+  );
+}

@@ -46,3 +46,25 @@ export const VIEWER_RANK = "Gold II";
 export function canViewPortfolio(profileRank: string, viewerRank: string = VIEWER_RANK): boolean {
   return rankScore(viewerRank) >= rankScore(profileRank);
 }
+
+// Challenge gate: you can challenge anyone at most one tier above your own.
+// Tiers only — divisions don't matter, so any Silver can challenge any Gold
+// but no Diamond, and an Oracle can challenge everyone. Checked again on the
+// server when a challenge is sent (app/profile/challengeActions.ts).
+const tierIndex = (rank: string) => {
+  const tier = rankTier(rank);
+  return tier ? RANK_TIERS.indexOf(tier) : -1;
+};
+
+export function canChallenge(targetRank: string, viewerRank: string = VIEWER_RANK): boolean {
+  const target = tierIndex(targetRank);
+  const viewer = tierIndex(viewerRank);
+  return target >= 0 && viewer >= 0 && target <= viewer + 1;
+}
+
+// The lowest tier that may challenge `targetRank` ("Oracle" -> "Diamond"),
+// for the locked button's explanation.
+export function challengeTierNeeded(targetRank: string): string {
+  const tier = RANK_TIERS[Math.max(0, tierIndex(targetRank) - 1)];
+  return tier.charAt(0).toUpperCase() + tier.slice(1);
+}
