@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useState, type MouseEvent, type ReactNode } from "react";
 import { AuthorLink } from "@/app/AuthorLink";
 import { avatarGradient } from "@/app/lib/avatar";
 import { callRoi, callTrack, formatCallPrice, signedPct, type CallTrack } from "@/app/lib/calls";
@@ -9,22 +10,13 @@ import { profileHref } from "@/app/lib/mockProfiles";
 import { useBookmarks } from "@/app/lib/postLists";
 import { rankTier } from "@/app/lib/rank";
 import { RankBadge } from "@/app/RankBadge";
-import { POST_REPLIES, type Clash, type Market, type MarketCall, type Post, type PostFlair, type PostImage as PostImageData, type Reply } from "@/app/lib/mockPosts";
-import { BookmarkIcon, ClashIcon, FlameIcon, TrendIcon } from "@/app/icons";
+import { POST_REPLIES, type Clash, type Market, type MarketCall, type Post, type PostFlair, type Reply, type Share } from "@/app/lib/mockPosts";
+import { TopicIcon } from "@/app/FeedTopics";
+import { BookmarkIcon, ClashIcon, CommentIcon, DefyIcon, FlameIcon, HeartIcon, TrendIcon, VouchIcon } from "@/app/icons";
+import { postTopics, topicById, type TopicId } from "@/app/lib/topics";
+import { PostMedia } from "@/app/PostMedia";
 import { PostMenu } from "@/app/PostMenu";
-
-function sparkPath(values: number[], width = 56, height = 18): string {
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = max - min || 1;
-  return values
-    .map((v, i) => {
-      const x = (i / (values.length - 1)) * width;
-      const y = height - ((v - min) / range) * height;
-      return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(" ");
-}
+import { DefyPanel, ReshareHead, type Defy, type DefySide } from "@/app/PostShare";
 
 // Short tag at the right of the meta row; the full sentence is its tooltip.
 const FLAIRS: Record<PostFlair, { tag: string; title: string }> = {
@@ -40,6 +32,7 @@ const compact = (n: number) => compactCount.format(n).toLowerCase();
 const MARKET_META: Record<Market, { label: string; symbol: string; symbolClass: string }> = {
   btc: { label: "BTC", symbol: "₿", symbolClass: "btc-symbol" },
   eth: { label: "ETH", symbol: "Ξ", symbolClass: "eth-symbol" },
+  sol: { label: "SOL", symbol: "◎", symbolClass: "sol-symbol" },
   doge: { label: "DOGE", symbol: "Ð", symbolClass: "doge-symbol" },
 };
 
@@ -178,32 +171,9 @@ export function MarketCallCard({ call }: { call: MarketCall }) {
   );
 }
 
-function PostImage({ image }: { image: PostImageData }) {
-  if (image.kind === "chart") {
-    const isUp = image.spark[image.spark.length - 1] >= image.spark[0];
-    return (
-      <div className="post-image post-image--chart">
-        <svg
-          className={isUp ? "is-up" : "is-down"}
-          viewBox="0 0 320 120"
-          preserveAspectRatio="none"
-          aria-hidden="true"
-        >
-          <path d={sparkPath(image.spark, 320, 120)} />
-        </svg>
-      </div>
-    );
-  }
-  return (
-    <div className="post-image post-image--meme" style={{ background: avatarGradient(image.seed) }}>
-      <span aria-hidden="true">{image.emoji}</span>
-    </div>
-  );
-}
-
 const REPLIES_SHOWN_INITIALLY = 2;
 
-function ReplyItem({ reply }: { reply: Reply }) {
+export function ReplyItem({ reply }: { reply: Reply }) {
   const [liked, setLiked] = useState(false);
   return (
     <div className="reply-item">
@@ -222,9 +192,10 @@ function ReplyItem({ reply }: { reply: Reply }) {
             type="button"
             className={`action-like${liked ? " is-active" : ""}`}
             aria-pressed={liked}
+            aria-label={`Like (${reply.likes + (liked ? 1 : 0)})`}
             onClick={() => setLiked((v) => !v)}
           >
-            <span aria-hidden="true">{liked ? "♥" : "♡"}</span> {reply.likes + (liked ? 1 : 0)}
+            <HeartIcon filled={liked} /> {compact(reply.likes + (liked ? 1 : 0))}
           </button>
           <button type="button" className="action-reply">Reply</button>
         </div>
@@ -341,10 +312,47 @@ function ClashCard({ post, clash }: { post: Post; clash: Clash }) {
   );
 }
 
-export function PostCard({ post }: { post: Post }) {
+// Composer posts (`local-…`) only exist in the feed's state, so they have no
+// page to open.
+export const postHref = (post: Post) => (post.id.startsWith("local-") ? undefined : `/post/${encodeURIComponent(post.id)}`);
+
+// Clicks on the row's background open the post page, like X/Reddit. Anything
+// interactive inside keeps its own click, and selecting text doesn't navigate.
+const INTERACTIVE = "a, button, input, textarea, label, form, [role='button'], [role='menu'], .defy-panel";
+
+// `context` is a line above the row (the For You cover's "Because you're
+// interested in …"); `footer` sits under the actions. `detail` is the post
+// page layout (app/post/[id]/PostThread.tsx): full text, topic pills, no
+// inline thread — `onReply` then focuses that page's reply box instead.
+// `onNotInterested` adds "Not interested in <topic>" to the ⋯ menu. `share`
+// is a followed account's vouch/defy: like an X quote post, the sharer gets
+// their own header row and the original post drops into a bordered card
+// under it (your own vouch/defy does the same, replacing theirs). None of it
+// applies to streak/promo/clash cards.
+export function PostCard({
+  post,
+  context,
+  footer,
+  detail = false,
+  onReply,
+  onNotInterested,
+  share,
+}: {
+  post: Post;
+  context?: ReactNode;
+  footer?: ReactNode;
+  detail?: boolean;
+  onReply?: () => void;
+  onNotInterested?: (id: TopicId) => void;
+  share?: Share;
+}) {
+  const router = useRouter();
   const [repliesOpen, setRepliesOpen] = useState(false);
   const [liked, setLiked] = useState(false);
-  const [reposted, setReposted] = useState(false);
+  // Your own vouch/defy on this post — local only, like likes.
+  const [vouched, setVouched] = useState(false);
+  const [defy, setDefy] = useState<Defy | null>(null);
+  const [defyOpen, setDefyOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const bookmarks = useBookmarks();
 
@@ -353,93 +361,198 @@ export function PostCard({ post }: { post: Post }) {
   if (post.kind === "clash" && post.clash) return <ClashCard post={post} clash={post.clash} />;
 
   const firstName = post.author.split(" ")[0];
-  const isLongPost = post.content.length > 220;
+  const isLongPost = !detail && post.content.length > 220;
   const flair = post.flair && FLAIRS[post.flair];
   const bookmarked = bookmarks.has(post.id);
   const href = profileHref(post.handle);
+  const url = detail ? undefined : postHref(post);
+  const topics = postTopics(post).map(topicById);
   // The name link is the accessible one; the avatar link is a mouse-only
   // duplicate, so it stays out of the tab order and the a11y tree.
   const avatarProps = { className: "post-avatar", "aria-hidden": true, style: { background: avatarGradient(post.handle) } };
-  const reposts = (post.reposts ?? 0) + (reposted ? 1 : 0);
   const likes = post.likes + (liked ? 1 : 0);
+  const vouches = (post.vouches ?? 0) + (vouched ? 1 : 0);
+  const defies = (post.defies ?? 0) + (defy ? 1 : 0);
+  // A defy on a call takes the other side; a call that already resolved has
+  // nothing left to bet on, and you can't bet against your own post.
+  const takes: DefySide | undefined = post.call && {
+    side: post.call.side === "LONG" ? "SHORT" : "LONG",
+    market: MARKET_META[post.call.market].label,
+  };
+  const defyClosedReason = post.call?.outcome ? "Already resolved, nothing left to bet on" : post.id.startsWith("local-") ? "You can't defy your own omen" : undefined;
+  const reshare = defy ? (
+    <ReshareHead kind="defy" name="You" timestamp="now" stake={defy.stake} note={defy.note || undefined} takes={takes} />
+  ) : vouched ? (
+    <ReshareHead kind="vouch" name="You" timestamp="now" />
+  ) : share ? (
+    <ReshareHead kind={share.kind} name={share.name} handle={share.handle} timestamp={share.timestamp} stake={share.stake} note={share.note} takes={takes} />
+  ) : null;
+  // The post page keeps its own layout; it just gets the header on top.
+  const embedded = reshare !== null && !detail;
+
+  function openPost(event: MouseEvent<HTMLElement>) {
+    if (!url || (event.target as HTMLElement).closest(INTERACTIVE) || window.getSelection()?.toString()) return;
+    if (event.metaKey || event.ctrlKey) window.open(url, "_blank");
+    else router.push(url);
+  }
+
+  const row = (
+    <>
+    {href ? (
+      <Link href={href} tabIndex={-1} {...avatarProps}>
+        {post.avatarInitial}
+      </Link>
+    ) : (
+      <div {...avatarProps}>{post.avatarInitial}</div>
+    )}
+    <div className="post-body">
+      <div className="post-meta">
+        <AuthorLink handle={post.handle} name={post.author} />
+        {post.rank && <RankBadge rank={post.rank} seed={post.handle} />}
+        <span className="muted">
+          {post.handle}
+          {!detail && (
+            <>
+              {" · "}
+              {url ? (
+                <Link href={url} className="post-time">
+                  {post.timestamp}
+                </Link>
+              ) : (
+                post.timestamp
+              )}
+            </>
+          )}
+        </span>
+        <span className="post-meta-trail">
+          {flair && (
+            <span className={`post-tag post-tag--${post.flair}`} title={flair.title}>
+              {flair.tag}
+            </span>
+          )}
+          <PostMenu firstName={firstName} topics={topics} onNotInterested={onNotInterested} />
+        </span>
+      </div>
+      <div className={`post-content${isLongPost && !expanded ? " is-collapsed" : ""}`}>
+        {post.content.split(/\n\n+/).map((paragraph, index) => (
+          <p key={`${post.id}-paragraph-${index}`}>{paragraph}</p>
+        ))}
+      </div>
+      {isLongPost && (
+        <button type="button" className="post-read-more" onClick={() => setExpanded((value) => !value)}>
+          {expanded ? "Show less" : "Read more"}
+        </button>
+      )}
+      {post.media && <PostMedia media={post.media} />}
+      {post.call && <MarketCallCard call={post.call} />}
+      {detail && (
+        <p className="post-detail-meta">
+          <span>{post.timestamp}</span>
+          {topics.map((topic) => (
+            <span key={topic.id} className="post-detail-topic">
+              <TopicIcon topic={topic} />
+              {topic.label}
+            </span>
+          ))}
+        </p>
+      )}
+      <div className="post-actions">
+        <button
+          type="button"
+          className={`action-like${liked ? " is-active" : ""}`}
+          aria-pressed={liked}
+          aria-label={`Like (${likes})`}
+          onClick={() => setLiked((v) => !v)}
+        >
+          <HeartIcon filled={liked} />
+          {compact(likes)}
+        </button>
+        <button
+          type="button"
+          className="action-reply"
+          aria-expanded={onReply ? undefined : repliesOpen}
+          aria-label={`Comment (${post.replies})`}
+          onClick={() => (onReply ? onReply() : setRepliesOpen((v) => !v))}
+        >
+          <CommentIcon />
+          {compact(post.replies)}
+        </button>
+        <button
+          type="button"
+          className={`action-vouch${vouched ? " is-active" : ""}`}
+          aria-pressed={vouched}
+          aria-label={`Vouch (${vouches}): repost to your followers with your name on it`}
+          title="Vouch: repost to your followers with your name on it"
+          onClick={() => setVouched((v) => !v)}
+        >
+          <VouchIcon />
+          <span className="action-label">Vouch</span>
+          {compact(vouches)}
+        </button>
+        <button
+          type="button"
+          className={`action-defy${defy ? " is-active" : ""}`}
+          aria-pressed={defy !== null}
+          aria-expanded={defyOpen}
+          aria-label={`Defy (${defies}): repost while betting against it`}
+          title={defyClosedReason ?? "Defy: repost while betting against it"}
+          disabled={defyClosedReason !== undefined}
+          onClick={() => setDefyOpen((open) => !open)}
+        >
+          <DefyIcon />
+          <span className="action-label">Defy</span>
+          {compact(defies)}
+        </button>
+        <button
+          type="button"
+          className={`action-bookmark${bookmarked ? " is-active" : ""}`}
+          aria-pressed={bookmarked}
+          aria-label={bookmarked ? "Remove bookmark" : "Bookmark post"}
+          onClick={() => bookmarks.toggle(post.id)}
+        >
+          <BookmarkIcon filled={bookmarked} />
+        </button>
+      </div>
+      {defyOpen && (
+        <DefyPanel
+          author={firstName}
+          takes={takes}
+          current={defy}
+          onDefy={(next) => {
+            setDefy(next);
+            setDefyOpen(false);
+          }}
+          onWithdraw={() => {
+            setDefy(null);
+            setDefyOpen(false);
+          }}
+          onClose={() => setDefyOpen(false)}
+        />
+      )}
+      {repliesOpen && <ReplyThread postId={post.id} />}
+      {!embedded && footer}
+    </div>
+    </>
+  );
 
   return (
-    <article className="post-card" id={`post-${post.id}`} data-rank={rankTier(post.rank)} data-post-id={post.id}>
-      {href ? (
-        <Link href={href} tabIndex={-1} {...avatarProps}>
-          {post.avatarInitial}
-        </Link>
+    <article
+      className={`post-card${context || reshare ? " post-card--context" : ""}${embedded ? " post-card--reshared" : ""}${detail ? " post-card--detail" : ""}${url ? " is-linkable" : ""}`}
+      id={`post-${post.id}`}
+      data-rank={rankTier(post.rank)}
+      data-post-id={post.id}
+      onClick={openPost}
+    >
+      {context && <div className="post-context">{context}</div>}
+      {reshare}
+      {embedded ? (
+        <>
+          <div className="post-reshare-embed">{row}</div>
+          {footer && <div className="post-reshare-footer">{footer}</div>}
+        </>
       ) : (
-        <div {...avatarProps}>{post.avatarInitial}</div>
+        row
       )}
-      <div className="post-body">
-        <div className="post-meta">
-          <AuthorLink handle={post.handle} name={post.author} />
-          {post.rank && <RankBadge rank={post.rank} seed={post.handle} />}
-          <span className="muted">
-            {post.handle} · {post.timestamp}
-          </span>
-          <span className="post-meta-trail">
-            {flair && (
-              <span className={`post-tag post-tag--${post.flair}`} title={flair.title}>
-                {flair.tag}
-              </span>
-            )}
-            <PostMenu firstName={firstName} />
-          </span>
-        </div>
-        <div className={`post-content${isLongPost && !expanded ? " is-collapsed" : ""}`}>
-          {post.content.split(/\n\n+/).map((paragraph, index) => (
-            <p key={`${post.id}-paragraph-${index}`}>{paragraph}</p>
-          ))}
-        </div>
-        {isLongPost && (
-          <button type="button" className="post-read-more" onClick={() => setExpanded((value) => !value)}>
-            {expanded ? "Show less" : "Read more"}
-          </button>
-        )}
-        {post.image && <PostImage image={post.image} />}
-        {post.call && <MarketCallCard call={post.call} />}
-        <div className="post-actions">
-          <button
-            type="button"
-            className="action-reply"
-            aria-expanded={repliesOpen}
-            aria-label={`Replies (${post.replies})`}
-            onClick={() => setRepliesOpen((v) => !v)}
-          >
-            <span aria-hidden="true">↩</span> {compact(post.replies)}
-          </button>
-          <button
-            type="button"
-            className={`action-repost${reposted ? " is-active" : ""}`}
-            aria-pressed={reposted}
-            aria-label={`Repost (${reposts})`}
-            onClick={() => setReposted((v) => !v)}
-          >
-            <span aria-hidden="true">⟲</span> {compact(reposts)}
-          </button>
-          <button
-            type="button"
-            className={`action-like${liked ? " is-active" : ""}`}
-            aria-pressed={liked}
-            aria-label={`Like (${likes})`}
-            onClick={() => setLiked((v) => !v)}
-          >
-            <span aria-hidden="true">{liked ? "♥" : "♡"}</span> {compact(likes)}
-          </button>
-          <button
-            type="button"
-            className={`action-bookmark${bookmarked ? " is-active" : ""}`}
-            aria-pressed={bookmarked}
-            aria-label={bookmarked ? "Remove bookmark" : "Bookmark post"}
-            onClick={() => bookmarks.toggle(post.id)}
-          >
-            <BookmarkIcon filled={bookmarked} />
-          </button>
-        </div>
-        {repliesOpen && <ReplyThread postId={post.id} />}
-      </div>
     </article>
   );
 }

@@ -7,6 +7,7 @@ import { PROFITABLE_CALLS, type CallWindow, type ProfitableCall } from "@/app/li
 const MARKET_META: Record<Market, { label: string; symbol: string; symbolClass: string }> = {
   btc: { label: "BTC", symbol: "₿", symbolClass: "btc-symbol" },
   eth: { label: "ETH", symbol: "Ξ", symbolClass: "eth-symbol" },
+  sol: { label: "SOL", symbol: "◎", symbolClass: "sol-symbol" },
   doge: { label: "DOGE", symbol: "Ð", symbolClass: "doge-symbol" },
 };
 
