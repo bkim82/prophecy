@@ -1,25 +1,29 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useMemo, useSyncExternalStore } from "react";
+import { DEFAULT_INTERESTS, isTopicId, type TopicId } from "@/app/lib/topics";
 
-// Per-browser Bookmarked / Recently viewed lists for the Omens feed rail
-// (app/FeedSwitcher.tsx). Viewer conveniences over mock posts, so they live in
+// Per-browser Bookmarked / Recently viewed / Interests / Not interested lists for the Omens
+// feed (app/FeedSwitcher.tsx). Viewer conveniences over mock posts, so they live in
 // localStorage like the Portfolio watchlist (app/duel/portfolio/watchlist.ts);
-// empty/blocked storage just means empty lists. Stored as post ids only.
+// empty/blocked storage just means empty (or default) lists. Stored as ids only.
 
 const EMPTY: string[] = [];
 const RECENT_LIMIT = 5;
 
-function createIdStore(key: string) {
+// `fallback` is the list before this browser has ever saved one.
+function createIdStore(key: string, fallback: string[] = EMPTY) {
   const listeners = new Set<() => void>();
   let ids: string[] | null = null;
 
   function read(): string[] {
     try {
-      const parsed = JSON.parse(localStorage.getItem(key) ?? "[]");
-      return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string") : EMPTY;
+      const stored = localStorage.getItem(key);
+      if (stored === null) return fallback;
+      const parsed = JSON.parse(stored);
+      return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string") : fallback;
     } catch {
-      return EMPTY;
+      return fallback;
     }
   }
 
@@ -58,6 +62,8 @@ function createIdStore(key: string) {
 
 const bookmarks = createIdStore("omens-bookmarks-v1");
 const recent = createIdStore("omens-recent-v1");
+const interests = createIdStore("omens-interests-v2", DEFAULT_INTERESTS);
+const mutedTopics = createIdStore("omens-muted-topics-v1");
 
 export function useBookmarks() {
   const ids = useSyncExternalStore(bookmarks.subscribe, bookmarks.snapshot, () => EMPTY);
@@ -78,4 +84,46 @@ export function markViewed(id: string) {
   const current = recent.snapshot();
   if (current[0] === id) return;
   recent.write([id, ...current.filter((other) => other !== id)].slice(0, RECENT_LIMIT));
+}
+
+// Followed topics, in the order they were added — that order is the order of
+// the For You covers. Unknown ids (a topic since removed) are dropped.
+export function useInterests() {
+  const stored = useSyncExternalStore(interests.subscribe, interests.snapshot, () => DEFAULT_INTERESTS);
+  const ids = useMemo(() => stored.filter(isTopicId), [stored]);
+  const toggle = (id: TopicId) => {
+    const current = interests.snapshot();
+    if (current.includes(id)) {
+      interests.write(current.filter((other) => other !== id));
+      return;
+    }
+    interests.write([...current, id]);
+    // Following a topic takes back an earlier "Not interested".
+    mutedTopics.write(mutedTopics.snapshot().filter((other) => other !== id));
+  };
+  return { ids, has: (id: TopicId) => ids.includes(id), toggle };
+}
+
+// "Not interested" topics: kept out of the For You suggestions (covers, the
+// feed under them, Mix it up). Muting also unfollows; `mute` returns where the
+// topic sat in your interests (-1 if it wasn't followed) so an Undo can put it
+// back in the same spot.
+export function useMutedTopics() {
+  const stored = useSyncExternalStore(mutedTopics.subscribe, mutedTopics.snapshot, () => EMPTY);
+  const ids = useMemo(() => stored.filter(isTopicId), [stored]);
+  const mute = (id: TopicId) => {
+    const followed = interests.snapshot();
+    const followAt = followed.indexOf(id);
+    if (followAt >= 0) interests.write(followed.filter((other) => other !== id));
+    const current = mutedTopics.snapshot();
+    if (!current.includes(id)) mutedTopics.write([...current, id]);
+    return followAt;
+  };
+  const unmute = (id: TopicId, followAt = -1) => {
+    mutedTopics.write(mutedTopics.snapshot().filter((other) => other !== id));
+    if (followAt < 0) return;
+    const followed = interests.snapshot().filter((other) => other !== id);
+    interests.write([...followed.slice(0, followAt), id, ...followed.slice(followAt)]);
+  };
+  return { ids, has: (id: TopicId) => ids.includes(id), mute, unmute };
 }

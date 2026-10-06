@@ -157,3 +157,58 @@ export function ClashIcon({ className }: { className?: string }) {
     </svg>
   );
 }
+
+// Post action row (app/PostCard.tsx): like → comment → vouch → defy, then bookmark.
+export function HeartIcon({ className, filled = false }: { className?: string; filled?: boolean }) {
+  return (
+    <svg viewBox="0 0 20 20" className={className} fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M10 16.6 3.9 10.6a3.8 3.8 0 0 1 5.4-5.4l.7.7.7-.7a3.8 3.8 0 0 1 5.4 5.4L10 16.6Z" />
+    </svg>
+  );
+}
+
+export function CommentIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" className={className} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4.2 4h11.6c.9 0 1.7.8 1.7 1.7v7.1c0 .9-.8 1.7-1.7 1.7H9.4L5.8 17.4v-2.9H4.2c-.9 0-1.7-.8-1.7-1.7V5.7C2.5 4.8 3.3 4 4.2 4Z" />
+    </svg>
+  );
+}
+
+// Vouch: a seal with a check — "I stand behind this omen".
+export function VouchIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" className={className} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M10 2.5 16 5v4.4c0 3.7-2.6 6.6-6 8.1-3.4-1.5-6-4.4-6-8.1V5l6-2.5Z" />
+      <path d="m7.2 9.9 2 2 3.6-3.9" />
+    </svg>
+  );
+}
+
+// Defy: crossed swords — reposting while betting against it.
+export function DefyIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" className={className} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3.5 3.5h2.8l7.4 7.4M3.5 3.5v2.8l7.4 7.4M11.2 15.6l4.4-4.4M13.2 13.6l3 3" />
+      <path d="M16.5 3.5h-2.8l-3 3M16.5 3.5v2.8l-3 3M8.8 15.6l-4.4-4.4M6.8 13.6l-3 3" />
+    </svg>
+  );
+}
+
+// Circle-slash for "Not interested in …".
+export function NotInterestedIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" className={className} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+      <circle cx="10" cy="10" r="6.5" />
+      <path d="m5.4 5.4 9.2 9.2" />
+    </svg>
+  );
+}
+
+export function BackIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" className={className} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M16 10H4M9 5l-5 5 5 5" />
+    </svg>
+  );
+}
