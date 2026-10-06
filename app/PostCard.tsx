@@ -513,7 +513,6 @@ export function PostCard({
       className={`post-card${context || reshare ? " post-card--context" : ""}${embedded ? " post-card--reshared" : ""}${detail ? " post-card--detail" : ""}${url ? " is-linkable" : ""}`}
       id={`post-${post.id}`}
       data-rank={rankTier(post.rank)}
-      data-post-id={post.id}
       onClick={openPost}
     >
       {context && <div className="post-context">{context}</div>}

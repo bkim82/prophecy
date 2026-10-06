@@ -3,13 +3,12 @@
 import { useMemo, useSyncExternalStore } from "react";
 import { DEFAULT_INTERESTS, isTopicId, type TopicId } from "@/app/lib/topics";
 
-// Per-browser Bookmarked / Recently viewed / Interests / Not interested lists for the Omens
+// Per-browser Bookmarked / Interests / Not interested lists for the Omens
 // feed (app/FeedSwitcher.tsx). Viewer conveniences over mock posts, so they live in
 // localStorage like the Portfolio watchlist (app/duel/portfolio/watchlist.ts);
 // empty/blocked storage just means empty (or default) lists. Stored as ids only.
 
 const EMPTY: string[] = [];
-const RECENT_LIMIT = 5;
 
 // `fallback` is the list before this browser has ever saved one.
 function createIdStore(key: string, fallback: string[] = EMPTY) {
@@ -61,7 +60,6 @@ function createIdStore(key: string, fallback: string[] = EMPTY) {
 }
 
 const bookmarks = createIdStore("omens-bookmarks-v1");
-const recent = createIdStore("omens-recent-v1");
 const interests = createIdStore("omens-interests-v2", DEFAULT_INTERESTS);
 const mutedTopics = createIdStore("omens-muted-topics-v1");
 
@@ -72,18 +70,6 @@ export function useBookmarks() {
     bookmarks.write(current.includes(id) ? current.filter((other) => other !== id) : [id, ...current]);
   };
   return { ids, has: (id: string) => ids.includes(id), toggle };
-}
-
-export function useRecentlyViewed() {
-  const ids = useSyncExternalStore(recent.subscribe, recent.snapshot, () => EMPTY);
-  return { ids, clear: () => recent.write([]) };
-}
-
-// Most recent first; re-viewing a post moves it back to the top.
-export function markViewed(id: string) {
-  const current = recent.snapshot();
-  if (current[0] === id) return;
-  recent.write([id, ...current.filter((other) => other !== id)].slice(0, RECENT_LIMIT));
 }
 
 // Followed topics, in the order they were added — that order is the order of

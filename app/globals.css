@@ -230,14 +230,15 @@ button { cursor: pointer; }
 .feed-tabs button.active { border-color: color-mix(in srgb, var(--brand) 45%, transparent); background: var(--selected-bg); color: var(--brand-strong); font-weight: 700; }
 .feed-tabs button:hover:not(.active) { color: var(--text); }
 /* Reddit-style left rail on `/`: feeds as a vertical icon list. Above 960px only — below that .feed-nav falls back to the .feed-tabs pill/segmented styles. */
-.feed-nav-label, .feed-recent { display: none; }
+.feed-nav-label, .feed-notifs { display: none; }
 .feed-nav { min-width: 0; }
 .feed-nav .feed-tabs button { display: inline-flex; align-items: center; gap: 6px; }
 .feed-nav-live { display: inline-flex; align-items: center; gap: 5px; color: var(--chart-up); font-family: var(--font-mono), ui-monospace, monospace; font-size: 11px; font-weight: 600; }
 .feed-nav-live::before { content: ""; width: 6px; height: 6px; border-radius: 999px; background: currentColor; box-shadow: 0 0 6px currentColor; }
 @media (min-width: 961px) {
   .feed-shell--nav { grid-template-columns: 200px minmax(0, 1fr) 340px; }
-  .feed-nav { position: sticky; top: 24px; align-self: start; padding: 4px 16px 4px 0; border-right: 1px solid var(--line); }
+  /* Capped to the viewport so Notifications stay reachable on short screens while the rail is stuck. */
+  .feed-nav { position: sticky; top: 24px; align-self: start; max-height: calc(100vh - 48px); overflow-y: auto; scrollbar-width: thin; padding: 4px 16px 4px 0; border-right: 1px solid var(--line); }
   .feed-nav-label { display: block; margin: 6px 12px 8px; color: var(--muted-dim); font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
   .feed-nav-label::before { content: "◆ "; color: var(--violet-strong); }
   .feed-nav .feed-tabs { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; }
@@ -245,19 +246,33 @@ button { cursor: pointer; }
   .feed-nav-live { margin-left: auto; }
   .feed-nav .feed-tabs button:hover:not(.active) { background: var(--surface-hover); color: var(--text); }
   .feed-nav .feed-tabs button.active { border: 0; background: var(--surface-raised); color: var(--text); font-weight: 700; }
-  /* Recently viewed: section break under the feed tabs, rail-only. */
-  .feed-recent { display: block; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
-  .feed-recent-clear { border: 0; border-radius: 6px; background: transparent; color: var(--muted); padding: 4px 6px; margin: 4px 0 0 6px; font-size: 11px; font-weight: 600; }
-  .feed-recent-clear:hover { background: var(--surface-hover); color: var(--brand-strong); }
-  .feed-recent-empty { margin: 0 12px; color: var(--muted); font-size: 12px; line-height: 1.4; }
-  .feed-recent-list { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
-  .feed-recent-list button { display: flex; align-items: center; gap: 10px; width: 100%; border: 0; border-radius: 8px; background: transparent; padding: 7px 12px; color: var(--text); text-align: left; }
-  .feed-recent-list button:hover { background: var(--surface-hover); }
-  .feed-recent-avatar { flex: none; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 999px; color: #fff; font-size: 10px; font-weight: 700; text-shadow: 0 1px 2px rgba(0, 0, 0, .35); }
-  .feed-recent-text { min-width: 0; display: grid; gap: 1px; }
-  .feed-recent-text strong, .feed-recent-text span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .feed-recent-text strong { font-size: 12px; font-weight: 600; }
-  .feed-recent-text span { color: var(--muted); font-size: 11.5px; }
+  /* Notifications: section break under the feed tabs, rail-only. Challenge requests on top as tinted cards (avatar + text, then a full-width Accept/Decline row so it fits the 180px rail). */
+  .feed-notifs { display: block; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+  .feed-notif-list { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+  .feed-notif { display: flex; align-items: flex-start; gap: 10px; width: 100%; border-radius: 8px; padding: 7px 12px; color: var(--text); text-align: left; text-decoration: none; }
+  a.feed-notif:hover { background: var(--surface-hover); }
+  .feed-notif--challenge { display: grid; grid-template-columns: 24px minmax(0, 1fr); column-gap: 10px; margin-bottom: 4px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--violet) 35%, var(--line)); background: color-mix(in srgb, var(--violet) 8%, transparent); }
+  .feed-notif-avatar { position: relative; flex: none; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 999px; color: #fff; font-size: 10px; font-weight: 700; text-decoration: none; text-shadow: 0 1px 2px rgba(0, 0, 0, .35); }
+  .feed-notif-kind { position: absolute; right: -5px; bottom: -5px; display: grid; place-items: center; width: 15px; height: 15px; border-radius: 999px; background: var(--surface); color: #e0743a; text-shadow: none; }
+  .feed-notif-kind svg { width: 9px; height: 9px; }
+  .feed-notif-body { min-width: 0; display: grid; gap: 1px; }
+  .feed-notif-line, .feed-notif-detail { margin: 0; }
+  .feed-notif-line { color: var(--muted); font-size: 12px; line-height: 1.35; }
+  .feed-notif-line strong { color: var(--text); font-weight: 600; }
+  .feed-notif-line a { color: inherit; text-decoration: none; }
+  .feed-notif-line a:hover { text-decoration: underline; }
+  .feed-notif-detail { overflow: hidden; color: var(--muted); font-size: 11.5px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+  .feed-notif--challenge .feed-notif-detail { white-space: normal; }
+  .feed-notif-meta:not([hidden]) { display: flex; flex-wrap: wrap; column-gap: 8px; }
+  .feed-notif-more { padding: 0; border: 0; background: none; color: var(--violet-strong); font: inherit; font-weight: 600; cursor: pointer; }
+  .feed-notif-more:hover { text-decoration: underline; }
+  .feed-notif-actions { grid-column: 1 / -1; display: flex; gap: 6px; margin-top: 8px; }
+  .feed-notif-actions button { flex: 1; min-height: 28px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 999px; background: transparent; color: var(--muted); font-size: 11.5px; font-weight: 700; transition: color .15s ease, border-color .15s ease, filter .15s ease; }
+  .feed-notif-actions button:hover { border-color: color-mix(in srgb, var(--negative) 45%, var(--line-strong)); color: var(--text); }
+  .feed-notif-actions .feed-notif-accept { border-color: transparent; background: var(--violet-strong); color: var(--bg); }
+  .feed-notif-actions .feed-notif-accept:hover { border-color: transparent; color: var(--bg); filter: brightness(1.08); }
+  .feed-notif-status { grid-column: 1 / -1; margin: 8px 0 0; color: var(--muted); font-size: 11.5px; font-weight: 700; }
+  .feed-notif-status[data-answer="accepted"] { color: var(--chart-up); }
 }
 @media (min-width: 961px) and (max-width: 1180px) {
   .feed-shell--nav { grid-template-columns: 180px minmax(0, 1fr) 280px; gap: 20px; }
@@ -284,9 +299,6 @@ button { cursor: pointer; }
 .post-card:is([data-rank="gold"], [data-rank="diamond"]) .post-avatar { box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px color-mix(in srgb, var(--room) 75%, transparent); }
 .post-card[data-rank="oracle"] .post-avatar { box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px var(--room), 0 0 16px var(--room-glow); }
 .rank-badge[data-rank] { border-color: color-mix(in srgb, var(--room) 48%, var(--line)); background: color-mix(in srgb, var(--room) 12%, transparent); color: var(--room-strong); }
-/* Set by FeedSwitcher's jumpToPost when a Recently viewed row scrolls back to a post. */
-.post-card.is-flash { animation: post-flash 1.6s ease-out; }
-@keyframes post-flash { 0%, 35% { outline: 2px solid var(--brand); outline-offset: -2px; } 100% { outline: 2px solid transparent; outline-offset: -2px; } }
 /* Shiny high-tier badges. Gold: metallic fill + a sheen sweep every few
    seconds. Diamond: brighter, faster sweep and a twinkling ◆. Oracle: drifting
    holographic fill, pulsing glow, fastest sweep and a spinning ✦. The sheen is

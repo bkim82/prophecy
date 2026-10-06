@@ -1,14 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { flushSync } from "react-dom";
+import { useMemo, useRef, useState } from "react";
 import { CallStrip } from "@/app/CallStrip";
 import { FeedComposer } from "@/app/FeedComposer";
+import { FeedNotifications } from "@/app/FeedNotifications";
 import { CoverEyebrow, InterestPicker, MixBanner, MutedNotice, SeeMore, TopicChips, TopicHeader, type TopicView } from "@/app/FeedTopics";
-import { avatarGradient } from "@/app/lib/avatar";
 import { PostCard } from "@/app/PostCard";
 import { FOLLOWED_HANDLES, LIVE_CALL_COUNT, SHARES, type Post, type Share } from "@/app/lib/mockPosts";
-import { markViewed, useBookmarks, useInterests, useMutedTopics, useRecentlyViewed } from "@/app/lib/postLists";
+import { useBookmarks, useInterests, useMutedTopics } from "@/app/lib/postLists";
 import { ageMinutes, blendTopics, personalize, pickCovers, postTopics, topicById, type Cover, type Topic, type TopicId } from "@/app/lib/topics";
 
 type FilterId = "forYou" | "following" | "live" | "clashes" | "bookmarked";
@@ -20,10 +19,6 @@ const FILTERS: { id: FilterId; label: string }[] = [
   { id: "clashes", label: "Clashes" },
   { id: "bookmarked", label: "Bookmarked" },
 ];
-
-// A post counts as viewed once it has sat at least half on screen (or filled
-// half the viewport, for cards taller than that) for this long.
-const VIEW_DWELL_MS = 1000;
 
 // The latest vouch/defy per post by someone you follow. It's the line shown
 // above that post wherever it appears, and it pulls the post into Following.
@@ -61,8 +56,6 @@ export function FeedSwitcher({ posts }: { posts: Post[] }) {
   const interests = useInterests();
   const muted = useMutedTopics();
   const [notices, setNotices] = useState<Notice[]>([]);
-  const recent = useRecentlyViewed();
-  const listRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
   // The For You home (rail For You + chip For You) is the personalized one:
@@ -125,56 +118,6 @@ export function FeedSwitcher({ posts }: { posts: Post[] }) {
     setNotices((current) => current.filter((notice) => notice.topic !== topic));
   }
 
-  const recentPosts = recent.ids.flatMap((id) => [...localPosts, ...posts].find((post) => post.id === id) ?? []);
-
-  useEffect(() => {
-    const list = listRef.current;
-    if (!list) return;
-    const timers = new Map<Element, number>();
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          const seen =
-            entry.isIntersecting &&
-            (entry.intersectionRatio >= 0.5 || entry.intersectionRect.height >= window.innerHeight / 2);
-          const pending = timers.get(entry.target);
-          if (seen && pending === undefined) {
-            const id = (entry.target as HTMLElement).dataset.postId!;
-            timers.set(entry.target, window.setTimeout(() => markViewed(id), VIEW_DWELL_MS));
-          } else if (!seen && pending !== undefined) {
-            window.clearTimeout(pending);
-            timers.delete(entry.target);
-          }
-        }
-      },
-      { threshold: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1] },
-    );
-    list.querySelectorAll("[data-post-id]").forEach((card) => observer.observe(card));
-    return () => {
-      observer.disconnect();
-      timers.forEach((timer) => window.clearTimeout(timer));
-    };
-  }, [visible]);
-
-  // Recently viewed rows jump back to the post in the feed, widening the
-  // filters first if the current view hides it.
-  function jumpToPost(id: string) {
-    if (!visible.some((post) => post.id === id)) {
-      flushSync(() => {
-        setFilter("forYou");
-        setView("forYou");
-        setMixed(false);
-      });
-    }
-    const card = listRef.current?.querySelector<HTMLElement>(`[data-post-id="${id}"]`);
-    if (!card) return;
-    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    card.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" });
-    card.classList.remove("is-flash");
-    void card.offsetWidth; // restart the flash on a repeat click
-    card.classList.add("is-flash");
-  }
-
   // "See more on …": open the topic and bring the top of the feed back into
   // view, since the cover that was clicked may be far down.
   function openTopic(next: TopicView) {
@@ -211,33 +154,7 @@ export function FeedSwitcher({ posts }: { posts: Post[] }) {
             </button>
           ))}
         </div>
-        <section className="feed-recent" aria-labelledby="feed-recent-label">
-          <p className="feed-nav-label" id="feed-recent-label">Recently viewed</p>
-          {recentPosts.length === 0 ? (
-            <p className="feed-recent-empty">Posts you read will show up here.</p>
-          ) : (
-            <ul className="feed-recent-list">
-              {recentPosts.map((post) => (
-                <li key={post.id}>
-                  <button type="button" onClick={() => jumpToPost(post.id)}>
-                    <span className="feed-recent-avatar" aria-hidden="true" style={{ background: avatarGradient(post.handle) }}>
-                      {post.avatarInitial}
-                    </span>
-                    <span className="feed-recent-text">
-                      <strong>{post.author}</strong>
-                      <span>{post.content}</span>
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-          {recentPosts.length > 0 && (
-            <button type="button" className="feed-recent-clear" onClick={recent.clear}>
-              Clear
-            </button>
-          )}
-        </section>
+        <FeedNotifications />
       </nav>
       <div className="feed-main">
         <div className="feed-panel" ref={panelRef}>
@@ -272,7 +189,7 @@ export function FeedSwitcher({ posts }: { posts: Post[] }) {
             />
           )}
           <CallStrip posts={visible} />
-          <div className="feed-list" ref={listRef}>
+          <div className="feed-list">
             {home && !mixed && interests.ids.length === 0 && (
               <p className="feed-covers-empty">
                 Follow a few coins, companies or people and For You will open with a top post from each.

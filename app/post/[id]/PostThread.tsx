@@ -2,10 +2,9 @@
 
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { useRef, useState, type RefObject } from "react";
 import { BackIcon } from "@/app/icons";
 import type { Post, Reply } from "@/app/lib/mockPosts";
-import { markViewed } from "@/app/lib/postLists";
 import { PostCard, ReplyItem } from "@/app/PostCard";
 
 // Local-only, like the feed composer: a reply is prepended to this page's
@@ -60,11 +59,6 @@ export function PostThread({ post, replies }: { post: Post; replies: Reply[] }) 
   const inputRef = useRef<HTMLInputElement>(null);
   const [mine, setMine] = useState<Reply[]>([]);
   const all = [...mine, ...replies];
-
-  // Opening a post counts as reading it (feed rail's Recently viewed).
-  useEffect(() => {
-    markViewed(post.id);
-  }, [post.id]);
 
   // Back to wherever the post was opened from; a fresh tab has nowhere to go
   // back to, so it lands on the feed.
