@@ -5,8 +5,8 @@ import { rankTier } from "@/app/lib/rank";
 import { RankBadge } from "@/app/RankBadge";
 
 // Right rail on /profile/[handle] and /profile, in place of the feed's
-// FeedSidebar: the profile's records (peak Elo, biggest-ROI trade, …). The
-// trophy case it used to carry became the highlight reel (HighlightReel.tsx).
+// FeedSidebar: the profile's records (peak Elo, biggest-ROI trade, …), then
+// whatever the page stacks under it (the highlight reel, HighlightReel.tsx).
 
 const MARKET_META: Record<Market, { label: string; symbol: string; symbolClass: string }> = {
   btc: { label: "BTC", symbol: "₿", symbolClass: "btc-symbol" },
@@ -17,14 +17,16 @@ const MARKET_META: Record<Market, { label: string; symbol: string; symbolClass: 
 
 const count = new Intl.NumberFormat("en-US");
 
-export function ProfileAchievements({ records, seed }: { records: ProfileRecords | null; seed: string }) {
+// `children` = panels stacked under Achievements (the highlight reel).
+export function ProfileAchievements({ records, seed, children }: { records: ProfileRecords | null; seed: string; children?: React.ReactNode }) {
   if (!records) {
     return (
-      <aside className="feed-sidebar">
+      <aside className="feed-sidebar profile-rail">
         <section className="panel sidebar-panel">
           <h3>Achievements</h3>
           <p className="muted profile-records-empty">No records yet.</p>
         </section>
+        {children}
       </aside>
     );
   }
@@ -33,7 +35,7 @@ export function ProfileAchievements({ records, seed }: { records: ProfileRecords
   const market = MARKET_META[bestTrade.market];
 
   return (
-    <aside className="feed-sidebar">
+    <aside className="feed-sidebar profile-rail">
       <section className="panel sidebar-panel profile-records">
         <h3>Achievements</h3>
         <div className="profile-record-heroes">
@@ -75,6 +77,7 @@ export function ProfileAchievements({ records, seed }: { records: ProfileRecords
           </div>
         </dl>
       </section>
+      {children}
     </aside>
   );
 }

@@ -6,6 +6,7 @@ import type { ProfileBanner } from "@/app/lib/profileEdit";
 import { archetypeFor, isPinnableMatch, type Highlight } from "@/app/lib/profileTraits";
 import { VIEWER_COPY_EARNINGS, VIEWER_FOLLOWERS, VIEWER_RECORDS, VIEWER_STYLE } from "@/app/lib/mockViewer";
 import { VIEWER_RANK } from "@/app/lib/rank";
+import { HighlightReel } from "@/app/profile/[handle]/HighlightReel";
 import { ProfileAchievements } from "@/app/profile/[handle]/ProfileAchievements";
 import { ProfileView, type ProfileMatch, type SentChallenge } from "@/app/profile/[handle]/ProfileView";
 import { pendingChallengesFrom } from "@/lib/challenges";
@@ -157,7 +158,6 @@ export default async function OwnProfilePage() {
           archetype: archetypeFor(VIEWER_STYLE),
           accuracySource: "Share of your Arena rounds per market that finished in profit",
         }}
-        highlights={highlights}
         self={{
           pinnedMatchIds: pinnedEntries.map((entry) => entry.id),
           challenges,
@@ -178,7 +178,9 @@ export default async function OwnProfilePage() {
           },
         }}
       />
-      <ProfileAchievements records={{ ...VIEWER_RECORDS, duelsWon: record.won }} seed={seed} />
+      <ProfileAchievements records={{ ...VIEWER_RECORDS, duelsWon: record.won }} seed={seed}>
+        <HighlightReel highlights={highlights} editable />
+      </ProfileAchievements>
     </main>
   );
 }

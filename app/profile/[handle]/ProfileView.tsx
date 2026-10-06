@@ -20,14 +20,12 @@ import {
   signatureAsset,
   type ArchetypeId,
   type AssetAccuracy,
-  type Highlight,
 } from "@/app/lib/profileTraits";
 import { togglePinnedMatch } from "@/app/profile/actions";
 import { EditProfileDialog, type EditableProfile } from "@/app/profile/EditProfileDialog";
 import type { MatchHistoryEntry, MatchRecord } from "@/lib/match";
 import { rankTier } from "@/app/lib/rank";
 import { ChallengeControl, type ChallengeState } from "@/app/profile/[handle]/ChallengeDialog";
-import { HighlightReel } from "@/app/profile/[handle]/HighlightReel";
 import { cancelChallenge } from "@/app/profile/challengeActions";
 import { MarketCallCard, PostCard } from "@/app/PostCard";
 import { RankBadge } from "@/app/RankBadge";
@@ -90,17 +88,15 @@ type ProfileViewProps = {
   viewerRank: string;
   initiallyFollowing: boolean;
   traits: ProfileTraits;
-  // Highlight reel, best first (≤ MAX_PINS).
-  highlights: Highlight[];
   // Someone else's profile only: which Challenge button to show.
   challenge?: ChallengeState;
   // Set on /profile (the signed-in viewer's own page): Edit profile in place
-  // of Follow, copy earnings under the hero, a Matches tab with Pin buttons,
-  // and Unpin on the highlight reel.
+  // of Follow, copy earnings under the hero, and a Matches tab with Pin
+  // buttons (the highlight reel itself lives in the rail, HighlightReel.tsx).
   self?: OwnProfile;
 };
 
-export function ProfileView({ profile, activity, portfolio, portfolioLocked, viewerRank, initiallyFollowing, traits, highlights, challenge, self }: ProfileViewProps) {
+export function ProfileView({ profile, activity, portfolio, portfolioLocked, viewerRank, initiallyFollowing, traits, challenge, self }: ProfileViewProps) {
   const [tab, setTab] = useState<TabId>(self ? "matches" : "omens");
   const [editing, setEditing] = useState(false);
   // Own profiles may have no handle yet; the page supplies a stable seed instead.
@@ -113,7 +109,7 @@ export function ProfileView({ profile, activity, portfolio, portfolioLocked, vie
   const [, startPin] = useTransition();
   const Archetype = traits.archetype ? ARCHETYPE_ICONS[traits.archetype] : null;
 
-  // Pin from the Matches tab, unpin from the reel; the action refreshes the page with the new pins.
+  // Pin/unpin from the Matches tab; the action refreshes the page, so the rail's reel updates too.
   const togglePin = (id: string) => {
     setPinPendingId(id);
     setPinError(null);
@@ -205,12 +201,6 @@ export function ProfileView({ profile, activity, portfolio, portfolioLocked, vie
         )}
       </section>
 
-      <HighlightReel highlights={highlights} onUnpin={self ? togglePin : undefined} pendingId={pinPendingId} />
-      {pinError && (
-        <p className="profile-pin-error" role="alert">
-          {pinError}
-        </p>
-      )}
       {self && <CopyEarningsCard earnings={self.copyEarnings} />}
       {self && editing && <EditProfileDialog initial={self.edit} onClose={() => setEditing(false)} />}
 
@@ -235,6 +225,11 @@ export function ProfileView({ profile, activity, portfolio, portfolioLocked, vie
       <div id="profile-panel" role="tabpanel" aria-labelledby={`profile-tab-${tab}`}>
         {tab === "matches" && self && (
           <>
+            {pinError && (
+              <p className="profile-pin-error" role="alert">
+                {pinError}
+              </p>
+            )}
             <SentChallenges challenges={self.challenges} />
             <MatchesTab matches={self.matches} record={self.record} pinnedIds={self.pinnedMatchIds} pendingId={pinPendingId} onTogglePin={togglePin} />
           </>
