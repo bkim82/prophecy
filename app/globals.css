@@ -487,12 +487,9 @@ button { cursor: pointer; }
 .post-actions .action-reply { --tone: var(--brand-strong); }
 .post-actions .action-vouch { --tone: var(--chart-up); }
 .post-actions .action-defy { --tone: var(--negative); }
-.post-actions .action-defy[aria-expanded="true"] { border-color: color-mix(in srgb, var(--tone) 30%, transparent); background: color-mix(in srgb, var(--tone) 13%, transparent); color: var(--tone); }
-.post-actions button:disabled { opacity: .45; cursor: not-allowed; }
-.post-actions button:disabled:hover { border-color: transparent; background: color-mix(in srgb, var(--surface-raised) 75%, transparent); color: inherit; }
 .action-label { font-family: var(--font-sans), Inter, system-ui, sans-serif; font-size: 12.5px; }
 @container (max-width: 470px) { .action-label { display: none; } }
-/* Reshared posts (vouch/defy, app/PostShare.tsx ReshareHead): the sharer's
+/* Reposted posts (vouch/defy, app/PostShare.tsx ReshareHead): the sharer's
    own row on top, then the original post inside a bordered card indented to
    the sharer's text column (full width on phones), so the reshare reads as a
    separate thing wrapped around the post — like an X quote post. */
@@ -509,9 +506,6 @@ button { cursor: pointer; }
 .post-reshare-who { color: var(--muted); font-size: 13.5px; line-height: 1.35; }
 .post-reshare-who strong { color: var(--text); font-size: 14px; }
 .post-reshare-verb { color: var(--tone); font-weight: 700; }
-.post-reshare-stake { justify-self: start; display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px 3px 8px; border: 1px solid color-mix(in srgb, var(--negative) 40%, transparent); border-radius: 999px; background: color-mix(in srgb, var(--negative) 10%, transparent); color: var(--negative); font-family: var(--font-mono), ui-monospace, monospace; font-size: 12px; font-weight: 600; }
-.post-reshare-stake svg { width: 13px; height: 13px; }
-.post-reshare-note { color: var(--text); font-size: 14.5px; line-height: 1.45; }
 .post-reshare-reach { color: var(--muted-dim); font-size: 12px; }
 .post-reshare-embed { flex: 0 0 calc(100% - 50px); display: flex; gap: 10px; min-width: 0; margin-left: 50px; padding: 12px 14px; border: 1px solid var(--line-strong); border-radius: 14px; background: color-mix(in srgb, var(--surface-raised) 35%, var(--surface)); }
 .post-reshare-embed .post-avatar { width: 32px; height: 32px; font-size: 13px; }
@@ -520,23 +514,6 @@ button { cursor: pointer; }
 .post-card--detail .post-reshare-head { grid-column: 1 / -1; }
 @media (max-width: 420px) { .post-reshare-embed .post-actions { gap: 2px; } .post-reshare-embed .post-actions button { padding: 0 5px; } .post-reshare-embed .post-actions .action-bookmark { width: 30px; padding: 0; } }
 @media (max-width: 768px) { .post-reshare-head { gap: 10px; } .post-reshare-avatar { width: 32px; height: 32px; font-size: 13px; } .post-reshare-embed, .post-reshare-footer { flex-basis: 100%; margin-left: 0; } .post-reshare-embed { padding: 10px 12px; } }
-/* Defy panel: opens under the action row. */
-.defy-panel { display: grid; gap: 10px; margin-top: 4px; padding: 14px; border: 1px solid color-mix(in srgb, var(--negative) 35%, var(--line)); border-radius: 12px; background: color-mix(in srgb, var(--negative) 6%, var(--surface)); cursor: default; }
-.defy-panel-title { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 14px; font-weight: 700; }
-.defy-panel-title svg { flex: none; width: 17px; height: 17px; color: var(--negative); }
-.defy-panel-copy { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
-.defy-stakes { display: flex; flex-wrap: wrap; gap: 8px; }
-.defy-stakes button { display: inline-flex; align-items: center; gap: 5px; min-height: 34px; padding: 0 14px 0 11px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--text); font-family: var(--font-mono), ui-monospace, monospace; font-size: 13px; font-weight: 600; }
-.defy-stakes button svg { width: 14px; height: 14px; color: var(--ember); }
-.defy-stakes button[aria-checked="true"] { border-color: var(--negative); background: color-mix(in srgb, var(--negative) 14%, var(--surface)); }
-.defy-note { min-height: 38px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; outline: 0; background: var(--field-bg); color: var(--text); font: inherit; font-size: 13.5px; }
-.defy-note:focus { border-color: color-mix(in srgb, var(--negative) 55%, var(--line)); }
-.defy-panel-actions { display: flex; justify-content: flex-end; gap: 8px; }
-.defy-panel-actions button { min-height: 36px; padding: 0 16px; border-radius: 999px; font-size: 13px; font-weight: 700; }
-.defy-panel-cancel { border: 1px solid var(--line-strong); background: transparent; color: var(--text); }
-.defy-panel-submit, .defy-panel-withdraw { display: inline-flex; align-items: center; gap: 7px; border: 0; background: var(--negative); color: #fff; }
-.defy-panel-submit svg { width: 16px; height: 16px; }
-.defy-panel-withdraw { background: transparent; border: 1px solid var(--negative); color: var(--negative); }
 .post-actions .action-bookmark { --tone: var(--brand-strong); justify-content: center; width: 36px; margin-left: auto; padding: 0; }
 .post-actions .action-like.is-active svg { animation: like-pop .35s ease-out; }
 @keyframes like-pop { 40% { transform: scale(1.3); } }

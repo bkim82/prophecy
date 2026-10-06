@@ -101,8 +101,8 @@ export type Post = {
   likes: number;
   replies: number;
   // Display-only counts beside the Vouch / Defy actions (app/PostCard.tsx);
-  // nothing increments them. Vouch = repost to your followers with your name
-  // on it; Defy = repost while betting Embers against it.
+  // nothing increments them. Both are reposts to your followers: Vouch = one
+  // you back, Defy = one you're against.
   vouches?: number;
   defies?: number;
   kind: PostKind;
@@ -131,10 +131,9 @@ export const LIVE_CALL_COUNT = 214;
 export const FOLLOWED_HANDLES = ["@nova_trades", "@ren.eth", "@zane_lfg"];
 
 // A vouch or defy someone made, as it lands in their followers' feeds: the
-// original post with "Nova vouched" / "Zane defied · 250 Embers on ↑ LONG"
-// above it. A defy's `stake` is Embers bet against the post (the opposite
-// side, for a call) plus an optional `note`. Newest first; hand-written, no
-// Embers actually move.
+// original post under "Nova vouched for this omen" / "Zane defied this omen".
+// Both are plain reposts (a defy just says you're against it). Newest first;
+// hand-written.
 export type Share = {
   id: string;
   kind: "vouch" | "defy";
@@ -142,17 +141,15 @@ export type Share = {
   name: string;
   handle: string;
   timestamp: string;
-  stake?: number;
-  note?: string;
 };
 
 export const SHARES: Share[] = [
-  { id: "sh1", kind: "defy", postId: "g-oracle1", name: "Zane", handle: "@zane_lfg", timestamp: "1m ago", stake: 250, note: "that wall gets pulled the second we touch it. im long" },
-  { id: "sh2", kind: "defy", postId: "t-near", name: "Nova", handle: "@nova_trades", timestamp: "5m ago", stake: 50, note: "50x into resistance, fading this one sorry tobi" },
+  { id: "sh1", kind: "defy", postId: "g-oracle1", name: "Zane", handle: "@zane_lfg", timestamp: "1m ago" },
+  { id: "sh2", kind: "defy", postId: "t-near", name: "Nova", handle: "@nova_trades", timestamp: "5m ago" },
   { id: "sh3", kind: "vouch", postId: "n4", name: "Nova", handle: "@nova_trades", timestamp: "8m ago" },
   { id: "sh4", kind: "vouch", postId: "s-sol3", name: "Ren", handle: "@ren.eth", timestamp: "12m ago" },
   { id: "sh5", kind: "vouch", postId: "c-cb1", name: "Zane", handle: "@zane_lfg", timestamp: "15m ago" },
-  { id: "sh6", kind: "defy", postId: "hy1", name: "Ren", handle: "@ren.eth", timestamp: "30m ago", stake: 100, note: "range highs are where the hopium threads start" },
+  { id: "sh6", kind: "defy", postId: "hy1", name: "Ren", handle: "@ren.eth", timestamp: "30m ago" },
 ];
 
 export type Reply = {

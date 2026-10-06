@@ -16,7 +16,7 @@ import { BookmarkIcon, ClashIcon, CommentIcon, DefyIcon, FlameIcon, HeartIcon, T
 import { postTopics, topicById, type TopicId } from "@/app/lib/topics";
 import { PostMedia } from "@/app/PostMedia";
 import { PostMenu } from "@/app/PostMenu";
-import { DefyPanel, ReshareHead, type Defy, type DefySide } from "@/app/PostShare";
+import { ReshareHead, type ReshareKind } from "@/app/PostShare";
 
 // Short tag at the right of the meta row; the full sentence is its tooltip.
 const FLAIRS: Record<PostFlair, { tag: string; title: string }> = {
@@ -318,7 +318,7 @@ export const postHref = (post: Post) => (post.id.startsWith("local-") ? undefine
 
 // Clicks on the row's background open the post page, like X/Reddit. Anything
 // interactive inside keeps its own click, and selecting text doesn't navigate.
-const INTERACTIVE = "a, button, input, textarea, label, form, [role='button'], [role='menu'], .defy-panel";
+const INTERACTIVE = "a, button, input, textarea, label, form, [role='button'], [role='menu']";
 
 // `context` is a line above the row (the For You cover's "Because you're
 // interested in …"); `footer` sits under the actions. `detail` is the post
@@ -349,10 +349,9 @@ export function PostCard({
   const router = useRouter();
   const [repliesOpen, setRepliesOpen] = useState(false);
   const [liked, setLiked] = useState(false);
-  // Your own vouch/defy on this post — local only, like likes.
-  const [vouched, setVouched] = useState(false);
-  const [defy, setDefy] = useState<Defy | null>(null);
-  const [defyOpen, setDefyOpen] = useState(false);
+  // Your own repost of this post — a vouch or a defy, not both. Local only,
+  // like likes.
+  const [reshared, setReshared] = useState<ReshareKind | null>(null);
   const [expanded, setExpanded] = useState(false);
   const bookmarks = useBookmarks();
 
@@ -371,21 +370,13 @@ export function PostCard({
   // duplicate, so it stays out of the tab order and the a11y tree.
   const avatarProps = { className: "post-avatar", "aria-hidden": true, style: { background: avatarGradient(post.handle) } };
   const likes = post.likes + (liked ? 1 : 0);
-  const vouches = (post.vouches ?? 0) + (vouched ? 1 : 0);
-  const defies = (post.defies ?? 0) + (defy ? 1 : 0);
-  // A defy on a call takes the other side; a call that already resolved has
-  // nothing left to bet on, and you can't bet against your own post.
-  const takes: DefySide | undefined = post.call && {
-    side: post.call.side === "LONG" ? "SHORT" : "LONG",
-    market: MARKET_META[post.call.market].label,
-  };
-  const defyClosedReason = post.call?.outcome ? "Already resolved, nothing left to bet on" : post.id.startsWith("local-") ? "You can't defy your own omen" : undefined;
-  const reshare = defy ? (
-    <ReshareHead kind="defy" name="You" timestamp="now" stake={defy.stake} note={defy.note || undefined} takes={takes} />
-  ) : vouched ? (
-    <ReshareHead kind="vouch" name="You" timestamp="now" />
+  const vouches = (post.vouches ?? 0) + (reshared === "vouch" ? 1 : 0);
+  const defies = (post.defies ?? 0) + (reshared === "defy" ? 1 : 0);
+  const toggleReshare = (kind: ReshareKind) => setReshared((current) => (current === kind ? null : kind));
+  const reshare = reshared ? (
+    <ReshareHead kind={reshared} name="You" timestamp="now" />
   ) : share ? (
-    <ReshareHead kind={share.kind} name={share.name} handle={share.handle} timestamp={share.timestamp} stake={share.stake} note={share.note} takes={takes} />
+    <ReshareHead kind={share.kind} name={share.name} handle={share.handle} timestamp={share.timestamp} />
   ) : null;
   // The post page keeps its own layout; it just gets the header on top.
   const embedded = reshare !== null && !detail;
@@ -479,11 +470,11 @@ export function PostCard({
         </button>
         <button
           type="button"
-          className={`action-vouch${vouched ? " is-active" : ""}`}
-          aria-pressed={vouched}
-          aria-label={`Vouch (${vouches}): repost to your followers with your name on it`}
-          title="Vouch: repost to your followers with your name on it"
-          onClick={() => setVouched((v) => !v)}
+          className={`action-vouch${reshared === "vouch" ? " is-active" : ""}`}
+          aria-pressed={reshared === "vouch"}
+          aria-label={`Vouch (${vouches}): repost to your followers as one you back`}
+          title="Vouch: repost to your followers as one you back"
+          onClick={() => toggleReshare("vouch")}
         >
           <VouchIcon />
           <span className="action-label">Vouch</span>
@@ -491,13 +482,11 @@ export function PostCard({
         </button>
         <button
           type="button"
-          className={`action-defy${defy ? " is-active" : ""}`}
-          aria-pressed={defy !== null}
-          aria-expanded={defyOpen}
-          aria-label={`Defy (${defies}): repost while betting against it`}
-          title={defyClosedReason ?? "Defy: repost while betting against it"}
-          disabled={defyClosedReason !== undefined}
-          onClick={() => setDefyOpen((open) => !open)}
+          className={`action-defy${reshared === "defy" ? " is-active" : ""}`}
+          aria-pressed={reshared === "defy"}
+          aria-label={`Defy (${defies}): repost to your followers as one you're against`}
+          title="Defy: repost to your followers as one you're against"
+          onClick={() => toggleReshare("defy")}
         >
           <DefyIcon />
           <span className="action-label">Defy</span>
@@ -513,22 +502,6 @@ export function PostCard({
           <BookmarkIcon filled={bookmarked} />
         </button>
       </div>
-      {defyOpen && (
-        <DefyPanel
-          author={firstName}
-          takes={takes}
-          current={defy}
-          onDefy={(next) => {
-            setDefy(next);
-            setDefyOpen(false);
-          }}
-          onWithdraw={() => {
-            setDefy(null);
-            setDefyOpen(false);
-          }}
-          onClose={() => setDefyOpen(false)}
-        />
-      )}
       {repliesOpen && <ReplyThread postId={post.id} />}
       {!embedded && footer}
     </div>
