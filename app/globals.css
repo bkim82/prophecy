@@ -220,7 +220,7 @@ button { cursor: pointer; }
 .wallet-notice a { color: inherit; font-weight: 700; }
 @media (max-width: 960px) { .wallet-shell { grid-template-columns: 1fr; } .wallet-sidebar { position: static; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; } .wallet-ticket { position: sticky; top: 12px; } .wallet-sidebar .feed-sidebar { grid-column: 1 / -1; position: static; } }
 @media (max-width: 620px) { .wallet-shell { width: min(100% - 28px, var(--shell-max)); padding-top: 20px; } .wallet-sidebar { grid-template-columns: 1fr; } .wallet-ticket { top: 8px; } .wallet-sidebar .feed-sidebar { grid-column: auto; } }
-.lobby-shell { width: min(100% - 56px, var(--shell-max)); margin: 0 auto; padding: 32px 0 56px; }
+.lobby-shell { width: min(100% - 56px, var(--shell-max)); margin: 0 auto; padding: 24px 0 56px; }
 .feed-shell { width: min(100% - 56px, var(--shell-max)); margin: 0 auto; padding: 32px 0 64px; display: grid; grid-template-columns: minmax(0, 1fr) 360px; align-items: start; gap: 28px; }
 .feed-main { min-width: 0; }
 .feed-heading { margin: 0 2px 16px; }
@@ -1640,28 +1640,30 @@ a.post-avatar { text-decoration: none; }
 @keyframes stage-rise { from { opacity: 0; transform: translateY(14px); } }
 @media (prefers-reduced-motion: reduce) { .pulse-stage > *, .pulse-stage .ticker-copy, .pulse-stage .market-stats { animation: none; } }
 .pulse-stage { display: grid; grid-template-columns: minmax(0, 1.8fr) minmax(300px, 1fr); gap: 16px; align-items: stretch; }
-.pulse-stage .market-overview { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "copy stats" "chart chart"; grid-template-rows: auto 1fr; align-items: start; align-content: start; gap: 22px 28px; padding: 24px 24px 18px; }
+.pulse-stage .market-overview { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "copy stats" "chart chart"; grid-template-rows: auto 1fr; align-items: start; align-content: start; gap: 16px 28px; padding: 20px 22px 14px; }
 .pulse-stage .market-overview.panel { position: relative; overflow: hidden; background:
   radial-gradient(90% 70% at 88% 92%, color-mix(in srgb, var(--brand) 11%, transparent), transparent 62%),
   radial-gradient(70% 60% at 6% 0%, color-mix(in srgb, var(--violet) 14%, transparent), transparent 60%),
   var(--surface); border-color: color-mix(in srgb, var(--violet) 22%, var(--line)); }
 .pulse-stage .ticker-copy { grid-area: copy; }
-.pulse-stage .ticker-price { font-size: clamp(40px, 4.6vw, 64px); }
+.pulse-stage .ticker-price { font-size: clamp(36px, 4vw, 56px); }
 .pulse-stage .ticker-chart-wrap { grid-area: chart; align-self: stretch; }
 .pulse-stage .market-stats { grid-area: stats; grid-column: auto; grid-template-columns: repeat(2, auto); gap: 12px 28px; align-self: center; padding: 0 0 0 24px; border-top: 0; border-left: 1px solid var(--line); }
 .pulse-stage .market-stats div { display: grid; gap: 4px; justify-content: start; }
 .market-stats dd.change-up { color: var(--positive); }
 .market-stats dd.change-down { color: var(--negative); }
-.pulse-stage .call-box { display: flex; flex-direction: column; gap: 18px; padding: 24px 22px 22px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.pulse-stage .call-box { display: flex; flex-direction: column; gap: 12px; padding: 18px 20px 18px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
 .pulse-stage .call-box .section-heading { margin: 0; }
+.pulse-stage .call-box .section-heading h2 { font-size: 26px; }
 .pulse-stage .call-box > .panel { flex: 1; padding: 0; border: 0; border-radius: 0; background: none; }
-.pulse-stage .play-panel { display: flex; flex-direction: column; align-items: stretch; gap: 16px; }
+.pulse-stage .play-panel { display: flex; flex-direction: column; align-items: stretch; gap: 12px; }
 .pulse-stage .play-panel-market { display: none; } /* the left box already names the market */
-.pulse-stage .play-panel .control-group, .pulse-stage .play-panel .opponent-status { padding: 16px 0 0; border-left: 0; border-top: 1px solid var(--line); }
-.pulse-stage .play-actions { display: grid; gap: 10px; width: 100%; margin-top: auto; padding-top: 6px; }
+.pulse-stage .play-panel .control-group, .pulse-stage .play-panel .opponent-status { padding: 12px 0 0; border-left: 0; border-top: 1px solid var(--line); }
+.pulse-stage .control-group--format .muted:not(strong) { font-size: 12px; }
+.pulse-stage .play-actions { display: grid; gap: 10px; width: 100%; margin-top: auto; padding-top: 2px; }
 .pulse-stage .play-actions > * { grid-column: 1 / -1; }
-.pulse-stage .play-button { position: relative; overflow: hidden; width: 100%; min-height: 64px; border-radius: 10px; font-size: 20px; letter-spacing: .01em; }
-.pulse-stage .play-button span { font-size: 26px; transition: transform .2s ease; }
+.pulse-stage .play-button { position: relative; overflow: hidden; width: 100%; min-height: 54px; border-radius: 10px; font-size: 18px; letter-spacing: .01em; }
+.pulse-stage .play-button span { font-size: 22px; transition: transform .2s ease; }
 /* The one violet thing on the page: every other action (Arena, Wallet, timer)
    is teal, so Play reads as THE button. Sheen sweeps across every few seconds. */
 .pulse-stage .play-button:not(:disabled) { border-color: color-mix(in srgb, var(--violet-strong) 70%, transparent); background: linear-gradient(135deg, var(--play-a), var(--play-b)); color: #fffaf0; text-shadow: 0 1px 2px rgba(20, 8, 50, .35); box-shadow: 0 10px 34px color-mix(in srgb, var(--violet) 45%, transparent), inset 0 1px 0 rgba(255, 255, 255, .25); animation: play-glow 2.4s ease-in-out infinite; }
@@ -1670,7 +1672,7 @@ a.post-avatar { text-decoration: none; }
 .pulse-stage .play-button:not(:disabled):hover span { transform: translateX(4px); }
 .pulse-stage { --play-a: #a283f0; --play-b: #6a45d1; --play-a-hover: #b79cf7; }
 [data-theme="light"] .pulse-stage { --play-a: #8a63d2; --play-b: #5b35a8; --play-a-hover: #9b78dc; }
-.pulse-stage .practice-button { width: 100%; padding: 11px; font-size: 12px; }
+.pulse-stage .practice-button { width: 100%; padding: 9px; font-size: 12px; }
 .pulse-stage .queue-panel { flex-wrap: wrap; align-content: start; }
 .pulse-stage .queue-copy { flex: 1 1 calc(100% - 40px); }
 @keyframes play-glow { 0%, 100% { box-shadow: 0 10px 30px color-mix(in srgb, var(--violet) 35%, transparent), inset 0 1px 0 rgba(255, 255, 255, .25); } 50% { box-shadow: 0 10px 46px color-mix(in srgb, var(--violet) 70%, transparent), inset 0 1px 0 rgba(255, 255, 255, .25); } }
