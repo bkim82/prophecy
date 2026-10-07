@@ -22,6 +22,7 @@ import { productForMarket } from "@/lib/spotPrice";
 
 const POLL_MS = 1000;
 const TICK_MS = 200;
+const SKEW_RESYNC_MS = 1000;
 const STAKE_OPTIONS = [10, 25, 50];
 type Action = "enter" | "close";
 type LocalTrade = { t: number; p: number; side: PulseSide; action: "entry" | "exit" };
@@ -57,14 +58,19 @@ export default function Page({ params }: { params: Promise<{ market: string; mat
   const prevHeadlineRef = useRef<number | null>(null);
   const pointsRef = useRef(points);
   pointsRef.current = points;
-  const skewRef = useRef(0);
+  const skewRef = useRef<number | null>(null);
 
   useEffect(() => {
     setPlayerId(getPlayerId());
     setInviteJoin(new URLSearchParams(window.location.search).get("invite") === "1");
   }, []);
   const applyView = useCallback((next: MatchView) => {
-    skewRef.current = next.serverNow - Date.now();
+    // Only re-sync on real drift: per-poll network jitter would otherwise shift
+    // every server→local timestamp by a few ms each second, and `roundStart`
+    // keys PriceChart's SVG — so the chart would remount (and replay its
+    // entrance) on every poll.
+    const skew = next.serverNow - Date.now();
+    if (skewRef.current === null || Math.abs(skew - skewRef.current) > SKEW_RESYNC_MS) skewRef.current = skew;
     setView(next);
   }, []);
 
@@ -123,7 +129,7 @@ export default function Page({ params }: { params: Promise<{ market: string; mat
   }, [matchId, playerId, inviteJoin, applyView]);
 
   const phase = view?.status;
-  const toLocal = useCallback((serverMs: number | null) => serverMs === null ? null : serverMs - skewRef.current, []);
+  const toLocal = useCallback((serverMs: number | null) => serverMs === null ? null : serverMs - (skewRef.current ?? 0), []);
   const deadline = phase === "predict" ? toLocal(view?.lockDeadlineAt ?? null) : phase === "countdown" ? toLocal(view?.deadlineAt ?? null) : null;
   useEffect(() => {
     if (deadline === null) { setSecondsLeft(null); return; }
