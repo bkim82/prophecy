@@ -1861,6 +1861,9 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
 .row-age { color: var(--muted-dim); }
 .result-row { grid-template-columns: minmax(110px, 1fr) 44px 55px 52px; }
 .result-row > span { text-align: right; font-size: 11px; }
+/* "vs @opponent" under the coin: a long name truncates rather than widening the row. */
+.result-row .row-market, .result-row .row-market > span { min-width: 0; }
+.result-row .row-market .muted { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .market-switcher { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .market-switcher .field-label { margin-right: 5px; }
 .market-switcher button { display: inline-flex; align-items: center; gap: 6px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--muted); padding: 5px 8px; font-size: 12px; }

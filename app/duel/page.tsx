@@ -13,6 +13,7 @@ import {
   type ActiveMatch,
 } from "@/app/lib/activeMatch";
 import { getPlayerId } from "@/app/lib/playerId";
+import { playedLabel } from "@/app/lib/playedLabel";
 import { usePriceFeed } from "@/app/usePriceFeed";
 import { clockLabel, MARKET_CHART_WINDOW_MS, MarketChart, priceAt, type ScrubPoint } from "@/app/MarketChart";
 
@@ -67,11 +68,21 @@ type OpenMatch = {
   isYours: boolean;
 };
 
-const recentResults = [
-  { market: "BTC", result: "Won", entry: "+0.50", time: "2m ago" },
-  { market: "ETH", result: "Lost", entry: "−0.25", time: "8m ago" },
-  { market: "BTC", result: "Won", entry: "+1.00", time: "14m ago" },
-];
+// One of your settled Pulse matches, from GET /api/match/recent.
+type RecentResult = {
+  id: string;
+  market: string;
+  result: "won" | "lost" | "tie";
+  yourProfit: number | null;
+  opponentName: string;
+  playedAt: number;
+};
+
+const RESULT_LABEL: Record<RecentResult["result"], string> = { won: "Won", lost: "Lost", tie: "Tie" };
+const RESULT_CLASS: Record<RecentResult["result"], string> = { won: "change-up", lost: "change-down", tie: "muted" };
+
+const signedUsd = (value: number | null) =>
+  value === null ? "—" : `${value >= 0 ? "+" : "−"}${usd(Math.abs(value))}`;
 
 type ModeId = "pulse" | "battle-24h";
 type MarketId = "btc" | "eth" | "doge";
@@ -130,6 +141,8 @@ export default function Page() {
   // global ActiveMatchBar is the only way back into it.
   const [activeMatch, setActiveMatchState] = useState<ActiveMatch | null>(null);
   const [inviteState, setInviteState] = useState<"idle" | "shared" | "copied" | "error">("idle");
+  // null until loaded; finishing a match navigates back here, which remounts and refetches.
+  const [recentResults, setRecentResults] = useState<RecentResult[] | null>(null);
   const modes = MODES_BY_MARKET[market];
   // The chart's head (bid/ask midpoint), so the headline matches the pill.
   const livePrice = points.at(-1)?.p ?? price;
@@ -196,6 +209,16 @@ export default function Page() {
       clearTimeout(timerId);
     };
   }, [market, takesCall, matchMode, playerId]);
+
+  useEffect(() => {
+    if (!isSignedIn) return;
+    let cancelled = false;
+    fetch("/api/match/recent", { cache: "no-store" })
+      .then((res) => (res.ok ? (res.json() as Promise<{ results: RecentResult[] }>) : null))
+      .then((data) => { if (!cancelled && data) setRecentResults(data.results); })
+      .catch(() => { /* Leave the list as it was; it's history, not live state. */ });
+    return () => { cancelled = true; };
+  }, [isSignedIn]);
 
   const matchHref = (matchMarket: string, matchId: string) =>
     `/duel/${matchMarket}/pulse/${matchId}`;
@@ -508,7 +531,22 @@ export default function Page() {
             );
           })}
         </div></div>
-        <div><div className="list-heading"><h2>Recent results</h2><span className="muted">Today</span></div><div className="data-list panel">{recentResults.map((result, index) => <div className="data-row result-row" key={`${result.market}-${index}`}><div className="row-market"><span className={`market-symbol ${result.market === "BTC" ? "btc-symbol" : "eth-symbol"}`}>{result.market === "BTC" ? "₿" : "Ξ"}</span><strong>{result.market}</strong></div><span className={result.result === "Won" ? "change-up" : "change-down"}>{result.result}</span><span className="row-detail">{result.entry}</span><span className="row-age">{result.time}</span></div>)}</div></div>
+        <div><div className="list-heading"><h2>Recent results</h2><span className="muted">Your Pulse matches</span></div><div className="data-list panel">
+          {isSignedIn === false && <div className="data-row"><span className="muted">Sign in to see your results.</span></div>}
+          {isSignedIn && recentResults === null && <div className="data-row"><span className="muted">Loading…</span></div>}
+          {isSignedIn && recentResults?.length === 0 && <div className="data-row"><span className="muted">No results yet — finish a Pulse match to see it here.</span></div>}
+          {isSignedIn && recentResults?.map((result) => {
+            const resultMarket = MARKETS[result.market as MarketId];
+            return (
+              <div className="data-row result-row" key={result.id}>
+                <div className="row-market"><span className={`market-symbol ${SYMBOL_CLASS[result.market as MarketId] ?? "eth-symbol"}`}>{resultMarket?.symbol ?? "?"}</span><span><strong>{resultMarket?.label ?? result.market.toUpperCase()}</strong><span className="muted">vs {result.opponentName}</span></span></div>
+                <span className={RESULT_CLASS[result.result]}>{RESULT_LABEL[result.result]}</span>
+                <span className="row-detail">{signedUsd(result.yourProfit)}</span>
+                <span className="row-age">{playedLabel(result.playedAt, Date.now())}</span>
+              </div>
+            );
+          })}
+        </div></div>
       </section>
       )}
 

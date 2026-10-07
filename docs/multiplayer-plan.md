@@ -63,6 +63,7 @@ multi-statement transactions or row locks. Every transition is a single guarded
 | `POST /api/match/[id]/action` | Pulse server-priced `enter` actions up to available bankroll and per-position `close` actions |
 | `POST /api/match/[id]/leave` | delete while `open`/`predict`; 409 once counting down |
 | `GET /api/match/open?market=&mode=&playerId=` | joinable matches with a fresh host heartbeat |
+| `GET /api/match/recent` | signed-in user's newest 5 settled matches, all markets — `settledMatchesFor` + `historyEntryFor` + `opponentNames` (`lib/opponentNames.ts`), same naming as the profile Matches tab. Rendered by the lobby's Recent results: coin, `vs <opponent>`, Won/Lost/Tie, your round P&L, relative time (`app/lib/playedLabel.ts`); fetched once per mount, so returning from a room refreshes it |
 
 Validation on entry: market must price (`lib/spotPrice.ts:12`), mode must be
 `pulse`, caller must be a signed-in Clerk user, wager integer

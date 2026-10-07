@@ -1,4 +1,4 @@
-import { auth, clerkClient, currentUser } from "@clerk/nextjs/server";
+import { auth, currentUser } from "@clerk/nextjs/server";
 import { FOLLOWED_HANDLES } from "@/app/lib/mockPosts";
 import { challengeTerms } from "@/app/lib/challengeRules";
 import { getProfile, profileHref, type Profile } from "@/app/lib/mockProfiles";
@@ -11,7 +11,9 @@ import { ProfileAchievements } from "@/app/profile/[handle]/ProfileAchievements"
 import { ProfileView, type ProfileMatch, type SentChallenge } from "@/app/profile/[handle]/ProfileView";
 import { pendingChallengesFrom } from "@/lib/challenges";
 import { historyEntryFor, marketAccuracyFor, matchRecordFor, settledMatchesByIds, settledMatchesFor } from "@/lib/match";
+import { opponentNames } from "@/lib/opponentNames";
 import { storedProfileFor } from "@/lib/profile";
+import { playedLabel } from "@/app/lib/playedLabel";
 
 // The signed-in viewer's own profile, opened from the header avatar menu
 // (app/AccountMenu.tsx). Same layout as /profile/[handle]. Real: Clerk
@@ -22,41 +24,9 @@ import { storedProfileFor } from "@/lib/profile";
 
 const MATCH_LIMIT = 20;
 const joinedFormat = new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
-const shortDate = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 
 const roundLength = (seconds: number) =>
   seconds % 3600 === 0 ? `${seconds / 3600}h` : seconds % 60 === 0 ? `${seconds / 60}m` : `${seconds}s`;
-
-// Same style as the feed's mock timestamps ("16m ago").
-function playedLabel(playedAt: number, now: number): string {
-  const minutes = Math.floor((now - playedAt) / 60_000);
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return days < 7 ? `${days}d ago` : shortDate.format(playedAt);
-}
-
-// Opponents by Clerk @username, else first name (this instance doesn't
-// collect usernames) — never a last name or email. "Opponent" when neither
-// is set or the lookup fails.
-async function opponentNames(ids: (string | null)[]): Promise<Map<string, string>> {
-  const unique = [...new Set(ids.filter((id) => id !== null))];
-  if (unique.length === 0) return new Map();
-  try {
-    const client = await clerkClient();
-    const { data } = await client.users.getUserList({ userId: unique, limit: unique.length });
-    return new Map(
-      data.flatMap((user) => {
-        const name = user.username ? `@${user.username}` : user.firstName;
-        return name ? [[user.id, name]] : [];
-      }),
-    );
-  } catch {
-    return new Map();
-  }
-}
 
 export default async function OwnProfilePage() {
   const { userId, redirectToSignIn } = await auth();
