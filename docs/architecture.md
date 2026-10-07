@@ -73,6 +73,7 @@ its stake and leverage in-round; so does the 24h Portfolio.
 | `app/sanctum/page.tsx` | Oracle Room: coin toggle, live chart + trading dock, simulated room trade feed with coin filters, mini chat — see [sanctum.md](sanctum.md) |
 | `app/TabNav.tsx` | desktop Omens/Arena/Sanctum/Wallet header nav, active pill via `usePathname()` |
 | `app/MobileBottomNav.tsx` | dedicated sub-768px bottom navigation for Omens, Arena, Sanctum, and Wallet |
+| `app/MobileChromeAutoHide.tsx` | sub-768px scroll-direction auto-hide for the header + bottom nav via `html[data-chrome]` ([feeds.md](feeds.md)) |
 | `app/PostCard.tsx` | shared post rendering for both feed pages |
 | `app/lib/mockPosts.ts` | hardcoded `GLOBAL_POSTS`/`EXCLUSIVE_POSTS` mock data, no persistence |
 | `app/lib/rank.ts` | hardcoded mock rank/threshold stub gating `/exclusive` — no real rank system exists |

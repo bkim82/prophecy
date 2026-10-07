@@ -2008,7 +2008,14 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
   .quick-ticket-bar, .active-match-bar { bottom: calc(80px + env(safe-area-inset-bottom)); }
   .quick-ticket-bar { padding-bottom: 0; }
   .active-match-bar { padding-bottom: 0; }
+
+  /* Scroll-down auto-hide (app/MobileChromeAutoHide.tsx sets html[data-chrome]). Header and nav slide off their edges; the ticket/match bars drop 70px to sit 10px off the bottom, as on desktop. Keyboard focus inside a bar holds it in view. */
+  .app-header, .mobile-bottom-nav, .quick-ticket-bar, .active-match-bar { transition: transform .22s ease; }
+  html[data-chrome="hidden"] .app-header:not(:has(:focus-visible)) { transform: translateY(-100%); }
+  html[data-chrome="hidden"] .mobile-bottom-nav:not(:has(:focus-visible)) { transform: translateY(100%); }
+  html[data-chrome="hidden"] .quick-ticket-bar, html[data-chrome="hidden"] .active-match-bar { transform: translateY(70px); }
 }
+@media (prefers-reduced-motion: reduce) { .app-header, .mobile-bottom-nav, .quick-ticket-bar, .active-match-bar { transition: none; } }
 
 @media (max-width: 340px) {
   .app-header { padding-inline: 16px; }
@@ -2116,8 +2123,11 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
 @keyframes pf-shimmer { 50% { opacity: .45; } }
 @media (max-width: 767px) {
   /* Valid order only: the submit button rides just above the mobile bottom nav. */
-  .pf-sticky-submit { position: sticky; bottom: calc(72px + env(safe-area-inset-bottom)); z-index: 10; margin-inline: -14px; padding: 0 14px 6px; background: var(--surface-raised); }
+  .pf-sticky-submit { position: sticky; bottom: calc(72px + env(safe-area-inset-bottom)); z-index: 10; margin-inline: -14px; padding: 0 14px 6px; background: var(--surface-raised); transition: transform .22s ease; }
+  /* Follows the bottom nav down when it auto-hides (app/MobileChromeAutoHide.tsx). */
+  html[data-chrome="hidden"] .pf-sticky-submit { transform: translateY(64px); }
 }
+@media (prefers-reduced-motion: reduce) { .pf-sticky-submit { transition: none; } }
 
 /* Event-based motion: each animation answers one action and then stops. */
 /* Explorer: one selection indicator slides between rows (subtle teal + left accent). */
