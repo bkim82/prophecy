@@ -11,11 +11,13 @@ import { TOPIC_KINDS, TOPICS, topicById, type Topic, type TopicId } from "@/app/
 
 export type TopicView = "forYou" | TopicId;
 
+// Topic icons are neutral; the open topic's header is the one place the
+// topic's own color shows (its icon inherits --topic from the header).
 const topicStyle = (topic: Topic) => ({ "--topic": topic.color }) as CSSProperties;
 
 export function TopicIcon({ topic }: { topic: Topic }) {
   return (
-    <span className="topic-icon" data-kind={topic.kind} style={topicStyle(topic)} aria-hidden="true">
+    <span className="topic-icon" data-kind={topic.kind} aria-hidden="true">
       {topic.glyph}
     </span>
   );
@@ -63,7 +65,6 @@ export function TopicChips({
               role="tab"
               aria-selected={view === id}
               className="topic-chip"
-              style={topicStyle(topic)}
               onClick={() => onSelect(id)}
             >
               <TopicIcon topic={topic} />
@@ -117,7 +118,6 @@ export function InterestPicker({
                   type="button"
                   className="interest-option"
                   aria-pressed={on}
-                  style={topicStyle(topic)}
                   onClick={() => onToggle(topic.id)}
                 >
                   <TopicIcon topic={topic} />
@@ -142,7 +142,6 @@ export function InterestPicker({
                   key={id}
                   type="button"
                   className="interest-option interest-option--muted"
-                  style={topicStyle(topic)}
                   aria-label={`Show ${topic.label} again`}
                   onClick={() => onUnmute(id)}
                 >

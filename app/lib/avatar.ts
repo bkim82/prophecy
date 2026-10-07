@@ -9,7 +9,10 @@ export function hueFromHandle(handle: string): number {
   return Math.abs(hash) % 360;
 }
 
-export function avatarGradient(handle: string): string {
+// Muted by default: avatars tell people apart but shouldn't compete with the
+// feed's accent colors. PostMedia's fake screenshots pass a full 70% so they
+// still read as real, full-color images.
+export function avatarGradient(handle: string, saturation = 42): string {
   const hue = hueFromHandle(handle);
-  return `linear-gradient(135deg, hsl(${hue} 70% 45%), hsl(${(hue + 45) % 360} 70% 32%))`;
+  return `linear-gradient(135deg, hsl(${hue} ${saturation}% 45%), hsl(${(hue + 45) % 360} ${saturation}% 32%))`;
 }

@@ -119,10 +119,12 @@ const STATUS_LABEL: Record<CallTrack["state"], (track: CallTrack) => string> = {
   liquidated: () => "× Liquidated",
 };
 
-// Five states (data-state): live (violet glow, pulsing orb), doom = near
+// Five states (data-state): live (violet ring, pulsing orb), doom = near
 // stop/liq (orb hugging the left, red pulse), fulfilled (orb on ✦, all gold),
-// broken (grayed out), liquidated (red, hazard stripes). Open calls end in
-// Copy with the tailing count under it.
+// broken (grayed out), liquidated (red, hazard stripes). Outside those state
+// moments only the coin, the side (LONG green / SHORT red), P&L (ROI, fill,
+// orb) and Copy carry color. Open calls end in Copy with the tailing count
+// under it.
 export function MarketCallCard({ call }: { call: MarketCall }) {
   const meta = MARKET_META[call.market];
   const isLong = call.side === "LONG";
@@ -260,7 +262,8 @@ function PromoCard({ post }: { post: Post }) {
 
 // Two opposing calls; the crowd votes for a side. Your vote is local-only:
 // it adds one to that side, recomputes the split, and can be switched or
-// taken back.
+// taken back. Sides stay neutral (the arrows say which way each calls it);
+// your side of the bar turns violet once you vote (data-vote).
 function ClashCard({ post, clash }: { post: Post; clash: Clash }) {
   const [vote, setVote] = useState<0 | 1 | null>(null);
   const [a, b] = clash.sides;
@@ -268,7 +271,6 @@ function ClashCard({ post, clash }: { post: Post; clash: Clash }) {
   const total = counts[0] + counts[1];
   const firstPct = Math.round((counts[0] / total) * 100);
   const pcts = [firstPct, 100 - firstPct];
-  const tone = (direction: "up" | "down") => (direction === "up" ? "is-up" : "is-down");
   const arrow = (direction: "up" | "down") => (direction === "up" ? "↑" : "↓");
   return (
     <article className="post-card post-card--clash" id={`post-${post.id}`}>
@@ -280,27 +282,27 @@ function ClashCard({ post, clash }: { post: Post; clash: Clash }) {
       <div className="clash-sides">
         <span className="clash-side">
           <AuthorLink handle={a.handle} name={a.name} />
-          <span className={tone(a.direction)}>
+          <span>
             {arrow(a.direction)} {a.target}
           </span>
         </span>
         <span className="clash-vs">vs</span>
         <span className="clash-side clash-side--right">
-          <span className={tone(b.direction)}>
+          <span>
             {arrow(b.direction)} {b.target}
           </span>
           <AuthorLink handle={b.handle} name={b.name} />
         </span>
       </div>
-      <div className={`clash-bar ${tone(b.direction)}`} aria-hidden="true">
-        <span className={tone(a.direction)} style={{ width: `${pcts[0]}%` }} />
+      <div className="clash-bar" data-vote={vote ?? undefined} aria-hidden="true">
+        <span style={{ width: `${pcts[0]}%` }} />
       </div>
       <div className="clash-picks">
         {clash.sides.map((side, i) => (
           <button
             key={side.handle}
             type="button"
-            className={`clash-pick ${tone(side.direction)}`}
+            className="clash-pick"
             aria-pressed={vote === i}
             onClick={() => setVote((current) => (current === i ? null : (i as 0 | 1)))}
           >
@@ -417,7 +419,7 @@ export function PostCard({
         </span>
         <span className="post-meta-trail">
           {flair && (
-            <span className={`post-tag post-tag--${post.flair}`} title={flair.title}>
+            <span className="post-tag" title={flair.title}>
               {flair.tag}
             </span>
           )}
