@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { CallStrip } from "@/app/CallStrip";
 import { FeedComposer } from "@/app/FeedComposer";
 import { CoverEyebrow, InterestPicker, MixBanner, MutedNotice, SeeMore, TopicChips, TopicHeader, type TopicView } from "@/app/FeedTopics";
 import { avatarGradient } from "@/app/lib/avatar";
@@ -271,7 +270,6 @@ export function FeedSwitcher({ posts }: { posts: Post[] }) {
               onNotInterested={() => notInterested(openTopicData.id)}
             />
           )}
-          <CallStrip posts={visible} />
           <div className="feed-list" ref={listRef}>
             {home && !mixed && interests.ids.length === 0 && (
               <p className="feed-covers-empty">
