@@ -9,7 +9,7 @@ import { archetypeFor } from "@/app/lib/profileTraits";
 import { VIEWER_RANK, canChallenge, canViewPortfolio, challengeTierNeeded } from "@/app/lib/rank";
 import type { ChallengeState } from "@/app/profile/[handle]/ChallengeDialog";
 import { HighlightReel } from "@/app/profile/[handle]/HighlightReel";
-import { ProfileAchievements } from "@/app/profile/[handle]/ProfileAchievements";
+import { AchievementsPanel, ProfileAchievements } from "@/app/profile/[handle]/ProfileAchievements";
 import { ProfileView } from "@/app/profile/[handle]/ProfileView";
 import { pendingChallengeTo } from "@/lib/challenges";
 
@@ -35,6 +35,9 @@ export default async function ProfilePage({ params }: { params: Promise<{ handle
     challenge = pending ? { kind: "pending", id: pending.id, terms: challengeTerms(pending) } : { kind: "ready" };
   }
 
+  const records = RECORDS[profile.handle] ?? null;
+  const highlights = PINNED_OMENS[profile.handle] ?? [];
+
   return (
     <main className="feed-shell">
       <ProfileView
@@ -46,9 +49,14 @@ export default async function ProfilePage({ params }: { params: Promise<{ handle
         initiallyFollowing={FOLLOWED_HANDLES.includes(profile.handle)}
         traits={{ accuracy: ACCURACY[profile.handle] ?? [], archetype: archetypeFor(STYLES[profile.handle]) }}
         challenge={challenge}
+        showcase={{
+          achievements: <AchievementsPanel records={records} seed={profile.handle} />,
+          // HighlightReel renders nothing for a trader with no pins, so don't offer the face.
+          reel: highlights.length > 0 ? <HighlightReel highlights={highlights} /> : undefined,
+        }}
       />
-      <ProfileAchievements records={RECORDS[profile.handle] ?? null} seed={profile.handle}>
-        <HighlightReel highlights={PINNED_OMENS[profile.handle] ?? []} />
+      <ProfileAchievements records={records} seed={profile.handle}>
+        <HighlightReel highlights={highlights} />
       </ProfileAchievements>
     </main>
   );

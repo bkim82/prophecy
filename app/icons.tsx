@@ -275,3 +275,22 @@ export function DaredevilIcon({ className }: { className?: string }) {
     </svg>
   );
 }
+
+export function TrophyIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4.5 2h7v3.5a3.5 3.5 0 0 1-7 0Z" />
+      <path d="M4.5 3.5H2.5c0 2 .8 3 2.3 3.3M11.5 3.5h2c0 2-.8 3-2.3 3.3" />
+      <path d="M8 9v3M5.5 14h5M6.5 12h3" />
+    </svg>
+  );
+}
+
+// Four-point ✦, the highlight reel's mark.
+export function SparkleIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M8 1.5c.5 3.6 1.9 5 5.5 6.5-3.6 1.5-5 2.9-5.5 6.5C7.5 10.9 6.1 9.5 2.5 8 6.1 6.5 7.5 5.1 8 1.5Z" />
+    </svg>
+  );
+}
