@@ -676,7 +676,7 @@ button { cursor: pointer; }
 .clash-pick { min-height: 36px; border: 1px solid color-mix(in srgb, currentColor 40%, var(--line)); border-radius: 8px; background: transparent; font-size: 12px; font-weight: 700; transition: background .15s ease, border-color .15s ease; }
 .clash-pick:hover, .clash-pick[aria-pressed="true"] { background: color-mix(in srgb, currentColor 12%, transparent); }
 .clash-pick[aria-pressed="true"] { border-color: currentColor; }
-/* Composer + call strip head the feed panel. */
+/* Composer heads the feed panel. */
 .feed-composer { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--line); }
 .feed-composer:focus-within { box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--violet) 60%, transparent); }
 .feed-composer-avatar { flex: none; display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface-raised); color: var(--text); font-size: 13px; font-weight: 700; }
@@ -686,13 +686,6 @@ button { cursor: pointer; }
 .feed-composer-trade:hover { background: var(--surface-hover); }
 .feed-composer-post { flex: none; min-height: 32px; padding: 0 16px; border: 0; border-radius: 8px; background: var(--violet-strong); color: var(--bg); font-size: 12px; font-weight: 700; }
 .feed-composer-post:disabled { opacity: .45; cursor: default; }
-.call-strip { display: flex; gap: 8px; padding: 12px 18px; overflow-x: auto; border-bottom: 1px solid var(--line); scrollbar-width: none; }
-.call-strip::-webkit-scrollbar { display: none; }
-.call-chip { --ring: var(--chart-up); flex: none; display: inline-flex; align-items: center; gap: 8px; padding: 4px 12px 4px 6px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-raised); color: var(--text); font-family: var(--font-mono), ui-monospace, monospace; font-size: 11px; font-weight: 600; text-decoration: none; transition: border-color .15s ease; }
-.call-chip.is-down { --ring: var(--chart-down); }
-.call-chip:hover { border-color: var(--line-strong); }
-.call-chip-avatar { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 999px; color: #fff; font-family: var(--font-sans), Inter, system-ui, sans-serif; font-size: 10px; font-weight: 700; box-shadow: 0 0 0 2px var(--surface-raised), 0 0 0 3.5px var(--ring); }
-.call-chip-roi { color: var(--ring); }
 /* Interest topics (app/FeedTopics.tsx), inside .feed-panel under the
    composer: Mix it up banner → topic chips → interests picker → topic header.
    --topic is the topic's own color (app/lib/topics.ts), set inline. */
@@ -2045,7 +2038,6 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
   .post-card { padding: 12px 14px; gap: 10px; }
   .feed-composer { gap: 8px; padding: 12px 14px; }
   .feed-composer-trade, .feed-composer-post { min-height: 30px; padding: 0 10px; font-size: 11px; }
-  .call-strip { padding: 10px 14px; }
   .post-avatar { width: 32px; height: 32px; font-size: 11px; }
   .post-meta { font-size: 9px; }
   .post-meta strong { font-size: 11px; }

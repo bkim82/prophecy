@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { CallStrip } from "@/app/CallStrip";
 import { FeedComposer } from "@/app/FeedComposer";
 import { FeedNotifications } from "@/app/FeedNotifications";
 import { CoverEyebrow, InterestPicker, MixBanner, MutedNotice, SeeMore, TopicChips, TopicHeader, type TopicView } from "@/app/FeedTopics";
@@ -188,7 +187,6 @@ export function FeedSwitcher({ posts }: { posts: Post[] }) {
               onNotInterested={() => notInterested(openTopicData.id)}
             />
           )}
-          <CallStrip posts={visible} />
           <div className="feed-list">
             {home && !mixed && interests.ids.length === 0 && (
               <p className="feed-covers-empty">
