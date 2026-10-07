@@ -6,6 +6,7 @@ import { AccountMenu } from "./AccountMenu";
 import { ActiveMatchBar } from "./ActiveMatchBar";
 import { BalancePill } from "./BalancePill";
 import { MobileBottomNav } from "./MobileBottomNav";
+import { MobileChromeAutoHide } from "./MobileChromeAutoHide";
 import { QuickTicketBar } from "./QuickTicketBar";
 import { TabNav } from "./TabNav";
 import { DEFAULT_THEME, THEME_INIT_SCRIPT } from "./theme";
@@ -63,6 +64,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </header>
           {children}
           <MobileBottomNav />
+          <MobileChromeAutoHide />
           <QuickTicketBar />
           <ActiveMatchBar />
         </ClerkProvider>
