@@ -26,6 +26,7 @@ import { EditProfileDialog, type EditableProfile } from "@/app/profile/EditProfi
 import type { MatchHistoryEntry, MatchRecord } from "@/lib/match";
 import { rankTier } from "@/app/lib/rank";
 import { ChallengeControl, type ChallengeState } from "@/app/profile/[handle]/ChallengeDialog";
+import { ProfileShowcase, type ShowcasePanels } from "@/app/profile/[handle]/ProfileShowcase";
 import { cancelChallenge } from "@/app/profile/challengeActions";
 import { MarketCallCard, PostCard } from "@/app/PostCard";
 import { RankBadge } from "@/app/RankBadge";
@@ -94,9 +95,11 @@ type ProfileViewProps = {
   // of Follow, copy earnings under the hero, and a Matches tab with Pin
   // buttons (the highlight reel itself lives in the rail, HighlightReel.tsx).
   self?: OwnProfile;
+  // The rail's panels, offered as faces of the hero ≤768px (ProfileShowcase.tsx).
+  showcase?: ShowcasePanels;
 };
 
-export function ProfileView({ profile, activity, portfolio, portfolioLocked, viewerRank, initiallyFollowing, traits, challenge, self }: ProfileViewProps) {
+export function ProfileView({ profile, activity, portfolio, portfolioLocked, viewerRank, initiallyFollowing, traits, challenge, self, showcase }: ProfileViewProps) {
   const [tab, setTab] = useState<TabId>(self ? "matches" : "omens");
   const [editing, setEditing] = useState(false);
   // Own profiles may have no handle yet; the page supplies a stable seed instead.
@@ -126,7 +129,7 @@ export function ProfileView({ profile, activity, portfolio, portfolioLocked, vie
 
   return (
     <div className="feed-main">
-      <section className={`profile-hero${profile.banner ? " has-banner" : ""}`} data-rank={rankTier(profile.rank)}>
+      <ProfileShowcase className={`profile-hero${profile.banner ? " has-banner" : ""}`} rank={rankTier(profile.rank)} panels={showcase}>
         {profile.banner && <div className="profile-banner" aria-hidden="true" style={{ background: bannerBackground(profile.banner) }} />}
         <div className="profile-avatar" aria-hidden="true" style={{ background: avatarGradient(seed) }}>
           {/* Clerk-hosted; a plain img avoids allow-listing its domain for next/image. */}
@@ -199,7 +202,7 @@ export function ProfileView({ profile, activity, portfolio, portfolioLocked, vie
             </button>
           </ChallengeControl>
         )}
-      </section>
+      </ProfileShowcase>
 
       {self && <CopyEarningsCard earnings={self.copyEarnings} />}
       {self && editing && <EditProfileDialog initial={self.edit} onClose={() => setEditing(false)} />}

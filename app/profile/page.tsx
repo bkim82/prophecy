@@ -7,7 +7,7 @@ import { archetypeFor, isPinnableMatch, type Highlight } from "@/app/lib/profile
 import { VIEWER_COPY_EARNINGS, VIEWER_FOLLOWERS, VIEWER_RECORDS, VIEWER_STYLE } from "@/app/lib/mockViewer";
 import { VIEWER_RANK } from "@/app/lib/rank";
 import { HighlightReel } from "@/app/profile/[handle]/HighlightReel";
-import { ProfileAchievements } from "@/app/profile/[handle]/ProfileAchievements";
+import { AchievementsPanel, ProfileAchievements } from "@/app/profile/[handle]/ProfileAchievements";
 import { ProfileView, type ProfileMatch, type SentChallenge } from "@/app/profile/[handle]/ProfileView";
 import { pendingChallengesFrom } from "@/lib/challenges";
 import { historyEntryFor, marketAccuracyFor, matchRecordFor, settledMatchesByIds, settledMatchesFor } from "@/lib/match";
@@ -142,6 +142,7 @@ export default async function OwnProfilePage() {
     banner,
   };
   const seed = handle || userId;
+  const records = { ...VIEWER_RECORDS, duelsWon: record.won };
 
   return (
     <main className="feed-shell">
@@ -177,8 +178,12 @@ export default async function OwnProfilePage() {
             avatarSeed: seed,
           },
         }}
+        showcase={{
+          achievements: <AchievementsPanel records={records} seed={seed} />,
+          reel: <HighlightReel highlights={highlights} editable />,
+        }}
       />
-      <ProfileAchievements records={{ ...VIEWER_RECORDS, duelsWon: record.won }} seed={seed}>
+      <ProfileAchievements records={records} seed={seed}>
         <HighlightReel highlights={highlights} editable />
       </ProfileAchievements>
     </main>
