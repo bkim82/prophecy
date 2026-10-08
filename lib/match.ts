@@ -1,8 +1,8 @@
-import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { matches } from "@/db/schema";
-import { pulsePositionsPnl, type PulsePosition } from "@/lib/pulse";
-import { getSpotPrice, productForMarket } from "@/lib/spotPrice";
+import { pulseIsLiquidated, pulsePositionsPnl, type PulsePosition } from "@/lib/pulse";
+import { getRecentTrades, getSpotPrice, productForMarket } from "@/lib/spotPrice";
 import { creditPayout } from "@/lib/balance";
 
 export type MatchRow = typeof matches.$inferSelect;
@@ -42,6 +42,13 @@ export const pulsePositionsFor = (row: MatchRow, role: 1 | 2): PulsePosition[] =
 
 const pulseRealizedFor = (row: MatchRow, role: 1 | 2) =>
   (role === 1 ? row.pulseRealizedPnl1 : row.pulseRealizedPnl2) ?? 0;
+
+/** Compare-and-swap guard: this role's positions are still what `row` read. */
+export const pulsePositionsUnchanged = (row: MatchRow, role: 1 | 2) => {
+  const column = role === 1 ? matches.pulsePositions1 : matches.pulsePositions2;
+  const value = role === 1 ? row.pulsePositions1 : row.pulsePositions2;
+  return value === null ? isNull(column) : sql`${column} = ${JSON.stringify(value)}::jsonb`;
+};
 
 export async function findMatch(id: string): Promise<MatchRow | null> {
   const [row] = await getDb().select().from(matches).where(eq(matches.id, id));
@@ -88,6 +95,55 @@ export async function expireLocksIfDue(row: MatchRow): Promise<MatchRow> {
     .where(and(eq(matches.id, row.id), eq(matches.status, "predict")))
     .returning();
   return started ?? (await findMatch(row.id)) ?? row;
+}
+
+/**
+ * Stops out every open position whose liquidation price a trade touched
+ * between its fill and the round deadline: it closes at exactly −stake, so a
+ * balance can reach $0 but never go below. Runs before settlement and before
+ * every action, lazily off the polls like the other deadlines.
+ */
+export async function liquidateIfDue(row: MatchRow): Promise<MatchRow> {
+  if (row.status !== "countdown") return row;
+  const positions1 = pulsePositionsFor(row, 1);
+  const positions2 = pulsePositionsFor(row, 2);
+  if (positions1.length === 0 && positions2.length === 0) return row;
+  const product = productForMarket(row.market);
+  const tape = product ? await getRecentTrades(product) : null;
+  if (!tape) return row;
+
+  const deadline = deadlineOf(row) ?? Infinity;
+  const newest = tape[tape.length - 1].t;
+  const touched = (position: PulsePosition) =>
+    tape.some((trade) =>
+      trade.t >= (position.openedAt ?? newest) && trade.t <= deadline && pulseIsLiquidated(position, trade.p));
+  const stopOut = (positions: PulsePosition[], realized: number) => {
+    const hit = positions.filter(touched);
+    return {
+      hit: hit.length,
+      positions: positions.filter((position) => !hit.includes(position)),
+      realized: realized - hit.reduce((total, position) => total + position.stake, 0),
+    };
+  };
+  const side1 = stopOut(positions1, pulseRealizedFor(row, 1));
+  const side2 = stopOut(positions2, pulseRealizedFor(row, 2));
+  if (side1.hit === 0 && side2.hit === 0) return row;
+
+  const [updated] = await getDb()
+    .update(matches)
+    .set({
+      ...(side1.hit > 0 ? { pulsePositions1: side1.positions, pulseRealizedPnl1: side1.realized } : {}),
+      ...(side2.hit > 0 ? { pulsePositions2: side2.positions, pulseRealizedPnl2: side2.realized } : {}),
+    })
+    .where(and(
+      eq(matches.id, row.id),
+      eq(matches.status, "countdown"),
+      pulsePositionsUnchanged(row, 1),
+      pulsePositionsUnchanged(row, 2),
+    ))
+    .returning();
+  // No row back = a concurrent trade moved the positions; the next poll rechecks.
+  return updated ?? (await findMatch(row.id)) ?? row;
 }
 
 /**
@@ -173,6 +229,8 @@ export type MatchView = {
   pulseOpponentRealizedPnl: number;
   pulseYourProfit: number | null;
   pulseOpponentProfit: number | null;
+  /** Revealed only once settled, and only by the poll route (app/api/match/[id]/route.ts). */
+  opponentName: string | null;
   /** Lets the client correct for clock skew before running the countdown. */
   serverNow: number;
 };
@@ -204,7 +262,7 @@ export function viewFor(row: MatchRow, you: 1 | 2): MatchView {
     status: row.status as MatchStatus,
     you,
     opponentJoined: row.player2Id !== null,
-    opponentPresent: isFresh(oppLastSeen),
+    opponentPresent: row.botState?.role === (you === 1 ? 2 : 1) || isFresh(oppLastSeen),
     lockDeadlineAt: row.status === "predict" ? lockDeadlineOf(row) : null,
     roundStartAt: row.roundStartAt?.getTime() ?? null,
     deadlineAt: deadlineOf(row),
@@ -220,6 +278,7 @@ export function viewFor(row: MatchRow, you: 1 | 2): MatchView {
         ? row.pulseProfit2
         : row.pulseProfit1
       : null,
+    opponentName: null,
     serverNow: Date.now(),
   };
 }

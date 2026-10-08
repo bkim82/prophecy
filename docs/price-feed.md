@@ -45,7 +45,7 @@ it — a seed covering only the last 40s would leave most of the axis empty.
 ## Freshness / settlement guard
 
 - `getLivePrice()` returns last trade only if the socket was heard from (ticker **or heartbeat**) < `FRESH_MS`=5s ago, else `null` (`app/usePriceFeed.ts:58-62`). Was last-*trade* age, which nulled the price on any quiet tape.
-- `/api/price`: Coinbase spot → Binance fallback, each validated finite+positive before accept (`lib/spotPrice.ts:39-52`). Both fail → 502 (`app/api/price/route.ts:17`). The same chain settles a match (`lib/match.ts:72`).
+- `/api/price`: Coinbase Exchange ticker (same tape as the socket, ~1s fresh) → Coinbase `v2` spot (CDN-cached ~10s, fallback only) → Binance, each validated finite+positive before accept (`lib/spotPrice.ts:23-63`). Also prices multiplayer Pulse entries/closes (`app/api/match/[id]/action/route.ts:53`). Both fail → 502 (`app/api/price/route.ts:17`). The same chain settles a match (`lib/match.ts:72`).
 
 ## Reconnection
 

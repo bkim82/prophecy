@@ -63,6 +63,9 @@ export async function POST(request: Request) {
     eq(matches.timerSeconds, timerSeconds),
     isNotNull(matches.player1UserId),
     gt(matches.player1LastSeen, presenceCutoff()),
+    // Play pairs real players first; a lonely queue gets a bot after a few
+    // seconds (lib/bots.ts seatBotIfWaiting). Bot hosts are joined from the list.
+    isNull(matches.botState),
   );
 
   const candidates = await db

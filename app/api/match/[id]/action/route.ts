@@ -4,6 +4,7 @@ import { matches } from "@/db/schema";
 import {
   expireLocksIfDue,
   findMatch,
+  liquidateIfDue,
   pulsePositionsFor,
   readBody,
   roleOf,
@@ -15,7 +16,6 @@ import {
   isPulseSide,
   pulseAvailableCash,
   pulsePositionPnl,
-  PULSE_STAKE_MAX,
   type PulsePosition,
 } from "@/lib/pulse";
 import { getSpotPrice, productForMarket } from "@/lib/spotPrice";
@@ -44,7 +44,7 @@ export async function POST(
   if (!role) return Response.json({ error: "Not in this match" }, { status: 403 });
   if (found.mode !== "pulse") return Response.json({ error: "Not a Pulse match" }, { status: 409 });
 
-  const row = await settleIfDue(await expireLocksIfDue(found));
+  const row = await settleIfDue(await liquidateIfDue(await expireLocksIfDue(found)));
   if (row.status !== "countdown") return Response.json({ error: "Round is not live" }, { status: 409 });
   const product = productForMarket(row.market);
   if (!product) return Response.json({ error: "Unsupported market" }, { status: 400 });
@@ -60,7 +60,7 @@ export async function POST(
     const stake = Number(body.stake);
     const leverage = Number(body.leverage);
     if (!isPulseSide(side)) return Response.json({ error: "Invalid side" }, { status: 400 });
-    if (!Number.isFinite(stake) || stake <= 0 || stake > PULSE_STAKE_MAX) {
+    if (!Number.isFinite(stake) || stake <= 0) {
       return Response.json({ error: "Invalid stake" }, { status: 400 });
     }
     if (stake > pulseAvailableCash(current, realized)) {
@@ -70,12 +70,13 @@ export async function POST(
       return Response.json({ error: "Invalid leverage" }, { status: 400 });
     }
     nextPositions = [...current, {
-      id: crypto.randomUUID(), side, entryPrice: spot.price, stake, leverage,
+      id: crypto.randomUUID(), side, entryPrice: spot.price, stake, leverage, openedAt: spot.at,
     }];
   } else {
     const positionId = typeof body.positionId === "string" ? body.positionId : "";
     const position = current.find((item) => item.id === positionId);
-    if (!position) return Response.json({ error: "Position is already closed" }, { status: 409 });
+    // Already gone (liquidated just above, or a double-press): nothing to close.
+    if (!position) return Response.json(viewFor(row, role));
     nextPositions = current.filter((item) => item.id !== positionId);
     nextRealized += pulsePositionPnl(position, spot.price);
   }

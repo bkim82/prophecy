@@ -15,6 +15,6 @@ Agent-readable fact sheets, not prose. Format: flat bullets, `file:line` refs, n
 - [wallet-trading-plan.md](wallet-trading-plan.md) — plan to make Send/Swap real (not built): phases, security protocols, open decisions
 - [chart.md](chart.md) — SVG chart geometry, layers, scaling
 - [roadmap.md](roadmap.md) — unbuilt features, known gaps
-- [multiplayer-plan.md](multiplayer-plan.md) — server-authoritative multiplayer Pulse: match lifecycle, guarded updates, presence
+- [multiplayer-plan.md](multiplayer-plan.md) — server-authoritative multiplayer Pulse: match lifecycle, guarded updates, presence, house bots
 
 Multiplayer Pulse is server-authoritative (Neon Postgres `matches` table, anonymous per-browser ids); the chart and price feed stay client-side. Solo Pulse remains client-only. `/api/price` and `/api/history` stay stateless proxies. Solo Pulse needs no auth. The 24h Portfolio is also server-authoritative (Neon Postgres `portfolio_sessions`/`positions` tables) but is Clerk-`userId`-scoped, not anonymous — signing in is required (see [portfolio.md](portfolio.md)).

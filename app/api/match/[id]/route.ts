@@ -1,5 +1,6 @@
 import {
   expireLocksIfDue,
+  liquidateIfDue,
   roleOf,
   settleFundsIfNeeded,
   settleIfDue,
@@ -7,6 +8,8 @@ import {
   viewFor,
 } from "@/lib/match";
 import { auth } from "@clerk/nextjs/server";
+import { driveBot, seatBotIfWaiting } from "@/lib/bots";
+import { opponentNames } from "@/lib/opponentNames";
 
 export const dynamic = "force-dynamic";
 
@@ -42,9 +45,19 @@ export async function GET(request: Request, ctx: { params: Promise<{ id: string 
 
   // Both deadlines are lazy: a poll is the only thing that moves the row on.
   // Expiry can hand back a `countdown` row, so settlement runs on its result.
-  const row = await settleIfDue(await expireLocksIfDue(touched));
+  // A house bot takes a lonely queue's seat and makes its trades here too.
+  // Liquidation runs first so the bot and settlement never see a dead position.
+  const live = await liquidateIfDue(await expireLocksIfDue(await seatBotIfWaiting(touched)));
+  const row = await settleIfDue(await driveBot(live));
   await settleFundsIfNeeded(row);
-  return Response.json(viewFor(row, role), {
+  const view = viewFor(row, role);
+  // Who you played stays hidden until the round is over.
+  if (row.status === "settled") {
+    const opponentUserId = role === 1 ? row.player2UserId : row.player1UserId;
+    const names = await opponentNames([opponentUserId]);
+    view.opponentName = (opponentUserId && names.get(opponentUserId)) || null;
+  }
+  return Response.json(view, {
     headers: { "Cache-Control": "no-store" },
   });
 }
