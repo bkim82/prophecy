@@ -12,11 +12,12 @@ import { rankTier } from "@/app/lib/rank";
 import { RankBadge } from "@/app/RankBadge";
 import { POST_REPLIES, type Clash, type Market, type MarketCall, type Post, type PostFlair, type Reply, type Share } from "@/app/lib/mockPosts";
 import { TopicIcon } from "@/app/FeedTopics";
-import { BookmarkIcon, ClashIcon, CommentIcon, DefyIcon, FlameIcon, HeartIcon, TrendIcon, VouchIcon } from "@/app/icons";
+import { BookmarkIcon, ClashIcon, CommentIcon, FlameIcon, HeartIcon, TrendIcon } from "@/app/icons";
 import { postTopics, topicById, type TopicId } from "@/app/lib/topics";
 import { PostMedia } from "@/app/PostMedia";
 import { PostMenu } from "@/app/PostMenu";
-import { ReshareHead, type ReshareKind } from "@/app/PostShare";
+import { ReshareHead, type Reshare } from "@/app/PostShare";
+import { RepostMenu } from "@/app/RepostMenu";
 
 // Short tag at the right of the meta row; the full sentence is its tooltip.
 const FLAIRS: Record<PostFlair, { tag: string; title: string }> = {
@@ -320,17 +321,21 @@ export const postHref = (post: Post) => (post.id.startsWith("local-") ? undefine
 
 // Clicks on the row's background open the post page, like X/Reddit. Anything
 // interactive inside keeps its own click, and selecting text doesn't navigate.
-const INTERACTIVE = "a, button, input, textarea, label, form, [role='button'], [role='menu']";
+// The repost dialog is portaled out of the row, but its clicks still bubble
+// here through React, so anything outside the row's DOM is ignored too.
+const INTERACTIVE = "a, button, input, textarea, label, form, dialog, [role='button'], [role='menu']";
 
 // `context` is a line above the row (the For You cover's "Because you're
 // interested in …"); `footer` sits under the actions. `detail` is the post
 // page layout (app/post/[id]/PostThread.tsx): full text, topic pills, no
 // inline thread — `onReply` then focuses that page's reply box instead.
-// `onNotInterested` adds "Not interested in <topic>" to the ⋯ menu. `share`
+// `onNotInterested` adds "Not interested in <topic>" to the ⋯ menu, and
+// `onDelete` adds Delete post there for your own (`post.mine`) posts. `share`
 // is a followed account's vouch/defy: like an X quote post, the sharer gets
 // their own header row and the original post drops into a bordered card
-// under it (your own vouch/defy does the same, replacing theirs). None of it
-// applies to streak/promo/clash cards.
+// under it (your own repost/vouch/defy does the same, with your words if you
+// added any, replacing theirs). None of it applies to streak/promo/clash
+// cards.
 export function PostCard({
   post,
   context,
@@ -338,6 +343,7 @@ export function PostCard({
   detail = false,
   onReply,
   onNotInterested,
+  onDelete,
   share,
 }: {
   post: Post;
@@ -346,14 +352,15 @@ export function PostCard({
   detail?: boolean;
   onReply?: () => void;
   onNotInterested?: (id: TopicId) => void;
+  onDelete?: () => void;
   share?: Share;
 }) {
   const router = useRouter();
   const [repliesOpen, setRepliesOpen] = useState(false);
   const [liked, setLiked] = useState(false);
-  // Your own repost of this post — a vouch or a defy, not both. Local only,
-  // like likes.
-  const [reshared, setReshared] = useState<ReshareKind | null>(null);
+  // Your own repost of this post — one kind (repost, vouch or defy) plus
+  // optional words. Local only, like likes.
+  const [reshared, setReshared] = useState<Reshare | null>(null);
   const [expanded, setExpanded] = useState(false);
   const bookmarks = useBookmarks();
 
@@ -372,11 +379,17 @@ export function PostCard({
   // duplicate, so it stays out of the tab order and the a11y tree.
   const avatarProps = { className: "post-avatar", "aria-hidden": true, style: { background: avatarGradient(post.handle) } };
   const likes = post.likes + (liked ? 1 : 0);
-  const vouches = (post.vouches ?? 0) + (reshared === "vouch" ? 1 : 0);
-  const defies = (post.defies ?? 0) + (reshared === "defy" ? 1 : 0);
-  const toggleReshare = (kind: ReshareKind) => setReshared((current) => (current === kind ? null : kind));
+  const mine = post.mine === true;
+  // A deleted post shouldn't linger in Bookmarked as a dangling id.
+  const deletePost =
+    mine && onDelete
+      ? () => {
+          if (bookmarked) bookmarks.toggle(post.id);
+          onDelete();
+        }
+      : undefined;
   const reshare = reshared ? (
-    <ReshareHead kind={reshared} name="You" timestamp="now" />
+    <ReshareHead kind={reshared.kind} name="You" timestamp="now" text={reshared.text} />
   ) : share ? (
     <ReshareHead kind={share.kind} name={share.name} handle={share.handle} timestamp={share.timestamp} />
   ) : null;
@@ -384,7 +397,8 @@ export function PostCard({
   const embedded = reshare !== null && !detail;
 
   function openPost(event: MouseEvent<HTMLElement>) {
-    if (!url || (event.target as HTMLElement).closest(INTERACTIVE) || window.getSelection()?.toString()) return;
+    const target = event.target as HTMLElement;
+    if (!url || !event.currentTarget.contains(target) || target.closest(INTERACTIVE) || window.getSelection()?.toString()) return;
     if (event.metaKey || event.ctrlKey) window.open(url, "_blank");
     else router.push(url);
   }
@@ -423,7 +437,7 @@ export function PostCard({
               {flair.tag}
             </span>
           )}
-          <PostMenu firstName={firstName} topics={topics} onNotInterested={onNotInterested} />
+          <PostMenu firstName={firstName} topics={topics} onNotInterested={onNotInterested} mine={mine} onDelete={deletePost} />
         </span>
       </div>
       <div className={`post-content${isLongPost && !expanded ? " is-collapsed" : ""}`}>
@@ -470,30 +484,7 @@ export function PostCard({
           <CommentIcon />
           {compact(post.replies)}
         </button>
-        <button
-          type="button"
-          className={`action-vouch${reshared === "vouch" ? " is-active" : ""}`}
-          aria-pressed={reshared === "vouch"}
-          aria-label={`Vouch (${vouches}): repost to your followers as one you back`}
-          title="Vouch: repost to your followers as one you back"
-          onClick={() => toggleReshare("vouch")}
-        >
-          <VouchIcon />
-          <span className="action-label">Vouch</span>
-          {compact(vouches)}
-        </button>
-        <button
-          type="button"
-          className={`action-defy${reshared === "defy" ? " is-active" : ""}`}
-          aria-pressed={reshared === "defy"}
-          aria-label={`Defy (${defies}): repost to your followers as one you're against`}
-          title="Defy: repost to your followers as one you're against"
-          onClick={() => toggleReshare("defy")}
-        >
-          <DefyIcon />
-          <span className="action-label">Defy</span>
-          {compact(defies)}
-        </button>
+        <RepostMenu post={post} mine={mine} reshare={reshared} onChange={setReshared} />
         <button
           type="button"
           className={`action-bookmark${bookmarked ? " is-active" : ""}`}

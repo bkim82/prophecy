@@ -158,7 +158,7 @@ export function ClashIcon({ className }: { className?: string }) {
   );
 }
 
-// Post action row (app/PostCard.tsx): like → comment → vouch → defy, then bookmark.
+// Post action row (app/PostCard.tsx): like → comment → repost, then bookmark.
 export function HeartIcon({ className, filled = false }: { className?: string; filled?: boolean }) {
   return (
     <svg viewBox="0 0 20 20" className={className} fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -171,6 +171,37 @@ export function CommentIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 20 20" className={className} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M4.2 4h11.6c.9 0 1.7.8 1.7 1.7v7.1c0 .9-.8 1.7-1.7 1.7H9.4L5.8 17.4v-2.9H4.2c-.9 0-1.7-.8-1.7-1.7V5.7C2.5 4.8 3.3 4 4.2 4Z" />
+    </svg>
+  );
+}
+
+// Repost: two arrows chasing each other. The action row's one repost button;
+// its menu (app/RepostMenu.tsx) picks plain repost, vouch or defy.
+export function RepostIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" className={className} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4.5 9V7.5A2.5 2.5 0 0 1 7 5h8.5M13 2.5 15.5 5 13 7.5" />
+      <path d="M15.5 11v1.5A2.5 2.5 0 0 1 13 15H4.5M7 17.5 4.5 15 7 12.5" />
+    </svg>
+  );
+}
+
+// Pen over a line — "Add your words" to a repost.
+export function PenIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" className={className} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12.6 3.9a1.8 1.8 0 0 1 2.5 2.5L7.2 14.3l-3.4.9.9-3.4 7.9-7.9Z" />
+      <path d="M11.3 5.2l2.5 2.5M10.5 16.5h6" />
+    </svg>
+  );
+}
+
+// Lidded bin — Delete post in the ⋯ menu.
+export function TrashIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" className={className} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3.5 5.5h13M8 5.5V4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1.5" />
+      <path d="m5.3 5.5.8 10.1a1.5 1.5 0 0 0 1.5 1.4h4.8a1.5 1.5 0 0 0 1.5-1.4l.8-10.1M8.5 9v4.5M11.5 9v4.5" />
     </svg>
   );
 }
