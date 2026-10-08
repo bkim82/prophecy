@@ -100,9 +100,11 @@ export type Post = {
   timestamp: string;
   likes: number;
   replies: number;
-  // Display-only counts beside the Vouch / Defy actions (app/PostCard.tsx);
-  // nothing increments them. Both are reposts to your followers: Vouch = one
-  // you back, Defy = one you're against.
+  // Display-only repost counts, summed on the Repost button and listed per
+  // kind in its menu (app/RepostMenu.tsx); nothing increments them. All three
+  // are reposts to your followers: plain, Vouch = one you back, Defy = one
+  // you're against. No mock post sets `reposts` yet.
+  reposts?: number;
   vouches?: number;
   defies?: number;
   kind: PostKind;
@@ -120,6 +122,9 @@ export type Post = {
   topics?: TopicId[];
   flair?: PostFlair;
   clash?: Clash;
+  // Written by the viewer (FeedComposer posts): deletable from the ⋯ menu,
+  // and it can be reposted but not vouched for or defied.
+  mine?: boolean;
 };
 
 // Platform-wide count beside "Live Calls" in the feed rail — a hardcoded

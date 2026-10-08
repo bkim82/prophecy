@@ -19,7 +19,7 @@ export function FeedComposer({ onPost }: { onPost: (post: Post) => void }) {
     event.preventDefault();
     const content = text.trim();
     if (!content) return;
-    onPost({ id: `local-${Date.now()}`, author: name, handle, avatarInitial: initial, content, timestamp: "now", likes: 0, replies: 0, kind: "text" });
+    onPost({ id: `local-${Date.now()}`, author: name, handle, avatarInitial: initial, content, timestamp: "now", likes: 0, replies: 0, kind: "text", mine: true });
     setText("");
   }
 

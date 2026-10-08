@@ -91,11 +91,11 @@ export function ageMinutes(timestamp: string): number {
   return Number(match[1]) * { s: 1 / 60, m: 1, h: 60, d: 1440 }[match[2] as "s" | "m" | "h" | "d"];
 }
 
-// Hacker-News-style hotness: log engagement minus age. Replies, vouches and
-// defies count for more than likes; every 45 minutes costs a 10× engagement
-// edge.
+// Hacker-News-style hotness: log engagement minus age. Replies and reposts
+// (plain, vouches, defies) count for more than likes; every 45 minutes costs
+// a 10× engagement edge.
 function postScore(post: Post): number {
-  const engagement = post.likes + 2 * ((post.vouches ?? 0) + (post.defies ?? 0)) + 3 * post.replies;
+  const engagement = post.likes + 2 * ((post.reposts ?? 0) + (post.vouches ?? 0) + (post.defies ?? 0)) + 3 * post.replies;
   return Math.log10(1 + engagement) - ageMinutes(post.timestamp) / 45;
 }
 

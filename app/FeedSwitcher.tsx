@@ -49,7 +49,8 @@ export function FeedSwitcher({ posts }: { posts: Post[] }) {
   // "Mix it up": the For You home as a round-robin blend instead of covers.
   const [mixed, setMixed] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
-  // Posts written in the composer this session, newest first. Never persisted.
+  // Posts written in the composer this session, newest first. Never persisted;
+  // deleting one (its ⋯ menu) just drops it from here.
   const [localPosts, setLocalPosts] = useState<Post[]>([]);
   const { ids: bookmarkIds } = useBookmarks();
   const interests = useInterests();
@@ -210,6 +211,7 @@ export function FeedSwitcher({ posts }: { posts: Post[] }) {
                   post={post}
                   share={FOLLOWED_SHARES.get(post.id)}
                   onNotInterested={onNotInterested}
+                  onDelete={post.mine ? () => setLocalPosts((current) => current.filter((local) => local.id !== post.id)) : undefined}
                   context={cover && <CoverEyebrow topic={cover} onNotInterested={() => notInterested(cover.id, post.id)} />}
                   footer={cover && <SeeMore topic={cover} onClick={() => openTopic(cover.id)} />}
                 />
