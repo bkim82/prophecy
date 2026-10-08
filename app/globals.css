@@ -1730,6 +1730,15 @@ a.post-avatar { text-decoration: none; }
 .pulse-stage { --play-a: #a283f0; --play-b: #6a45d1; --play-a-hover: #b79cf7; }
 [data-theme="light"] .pulse-stage { --play-a: #8a63d2; --play-b: #5b35a8; --play-a-hover: #9b78dc; }
 .pulse-stage .practice-button { width: 100%; padding: 9px; font-size: 12px; }
+/* Practice + Tutorial share one row under Play; the tutorial nudge sits above the play controls until it's finished (app/duel/tutorial/progress.ts). */
+.play-secondary { display: flex; gap: 8px; }
+.pulse-stage .play-secondary { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+.tutorial-callout { display: flex; align-items: center; gap: 12px; border: 1px solid color-mix(in srgb, var(--brand) 40%, var(--line)); border-radius: 10px; background: color-mix(in srgb, var(--brand) 8%, var(--surface)); padding: 10px 12px; color: var(--text); text-decoration: none; transition: border-color .15s ease, background .15s ease; }
+.tutorial-callout:hover { border-color: var(--brand); background: color-mix(in srgb, var(--brand) 13%, var(--surface)); }
+.tutorial-callout > span:first-child { display: grid; gap: 2px; min-width: 0; }
+.tutorial-callout strong { font-size: 13px; }
+.tutorial-callout .muted { font-size: 11.5px; }
+.tutorial-callout-cta { flex: none; margin-left: auto; color: var(--brand-strong); font-size: 12px; font-weight: 700; white-space: nowrap; }
 .pulse-stage .queue-panel { flex-wrap: wrap; align-content: start; }
 .pulse-stage .queue-copy { flex: 1 1 calc(100% - 40px); }
 @keyframes play-glow { 0%, 100% { box-shadow: 0 10px 30px color-mix(in srgb, var(--violet) 35%, transparent), inset 0 1px 0 rgba(255, 255, 255, .25); } 50% { box-shadow: 0 10px 46px color-mix(in srgb, var(--violet) 70%, transparent), inset 0 1px 0 rgba(255, 255, 255, .25); } }
@@ -2569,3 +2578,128 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
 .profile-setup-mark { color: var(--brand-strong); font-size: 18px; }
 .profile-setup-text { display: grid; flex: 1; gap: 2px; min-width: 0; font-size: 14px; }
 .profile-setup-text .muted { font-size: 12.5px; }
+
+/* Pulse tutorial (app/duel/tutorial): lesson stepper, lesson/debrief cards,
+   the scripted LessonChart, leverage slider/chips/tables, and the live
+   round's coach line. Market-tinted via the shell's data-market like the arena.
+   Layout: named grid areas. Stacked (phones/tablets) the chart sits between
+   the lesson and its controls; .is-split at ≥1024px puts head/lesson/controls/
+   debrief in a left column and pins the chart (.tut-stage) on the right. */
+.tut-shell { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "brief" "chart" "dock" "debrief"; row-gap: 14px; align-items: start; width: min(100% - 32px, 1180px); margin: 0 auto; padding: 16px 0 40px; }
+.tut-shell:not(.is-split) { width: min(100% - 32px, 760px); }
+.tut-head { grid-area: head; display: grid; gap: 10px; min-width: 0; }
+.tut-head-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.tut-back { display: inline-flex; min-height: 32px; align-items: center; color: var(--muted-dim); font-size: 11px; letter-spacing: .08em; text-decoration: none; text-transform: uppercase; transition: color .15s ease; }
+.tut-back:hover { color: var(--text); }
+.tut-head .arena-market-title { margin: 0; gap: 8px; font-size: 11px; letter-spacing: .16em; }
+.tut-head .arena-market-badge { gap: 5px; padding: 2px 9px 2px 4px; box-shadow: none; font-size: 11px; }
+.tut-head .arena-market-badge .market-symbol { width: 16px; height: 16px; font-size: 12px; }
+.tut-steps { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; margin: 0; padding: 0; list-style: none; }
+.tut-step { display: flex; width: 100%; flex-direction: column; align-items: center; gap: 4px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); padding: 6px 2px; color: var(--muted); font-size: 10px; transition: border-color .15s ease, background .15s ease, color .15s ease; }
+.tut-step:hover { border-color: var(--line-strong); color: var(--text); }
+.tut-step-dot { display: grid; place-items: center; width: 20px; height: 20px; border: 1px solid var(--line-strong); border-radius: 999px; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.tut-step-label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tut-step.is-done .tut-step-dot { border-color: color-mix(in srgb, var(--positive) 60%, transparent); background: color-mix(in srgb, var(--positive) 16%, transparent); color: var(--positive); }
+.tut-step.is-current { border-color: var(--market-accent); background: color-mix(in srgb, var(--market-accent) 10%, var(--surface)); color: var(--text); }
+.tut-step.is-current .tut-step-dot { border-color: var(--market-accent); background: var(--market-accent); color: var(--market-accent-contrast); }
+.tut-balance { margin: 0 0 0 auto; border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; color: var(--muted); font-size: 11px; white-space: nowrap; }
+.tut-balance strong { color: var(--text); font-weight: 600; }
+
+.tut-card { grid-area: brief; min-width: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 16px 18px; }
+.tut-card.is-collapsed { padding-block: 12px; }
+.tut-card.is-collapsed > :not(.tut-kicker, .tut-title) { display: none; }
+.tut-shell .tut-card.is-collapsed .tut-title { font-size: 17px; }
+.tut-controls { grid-area: dock; min-width: 0; }
+.tut-hero { padding: 24px; }
+.tut-kicker { margin: 0; color: var(--market-accent-strong); font-size: 10px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+.tut-title { margin: 6px 0 0; color: var(--text); font-size: clamp(20px, 3.4vw, 26px); font-weight: 700; line-height: 1.2; }
+.tut-body { max-width: 66ch; margin: 10px 0 0; color: var(--text); font-size: 14px; line-height: 1.55; }
+.tut-body.muted { color: var(--muted); font-size: 13px; }
+.tut-key, .tut-warn { max-width: 66ch; margin: 12px 0 0; border-left: 3px solid var(--market-accent); border-radius: 0 8px 8px 0; background: color-mix(in srgb, var(--market-accent) 9%, transparent); padding: 10px 12px; color: var(--text); font-size: 13.5px; line-height: 1.5; }
+.tut-warn { border-left-color: var(--negative); background: color-mix(in srgb, var(--negative) 8%, transparent); }
+.tut-tips { display: grid; gap: 4px; margin: 10px 0 0; padding-left: 18px; list-style: disc; color: var(--text); font-size: 13.5px; line-height: 1.5; }
+.tut-intro-list { display: grid; gap: 8px; margin: 16px 0 0; padding: 0; list-style: none; }
+.tut-intro-list li { display: grid; gap: 2px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-raised); padding: 10px 12px; }
+.tut-intro-list strong { color: var(--text); font-size: 14px; }
+.tut-intro-list span { color: var(--muted); font-size: 12.5px; line-height: 1.45; }
+.tut-recap { display: grid; gap: 6px; margin: 14px 0 0; padding-left: 20px; list-style: decimal; color: var(--text); font-size: 14px; line-height: 1.5; }
+.tut-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+.tut-button-primary, .tut-button-secondary { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; gap: 8px; border-radius: 8px; padding: 0 18px; font-size: 14px; text-decoration: none; transition: background .15s ease, border-color .15s ease, box-shadow .2s ease; }
+.tut-button-primary { border: 1px solid var(--brand); background: var(--btn-bg); color: var(--btn-text); font-weight: 700; }
+.tut-button-primary:hover { background: var(--btn-bg-hover); box-shadow: 0 0 20px color-mix(in srgb, var(--brand) 35%, transparent); }
+.tut-button-secondary { border: 1px solid var(--line); background: transparent; color: var(--text); font-weight: 600; }
+.tut-button-secondary:hover { border-color: var(--line-strong); background: var(--surface-hover); }
+
+.tut-stage { grid-area: chart; min-width: 0; scroll-margin-top: 12px; }
+.tut-live-price { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: center; gap: 4px 10px; margin: 10px 0 8px; }
+.tut-live-price strong { color: var(--text); font-size: 26px; font-weight: 600; }
+.tut-stage-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; margin-bottom: 8px; padding: 0 2px; }
+.tut-stage-price { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; font-size: 13px; font-weight: 600; }
+.tut-stage-price strong { color: var(--text); font-size: 18px; font-weight: 700; }
+.tut-stage-label { color: var(--market-accent-strong); font-size: 11px; font-weight: 700; letter-spacing: .08em; }
+.tut-stage-clock { display: flex; min-width: 0; align-items: center; gap: 8px; margin-left: auto; }
+.tut-stage-clock > span { display: grid; gap: 1px; }
+.tut-stage-clock strong { color: var(--text); font-size: 12px; }
+.tut-stage-clock .muted { font-size: 10.5px; }
+.tut-chart { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 8px; font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace; }
+.arena-shell[data-market] .tut-chart { border-color: color-mix(in srgb, var(--market-accent) 45%, var(--line)); box-shadow: 0 0 0 1px color-mix(in srgb, var(--market-accent) 12%, transparent), 0 0 24px color-mix(in srgb, var(--market-accent) 10%, transparent); }
+.tut-chart svg { display: block; }
+.tut-head-wait { transform-box: fill-box; transform-origin: center; animation: mc-breathe 1.3s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .tut-head-wait { animation: none; } }
+
+.tut-locked { font-size: 13px; font-weight: 600; }
+.tut-peak-note { margin: 8px 0; text-align: center; color: var(--muted); font-size: 12px; }
+.tut-close-button { font-size: 16px; }
+.tut-leverage { display: grid; gap: 12px; margin-bottom: 10px; }
+.tut-slider { display: grid; gap: 4px; }
+.tut-slider-head { display: flex; align-items: baseline; justify-content: space-between; }
+.tut-slider-head strong { color: var(--market-accent-strong); font-size: 22px; font-weight: 800; }
+.tut-slider input[type="range"] { width: 100%; height: 28px; accent-color: var(--market-accent); cursor: pointer; }
+.tut-slider-scale { display: flex; justify-content: space-between; color: var(--muted-dim); font-size: 10px; }
+.tut-leverage-readout { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.tut-leverage-readout > span { display: grid; gap: 1px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-raised); padding: 6px 8px; color: var(--muted); font-size: 10.5px; }
+.tut-leverage-readout strong { color: var(--text); font-size: 14px; }
+.tut-table { width: 100%; margin-top: 10px; border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.tut-table caption { caption-side: top; padding-bottom: 6px; color: var(--muted); font-size: 10px; letter-spacing: .09em; text-align: left; text-transform: uppercase; }
+.tut-table th, .tut-table td { border-top: 1px solid var(--line); padding: 6px 10px; text-align: left; }
+.tut-table thead th { border-top: 0; color: var(--muted-dim); font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.tut-table tbody th { color: var(--text); font-weight: 700; }
+.tut-table tr.is-current { background: color-mix(in srgb, var(--market-accent) 12%, transparent); }
+.tut-table tr.is-current th { color: var(--market-accent-strong); }
+.tut-choice { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 10px; }
+.tut-choice button { display: grid; gap: 2px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-raised); padding: 10px 8px; color: var(--muted); text-align: center; transition: border-color .15s ease, background .15s ease, color .15s ease; }
+.tut-choice button strong { color: var(--text); font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.tut-choice button span { font-size: 10.5px; line-height: 1.3; }
+.tut-choice button:hover { border-color: var(--line-strong); }
+.tut-choice button.is-selected { border-color: var(--market-accent); background: color-mix(in srgb, var(--market-accent) 14%, var(--surface-raised)); box-shadow: inset 0 0 0 1px var(--market-accent); color: var(--text); }
+.tut-choice.is-compact { grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 8px 0; }
+.tut-choice.is-compact button { padding: 6px 4px; }
+.tut-choice.is-compact button strong { font-size: 14px; }
+
+.tut-debrief { grid-area: debrief; min-width: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: inset 0 2px 0 color-mix(in srgb, var(--market-accent) 75%, transparent); padding: 18px 20px; scroll-margin-bottom: 16px; }
+.tut-debrief-headline { margin: 4px 0 0; font-size: clamp(28px, 6vw, 34px); font-weight: 800; letter-spacing: -.02em; line-height: 1.1; }
+.tut-rules { margin-top: 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-raised); padding: 12px 14px; }
+.tut-rules ol { display: grid; gap: 6px; margin: 8px 0 0; padding-left: 20px; list-style: decimal; color: var(--text); font-size: 13.5px; line-height: 1.5; }
+
+.tut-coach { display: flex; align-items: flex-start; gap: 10px; margin: 12px 0 0; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); padding: 10px 12px; color: var(--text); font-size: 13px; line-height: 1.45; }
+.tut-coach-label { flex: none; margin-top: 1px; border-radius: 999px; background: color-mix(in srgb, var(--brand) 18%, transparent); padding: 2px 7px; color: var(--brand-strong); font-size: 9.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+.tut-coach.is-good { border-color: color-mix(in srgb, var(--positive) 45%, var(--line)); }
+.tut-coach.is-good .tut-coach-label { background: color-mix(in srgb, var(--positive) 18%, transparent); color: var(--positive); }
+.tut-coach.is-warn { border-color: color-mix(in srgb, var(--negative) 50%, var(--line)); background: color-mix(in srgb, var(--negative) 7%, var(--surface)); }
+.tut-coach.is-warn .tut-coach-label { background: color-mix(in srgb, var(--negative) 18%, transparent); color: var(--negative); }
+
+@media (min-width: 1024px) {
+  .tut-shell.is-split { grid-template-columns: minmax(340px, 430px) minmax(0, 1fr); grid-template-areas: "head chart" "brief chart" "dock chart" "debrief chart"; grid-template-rows: auto auto auto 1fr; column-gap: 24px; }
+  .tut-shell.is-split .tut-stage { position: sticky; top: 16px; }
+  .tut-shell.is-split .tut-title { font-size: 22px; }
+}
+@media (max-width: 560px) {
+  .tut-step-label { display: none; }
+  .tut-stage-label, .tut-stage-clock .muted { display: none; }
+  .tut-card, .tut-debrief { padding: 16px; }
+  .tut-hero { padding: 18px 16px; }
+  .tut-actions { flex-direction: column-reverse; }
+  .tut-actions > * { width: 100%; }
+  .tut-choice { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tut-choice.is-compact { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
