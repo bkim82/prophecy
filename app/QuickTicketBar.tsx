@@ -43,8 +43,9 @@ export function QuickTicketBar() {
 
   // Arena (lobby and every game under it) has its own Play/trade actions, so
   // the floating + would only overlap the setup card and compete with them.
+  // Same for /welcome, where it sits on the onboarding Continue button.
   const inArena = pathname === "/duel" || (pathname?.startsWith("/duel/") ?? false);
-  if (activeMatch || queueing || inArena) return null;
+  if (activeMatch || queueing || inArena || pathname === "/welcome") return null;
 
   return (
     <div

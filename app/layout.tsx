@@ -38,7 +38,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
       <body>
-        <ClerkProvider>
+        {/* Every new account goes through /welcome (profile + a short survey) first. */}
+        <ClerkProvider signUpForceRedirectUrl="/welcome">
           <header className="app-header">
             <div className="app-header-inner">
               <div className="desktop-header-content">

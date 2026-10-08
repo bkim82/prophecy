@@ -90,6 +90,14 @@ export function useInterests() {
   return { ids, has: (id: TopicId) => ids.includes(id), toggle };
 }
 
+// Swaps the whole interest list at once — the topics picked during /welcome
+// (app/welcome/OnboardingFlow.tsx) become this browser's feed. Following
+// takes back "Not interested", same as toggle.
+export function replaceInterests(ids: TopicId[]) {
+  interests.write(ids);
+  mutedTopics.write(mutedTopics.snapshot().filter((id) => !ids.includes(id as TopicId)));
+}
+
 // "Not interested" topics: kept out of the For You suggestions (covers, the
 // feed under them, Mix it up). Muting also unfollows; `mute` returns where the
 // topic sat in your interests (-1 if it wasn't followed) so an Undo can put it

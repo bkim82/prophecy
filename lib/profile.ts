@@ -43,6 +43,12 @@ export async function savePinnedMatches(userId: string, ids: string[]): Promise<
     .onConflictDoUpdate({ target: profiles.userId, set: { pinnedMatches: ids } });
 }
 
+/** Clerk user id holding `handle` (stored form: lowercase, no "@"), or null. */
+export async function handleOwner(handle: string): Promise<string | null> {
+  const [row] = await getDb().select({ userId: profiles.userId }).from(profiles).where(eq(profiles.handle, handle));
+  return row?.userId ?? null;
+}
+
 export async function bannerImageFor(userId: string): Promise<{ mime: string; bytes: Buffer } | null> {
   const [row] = await getDb()
     .select({ image: profiles.bannerImage, mime: profiles.bannerMime })
@@ -78,8 +84,12 @@ const isUniqueViolation = (error: unknown) => {
   return code === "23505" || cause?.code === "23505";
 };
 
-/** One upsert per save. "handle-taken" when the unique index rejects the handle. */
-export async function saveStoredProfile(userId: string, fields: ProfileFields, banner: BannerUpdate): Promise<"ok" | "handle-taken"> {
+/**
+ * One upsert per save. "handle-taken" when the unique index rejects the
+ * handle. Fields left out keep their stored value (the /welcome flow only
+ * sends name, handle and bio).
+ */
+export async function saveStoredProfile(userId: string, fields: Partial<ProfileFields>, banner: BannerUpdate): Promise<"ok" | "handle-taken"> {
   const set = { ...fields, ...bannerColumns(banner), updatedAt: new Date() };
   try {
     await getDb()

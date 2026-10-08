@@ -6,8 +6,10 @@ import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { CameraIcon } from "@/app/icons";
 import { avatarGradient } from "@/app/lib/avatar";
 import {
+  AVATAR_MAX_BYTES,
   BANNER_MAX_BYTES,
   BANNER_PRESETS,
+  IMAGE_ACCEPT,
   PROFILE_LIMITS,
   bannerBackground,
   handleProblem,
@@ -41,9 +43,6 @@ type BannerDraft = { kind: "keep" } | { kind: "none" } | { kind: "preset"; id: s
 type AvatarDraft = { kind: "keep" } | { kind: "remove" } | { kind: "new"; file: File; previewUrl: string };
 type FormError = { message: string; field?: ProfileField | "avatar" };
 
-const IMAGE_ACCEPT = "image/jpeg,image/png,image/webp";
-// Clerk's own limit for profile images.
-const AVATAR_MAX_BYTES = 10 * 1024 * 1024;
 const BANNER_WIDTH = 1500;
 const BANNER_RATIO = 3;
 

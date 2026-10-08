@@ -41,6 +41,10 @@ export function websiteLabel(website: string): string {
   }
 }
 
+// Photos go straight to Clerk; this is Clerk's own limit for profile images.
+export const AVATAR_MAX_BYTES = 10 * 1024 * 1024;
+export const IMAGE_ACCEPT = "image/jpeg,image/png,image/webp";
+
 export const BANNER_MAX_BYTES = 512 * 1024;
 export const BANNER_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
