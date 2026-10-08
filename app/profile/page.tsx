@@ -12,6 +12,7 @@ import { ProfileView, type ProfileMatch, type SentChallenge } from "@/app/profil
 import { pendingChallengesFrom } from "@/lib/challenges";
 import { historyEntryFor, marketAccuracyFor, matchRecordFor, settledMatchesByIds, settledMatchesFor } from "@/lib/match";
 import { opponentNames } from "@/lib/opponentNames";
+import { isOnboarded } from "@/lib/onboarding";
 import { storedProfileFor } from "@/lib/profile";
 import { playedLabel } from "@/app/lib/playedLabel";
 
@@ -34,12 +35,13 @@ export default async function OwnProfilePage() {
   const user = await currentUser();
   if (!user) return redirectToSignIn();
 
-  const [rows, record, stored, marketAccuracy, sent] = await Promise.all([
+  const [rows, record, stored, marketAccuracy, sent, onboarded] = await Promise.all([
     settledMatchesFor(userId, MATCH_LIMIT),
     matchRecordFor(userId),
     storedProfileFor(userId),
     marketAccuracyFor(userId),
     pendingChallengesFrom(userId),
+    isOnboarded(userId),
   ]);
   // Pins can be older than the listed page, so they're fetched by id — and
   // re-checked, so a pin that stopped qualifying just drops out of the reel.
@@ -132,6 +134,7 @@ export default async function OwnProfilePage() {
         self={{
           pinnedMatchIds: pinnedEntries.map((entry) => entry.id),
           challenges,
+          onboarded,
           matches,
           record,
           copyEarnings: VIEWER_COPY_EARNINGS,

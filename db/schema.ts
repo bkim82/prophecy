@@ -184,6 +184,21 @@ export const profiles = pgTable("profiles", {
   handleUnique: uniqueIndex("profiles_handle_unique").on(table.handle),
 }));
 
+// One row per Clerk user who finished the post-sign-up flow at /welcome
+// (app/welcome/actions.ts finishOnboarding); no row = not onboarded yet.
+// Answers are option ids from app/lib/onboardingQuestions.ts, not copy.
+// Finishing requires confirming 18+, so a row also records that.
+export const onboarding = pgTable("onboarding", {
+  userId: text("user_id").primaryKey(),
+  goals: jsonb("goals").$type<string[]>().notNull(), // ≥1 GOALS id
+  experience: text("experience").notNull(), // EXPERIENCE id
+  paces: jsonb("paces").$type<string[]>().notNull(), // PACES ids, may be empty
+  interests: jsonb("interests").$type<string[]>().notNull(), // TopicIds, may be empty
+  referral: text("referral"), // REFERRALS id, null = skipped
+  timezone: text("timezone"), // IANA zone reported by the browser
+  completedAt: timestamp("completed_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // One row per challenge sent from a profile (app/profile/challengeActions.ts).
 // Requests only for now: profiles you can open are mock traders who can't
 // reply, so nothing reserves Embers or creates a `matches` row yet — that

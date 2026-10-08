@@ -2469,3 +2469,103 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
 .pulse-stake-field:focus-within { border-color: var(--accent); }
 .pulse-stake-field input { min-width: 0; width: 100%; border: 0; background: transparent; padding: 6px 0; color: var(--text); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; outline: none; }
 .pulse-stake-field input:disabled { color: var(--muted-dim); }
+
+/* /welcome onboarding (app/welcome/OnboardingFlow.tsx): one centered glass
+   card with segmented progress. Option cards and chips wrap visually hidden
+   native inputs, so selection and the focus ring come from :has(). Fields and
+   the avatar reuse .profile-edit-*; topic and referral chips reuse .interest-option. */
+.welcome-shell { width: min(100% - 32px, 640px); margin: 0 auto; padding: 40px 0 72px; }
+.welcome-card { display: grid; gap: 22px; padding: 22px 26px 24px; border: 1px solid var(--glass-edge); border-radius: 18px; background: linear-gradient(135deg, var(--glass-sheen), transparent 42%) padding-box, var(--glass-fill) padding-box; box-shadow: var(--glass-shadow); }
+.welcome-progress { display: flex; align-items: center; gap: 14px; font-size: 12px; }
+.welcome-progress ol { display: grid; flex: 1; grid-auto-columns: minmax(0, 1fr); grid-auto-flow: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.welcome-progress li { height: 4px; border-radius: 999px; background: var(--line); transition: background .3s ease; }
+.welcome-progress li[data-state="done"] { background: color-mix(in srgb, var(--brand) 50%, var(--line)); }
+.welcome-progress li[data-state="current"] { background: var(--brand); }
+.welcome-progress > span { flex: none; font-variant-numeric: tabular-nums; }
+.welcome-form { display: grid; gap: 22px; }
+.welcome-step { display: grid; gap: 20px; animation: welcome-step-in .3s ease both; }
+@keyframes welcome-step-in { from { opacity: 0; transform: translateY(8px); } }
+.welcome-head { display: grid; gap: 6px; }
+.welcome-head h1, .welcome-done h1 { margin: 0; font-size: 26px; line-height: 1.2; outline: none; }
+.welcome-head p { margin: 0; font-size: 14px; }
+.welcome-head .welcome-eyebrow { color: var(--brand-strong); font-family: var(--font-mono), ui-monospace, monospace; font-size: 11px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; }
+.welcome-profile { display: grid; gap: 16px; }
+.welcome-avatar-row { display: flex; align-items: center; gap: 16px; }
+.welcome-avatar-text { display: grid; gap: 2px; font-size: 14px; }
+.welcome-avatar-text .muted { font-size: 12px; }
+.welcome-avatar-actions { display: flex; gap: 12px; }
+.welcome-note { margin: 0; font-size: 12px; }
+.profile-edit-hint.welcome-hint-ok { color: var(--positive); }
+.welcome-options { display: grid; gap: 10px; }
+.welcome-options--grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.welcome-option, .welcome-chip { position: relative; border: 1px solid var(--line); background: var(--surface); cursor: pointer; transition: border-color .15s ease, background .15s ease; }
+.welcome-option { display: flex; align-items: flex-start; gap: 12px; padding: 14px 42px 14px 14px; border-radius: 12px; }
+.welcome-option:hover, .welcome-chip:hover { border-color: var(--line-strong); }
+.welcome-option:has(input:checked), .welcome-chip:has(input:checked) { border-color: color-mix(in srgb, var(--brand) 70%, transparent); background: color-mix(in srgb, var(--brand) 10%, var(--surface)); }
+.welcome-option:has(input:focus-visible), .welcome-chip:has(input:focus-visible) { outline: 2px solid var(--brand); outline-offset: 2px; }
+.welcome-option-icon, .welcome-meter { display: flex; flex: none; width: 36px; height: 36px; border-radius: 10px; background: var(--surface-raised); }
+.welcome-option-icon { align-items: center; justify-content: center; color: var(--brand-strong); }
+.welcome-option-icon svg { width: 18px; height: 18px; }
+.welcome-option-text { display: grid; gap: 3px; min-width: 0; }
+.welcome-option-text strong { font-size: 14px; }
+.welcome-option-text .muted { font-size: 12.5px; line-height: 1.4; }
+.welcome-option-check { position: absolute; top: 14px; right: 14px; width: 18px; height: 18px; border: 1.5px solid var(--line-strong); border-radius: 5px; transition: background .15s ease, border-color .15s ease; }
+.welcome-option-check::after { position: absolute; top: 1.5px; left: 5px; width: 5px; height: 9px; border: solid var(--btn-text); border-width: 0 2px 2px 0; content: ""; opacity: 0; transform: rotate(45deg); }
+.welcome-option-check.is-radio { border-radius: 999px; }
+.welcome-option-check.is-radio::after { top: 3.5px; left: 3.5px; width: 8px; height: 8px; border: 0; border-radius: 999px; background: var(--btn-text); transform: none; }
+.welcome-option:has(input:checked) .welcome-option-check { border-color: var(--brand); background: var(--brand); }
+.welcome-option:has(input:checked) .welcome-option-check::after { opacity: 1; }
+/* Experience meter: 1–3 rising bars lit by data-level. */
+.welcome-meter { align-items: flex-end; gap: 3px; padding: 9px 8px; }
+.welcome-meter i { flex: 1; height: 40%; border-radius: 2px; background: var(--line-strong); }
+.welcome-meter i:nth-child(2) { height: 70%; }
+.welcome-meter i:nth-child(3) { height: 100%; }
+.welcome-meter[data-level="1"] i:nth-child(-n + 1), .welcome-meter[data-level="2"] i:nth-child(-n + 2), .welcome-meter[data-level="3"] i { background: var(--brand-strong); }
+.welcome-subquestion { min-width: 0; margin: 0; padding: 0; border: 0; }
+.welcome-subquestion legend { margin-bottom: 10px; padding: 0; font-size: 13px; font-weight: 600; }
+.welcome-subquestion legend .muted { margin-left: 4px; font-size: 12px; font-weight: 500; }
+.welcome-chips { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.welcome-chip { display: grid; gap: 2px; padding: 10px 12px; border-radius: 10px; font-size: 13px; }
+.welcome-chip .muted { font-size: 11.5px; }
+.welcome-interests { display: grid; gap: 16px; }
+.welcome-count { margin: 0; font-size: 12.5px; }
+.welcome-finish { display: grid; gap: 22px; }
+.welcome-consent { display: flex; align-items: flex-start; gap: 12px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); cursor: pointer; transition: border-color .15s ease; }
+.welcome-consent:has(input:checked) { border-color: color-mix(in srgb, var(--brand) 70%, transparent); }
+.welcome-consent input { flex: none; width: 18px; height: 18px; margin: 1px 0 0; accent-color: var(--brand); }
+.welcome-consent > span { display: grid; gap: 2px; font-size: 14px; }
+.welcome-consent .muted { font-size: 12.5px; }
+.welcome-error { margin: 0; }
+.welcome-foot { display: flex; justify-content: flex-end; gap: 8px; padding-top: 18px; border-top: 1px solid var(--line); }
+.welcome-foot .profile-follow { min-height: 40px; margin-top: 0; }
+.welcome-foot .is-following { margin-right: auto; }
+.welcome-continue { min-width: 140px; }
+/* Finish screen: sigil, the recommended first move as the filled button-card, the rest as plain cards. */
+.welcome-done { justify-items: center; gap: 14px; padding-top: 32px; text-align: center; }
+.welcome-done > p { margin: 0 0 6px; font-size: 14px; }
+.welcome-done-sigil { display: grid; place-items: center; width: 64px; height: 64px; border-radius: 999px; background: radial-gradient(circle, color-mix(in srgb, var(--brand) 32%, transparent), transparent 70%); color: var(--brand-strong); font-size: 30px; animation: welcome-sigil 1.1s ease both; }
+@keyframes welcome-sigil { from { opacity: 0; transform: scale(.6) rotate(-45deg); } 60% { opacity: 1; transform: scale(1.1) rotate(8deg); } to { transform: none; } }
+.welcome-move { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--text); text-align: left; text-decoration: none; transition: border-color .15s ease, background .15s ease; }
+.welcome-move:hover { border-color: var(--line-strong); background: var(--surface-hover); }
+.welcome-move > span:first-child { display: grid; gap: 3px; min-width: 0; }
+.welcome-move strong { font-size: 14px; }
+.welcome-move span span { font-size: 12.5px; }
+.welcome-move--lead { padding: 16px 18px; border-color: var(--btn-bg); background: var(--btn-bg); color: var(--btn-text); }
+.welcome-move--lead:hover { border-color: var(--btn-bg-hover); background: var(--btn-bg-hover); }
+.welcome-move--lead strong { font-size: 15px; }
+.welcome-move-arrow { font-size: 18px; }
+.welcome-moves { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; width: 100%; }
+.welcome-done-profile { margin-top: 6px; font-size: 13px; }
+@media (max-width: 560px) {
+  .welcome-shell { padding-top: 16px; }
+  .welcome-card { gap: 18px; padding: 18px 16px 20px; border-radius: 16px; }
+  .welcome-head h1, .welcome-done h1 { font-size: 22px; }
+  .welcome-options--grid, .welcome-moves { grid-template-columns: minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) { .welcome-step, .welcome-done-sigil { animation: none; } }
+/* Own /profile until /welcome is finished. */
+.profile-setup { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; padding: 14px 18px; border: 1px solid color-mix(in srgb, var(--brand) 40%, var(--line)); border-radius: 14px; background: linear-gradient(135deg, color-mix(in srgb, var(--brand) 12%, var(--surface)), var(--surface) 70%); color: var(--text); text-decoration: none; transition: border-color .15s ease; }
+.profile-setup:hover { border-color: var(--brand); }
+.profile-setup-mark { color: var(--brand-strong); font-size: 18px; }
+.profile-setup-text { display: grid; flex: 1; gap: 2px; min-width: 0; font-size: 14px; }
+.profile-setup-text .muted { font-size: 12.5px; }
