@@ -18,10 +18,34 @@ export function isExclusiveUnlocked(rank: number = MOCK_CURRENT_RANK): boolean {
 // Gold II outranks Gold I. A bare tier sorts below every division of it.
 // Each tier keys a [data-room]/[data-rank] colour set in globals.css and a
 // door style in the Sanctum entry gate.
-export const RANK_TIERS = ["bronze", "silver", "gold", "diamond", "oracle"] as const;
+export const RANK_TIERS = ["bronze", "silver", "gold", "platinum", "diamond", "prophet", "oracle"] as const;
 export type RankTier = (typeof RANK_TIERS)[number];
 export type RoomId = RankTier;
 export const isRoomId = (v: unknown): v is RoomId => RANK_TIERS.includes(v as RoomId);
+
+// Tiers are percentile bands of the player base: the share (%) in each tier,
+// read top-down — Oracle is the top 1%, Prophet the next 4%, and so on to the
+// bottom 15% in Bronze. Sums to 100.
+export const TIER_SHARE: Record<RankTier, number> = {
+  oracle: 1,
+  prophet: 4,
+  diamond: 10,
+  platinum: 20,
+  gold: 20,
+  silver: 30,
+  bronze: 15,
+};
+
+// "Top X%" standing (0 = best player, 100 = worst) -> tier. Bands include
+// their upper edge, so exactly top 1% is Oracle and top 5% is Prophet.
+export function tierForPercentile(topPct: number): RankTier {
+  let cutoff = 0;
+  for (const tier of [...RANK_TIERS].reverse()) {
+    cutoff += TIER_SHARE[tier];
+    if (topPct <= cutoff) return tier;
+  }
+  return "bronze";
+}
 const DIVISIONS = ["I", "II", "III", "IV", "V"]; // low → high
 
 // "Gold II" -> "gold". Drives data-rank, which keys the tier color tokens and
@@ -49,7 +73,7 @@ export function canViewPortfolio(profileRank: string, viewerRank: string = VIEWE
 
 // Challenge gate: you can challenge anyone at most one tier above your own.
 // Tiers only — divisions don't matter, so any Silver can challenge any Gold
-// but no Diamond, and an Oracle can challenge everyone. Checked again on the
+// but no Platinum, and an Oracle can challenge everyone. Checked again on the
 // server when a challenge is sent (app/profile/challengeActions.ts).
 const tierIndex = (rank: string) => {
   const tier = rankTier(rank);
@@ -62,7 +86,7 @@ export function canChallenge(targetRank: string, viewerRank: string = VIEWER_RAN
   return target >= 0 && viewer >= 0 && target <= viewer + 1;
 }
 
-// The lowest tier that may challenge `targetRank` ("Oracle" -> "Diamond"),
+// The lowest tier that may challenge `targetRank` ("Oracle" -> "Prophet"),
 // for the locked button's explanation.
 export function challengeTierNeeded(targetRank: string): string {
   const tier = RANK_TIERS[Math.max(0, tierIndex(targetRank) - 1)];
