@@ -486,21 +486,78 @@ button { cursor: pointer; }
 .shot--meme.has-caption { justify-content: space-between; min-height: 200px; }
 .shot-meme-emoji { font-size: 52px; line-height: 1; }
 .shot-meme-caption { color: #fff; font-family: Impact, Anton, "Arial Black", sans-serif; font-size: clamp(20px, 7cqi, 32px); letter-spacing: .02em; line-height: 1.05; text-align: center; text-transform: uppercase; -webkit-text-stroke: 1.5px #000; paint-order: stroke fill; text-shadow: 0 2px 0 #000; }
-/* Action row: like → comment → vouch → defy, bookmark on the right. Tinted
-   pills with 19px icons so it's obvious they're tappable; each takes its own
-   color on hover/active (like = --like, comment = brand, vouch = green,
-   defy = red). Vouch/Defy carry a word label until the row gets narrow (the
-   row is a size container). */
+/* Action row: like → comment → repost, bookmark on the right. Tinted pills
+   with 19px icons so it's obvious they're tappable; each takes its own color
+   on hover/active (like = --like, comment = brand, repost = brand, or green /
+   red once you've vouched / defied). Repost carries a word label until the
+   row gets narrow (the row is a size container). Pill rules target direct
+   children + the repost trigger so the repost menu's items don't pick them up. */
 .post-actions { container-type: inline-size; display: flex; align-items: center; gap: 8px; margin-top: 4px; color: var(--muted); font-family: var(--font-mono), ui-monospace, monospace; font-size: 13px; font-variant-numeric: tabular-nums; --pill-bg: color-mix(in srgb, var(--surface-raised) 75%, transparent); }
-.post-actions button { --tone: var(--text); display: inline-flex; align-items: center; gap: 7px; min-height: 36px; padding: 0 13px 0 11px; border: 1px solid transparent; border-radius: 999px; background: var(--pill-bg); color: inherit; font: inherit; font-weight: 600; transition: background .15s ease, color .15s ease, border-color .15s ease; }
-.post-actions button svg { flex: none; width: 19px; height: 19px; }
-.post-actions button:hover, .post-actions button.is-active, .post-actions .action-reply[aria-expanded="true"] { border-color: color-mix(in srgb, var(--tone) 30%, transparent); background: color-mix(in srgb, var(--tone) 13%, transparent); color: var(--tone); }
+.post-actions > button, .post-actions .action-repost { --tone: var(--text); display: inline-flex; align-items: center; gap: 7px; min-height: 36px; padding: 0 13px 0 11px; border: 1px solid transparent; border-radius: 999px; background: var(--pill-bg); color: inherit; font: inherit; font-weight: 600; transition: background .15s ease, color .15s ease, border-color .15s ease; }
+.post-actions > button svg, .post-actions .action-repost svg { flex: none; width: 19px; height: 19px; }
+.post-actions > button:hover, .post-actions > button.is-active, .post-actions .action-repost:hover, .post-actions .action-repost.is-active, .post-actions .action-repost[aria-expanded="true"], .post-actions .action-reply[aria-expanded="true"] { border-color: color-mix(in srgb, var(--tone) 30%, transparent); background: color-mix(in srgb, var(--tone) 13%, transparent); color: var(--tone); }
 .post-actions .action-like { --tone: var(--like); }
 .post-actions .action-reply { --tone: var(--brand-strong); }
-.post-actions .action-vouch { --tone: var(--chart-up); }
-.post-actions .action-defy { --tone: var(--negative); }
+.post-actions .action-repost { --tone: var(--brand-strong); }
+.post-actions .action-repost[data-kind="vouch"] { --tone: var(--chart-up); }
+.post-actions .action-repost[data-kind="defy"] { --tone: var(--negative); }
 .action-label { font-family: var(--font-sans), Inter, system-ui, sans-serif; font-size: 12.5px; }
 @container (max-width: 470px) { .action-label { display: none; } }
+/* Repost menu (app/RepostMenu.tsx): Repost / Vouch / Defy (icon in its own
+   tone, hint line, per-kind count), a rule, then "Add your words". Anchored
+   under the trigger; in a narrow row it anchors to the row's left edge
+   instead (the row is the containing block). The row is a size container,
+   which makes it a stacking context, so it's lifted while the menu is open to
+   stay above the next post. */
+.post-actions:has(.repost-menu-dropdown) { position: relative; z-index: 11; }
+.repost-menu { position: relative; display: flex; }
+.repost-menu-dropdown { position: absolute; top: calc(100% + 6px); left: 0; z-index: 10; width: 272px; max-width: 100cqi; padding: 4px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-raised); box-shadow: 0 8px 24px rgba(0, 0, 0, .3); font-family: var(--font-sans), Inter, system-ui, sans-serif; }
+@container (max-width: 470px) { .repost-menu { position: static; } }
+.repost-option { --tone: var(--brand-strong); display: flex; width: 100%; align-items: center; gap: 10px; padding: 8px 10px; border: 0; border-radius: 7px; background: transparent; color: var(--text); font: inherit; text-align: left; }
+.repost-option[data-kind="vouch"] { --tone: var(--chart-up); }
+.repost-option[data-kind="defy"] { --tone: var(--negative); }
+.repost-option--words { --tone: var(--text); }
+.repost-option > svg { flex: none; width: 18px; height: 18px; color: var(--tone); }
+.repost-option:hover:not(:disabled), .repost-option:focus-visible { background: var(--surface-hover); }
+.repost-option:disabled { opacity: .5; cursor: not-allowed; }
+.repost-option-text { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.repost-option-text strong { font-size: 13px; font-weight: 700; }
+.repost-option-text span { color: var(--muted); font-size: 11.5px; line-height: 1.35; }
+.repost-option-count { flex: none; color: var(--muted); font-family: var(--font-mono), ui-monospace, monospace; font-size: 12px; font-variant-numeric: tabular-nums; }
+.repost-menu-sep { display: block; height: 1px; margin: 4px 6px; background: var(--line); }
+/* Add your words dialog: the Edit profile shell (.profile-edit*) at quote-
+   composer width; kind picker = three radio pills in their tones, then your
+   words beside your initial, then the quoted post (3 lines max). */
+.repost-dialog { width: min(560px, calc(100% - 32px)); }
+.repost-kinds { min-width: 0; margin: 0; padding: 0; border: 0; }
+.repost-kinds legend { margin-bottom: 8px; padding: 0; color: var(--muted); font-size: 12px; font-weight: 600; }
+.repost-kinds-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.repost-kind { --tone: var(--brand-strong); position: relative; display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 40px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 999px; color: var(--muted); font-size: 13px; font-weight: 700; cursor: pointer; transition: background .15s ease, color .15s ease, border-color .15s ease; }
+.repost-kind[data-kind="vouch"] { --tone: var(--chart-up); }
+.repost-kind[data-kind="defy"] { --tone: var(--negative); }
+.repost-kind input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: inherit; }
+.repost-kind svg { flex: none; width: 17px; height: 17px; }
+.repost-kind:hover { color: var(--text); }
+.repost-kind:has(input:checked) { border-color: color-mix(in srgb, var(--tone) 55%, transparent); background: color-mix(in srgb, var(--tone) 14%, transparent); color: var(--tone); }
+.repost-kind:has(input:focus-visible) { outline: 2px solid var(--tone); outline-offset: 2px; }
+.repost-kind:has(input:disabled) { opacity: .45; cursor: not-allowed; }
+.repost-kind:has(input:disabled):hover { color: var(--muted); }
+.repost-kinds-hint { margin: 8px 0 0; color: var(--muted); font-size: 12px; }
+.repost-compose { display: flex; gap: 12px; }
+.repost-compose textarea { flex: 1; min-width: 0; min-height: 84px; padding: 6px 0; border: 0; outline: 0; resize: vertical; background: transparent; color: var(--text); font: inherit; font-size: 15px; line-height: 1.5; }
+.repost-compose textarea::placeholder { color: var(--muted-dim); }
+.repost-quote { display: flex; gap: 10px; min-width: 0; padding: 12px 14px; border: 1px solid var(--line-strong); border-radius: 14px; background: var(--surface); }
+.repost-quote-avatar { flex: none; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 999px; color: #fff; font-size: 12px; font-weight: 700; text-shadow: 0 1px 2px rgba(0, 0, 0, .35); }
+.repost-quote-body { flex: 1; min-width: 0; display: grid; gap: 4px; }
+.repost-quote-body p { margin: 0; }
+.repost-quote-meta { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.repost-quote-meta .muted { font-size: 12.5px; }
+.repost-quote-text { display: -webkit-box; overflow: hidden; color: var(--text); font-size: 14px; line-height: 1.5; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+.repost-dialog-count { font-family: var(--font-mono), ui-monospace, monospace; font-size: 12px; font-variant-numeric: tabular-nums; }
+/* Scoped under .repost-dialog to outrank .profile-follow:hover further down. */
+.repost-dialog .repost-dialog-submit[data-kind="vouch"] { border-color: var(--chart-up); background: var(--chart-up); color: var(--bg); }
+.repost-dialog .repost-dialog-submit[data-kind="defy"] { border-color: var(--negative); background: var(--negative); color: var(--bg); }
+.repost-dialog .repost-dialog-submit:is([data-kind="vouch"], [data-kind="defy"]):hover { filter: brightness(1.08); }
 /* Reposted posts (vouch/defy, app/PostShare.tsx ReshareHead): the sharer's
    own row on top, then the original post inside a bordered card indented to
    the sharer's text column (full width on phones), so the reshare reads as a
@@ -510,6 +567,7 @@ button { cursor: pointer; }
 .post-card--reshared { flex-wrap: wrap; row-gap: 10px; }
 .post-reshare-head { --tone: var(--chart-up); flex: 0 0 100%; display: flex; gap: 12px; min-width: 0; }
 .post-reshare-head[data-kind="defy"] { --tone: var(--negative); }
+.post-reshare-head[data-kind="repost"] { --tone: var(--brand-strong); }
 .post-reshare-avatar { position: relative; flex: none; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 999px; color: #fff; font-size: 15px; font-weight: 700; text-shadow: 0 1px 2px rgba(0, 0, 0, .35); }
 .post-reshare-avatar.is-you { border: 1px solid color-mix(in srgb, var(--tone) 50%, transparent); background: color-mix(in srgb, var(--tone) 16%, var(--surface)); color: var(--tone); text-shadow: none; }
 .post-reshare-avatar.is-you svg { width: 19px; height: 19px; }
@@ -520,6 +578,7 @@ button { cursor: pointer; }
 .post-reshare-who { color: var(--muted); font-size: 13.5px; line-height: 1.35; }
 .post-reshare-who strong { color: var(--text); font-size: 14px; }
 .post-reshare-verb { color: var(--tone); font-weight: 700; }
+.post-reshare-words { color: var(--text); font-size: 14px; line-height: 1.5; white-space: pre-line; overflow-wrap: anywhere; }
 .post-reshare-reach { color: var(--muted-dim); font-size: 12px; }
 .post-reshare-embed { flex: 0 0 calc(100% - 50px); display: flex; gap: 10px; min-width: 0; margin-left: 50px; padding: 12px 14px; border: 1px solid var(--line-strong); border-radius: 14px; --surface: var(--surface-raised); background: var(--surface); }
 .post-reshare-embed .post-actions { --pill-bg: color-mix(in srgb, var(--text) 6%, transparent); }
@@ -527,13 +586,13 @@ button { cursor: pointer; }
 .post-reshare-footer { flex: 0 0 calc(100% - 50px); margin-left: 50px; }
 .post-reshare-footer .cover-more { margin-top: 0; }
 .post-card--detail .post-reshare-head { grid-column: 1 / -1; }
-@media (max-width: 420px) { .post-reshare-embed .post-actions { gap: 2px; } .post-reshare-embed .post-actions button { padding: 0 5px; } .post-reshare-embed .post-actions .action-bookmark { width: 30px; padding: 0; } }
+@media (max-width: 420px) { .post-reshare-embed .post-actions { gap: 2px; } .post-reshare-embed .post-actions > button, .post-reshare-embed .post-actions .action-repost { padding: 0 5px; } .post-reshare-embed .post-actions .action-bookmark { width: 30px; padding: 0; } }
 @media (max-width: 768px) { .post-reshare-head { gap: 10px; } .post-reshare-avatar { width: 32px; height: 32px; font-size: 13px; } .post-reshare-embed, .post-reshare-footer { flex-basis: 100%; margin-left: 0; } .post-reshare-embed { padding: 10px 12px; } }
 .post-actions .action-bookmark { --tone: var(--brand-strong); justify-content: center; width: 36px; margin-left: auto; padding: 0; }
 .post-actions .action-like.is-active svg { animation: like-pop .35s ease-out; }
 @keyframes like-pop { 40% { transform: scale(1.3); } }
 @media (prefers-reduced-motion: reduce) { .post-actions .action-like.is-active svg { animation: none; } }
-@media (max-width: 420px) { .post-actions { gap: 4px; font-size: 12px; } .post-actions button { gap: 4px; min-height: 34px; padding: 0 7px; } .post-actions button svg { width: 17px; height: 17px; } .post-actions .action-bookmark { width: 32px; padding: 0; } }
+@media (max-width: 420px) { .post-actions { gap: 4px; font-size: 12px; } .post-actions > button, .post-actions .action-repost { gap: 4px; min-height: 34px; padding: 0 7px; } .post-actions > button svg, .post-actions .action-repost svg { width: 17px; height: 17px; } .post-actions .action-bookmark { width: 32px; padding: 0; } }
 /* Rows open the post page (PostCard openPost); the timestamp is the
    keyboard/screen-reader link to it. */
 .post-card.is-linkable { cursor: pointer; transition: background .15s ease; }
@@ -813,6 +872,14 @@ button { cursor: pointer; }
 @media (prefers-reduced-motion: reduce) { .sidebar-live-dot { animation: none; } }
 .post-menu-dropdown svg { flex: none; width: 14px; height: 14px; }
 .post-menu-dropdown { min-width: 200px; }
+/* Delete post (own posts only): red item; confirming turns it into a filled
+   red Delete under a "Delete this post?" line, with Cancel below. */
+.post-menu-dropdown .post-menu-delete { color: var(--negative); }
+.post-menu-dropdown .post-menu-delete:hover { background: color-mix(in srgb, var(--negative) 12%, transparent); color: var(--negative); }
+.post-menu-dropdown .post-menu-delete.is-confirming { justify-content: center; background: var(--negative); color: var(--bg); }
+.post-menu-dropdown .post-menu-delete.is-confirming:hover { background: var(--negative); color: var(--bg); filter: brightness(1.08); }
+.post-menu-confirm { max-width: 220px; margin: 0; padding: 8px 10px 10px; color: var(--muted); font-size: 12px; line-height: 1.45; }
+.post-menu-confirm strong { display: block; margin-bottom: 2px; color: var(--text); font-size: 13px; }
 /* The Oracles leaderboard (app/OraclesLeaderboard.tsx). A night panel in both
    themes, so it carries its own --o-* palette rather than theme tokens.
    Choreography on mount, replayed on each period switch by a keyed remount:
