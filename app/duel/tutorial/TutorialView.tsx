@@ -19,7 +19,12 @@ const LIVE_INDEX = LESSONS.length;
 const usd = (n: number) =>
   n.toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-export function TutorialView() {
+/**
+ * `onExit` is set when the tutorial runs as the last stage of /welcome
+ * (app/welcome/OnboardingFlow.tsx): the back link becomes "Skip tutorial" and
+ * the done screen's Continue hands back to onboarding instead of the Arena.
+ */
+export function TutorialView({ onExit }: { onExit?: () => void } = {}) {
   // One feed for the whole tutorial: it anchors the scripted lessons to the
   // real BTC price and is already warm when the live round starts.
   const feed = usePriceFeed("BTC-USD");
@@ -55,9 +60,15 @@ export function TutorialView() {
     <main className={`arena-shell tut-shell${typeof step === "number" ? " is-split" : ""}`} data-market="btc">
       <header className="tut-head">
         <div className="tut-head-row">
-          <Link href="/duel" className="tut-back">
-            ← Arena
-          </Link>
+          {!onExit ? (
+            <Link href="/duel" className="tut-back">
+              ← Arena
+            </Link>
+          ) : step !== "done" && (
+            <button type="button" className="tut-back" onClick={onExit}>
+              Skip tutorial
+            </button>
+          )}
           <PulseMarketTitle market="btc">Learn Pulse</PulseMarketTitle>
           {typeof step === "number" && step < LIVE_INDEX && (
             <p className="tut-balance" title="Practice money only. No Embers at stake.">
@@ -91,7 +102,7 @@ export function TutorialView() {
       {step === "intro" && (
         <>
           <section className="tut-card tut-hero arena-panel">
-            <p className="tut-kicker">Pulse tutorial · for first-timers</p>
+            <p className="tut-kicker">{onExit ? "Last step · skip anytime" : "Pulse tutorial · for first-timers"}</p>
             <h2 className="tut-title">Learn Pulse in a few minutes</h2>
             <p className="tut-body">
               Pulse is a 60-second trading duel on the live price of Bitcoin. You bet on whether the price goes <b>up</b> or <b>down</b>. When the clock runs out, whoever has made more money wins.
@@ -168,12 +179,20 @@ export function TutorialView() {
             <button type="button" className="tut-button-secondary" onClick={() => { setResults({}); setLiveDone(false); goTo("intro"); }}>
               Replay the tutorial
             </button>
-            <Link href="/duel/btc/pulse?practice=1&market=btc" className="tut-button-secondary">
-              More practice vs Sibyl
-            </Link>
-            <Link href="/duel" className="tut-button-primary">
-              Play ranked <span aria-hidden="true">→</span>
-            </Link>
+            {onExit ? (
+              <button type="button" className="tut-button-primary" onClick={onExit}>
+                Continue <span aria-hidden="true">→</span>
+              </button>
+            ) : (
+              <>
+                <Link href="/duel/btc/pulse?practice=1&market=btc" className="tut-button-secondary">
+                  More practice vs Sibyl
+                </Link>
+                <Link href="/duel" className="tut-button-primary">
+                  Play ranked <span aria-hidden="true">→</span>
+                </Link>
+              </>
+            )}
           </div>
         </section>
       )}

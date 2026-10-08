@@ -64,10 +64,10 @@ export type OnboardingAnswers = {
   timezone: string | null;
 };
 
-export type FirstMove = { id: "practice" | "portfolio" | "arena" | "omens"; title: string; blurb: string; href: string };
+export type FirstMove = { id: "tutorial" | "portfolio" | "arena" | "omens"; title: string; blurb: string; href: string };
 
 const MOVES: Record<FirstMove["id"], FirstMove> = {
-  practice: { id: "practice", title: "Try a practice round", blurb: "Call BTC's next move on live prices. Nothing at stake.", href: "/duel/btc/pulse?practice=1" },
+  tutorial: { id: "tutorial", title: "Learn Pulse", blurb: "Five quick lessons, then a live round against a bot. Practice money only.", href: "/duel/tutorial" },
   portfolio: { id: "portfolio", title: "Open a 24h Portfolio", blurb: "Run a day-long book of meme coins, spot or leveraged.", href: "/duel/portfolio" },
   arena: { id: "arena", title: "Enter the Arena", blurb: "Stake Embers against another trader in a live Pulse round.", href: "/duel" },
   omens: { id: "omens", title: "Read the Omens", blurb: "See what traders are calling right now, and post your own.", href: "/" },
@@ -75,17 +75,22 @@ const MOVES: Record<FirstMove["id"], FirstMove> = {
 
 /**
  * Where the finish screen points first, then the rest as secondary links.
- * Newcomers and learners practice before they wager; strategy testers who
+ * Newcomers and learners learn Pulse before they wager; strategy testers who
  * trade slower get the 24h Portfolio; money goes to the Arena; community to
- * the feed.
+ * the feed. Once the tutorial is done (the /welcome tutorial stage, or
+ * earlier in this browser) it drops out and the Arena takes its place.
  */
-export function firstMovesFor({ goals, experience, paces }: Pick<OnboardingAnswers, "goals" | "experience" | "paces">): FirstMove[] {
+export function firstMovesFor(
+  { goals, experience, paces }: Pick<OnboardingAnswers, "goals" | "experience" | "paces">,
+  tutorialDone = false,
+): FirstMove[] {
   const has = (goal: GoalId) => goals.includes(goal);
-  const lead: FirstMove["id"] =
-    experience === "new" || has("learn") ? "practice"
-    : has("strategies") ? (paces.length > 0 && !paces.includes("quick") ? "portfolio" : "practice")
+  const pick: FirstMove["id"] =
+    experience === "new" || has("learn") ? "tutorial"
+    : has("strategies") ? (paces.length > 0 && !paces.includes("quick") ? "portfolio" : "tutorial")
     : has("profit") ? "arena"
     : "omens";
-  const order: FirstMove["id"][] = [lead, ...(["arena", "omens", "practice", "portfolio"] as const).filter((id) => id !== lead)];
-  return order.slice(0, 3).map((id) => MOVES[id]);
+  const lead = tutorialDone && pick === "tutorial" ? "arena" : pick;
+  const rest = (["arena", "omens", "tutorial", "portfolio"] as const).filter((id) => id !== lead && !(tutorialDone && id === "tutorial"));
+  return [lead, ...rest].slice(0, 3).map((id) => MOVES[id]);
 }
