@@ -5,6 +5,7 @@ import { SignInButton, useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { DailyCoin, pickDailyCoin } from "@/app/DailyCoin";
+import { FlameIcon } from "@/app/icons";
 import { PortfolioGame } from "@/app/duel/portfolio/PortfolioGame";
 import {
   getActiveMatch,
@@ -16,6 +17,7 @@ import { getPlayerId } from "@/app/lib/playerId";
 import { playedLabel } from "@/app/lib/playedLabel";
 import { usePriceFeed } from "@/app/usePriceFeed";
 import { clockLabel, MARKET_CHART_WINDOW_MS, MarketChart, priceAt, type ScrubPoint } from "@/app/MarketChart";
+import { PULSE_DEFAULT_WAGER, PULSE_WAGER_OPTIONS } from "@/lib/pulse";
 
 const TIMER_PRESETS = [
   { label: "60s", value: 60 },
@@ -126,6 +128,8 @@ export default function Page() {
   // While the chart is being scrubbed, the headline reads the scrubbed point.
   const [scrub, setScrub] = useState<ScrubPoint>(null);
   const [timer, setTimer] = useState(60);
+  // Embers each side puts in; matchmaking only pairs identical wagers.
+  const [wager, setWager] = useState<number>(PULSE_DEFAULT_WAGER);
   // Phones only: 24h high/low/players collapse so Play stays above the fold.
   const [statsOpen, setStatsOpen] = useState(false);
   const [mode, setMode] = useState<ModeId>("pulse");
@@ -274,9 +278,7 @@ export default function Page() {
           playerId,
           market,
           mode: matchMode,
-          // Pulse chooses its position stake in the room; this value only
-          // keeps its lobby rows compatible with the shared match schema.
-          wager: 100,
+          wager,
           timerSeconds: timer,
         }),
       });
@@ -286,7 +288,7 @@ export default function Page() {
         status: string;
       };
       if (matchStatus === "open") {
-        setQueue({ matchId, market, mode: matchMode, wager: 100, timerSeconds: timer, since: Date.now() });
+        setQueue({ matchId, market, mode: matchMode, wager, timerSeconds: timer, since: Date.now() });
         setQueuedFor(0);
         setPending(null);
         return;
@@ -458,7 +460,7 @@ export default function Page() {
             <span className="field-label">In queue</span>
             <strong>Waiting for an opponent…</strong>
             <span className="muted">
-              {MARKETS[queue.market].label} Pulse · {queue.timerSeconds}s round
+              {MARKETS[queue.market].label} Pulse · {queue.timerSeconds}s round · {queue.wager} Embers each, winner takes {queue.wager * 2}
             </span>
           </div>
           <span className="queue-elapsed">{queuedFor}s</span>
@@ -487,6 +489,17 @@ export default function Page() {
               <button key={preset.value} type="button" disabled={!takesCall} className={timer === preset.value ? "is-selected" : ""} onClick={() => setTimer(preset.value)}>{preset.label}</button>
             ))}
           </div>
+        </div>
+        <div className="control-group control-group--wager">
+          <span className="field-label">Wager</span>
+          <div className="segmented-control" role="group" aria-label="Choose wager">
+            {PULSE_WAGER_OPTIONS.map((option) => (
+              <button key={option} type="button" disabled={!takesCall} className={`wager-option${wager === option ? " is-selected" : ""}`} aria-pressed={wager === option} onClick={() => setWager(option)}>
+                <FlameIcon className="balance-ember-icon" /> {option}
+              </button>
+            ))}
+          </div>
+          <span className="muted wager-pot">Winner takes <FlameIcon className="balance-ember-icon" /> <strong>{wager * 2}</strong></span>
         </div>
         <div className="opponent-status"><span className="field-label">Opponent</span><strong><span className={`status-dot ${isPlayable ? "is-online" : ""}`} /> {takesCall ? "Open lobby" : isPlayable ? "Solo · NOVA AI" : "Unavailable"}</strong><span className="muted">{takesCall ? `${openMatches.length} Pulse match${openMatches.length === 1 ? "" : "es"} waiting` : isPlayable ? "Stake and leverage set in-round" : "Mode in development"}</span></div>
         <div className="play-actions">
@@ -525,7 +538,7 @@ export default function Page() {
               <button type="button" className="data-row" key={match.id} onClick={() => join(match)} disabled={pending !== null || queue !== null || match.isYours || activeMatch !== null}>
                 <div className="row-market"><span className={`market-symbol ${match.market === "btc" ? "btc-symbol" : "eth-symbol"}`}>{match.market === "btc" ? "₿" : "Ξ"}</span><span><strong>{label}</strong><span className="muted">{match.timerSeconds}s · {match.isYours ? "yours" : "Pulse"}</span></span></div>
                 <span className="row-detail">1 / 2</span>
-                <span className="row-detail">live trade</span>
+                <span className="row-detail wager-detail"><FlameIcon className="balance-ember-icon" /> {match.wager}</span>
                 <span className="row-age">{pending === match.id ? "joining…" : age(match.createdAt)}</span>
               </button>
             );

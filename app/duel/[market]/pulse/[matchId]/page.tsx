@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FlameIcon } from "@/app/icons";
 import PriceChart, { type TradeMarker } from "@/app/PriceChart";
 import PulseMovementAlert from "@/app/PulseMovementAlert";
 import PulseMarketTitle from "@/app/PulseMarketTitle";
@@ -421,6 +422,12 @@ export default function Page({ params }: { params: Promise<{ market: string; mat
     <PulseMovementAlert total={yourEquity} />
     <Link href="/duel" className="text-xs uppercase tracking-wider text-[var(--muted-dim)] transition hover:text-[var(--text)]">← Menu</Link>
     <PulseMarketTitle market={market}>Arena · Pulse</PulseMarketTitle>
+    {view && (
+      <p className="mt-1 flex items-center gap-1 text-xs text-[var(--muted)]">
+        <FlameIcon className="balance-ember-icon" />
+        <span className="tabular-nums">{view.wager} each · winner takes <strong className="font-semibold text-[var(--text)]">{view.wager * 2}</strong></span>
+      </p>
+    )}
 
     {/* Scoreboard: you, the clock, the opponent */}
     <section className="arena-panel mt-4 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 py-2.5">
@@ -492,6 +499,7 @@ export default function Page({ params }: { params: Promise<{ market: string; mat
         rivalEquity: Math.max(0, opponentEquity),
         rivalPnl: opponentProfit,
         trades: trades.filter((trade) => trade.owner === "you").map((trade) => ({ side: trade.side, action: trade.action, price: trade.p, pnl: trade.pnl, closed: trade.closed })),
+        wager: view.wager,
       } : null}
       notice={notice}
       error={error}
