@@ -35,18 +35,18 @@ export default async function WelcomePage() {
   if (onboarded) redirect("/");
 
   const displayName = stored?.displayName ?? user.fullName ?? user.username ?? "";
+  // OnboardingFlow renders the <main>: the welcome card shell, or the
+  // tutorial's own arena shell during its tutorial stage.
   return (
-    <main className="welcome-shell">
-      <OnboardingFlow
-        profile={{
-          displayName,
-          handle: stored?.handle ?? suggestedHandle([user.username, user.fullName]),
-          bio: stored?.bio ?? "",
-          // Clerk always has an imageUrl; without an upload it's a generic default.
-          avatarUrl: user.hasImage ? user.imageUrl : null,
-          avatarSeed: stored?.handle ? `@${stored.handle}` : userId,
-        }}
-      />
-    </main>
+    <OnboardingFlow
+      profile={{
+        displayName,
+        handle: stored?.handle ?? suggestedHandle([user.username, user.fullName]),
+        bio: stored?.bio ?? "",
+        // Clerk always has an imageUrl; without an upload it's a generic default.
+        avatarUrl: user.hasImage ? user.imageUrl : null,
+        avatarSeed: stored?.handle ? `@${stored.handle}` : userId,
+      }}
+    />
   );
 }

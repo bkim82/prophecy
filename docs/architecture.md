@@ -40,7 +40,7 @@ match room → POST /api/match/[id]/{action,leave}
 portfolio room → GET /api/portfolio/session (3s poll: session/positions/history + lazy settle)
 portfolio room → POST /api/portfolio/session {stake}, POST /api/portfolio/positions {...}, POST /api/portfolio/positions/[id]/close
 /api/portfolio/* → Neon Postgres (portfolio_sessions, positions, portfolio_payouts); pricing → lib/basePrices.ts (DexScreener, Base chain)
-Clerk sign-up → /welcome (server: auth, prefill, finished → /) → step 1 saveProfileBasics (app/profile/actions.ts) → profiles upsert; finish → finishOnboarding (app/welcome/actions.ts) → onboarding upsert; topics → localStorage feed interests
+Clerk sign-up → /welcome (server: auth, prefill, finished → /) → step 1 saveProfileBasics (app/profile/actions.ts) → profiles upsert; finish → finishOnboarding (app/welcome/actions.ts) → onboarding upsert; topics → localStorage feed interests → Pulse tutorial stage (TutorialView onExit, skippable) → finish screen
 /profile (server) → Clerk currentUser + lib/profile.ts (profiles) + lib/match.ts (settled matches); Edit profile → saveProfile server action (app/profile/actions.ts) → profiles upsert; photo → Clerk setProfileImage; banner bytes → GET /api/profile/banner
 /api/tokens/search, /api/tokens/prices → lib/basePrices.ts (token search + batch price quote); /api/tokens/trending, /api/tokens/history → lib/tokenHistory.ts (GeckoTerminal)
 
@@ -103,7 +103,7 @@ its stake and leverage in-round; so does the 24h Portfolio.
 | `app/api/match/*` | match lifecycle: find-or-create, view/heartbeat/settle, join, action, leave, open list |
 | `db/schema.ts` | `users` (Clerk id, balance), `matches` (one row per networked round), `portfolio_sessions`/`positions`/`portfolio_payouts` (one row per 24h Portfolio session, its independent spot/leverage position lots, and each session's idempotent payout), `profiles` (one row per Clerk user who edited their profile; unique `handle`, banner preset or base64 image, pinned won-match ids), `challenges` (pending/canceled challenge requests from profiles; one pending per challenger→target via partial unique index; nothing reserved or played yet) — see [profiles.md](profiles.md) |
 | `lib/profile.ts`, `app/profile/actions.ts`, `app/api/profile/banner/route.ts` | own-profile storage: read (no banner bytes), upsert (partial), handle owner lookup, pins; validated `saveProfile` / `saveProfileBasics` / `checkHandle` / `togglePinnedMatch` server actions; owner-only banner image route |
-| `app/welcome/*`, `app/lib/onboardingQuestions.ts`, `lib/onboarding.ts` | post-sign-up flow: profile basics + survey, `finishOnboarding` action, `onboarding` table reads/writes — see [onboarding.md](onboarding.md) |
+| `app/welcome/*`, `app/lib/onboardingQuestions.ts`, `lib/onboarding.ts` | post-sign-up flow: profile basics + survey, `finishOnboarding` action, `onboarding` table reads/writes, then the Pulse tutorial — see [onboarding.md](onboarding.md) |
 | `app/duel/btc/pulse/page.tsx` | solo trading state, countdown, leveraged P&L, settlement, layout |
 | `app/duel/tutorial/*` | Pulse tutorial: scripted lessons (`lessons.ts` paths/math, `LessonChart.tsx`, `ScriptedLesson.tsx`), live round vs bot (`LiveRound.tsx`, `live.ts`), done flag (`progress.ts`) — see [tutorial.md](tutorial.md) |
 | `app/api/match/[id]/action/route.ts` | server-priced Pulse entry, close, and reverse actions |
