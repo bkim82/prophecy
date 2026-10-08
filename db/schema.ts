@@ -10,6 +10,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import type { PulsePosition } from "@/lib/pulse";
+import type { BotState } from "@/lib/bots";
 
 export const users = pgTable("users", {
   id: text("id").primaryKey(), // Clerk user id
@@ -72,6 +73,27 @@ export const matches = pgTable("matches", {
   roundStartAt: timestamp("round_start_at", { withTimezone: true }),
   finalPrice: doublePrecision("final_price"),
   winner: text("winner"), // "1" | "2" | "tie"
+  // Non-null when one seat is a house bot (lib/bots.ts): which role it plays
+  // and its per-round decision state. Never sent to clients.
+  botState: jsonb("bot_state").$type<BotState>(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  // One bot-hosted waiting match per lobby slot, so concurrent
+  // `ensureBotSlots` calls can't stack duplicates (`ON CONFLICT DO NOTHING`).
+  oneOpenBotPerSlot: uniqueIndex("matches_one_open_bot_per_slot")
+    .on(table.market, table.mode, table.wager, table.timerSeconds)
+    .where(sql`${table.status} = 'open' AND ${table.botState} IS NOT NULL`),
+}));
+
+// House-bot personas (lib/bots.ts). `id` is Clerk-shaped and lands in
+// `matches.player{N}_user_id` like a real user's; `name` is what
+// lib/opponentNames.ts shows. `skill` (0 reckless .. 1 disciplined) shapes
+// trading habits and is never exposed. Bots have no `users` row, so payouts
+// to a bot are no-ops.
+export const bots = pgTable("bots", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  skill: doublePrecision("skill").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

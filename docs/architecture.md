@@ -44,7 +44,7 @@ portfolio room → POST /api/portfolio/session {stake}, POST /api/portfolio/posi
 /api/tokens/search, /api/tokens/prices → lib/basePrices.ts (token search + batch price quote); /api/tokens/trending, /api/tokens/history → lib/tokenHistory.ts (GeckoTerminal)
 
 /api/history → api.exchange.coinbase.com (trades + candles, both, merged)
-/api/price   → lib/spotPrice.ts → api.coinbase.com → api.binance.com fallback chain
+/api/price   → lib/spotPrice.ts → Coinbase Exchange ticker → api.coinbase.com spot → api.binance.com fallback chain
 
 duel/page.tsx Play controls → compact Practice action beside Play
 ```
@@ -98,7 +98,7 @@ its stake and leverage in-round; so does the 24h Portfolio.
 | `app/PulseMiniDock.tsx` | condensed Pulse trading controls (stake/leverage/long/short/close) shown from `ActiveMatchBar` on hover (desktop) or tap (touch), same `/api/match/[id]/action` calls as the full room |
 | `app/lib/playerId.ts` | anonymous per-browser id in `localStorage` |
 | `lib/match.ts` | `MatchView` role-scoping, presence, guarded settlement — shared by every `/api/match/*` route |
-| `lib/spotPrice.ts` | Coinbase→Binance fallback chain + `productForMarket`; shared by `/api/price` and settlement |
+| `lib/spotPrice.ts` | Coinbase Exchange→Coinbase spot→Binance fallback chain + `productForMarket`; shared by `/api/price` and settlement |
 | `app/api/match/*` | match lifecycle: find-or-create, view/heartbeat/settle, join, action, leave, open list |
 | `db/schema.ts` | `users` (Clerk id, balance), `matches` (one row per networked round), `portfolio_sessions`/`positions`/`portfolio_payouts` (one row per 24h Portfolio session, its independent spot/leverage position lots, and each session's idempotent payout), `profiles` (one row per Clerk user who edited their profile; unique `handle`, banner preset or base64 image, pinned won-match ids), `challenges` (pending/canceled challenge requests from profiles; one pending per challenger→target via partial unique index; nothing reserved or played yet) — see [profiles.md](profiles.md) |
 | `lib/profile.ts`, `app/profile/actions.ts`, `app/api/profile/banner/route.ts` | own-profile storage: read (no banner bytes), upsert, pins; validated `saveProfile` / `togglePinnedMatch` server actions; owner-only banner image route |
@@ -130,7 +130,7 @@ its stake and leverage in-round; so does the 24h Portfolio.
 - Match state transitions are single guarded `UPDATE ... WHERE <guard> RETURNING *` statements, never read-then-write: `neon-http` has no transactions or row locks, so the guard *is* the lock (`app/api/match/[id]/action/route.ts:89`). 0 rows back means someone else won — re-read, never retry blindly.
 - The opponent's positions are withheld server-side until `countdown`, not hidden in the client (`lib/match.ts:182-187`). Anything added to `MatchView` must be safe for the other player to read.
 - `matches` timestamps are `timestamptz`; a bare `timestamp` column stores the writer's local time and silently breaks presence across timezones (`db/schema.ts:29-35`).
-- All fetch paths degrade, never throw to the user: history → trades ∪ candles → `[]` (`app/api/history/route.ts:88-110`); price → Coinbase → Binance → 502 (`lib/spotPrice.ts:39-52`); match poll failure → keep polling, never eject the player (`app/duel/[market]/pulse/[matchId]/page.tsx:111-114`); settlement price outage → row stays in `countdown`, next poll retries (`lib/match.ts:103-106`).
+- All fetch paths degrade, never throw to the user: history → trades ∪ candles → `[]` (`app/api/history/route.ts:88-110`); price → Coinbase Exchange → Coinbase spot → Binance → 502 (`lib/spotPrice.ts:47-63`); match poll failure → keep polling, never eject the player (`app/duel/[market]/pulse/[matchId]/page.tsx:111-114`); settlement price outage → row stays in `countdown`, next poll retries (`lib/match.ts:103-106`).
 - `PriceChart` holds only its time and price wheel zoom levels (`docs/chart.md` → Zoom), and otherwise stays a pure function of props — including its clock, which arrives as the `now` prop rather than a `Date.now()` read or an interval of its own (`app/duel/[market]/pulse/[matchId]/page.tsx:201`). Round/freeze logic belongs in the match room (`app/duel/[market]/pulse/[matchId]/page.tsx:132`), not the chart. Same for server timestamps: the room converts them off the server clock (`app/duel/[market]/pulse/[matchId]/page.tsx:55-62`, `:121`), and the chart just draws whatever `roundStart`/`trades` it gets.
 - Color literals stay out of components: add a token to `app/globals.css` and define it in the `:root` and light blocks (and obsidian if Navy's value doesn't fit), or the toggle silently breaks in one theme.
 - The arena lobby may read `usePriceFeed()` for live market display (`app/duel/page.tsx:139`), but settlement logic stays out of it — multiplayer Pulse settles on the server (`lib/match.ts:98`), solo Pulse in its own page.

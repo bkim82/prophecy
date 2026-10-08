@@ -1,4 +1,4 @@
-import { and, eq, gt, isNull } from "drizzle-orm";
+import { and, eq, gt, isNotNull, isNull, or } from "drizzle-orm";
 import { auth } from "@clerk/nextjs/server";
 import { getDb } from "@/db";
 import { matches } from "@/db/schema";
@@ -50,7 +50,7 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
         eq(matches.status, "open"),
         isNull(matches.player2Id),
         // A direct invite should only claim a queue the host is still holding.
-        gt(matches.player1LastSeen, presenceCutoff()),
+        or(gt(matches.player1LastSeen, presenceCutoff()), isNotNull(matches.botState)),
       ),
     )
     .returning();

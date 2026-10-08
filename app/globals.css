@@ -1777,6 +1777,15 @@ a.post-avatar { text-decoration: none; }
 .dock-chip { flex: none; display: inline-flex; height: 40px; align-items: center; border: 1px solid; border-radius: 8px; padding: 0 10px; font-size: 12px; font-weight: 700; letter-spacing: .04em; }
 .dock-live-pnl { flex: 1; display: flex; align-items: center; justify-content: center; height: 40px; font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }
 .dock-meta { flex: none; display: flex; flex-direction: column; justify-content: center; height: 40px; text-align: right; font-size: 11px; color: var(--muted); }
+/* Multiplayer room (app/duel/[market]/pulse/[matchId]/page.tsx RoomDock) is
+   this same dock with the ±$25/All in stake stepper in place of the Amount
+   dropdown; that row wraps (stepper on its own line) on phones. */
+.dock-row-wrap { flex-wrap: wrap; }
+.dock-stake { flex: 999 1 240px; min-width: 0; }
+.dock-stake .pulse-stake { height: 40px; }
+.dock-stake .pulse-stake button { border-radius: 8px; background: var(--surface-raised); }
+.dock-stake .pulse-stake-field { border-radius: 8px; }
+.dock-select-compact { flex: 1 1 130px; }
 
 /* Sibyl duel: scoreboard avatars/ring/lead bar, dock hero P&L, result card. */
 .duel-avatar { position: relative; display: flex; flex-shrink: 0; align-items: center; justify-content: center; border-radius: 999px; font-weight: 700; color: #fff; box-shadow: 0 2px 10px rgba(0, 0, 0, .25); }
@@ -2393,3 +2402,14 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
     transform: none;
   }
 }
+
+/* Pulse stake stepper (app/PulseStakeStepper.tsx) — shared by the room dock and the mini dock. */
+.pulse-stake { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; gap: 6px; }
+.pulse-stake button { border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--muted); padding: 6px 10px; font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.pulse-stake button:hover:not(:disabled) { color: var(--text); border-color: var(--line-strong); }
+.pulse-stake button.is-active { border-color: var(--accent); background: var(--selected-bg); color: var(--accent-strong); }
+.pulse-stake button:disabled { color: var(--muted-dim); cursor: default; }
+.pulse-stake-field { display: flex; align-items: center; gap: 2px; min-width: 0; border: 1px solid var(--line); border-radius: 6px; background: var(--surface-raised); padding: 0 8px; color: var(--muted); font-size: 12px; }
+.pulse-stake-field:focus-within { border-color: var(--accent); }
+.pulse-stake-field input { min-width: 0; width: 100%; border: 0; background: transparent; padding: 6px 0; color: var(--text); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; outline: none; }
+.pulse-stake-field input:disabled { color: var(--muted-dim); }

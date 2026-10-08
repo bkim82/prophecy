@@ -53,6 +53,15 @@ multi-statement transactions or row locks. Every transition is a single guarded
 - `matches` timestamps are `timestamptz`, unlike `users.createdAt` (`db/schema.ts:35-47`). Bare `timestamp` columns store whatever local time the writer was in — a row written from a laptop and read on a UTC server lands hours out, which reads as "that player went offline".
 - Server sends `serverNow` with every view (`lib/match.ts:223`); the client subtracts the skew before running the pre-round timer, the countdown, or chart markers (`app/duel/[market]/pulse/[matchId]/page.tsx:55-62`).
 
+## House bots (`lib/bots.ts`)
+
+- Personas: `bots` table (`db/schema.ts`), Clerk-shaped `user_…` id, random name (`randomBotName`, `lib/bots.ts:74`) in the same `@handle`/first-name shapes as real opponents, hidden `skill` 0..1. Pool minted up to `POOL_TARGET`=80, then reused (`pickPersonas`). Names resolve via `lib/opponentNames.ts` → `botNames` before Clerk.
+- Per-round brain: `matches.bot_state` jsonb (`BotState`, role + skill + next tick). Non-null = a bot holds that seat; never in `viewFor`. A bot opponent always reads `opponentPresent: true`.
+- Always online: `ensureBotSlots` (`lib/bots.ts:149`, called from `GET /api/match/open`, throttled 4s/instance) keeps one bot-hosted `open` row per BTC × 60/120/300s at `BOT_WAGER`=100 (`BOT_MARKETS`; ETH stays human-only so invites aren't sniped); unique partial index `matches_one_open_bot_per_slot` dedupes. A slot gets a new persona only after its bot is joined; the listed age cycles every 90s (`listedCreatedAt`, display only). Bot hosts skip presence (`or(... isNotNull(botState))` in open list + join).
+- Play (`find-or-create`) pairs humans only (`isNull(botState)`); a queued human on a `BOT_MARKETS` market gets a bot after a deterministic 3–9s per match (`seatBotIfWaiting`, `lib/bots.ts:209`, run off the poll), same guarded seat UPDATE so a real joiner still wins.
+- Trading: `driveBot` (`lib/bots.ts:241`) runs off `GET /api/match/[id]` between pre-round expiry and settlement (`app/api/match/[id]/route.ts:47-48`); CAS on `bot_state`. Skill shapes habits only (stake fraction, leverage, momentum-follow, TP/SL, tick rate) — no lookahead. Only trades while someone polls.
+- Economy: bots have no `users` row and reserve nothing; a human beating a bot is paid the full 2× pot (half minted), a bot win just keeps the human's stake.
+
 ## Routes
 
 | Route | Does |
@@ -68,8 +77,8 @@ multi-statement transactions or row locks. Every transition is a single guarded
 Validation on entry: market must price (`lib/spotPrice.ts:12`), mode must be
 `pulse`, caller must be a signed-in Clerk user, wager integer
 1..1,000,000 and no more than the user's balance, timer 10..3600s. Pulse
-actions additionally validate side, stake ≤ $100 and available bankroll, leverage,
-and position id.
+actions additionally validate side, stake > 0 and ≤ available bankroll (no fixed
+cap, so winnings can be staked), leverage, and position id.
 
 ## Client
 

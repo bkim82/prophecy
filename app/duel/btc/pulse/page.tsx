@@ -1,11 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import PriceChart, { type TradeMarker } from "../../../PriceChart";
 import { usePriceFeed, type PricePoint } from "../../../usePriceFeed";
 import PulseMovementAlert from "../../../PulseMovementAlert";
 import PulseMarketTitle from "../../../PulseMarketTitle";
+import {
+  ArenaResultCard,
+  ArenaScore,
+  CountdownRing,
+  FlashingPrice,
+  LeadBar,
+  RIVAL_GRADIENT,
+  SoundToggle,
+  usePulseFeedback,
+  YOU_GRADIENT,
+} from "../../../PulseArenaParts";
 import { productForMarket } from "@/lib/spotPrice";
 
 const ROUND_SECONDS = 60;
@@ -13,7 +24,6 @@ const STARTING_CASH = 100;
 const DEFAULT_LEVERAGE = 100;
 const LEVERAGE_OPTIONS = [100, 1000, 10000];
 const FIXED_STAKE_OPTIONS = [10, 25, 50];
-const MUTE_STORAGE_KEY = "pulse-sound-muted";
 const RIVAL_STAKE = 48;
 const RIVAL_LEVERAGE = 10;
 
@@ -21,9 +31,6 @@ const RIVAL_LEVERAGE = 10;
 // the same colour as the control that placed it.
 const LONG_COLOR = "var(--chart-up)";
 const SHORT_COLOR = "var(--chart-down)";
-
-const YOU_GRADIENT = "linear-gradient(135deg, var(--brand), var(--brand-strong))";
-const SIBYL_GRADIENT = "linear-gradient(135deg, var(--violet), var(--violet-strong))";
 
 // Each line a short, grounded reaction to a real state change — never a
 // claim about activity that didn't happen.
@@ -56,6 +63,8 @@ type Trade = {
   amount: number;
   owner: Owner;
   pnl?: number;
+  /** On exit/reverse: the position this closed (the result card's trade review). */
+  closed?: { side: Side; entry: number; exit: number };
 };
 
 type ClosedPosition = {
@@ -83,8 +92,6 @@ const usd = (n: number) =>
 
 const signedUsd = (n: number) => `${n >= 0 ? "+" : "-"}${usd(Math.abs(n))}`;
 
-const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
-
 const positionPnl = (position: Position, price: number) => {
   const move =
     position.side === "long"
@@ -99,61 +106,6 @@ const pnlColor = (n: number) => (n >= 0 ? "var(--positive)" : "var(--negative)")
 
 const formatTime = (seconds: number) =>
   `${String(Math.floor(Math.max(0, seconds) / 60)).padStart(2, "0")}:${String(Math.max(0, seconds) % 60).padStart(2, "0")}`;
-
-// A one-sentence takeaway built only from this round's real trades — no
-// invented color commentary.
-function roundTakeaway(trades: Trade[]): string {
-  const closes = trades.filter((t) => t.owner === "you" && t.action !== "entry" && t.pnl !== undefined);
-  if (closes.length === 0) return "No trades this round — the clock ran out before a side was picked.";
-  const best = closes.reduce((a, b) => (Math.abs(b.pnl ?? 0) > Math.abs(a.pnl ?? 0) ? b : a));
-  const count = closes.length;
-  return `${count} trade${count === 1 ? "" : "s"} this round — your biggest mover was the ${best.side} @ ${usd(best.price)} (${signedUsd(best.pnl ?? 0)}).`;
-}
-
-function SoundWave() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 18 18" className="h-3.5 w-3.5">
-      <path
-        d="M3 7v4h2.5L9 14V4L5.5 7H3Zm8.4 1.1a2.3 2.3 0 0 1 0 2.8M13.6 6a5.1 5.1 0 0 1 0 6"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
-function CountdownRing({ seconds, total, urgent }: { seconds: number; total: number; urgent: boolean }) {
-  const r = 30;
-  const c = 2 * Math.PI * r;
-  const frac = total > 0 ? clamp(seconds / total, 0, 1) : 0;
-  return (
-    <svg viewBox="0 0 72 72" className="h-9 w-9 sm:h-11 sm:w-11">
-      <circle className="duel-ring-track" cx="36" cy="36" r={r} strokeWidth="5" />
-      <circle
-        className={`duel-ring-progress ${urgent ? "is-urgent" : ""}`}
-        cx="36"
-        cy="36"
-        r={r}
-        strokeWidth="5"
-        strokeDasharray={c}
-        strokeDashoffset={c * (1 - frac)}
-      />
-      <text
-        x="36"
-        y="41"
-        textAnchor="middle"
-        fontSize="18"
-        fontWeight="700"
-        fill={urgent ? "var(--negative)" : "var(--text)"}
-        className="tabular-nums"
-      >
-        {Math.max(0, Math.round(seconds))}
-      </text>
-    </svg>
-  );
-}
 
 function SibylFace({ mood }: { mood: "happy" | "sad" | "neutral" }) {
   return (
@@ -193,74 +145,6 @@ function SibylFace({ mood }: { mood: "happy" | "sad" | "neutral" }) {
   );
 }
 
-function LeadBar({ leadDelta, maxLead }: { leadDelta: number; maxLead: number }) {
-  const pct = clamp(50 + (leadDelta / Math.max(1, maxLead)) * 50, 0, 100);
-  const side: "you" | "sibyl" | "tie" = leadDelta > 0.5 ? "you" : leadDelta < -0.5 ? "sibyl" : "tie";
-  const label =
-    side === "tie"
-      ? "Tied"
-      : side === "you"
-        ? `You lead by ${usd(Math.abs(leadDelta))}`
-        : `Sibyl leads by ${usd(Math.abs(leadDelta))}`;
-  return (
-    <div className="mt-3">
-      <div className="duel-lead-bar">
-        <div className="duel-lead-mid" />
-        <div
-          className="duel-lead-fill"
-          style={{ width: `${pct}%`, backgroundColor: side === "sibyl" ? SHORT_COLOR : LONG_COLOR }}
-        />
-      </div>
-      <p className="mt-1.5 text-center text-xs text-[var(--muted)]">{label}</p>
-    </div>
-  );
-}
-
-function ResultBurst() {
-  const particles = useMemo(
-    () =>
-      Array.from({ length: 14 }, (_, i) => ({
-        id: i,
-        rot: (360 / 14) * i + Math.random() * 12,
-        dist: 70 + Math.random() * 40,
-        delay: Math.random() * 0.15,
-      })),
-    [],
-  );
-  return (
-    <div className="result-burst" aria-hidden="true">
-      {particles.map((p) => (
-        <span
-          key={p.id}
-          className="result-burst-particle"
-          style={
-            {
-              "--rot": `${p.rot}deg`,
-              "--dist": `-${p.dist}px`,
-              animationDelay: `${p.delay}s`,
-              background: p.id % 2 ? "var(--chart-up)" : "var(--brand)",
-            } as React.CSSProperties
-          }
-        />
-      ))}
-    </div>
-  );
-}
-
-// Per-character diff of the formatted headline, so only the glyphs that
-// actually changed flash — the whole number never re-animates on every tick.
-function FlashingPrice({ text, flashKey, dir, mask }: { text: string; flashKey: number; dir: "up" | "down"; mask: boolean[] }) {
-  return (
-    <>
-      {text.split("").map((ch, i) => (
-        <span key={`${flashKey}-${i}`} className={flashKey > 0 && mask[i] ? `price-flash is-${dir}` : undefined}>
-          {ch}
-        </span>
-      ))}
-    </>
-  );
-}
-
 export default function Page() {
   // `?market=eth` reuses this solo loop for any priced market; BTC otherwise.
   const [market, setMarket] = useState("btc");
@@ -287,22 +171,9 @@ export default function Page() {
   const [rivalSide, setRivalSide] = useState<Side>("short");
   const [isPractice, setIsPractice] = useState(false);
   const [isActing, setIsActing] = useState(false);
-  const [reviewOpen, setReviewOpen] = useState(false);
-  const [muted, setMuted] = useState(true);
   const [leadPulse, setLeadPulse] = useState<{ side: "you" | "sibyl"; key: number } | null>(null);
   const [sibylLine, setSibylLine] = useState(IDLE_LINE);
   const [sibylLineKey, setSibylLineKey] = useState(0);
-  // Flash the headline price green/red on a whole-tick move — same cue as
-  // the lobby ticker. Mask tracks which characters actually changed, so only
-  // those glyphs flash rather than the whole number.
-  const [priceFlash, setPriceFlash] = useState<{ key: number; dir: "up" | "down"; mask: boolean[] }>({
-    key: 0,
-    dir: "up",
-    mask: [],
-  });
-  const prevHeadlineRef = useRef<number | null>(null);
-  const prevHeadlineStrRef = useRef<string | null>(null);
-
   const priceRef = useRef(price);
   priceRef.current = price;
   const pointsRef = useRef(points);
@@ -317,8 +188,7 @@ export default function Page() {
   rivalEntryPriceRef.current = rivalEntryPrice;
   const rivalSideRef = useRef(rivalSide);
   rivalSideRef.current = rivalSide;
-  const mutedRef = useRef(muted);
-  mutedRef.current = muted;
+  const { muted, toggleMuted, playFeedback } = usePulseFeedback();
   const isActingRef = useRef(isActing);
   isActingRef.current = isActing;
   const maxLeadRef = useRef(1);
@@ -330,56 +200,11 @@ export default function Page() {
     setSibylLineKey((k) => k + 1);
   }, []);
 
-  const playFeedback = useCallback((kind: "entry" | "exit" | "reverse") => {
-    if (typeof navigator !== "undefined" && "vibrate" in navigator) {
-      navigator.vibrate(kind === "reverse" ? [12, 24, 12] : 12);
-    }
-    if (mutedRef.current) return;
-    if (typeof window === "undefined") return;
-    try {
-      const AudioContextClass =
-        window.AudioContext ||
-        (window as unknown as { webkitAudioContext?: typeof AudioContext })
-          .webkitAudioContext;
-      if (!AudioContextClass) return;
-      const context = new AudioContextClass();
-      const oscillator = context.createOscillator();
-      const gain = context.createGain();
-      oscillator.type = "sine";
-      oscillator.frequency.value = kind === "reverse" ? 520 : kind === "entry" ? 410 : 260;
-      gain.gain.setValueAtTime(0.025, context.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 0.09);
-      oscillator.connect(gain).connect(context.destination);
-      oscillator.start();
-      oscillator.stop(context.currentTime + 0.1);
-      window.setTimeout(() => void context.close(), 150);
-    } catch {
-      // Audio is a progressive enhancement; the interaction stays functional.
-    }
-  }, []);
-
   useEffect(() => {
     const query = new URLSearchParams(window.location.search);
     setIsPractice(query.get("practice") === "1");
     const requested = query.get("market");
     if (requested && productForMarket(requested)) setMarket(requested);
-    try {
-      setMuted(window.localStorage.getItem(MUTE_STORAGE_KEY) !== "0");
-    } catch {
-      // localStorage can throw in locked-down contexts; default stays muted.
-    }
-  }, []);
-
-  const toggleMuted = useCallback(() => {
-    setMuted((current) => {
-      const next = !current;
-      try {
-        window.localStorage.setItem(MUTE_STORAGE_KEY, next ? "1" : "0");
-      } catch {
-        // Best-effort persistence only.
-      }
-      return next;
-    });
   }, []);
 
   useEffect(() => {
@@ -424,6 +249,7 @@ export default function Page() {
           amount: openPosition.stake,
           owner: "you",
           pnl: openPnl,
+          closed: { side: openPosition.side, entry: openPosition.entryPrice, exit: finalPrice },
         });
       }
       positionRef.current = null;
@@ -530,7 +356,10 @@ export default function Page() {
     positionRef.current = null;
     setPosition(null);
     setPhase("setup");
-    addTrade({ t: Date.now(), side: current.side, action: "exit", price: execPrice, amount: current.stake, owner: "you", pnl });
+    addTrade({
+      t: Date.now(), side: current.side, action: "exit", price: execPrice, amount: current.stake, owner: "you", pnl,
+      closed: { side: current.side, entry: current.entryPrice, exit: execPrice },
+    });
     setPressedAction("close");
     isActingRef.current = true;
     setIsActing(true);
@@ -570,6 +399,7 @@ export default function Page() {
       amount: nextPosition.stake,
       owner: "you",
       pnl: closedPnl,
+      closed: { side: current.side, entry: current.entryPrice, exit: execPrice },
     });
     isActingRef.current = true;
     setIsActing(true);
@@ -602,7 +432,6 @@ export default function Page() {
     setSettleError(false);
     setFrozenPoints(null);
     setRivalEntryPrice(null);
-    setReviewOpen(false);
     maxLeadRef.current = 1;
     prevLeadSideRef.current = "tie";
     firedUrgentRef.current = false;
@@ -640,21 +469,6 @@ export default function Page() {
   const sibylMood: "happy" | "sad" | "neutral" = leadSide === "sibyl" ? "happy" : leadSide === "you" ? "sad" : "neutral";
 
   const headlinePrice = outcome?.finalPrice ?? displayPrice;
-
-  useEffect(() => {
-    const prevNum = prevHeadlineRef.current;
-    const prevStr = prevHeadlineStrRef.current;
-    prevHeadlineRef.current = headlinePrice;
-    const nextStr = headlinePrice === null ? null : usd(headlinePrice);
-    prevHeadlineStrRef.current = nextStr;
-    if (prevNum === null || headlinePrice === null || headlinePrice === prevNum || nextStr === null) return;
-    const dir = headlinePrice > prevNum ? "up" : "down";
-    const mask =
-      prevStr && nextStr.length === prevStr.length
-        ? nextStr.split("").map((ch, i) => ch !== prevStr[i])
-        : nextStr.split("").map(() => true);
-    setPriceFlash((f) => ({ key: f.key + 1, dir, mask }));
-  }, [headlinePrice]);
 
   // Lead-change pulse + grounded Sibyl commentary, fired once per flip.
   useEffect(() => {
@@ -705,8 +519,6 @@ export default function Page() {
     }
   }, [availableCash, stake]);
 
-  const headlineText = headlinePrice === null ? "Loading…" : usd(headlinePrice);
-
   return (
     <main className="arena-shell mx-auto max-w-4xl px-4 py-10" data-market={market}>
       <PulseMovementAlert total={liveEquity} />
@@ -733,7 +545,7 @@ export default function Page() {
             >
               Y
             </div>
-            <Score
+            <ArenaScore
               name="You"
               equity={outcome ? outcome.finalValue : liveEquity}
               pnl={displayYourPnl}
@@ -748,18 +560,18 @@ export default function Page() {
             </span>
           </div>
           <div className="flex min-w-0 items-center justify-end gap-1.5 sm:gap-2">
-            <Score name="Sibyl · AI" equity={sibylFinalEquity} pnl={displayRivalPnl} align="right" />
+            <ArenaScore name="Sibyl · AI" equity={sibylFinalEquity} pnl={displayRivalPnl} align="right" />
             <div
               key={leadPulse?.side === "sibyl" ? leadPulse.key : "sibyl-avatar"}
               className={`duel-avatar h-6 w-6 sm:h-8 sm:w-8 ${leadPulse?.side === "sibyl" ? "is-lead" : ""}`}
-              style={{ backgroundImage: SIBYL_GRADIENT }}
+              style={{ backgroundImage: RIVAL_GRADIENT }}
               aria-hidden="true"
             >
               <SibylFace mood={sibylMood} />
             </div>
           </div>
         </div>
-        <LeadBar leadDelta={leadDelta} maxLead={maxLeadRef.current} />
+        <LeadBar leadDelta={leadDelta} maxLead={maxLeadRef.current} rivalName="Sibyl" />
         {sibylLine && (
           <p key={sibylLineKey} className="sibyl-bubble mt-1.5 text-center text-[11px] text-[var(--muted)]">
             <span className="opacity-60">Sibyl:</span> {sibylLine}
@@ -792,7 +604,7 @@ export default function Page() {
           )}
         </div>
         <p className="mt-1 text-4xl font-semibold tabular-nums text-[var(--text)]">
-          <FlashingPrice text={headlineText} flashKey={priceFlash.key} dir={priceFlash.dir} mask={priceFlash.mask} />
+          <FlashingPrice price={headlinePrice} />
         </p>
       </section>
 
@@ -807,14 +619,7 @@ export default function Page() {
         />
         <div className="mt-2 flex items-center justify-between px-1 text-xs text-[var(--muted-dim)]">
           <span>Entries ○ · exits □ · reversals ◇ · dashed = Sibyl</span>
-          <button
-            type="button"
-            onClick={toggleMuted}
-            aria-pressed={!muted}
-            className="flex items-center gap-1.5 transition hover:text-[var(--text)]"
-          >
-            <SoundWave /> {muted ? "Sound off" : "Sound on"}
-          </button>
+          <SoundToggle muted={muted} onToggle={toggleMuted} />
         </div>
       </section>
 
@@ -845,47 +650,10 @@ export default function Page() {
         outcome={outcome}
         winner={winner}
         sibylFinalEquity={sibylFinalEquity}
-        leadDelta={leadDelta}
-        maxLead={maxLeadRef.current}
         trades={trades}
-        reviewOpen={reviewOpen}
-        onToggleReview={() => setReviewOpen((o) => !o)}
         onPlayAgain={playAgain}
       />
     </main>
-  );
-}
-
-function Score({
-  name,
-  equity,
-  pnl,
-  align,
-}: {
-  name: string;
-  equity: number;
-  pnl: number;
-  align: "left" | "right";
-}) {
-  return (
-    <div className={`min-w-0 ${align === "right" ? "text-right" : "text-left"}`}>
-      <div
-        className={`flex items-center gap-2 ${align === "right" ? "justify-end" : ""}`}
-      >
-        <span className="truncate text-[10px] uppercase tracking-wider text-[var(--muted)]">
-          {name}
-        </span>
-      </div>
-      <div className="text-sm font-semibold tabular-nums text-[var(--text)]">
-        {usd(equity)}
-      </div>
-      <div
-        className="text-[10px] font-medium tabular-nums"
-        style={{ color: pnlColor(pnl) }}
-      >
-        {signedUsd(pnl)} P&amp;L
-      </div>
-    </div>
   );
 }
 
@@ -916,11 +684,7 @@ type DockProps = {
   outcome: Outcome | null;
   winner: Winner | null;
   sibylFinalEquity: number;
-  leadDelta: number;
-  maxLead: number;
   trades: Trade[];
-  reviewOpen: boolean;
-  onToggleReview: () => void;
   onPlayAgain: () => void;
 };
 
@@ -929,8 +693,8 @@ function TradingDock(props: DockProps) {
     marketLabel, phase, stake, setStake, leverage, setLeverage, position, closedPosition,
     livePrice, livePositionPnl, availableCash, isBusted, canEnter, canManage, isActing,
     pressedAction, onEnter, onClose, onReverse, onRetry,
-    settleError, outcome, winner, sibylFinalEquity, leadDelta, maxLead,
-    trades, reviewOpen, onToggleReview, onPlayAgain,
+    settleError, outcome, winner, sibylFinalEquity,
+    trades, onPlayAgain,
   } = props;
   const [pressedSide, setPressedSide] = useState<Side | null>(null);
   const stakeDetailsRef = useRef<HTMLDetailsElement>(null);
@@ -1147,116 +911,28 @@ function TradingDock(props: DockProps) {
       )}
 
       {phase === "result" && outcome && winner && (
-        <ResultCard
+        <ArenaResultCard
           marketLabel={marketLabel}
-          outcome={outcome}
-          winner={winner}
+          finalPrice={outcome.finalPrice}
+          winner={winner === "sibyl" ? "rival" : winner}
+          rivalName="Sibyl"
           yourEquity={outcome.finalValue}
-          sibylEquity={sibylFinalEquity}
-          leadDelta={leadDelta}
-          maxLead={maxLead}
-          takeaway={roundTakeaway(trades)}
+          yourPnl={outcome.profit}
+          rivalEquity={sibylFinalEquity}
+          rivalPnl={sibylFinalEquity - STARTING_CASH}
+          rivalAvatar={<SibylFace mood={winner === "sibyl" ? "happy" : winner === "you" ? "sad" : "neutral"} />}
           trades={trades.filter((t) => t.owner === "you")}
-          reviewOpen={reviewOpen}
-          onToggleReview={onToggleReview}
-          onPlayAgain={onPlayAgain}
+          playAgain={
+            <button
+              type="button"
+              onClick={onPlayAgain}
+              className="rounded-md bg-[var(--btn-bg)] px-5 py-2 text-sm font-medium text-[var(--btn-text)] transition hover:bg-[var(--btn-bg-hover)]"
+            >
+              Play Again
+            </button>
+          }
         />
       )}
     </section>
   );
 }
-
-function ResultCard({
-  marketLabel,
-  outcome,
-  winner,
-  yourEquity,
-  sibylEquity,
-  leadDelta,
-  maxLead,
-  takeaway,
-  trades,
-  reviewOpen,
-  onToggleReview,
-  onPlayAgain,
-}: {
-  marketLabel: string;
-  outcome: Outcome;
-  winner: Winner;
-  yourEquity: number;
-  sibylEquity: number;
-  leadDelta: number;
-  maxLead: number;
-  takeaway: string;
-  trades: Trade[];
-  reviewOpen: boolean;
-  onToggleReview: () => void;
-  onPlayAgain: () => void;
-}) {
-  const headline = winner === "tie" ? "Dead heat" : winner === "you" ? "You won the round" : "Sibyl took this one";
-  return (
-    <div className="relative pt-4">
-      {winner === "you" && <ResultBurst />}
-      <p className="text-center text-xs uppercase tracking-wider text-[var(--muted)]">
-        Final {marketLabel} {usd(outcome.finalPrice)}
-      </p>
-      <h3 className="mt-1 text-center text-2xl font-bold text-[var(--text)]">{headline}</h3>
-      <div className="mt-4 grid grid-cols-2 gap-3">
-        <div className="rounded-md border border-[var(--line)] bg-[var(--surface-raised)] p-3 text-center">
-          <p className="text-xs uppercase tracking-wider text-[var(--muted)]">You</p>
-          <p className="mt-1 text-xl font-semibold tabular-nums text-[var(--text)]">{usd(yourEquity)}</p>
-          <p className="text-xs tabular-nums" style={{ color: pnlColor(outcome.profit) }}>
-            {signedUsd(outcome.profit)}
-          </p>
-        </div>
-        <div className="rounded-md border border-[var(--line)] bg-[var(--surface-raised)] p-3 text-center">
-          <p className="text-xs uppercase tracking-wider text-[var(--muted)]">Sibyl</p>
-          <p className="mt-1 text-xl font-semibold tabular-nums text-[var(--text)]">{usd(sibylEquity)}</p>
-          <p className="text-xs tabular-nums" style={{ color: pnlColor(sibylEquity - STARTING_CASH) }}>
-            {signedUsd(sibylEquity - STARTING_CASH)}
-          </p>
-        </div>
-      </div>
-      <LeadBar leadDelta={leadDelta} maxLead={maxLead} />
-      <p className="mt-3 text-center text-sm text-[var(--muted)]">{takeaway}</p>
-      <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-center">
-        <button
-          type="button"
-          onClick={onPlayAgain}
-          className="rounded-md bg-[var(--btn-bg)] px-5 py-2 text-sm font-medium text-[var(--btn-text)] transition hover:bg-[var(--btn-bg-hover)]"
-        >
-          Play Again
-        </button>
-        <button
-          type="button"
-          onClick={onToggleReview}
-          className="rounded-md border border-[var(--line)] px-5 py-2 text-sm text-[var(--text)] transition hover:border-[var(--line-strong)] hover:bg-[var(--surface-hover)]"
-        >
-          {reviewOpen ? "Hide trades" : "Review trades"}
-        </button>
-      </div>
-      {reviewOpen && (
-        <div className="mt-3 space-y-1.5 rounded-md border border-[var(--line)] bg-[var(--surface-raised)] p-3">
-          {trades.length === 0 ? (
-            <p className="text-center text-xs text-[var(--muted)]">No trades this round.</p>
-          ) : (
-            trades.map((trade, i) => (
-              <div key={i} className="flex items-center justify-between text-xs">
-                <span className="uppercase tracking-wide" style={{ color: sideColor(trade.side) }}>
-                  {trade.side} · {trade.action}
-                </span>
-                <span className="tabular-nums text-[var(--muted)]">{usd(trade.price)}</span>
-                {trade.pnl !== undefined && (
-                  <span className="tabular-nums" style={{ color: pnlColor(trade.pnl) }}>
-                    {signedUsd(trade.pnl)}
-                  </span>
-                )}
-              </div>
-            ))
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-

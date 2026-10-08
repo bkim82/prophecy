@@ -3,17 +3,19 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePriceFeed } from "./usePriceFeed";
+import PulseStakeStepper from "./PulseStakeStepper";
 import { activeMatchHref, type ActiveMatch } from "./lib/activeMatch";
 import type { MatchView } from "@/lib/match";
 import {
   pulseAvailableCash,
+  pulseIsOut,
+  pulseMaxStake,
   pulsePositionsPnl,
   PULSE_LEVERAGE_OPTIONS,
   type PulseSide,
 } from "@/lib/pulse";
 import { productForMarket } from "@/lib/spotPrice";
 
-const STAKE_OPTIONS = [10, 25, 50];
 type Action = "enter" | "close";
 
 const usd = (n: number) =>
@@ -45,7 +47,7 @@ export function PulseMiniDock({
 }) {
   const product = productForMarket(match.market) ?? "BTC-USD";
   const { price } = usePriceFeed(product);
-  const [stake, setStake] = useState(25);
+  const [stake, setStake] = useState(0);
   const [leverage, setLeverage] = useState<number>(100);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -69,11 +71,16 @@ export function PulseMiniDock({
   const positions = view.pulseYourPositions;
   const availableCash = pulseAvailableCash(positions, view.pulseYourRealizedPnl);
   const canTrade = view.status === "countdown" && price !== null && !busy;
+  const canEnter = canTrade && stake > 0 && stake <= availableCash;
+  const isOut = view.status === "countdown" && pulseIsOut(positions, view.pulseYourRealizedPnl);
+  useEffect(() => {
+    setStake((current) => Math.min(current, pulseMaxStake(availableCash)));
+  }, [availableCash]);
 
   const sendAction = useCallback(
     async (action: Action, side?: PulseSide, positionId?: string) => {
       if (busy || view.status !== "countdown" || price === null) return;
-      if (action === "enter" && stake > availableCash) {
+      if (action === "enter" && (stake <= 0 || stake > availableCash)) {
         setError("Not enough balance for that stake.");
         return;
       }
@@ -125,19 +132,11 @@ export function PulseMiniDock({
         </div>
       )}
 
-      <div className="pulse-mini-dock-row">
-        {STAKE_OPTIONS.map((option) => (
-          <button
-            key={option}
-            type="button"
-            disabled={option > availableCash || !canTrade}
-            onClick={() => setStake(option)}
-            className={stake === option ? "active" : ""}
-          >
-            {usd(option)}
-          </button>
-        ))}
-      </div>
+      {isOut ? (
+        <p className="pulse-mini-dock-error">Liquidated: you&apos;re out for the rest of this round.</p>
+      ) : (
+        <PulseStakeStepper stake={stake} availableCash={availableCash} disabled={!canTrade} onChange={setStake} />
+      )}
       <div className="pulse-mini-dock-row">
         {PULSE_LEVERAGE_OPTIONS.map((option) => (
           <button
@@ -154,17 +153,17 @@ export function PulseMiniDock({
       <div className="pulse-mini-dock-actions">
         <button
           type="button"
-          disabled={!canTrade}
+          disabled={!canEnter}
           onClick={() => void sendAction("enter", "long")}
-          style={canTrade ? { backgroundColor: sideColor("long"), color: "var(--trade-contrast)" } : undefined}
+          style={canEnter ? { backgroundColor: sideColor("long"), color: "var(--trade-contrast)" } : undefined}
         >
           Long ↗
         </button>
         <button
           type="button"
-          disabled={!canTrade}
+          disabled={!canEnter}
           onClick={() => void sendAction("enter", "short")}
-          style={canTrade ? { backgroundColor: sideColor("short"), color: "var(--trade-contrast)" } : undefined}
+          style={canEnter ? { backgroundColor: sideColor("short"), color: "var(--trade-contrast)" } : undefined}
         >
           Short ↘
         </button>
