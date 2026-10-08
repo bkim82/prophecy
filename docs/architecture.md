@@ -46,7 +46,7 @@ portfolio room → POST /api/portfolio/session {stake}, POST /api/portfolio/posi
 /api/history → api.exchange.coinbase.com (trades + candles, both, merged)
 /api/price   → lib/spotPrice.ts → Coinbase Exchange ticker → api.coinbase.com spot → api.binance.com fallback chain
 
-duel/page.tsx Play controls → compact Practice action beside Play
+duel/page.tsx Play controls → compact Practice action beside Play, "How to play" + first-timer nudge → /duel/tutorial (client-only lessons + live round vs bot, docs/tutorial.md)
 ```
 
 Multiplayer BTC and ETH Pulse are wired up (same room, `/duel/[market]/pulse/[matchId]`; solo practice serves both via `app/duel/btc/pulse/page.tsx?practice=1&market=`). The 24h Portfolio (solo,
@@ -103,6 +103,7 @@ its stake and leverage in-round; so does the 24h Portfolio.
 | `db/schema.ts` | `users` (Clerk id, balance), `matches` (one row per networked round), `portfolio_sessions`/`positions`/`portfolio_payouts` (one row per 24h Portfolio session, its independent spot/leverage position lots, and each session's idempotent payout), `profiles` (one row per Clerk user who edited their profile; unique `handle`, banner preset or base64 image, pinned won-match ids), `challenges` (pending/canceled challenge requests from profiles; one pending per challenger→target via partial unique index; nothing reserved or played yet) — see [profiles.md](profiles.md) |
 | `lib/profile.ts`, `app/profile/actions.ts`, `app/api/profile/banner/route.ts` | own-profile storage: read (no banner bytes), upsert, pins; validated `saveProfile` / `togglePinnedMatch` server actions; owner-only banner image route |
 | `app/duel/btc/pulse/page.tsx` | solo trading state, countdown, leveraged P&L, settlement, layout |
+| `app/duel/tutorial/*` | Pulse tutorial: scripted lessons (`lessons.ts` paths/math, `LessonChart.tsx`, `ScriptedLesson.tsx`), live round vs bot (`LiveRound.tsx`, `live.ts`), done flag (`progress.ts`) — see [tutorial.md](tutorial.md) |
 | `app/api/match/[id]/action/route.ts` | server-priced Pulse entry, close, and reverse actions |
 | `app/duel/btc/pulse/trading.ts` | pure buy/sell portfolio accounting and full-position clamping — **no importers yet**, the page tracks a single leveraged position instead |
 | `app/usePriceFeed.ts` | websocket, history seed, reconnection, sampled series |

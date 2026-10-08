@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { DailyCoin, pickDailyCoin } from "@/app/DailyCoin";
 import { FlameIcon } from "@/app/icons";
 import { PortfolioGame } from "@/app/duel/portfolio/PortfolioGame";
+import { hasFinishedTutorial, TUTORIAL_HREF } from "@/app/duel/tutorial/progress";
 import {
   getActiveMatch,
   setQueueing,
@@ -147,6 +148,8 @@ export default function Page() {
   const [inviteState, setInviteState] = useState<"idle" | "shared" | "copied" | "error">("idle");
   // null until loaded; finishing a match navigates back here, which remounts and refetches.
   const [recentResults, setRecentResults] = useState<RecentResult[] | null>(null);
+  // First-timer nudge toward the tutorial; read after mount (localStorage), so it never flashes for players who finished it.
+  const [tutorialNudge, setTutorialNudge] = useState(false);
   const modes = MODES_BY_MARKET[market];
   // The chart's head (bid/ask midpoint), so the headline matches the pill.
   const livePrice = points.at(-1)?.p ?? price;
@@ -173,6 +176,7 @@ export default function Page() {
   const playHref = activeMode.href ?? "/duel";
 
   useEffect(() => setPlayerId(getPlayerId()), []);
+  useEffect(() => setTutorialNudge(!hasFinishedTutorial()), []);
 
   useEffect(() => {
     setActiveMatchState(getActiveMatch());
@@ -453,6 +457,16 @@ export default function Page() {
       </div>
       )}
 
+      {takesCall && tutorialNudge && !queue && (
+        <Link href={TUTORIAL_HREF} className="tutorial-callout">
+          <span>
+            <strong>New to Pulse?</strong>
+            <span className="muted">Learn it in a few minutes with practice money.</span>
+          </span>
+          <span className="tutorial-callout-cta">Start tutorial <span aria-hidden="true">→</span></span>
+        </Link>
+      )}
+
       {queue ? (
         <section className="queue-panel panel" aria-live="polite">
           <span className="queue-pulse" aria-hidden="true" />
@@ -511,10 +525,17 @@ export default function Page() {
             : isPlayable
               ? <Link href={playHref} className="play-button">Play <span aria-hidden="true">→</span></Link>
               : <button type="button" className="play-button" disabled>Soon</button>}
-          {takesCall && practiceHref && (
-            <Link href={practiceHref} className="practice-button">
-              Practice
-            </Link>
+          {takesCall && (
+            <div className="play-secondary">
+              {practiceHref && (
+                <Link href={practiceHref} className="practice-button">
+                  Practice
+                </Link>
+              )}
+              <Link href={TUTORIAL_HREF} className="practice-button">
+                How to play
+              </Link>
+            </div>
           )}
         </div>
         {activeMatch ? (

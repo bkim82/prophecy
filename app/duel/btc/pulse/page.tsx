@@ -13,6 +13,7 @@ import {
   FlashingPrice,
   LeadBar,
   RIVAL_GRADIENT,
+  SibylFace,
   SoundToggle,
   usePulseFeedback,
   YOU_GRADIENT,
@@ -106,44 +107,6 @@ const pnlColor = (n: number) => (n >= 0 ? "var(--positive)" : "var(--negative)")
 
 const formatTime = (seconds: number) =>
   `${String(Math.floor(Math.max(0, seconds) / 60)).padStart(2, "0")}:${String(Math.max(0, seconds) % 60).padStart(2, "0")}`;
-
-function SibylFace({ mood }: { mood: "happy" | "sad" | "neutral" }) {
-  return (
-    <svg viewBox="0 0 40 40" className="h-6 w-6" aria-hidden="true">
-      <circle cx="14" cy="17" r="2.4" fill="#fff" />
-      <circle cx="26" cy="17" r="2.4" fill="#fff" />
-      <path
-        className="sibyl-face-mouth"
-        d="M13 25 Q20 30 27 25"
-        stroke="#fff"
-        strokeWidth="2.2"
-        fill="none"
-        strokeLinecap="round"
-        style={{ opacity: mood === "happy" ? 1 : 0 }}
-      />
-      <path
-        className="sibyl-face-mouth"
-        d="M13 27 Q20 22 27 27"
-        stroke="#fff"
-        strokeWidth="2.2"
-        fill="none"
-        strokeLinecap="round"
-        style={{ opacity: mood === "sad" ? 1 : 0 }}
-      />
-      <line
-        className="sibyl-face-mouth"
-        x1="13"
-        y1="26"
-        x2="27"
-        y2="26"
-        stroke="#fff"
-        strokeWidth="2.2"
-        strokeLinecap="round"
-        style={{ opacity: mood === "neutral" ? 1 : 0 }}
-      />
-    </svg>
-  );
-}
 
 export default function Page() {
   // `?market=eth` reuses this solo loop for any priced market; BTC otherwise.
