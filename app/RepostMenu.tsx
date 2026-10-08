@@ -1,11 +1,8 @@
 "use client";
 
-import { useUser } from "@clerk/nextjs";
-import { useEffect, useId, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { avatarGradient } from "@/app/lib/avatar";
+import { useRef, useState } from "react";
 import type { Post } from "@/app/lib/mockPosts";
-import { PenIcon, RepostIcon } from "@/app/icons";
+import { RepostIcon } from "@/app/icons";
 import { RESHARE, RESHARE_KINDS, type Reshare, type ReshareKind } from "@/app/PostShare";
 
 const compactCount = new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 });
@@ -13,10 +10,11 @@ const compact = (n: number) => compactCount.format(n).toLowerCase();
 
 const MAX_WORDS = 280;
 
-const PLACEHOLDER: Record<ReshareKind, string> = {
-  repost: "Add your take…",
-  vouch: "Why do you back it?",
-  defy: "Why are you against it?",
+// Option hints once the box has words in it.
+const WITH_WORDS_HINT: Record<ReshareKind, string> = {
+  repost: "Share it with your take",
+  vouch: "Back it, with your take",
+  defy: "Go against it, with your take",
 };
 
 const LOCKED_HINT: Record<ReshareKind, string> = {
@@ -28,11 +26,13 @@ const LOCKED_HINT: Record<ReshareKind, string> = {
 // You can repost your own post, but not vouch for or defy it.
 const lockedFor = (mine: boolean, kind: ReshareKind) => mine && kind !== "repost";
 
-// The action row's one repost button. It opens a menu: Repost / Vouch / Defy
-// share in one tap (the active one reads "Undo …"; picking another switches
-// and keeps your words), and "Add your words" opens RepostDialog to write a
-// take on top of any of the three. The button shows the total of all three
-// and takes the chosen kind's icon + color once you've reposted.
+// The action row's one repost button. It opens a popover with an optional
+// "Add your words" box on top and Repost / Vouch / Defy under it: each option
+// posts in one tap, carrying whatever is in the box (nothing = a bare
+// repost). The active option reads "Undo …", or "Update …" once you've
+// changed your words; picking another switches and keeps them. The draft
+// survives closing the popover. The button shows the total of all three and
+// takes the chosen kind's icon + color once you've reposted.
 export function RepostMenu({
   post,
   mine,
@@ -45,7 +45,7 @@ export function RepostMenu({
   onChange: (next: Reshare | null) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [composing, setComposing] = useState(false);
+  const [draft, setDraft] = useState(reshare?.text ?? "");
   const triggerRef = useRef<HTMLButtonElement>(null);
   const counts: Record<ReshareKind, number> = {
     repost: (post.reposts ?? 0) + (reshare?.kind === "repost" ? 1 : 0),
@@ -55,18 +55,22 @@ export function RepostMenu({
   const total = counts.repost + counts.vouch + counts.defy;
   const active = reshare && RESHARE[reshare.kind];
   const TriggerIcon = active ? active.Icon : RepostIcon;
+  const words = draft.trim();
+  const wordsChanged = words !== (reshare?.text ?? "");
 
-  // Focus goes back to the trigger first so it isn't lost when the menu
-  // item unmounts (and the dialog returns focus there when it closes).
+  // Focus goes back to the trigger first so it isn't lost when the popover
+  // unmounts.
   function close() {
     triggerRef.current?.focus();
     setOpen(false);
   }
 
   function pick(kind: ReshareKind) {
-    close();
     if (lockedFor(mine, kind)) return;
-    onChange(reshare?.kind === kind ? null : { kind, text: reshare?.text ?? "" });
+    const next = reshare?.kind === kind && !wordsChanged ? null : { kind, text: words };
+    onChange(next);
+    setDraft(next?.text ?? "");
+    close();
   }
 
   return (
@@ -76,10 +80,7 @@ export function RepostMenu({
         if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
       }}
       onKeyDown={(event) => {
-        if (event.key === "Escape" && open) {
-          event.stopPropagation();
-          close();
-        }
+        if (event.key === "Escape" && open) close();
       }}
     >
       <button
@@ -87,169 +88,62 @@ export function RepostMenu({
         type="button"
         className={`action-repost${reshare ? " is-active" : ""}`}
         data-kind={reshare?.kind}
-        aria-haspopup="menu"
+        aria-haspopup="dialog"
         aria-expanded={open}
         aria-label={active ? `${active.done} (${total}): change or undo` : `Repost (${total}): repost, vouch or defy`}
         title="Repost, vouch or defy"
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => (open ? close() : setOpen(true))}
       >
         <TriggerIcon />
         <span className="action-label">{active ? active.done : "Repost"}</span>
         {compact(total)}
       </button>
       {open && (
-        <div className="repost-menu-dropdown" role="menu" aria-label="Repost options">
-          {RESHARE_KINDS.map((kind) => {
-            const { label, hint, Icon } = RESHARE[kind];
-            const current = reshare?.kind === kind;
-            const locked = lockedFor(mine, kind);
-            return (
-              <button key={kind} type="button" role="menuitem" className="repost-option" data-kind={kind} disabled={locked} onClick={() => pick(kind)}>
-                <Icon />
-                <span className="repost-option-text">
-                  <strong>{current ? `Undo ${label.toLowerCase()}` : label}</strong>
-                  <span>{locked ? LOCKED_HINT[kind] : current ? "Take it off your followers' feeds" : hint}</span>
-                </span>
-                {counts[kind] > 0 && <span className="repost-option-count">{compact(counts[kind])}</span>}
-              </button>
-            );
-          })}
-          <span className="repost-menu-sep" role="separator" />
-          <button
-            type="button"
-            role="menuitem"
-            className="repost-option repost-option--words"
-            onClick={() => {
-              close();
-              setComposing(true);
-            }}
-          >
-            <PenIcon />
-            <span className="repost-option-text">
-              <strong>{reshare?.text ? "Edit your words" : "Add your words"}</strong>
-              <span>{mine ? "Repost it with your take" : "Repost, vouch or defy with your take"}</span>
-            </span>
-          </button>
+        <div className="repost-menu-dropdown" role="dialog" aria-label="Repost">
+          <div className="repost-words">
+            <textarea
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              placeholder="Add your words (optional)…"
+              aria-label="Your words (optional), posted with whichever option you pick"
+              maxLength={MAX_WORDS}
+              rows={2}
+            />
+            {draft && (
+              <span className="repost-words-count" aria-hidden="true">
+                {draft.length}/{MAX_WORDS}
+              </span>
+            )}
+          </div>
+          <div role="menu" aria-label="Repost as">
+            {RESHARE_KINDS.map((kind) => {
+              const { label, hint, Icon } = RESHARE[kind];
+              const current = reshare?.kind === kind;
+              const locked = lockedFor(mine, kind);
+              const title = current ? `${wordsChanged ? "Update" : "Undo"} ${label.toLowerCase()}` : label;
+              const sub = locked
+                ? LOCKED_HINT[kind]
+                : current
+                  ? wordsChanged
+                    ? "Save your new words"
+                    : "Take it off your followers' feeds"
+                  : words
+                    ? WITH_WORDS_HINT[kind]
+                    : hint;
+              return (
+                <button key={kind} type="button" role="menuitem" className="repost-option" data-kind={kind} disabled={locked} onClick={() => pick(kind)}>
+                  <Icon />
+                  <span className="repost-option-text">
+                    <strong>{title}</strong>
+                    <span>{sub}</span>
+                  </span>
+                  {counts[kind] > 0 && <span className="repost-option-count">{compact(counts[kind])}</span>}
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
-      {composing && <RepostDialog post={post} mine={mine} initial={reshare} onSubmit={onChange} onClose={() => setComposing(false)} />}
     </div>
-  );
-}
-
-// Quote composer: pick Repost / Vouch / Defy, write your words (optional, up
-// to 280), see the post you're quoting under them. A native modal <dialog>
-// (top layer, focus trap, Esc) in the Edit profile shell (.profile-edit*),
-// portaled to <body> so the feed row's styles and click-to-open don't reach it.
-function RepostDialog({
-  post,
-  mine,
-  initial,
-  onSubmit,
-  onClose,
-}: {
-  post: Post;
-  mine: boolean;
-  initial: Reshare | null;
-  onSubmit: (reshare: Reshare) => void;
-  onClose: () => void;
-}) {
-  const { user } = useUser();
-  const id = useId();
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const textRef = useRef<HTMLTextAreaElement>(null);
-  const [kind, setKind] = useState<ReshareKind>(initial?.kind ?? "repost");
-  const [text, setText] = useState(initial?.text ?? "");
-  const name = user?.firstName ?? user?.username ?? "You";
-
-  useEffect(() => {
-    dialogRef.current?.showModal();
-    const field = textRef.current;
-    field?.focus();
-    field?.setSelectionRange(field.value.length, field.value.length);
-  }, []);
-
-  return createPortal(
-    <dialog ref={dialogRef} className="profile-edit repost-dialog" aria-labelledby={`${id}-title`} onClose={onClose}>
-      <form
-        className="profile-edit-panel"
-        onSubmit={(event) => {
-          event.preventDefault();
-          onSubmit({ kind, text: text.trim() });
-          dialogRef.current?.close();
-        }}
-      >
-        <header className="profile-edit-head">
-          <h2 id={`${id}-title`}>Add your words</h2>
-          <button type="button" className="profile-edit-close" aria-label="Close" onClick={() => dialogRef.current?.close()}>
-            ×
-          </button>
-        </header>
-        <div className="profile-edit-body">
-          <fieldset className="repost-kinds">
-            <legend>Repost as</legend>
-            <div className="repost-kinds-row">
-              {RESHARE_KINDS.map((option) => {
-                const { label, Icon } = RESHARE[option];
-                return (
-                  <label key={option} className="repost-kind" data-kind={option}>
-                    <input
-                      type="radio"
-                      name={`${id}-kind`}
-                      value={option}
-                      checked={kind === option}
-                      disabled={lockedFor(mine, option)}
-                      onChange={() => setKind(option)}
-                    />
-                    <Icon />
-                    {label}
-                  </label>
-                );
-              })}
-            </div>
-            <p className="repost-kinds-hint">{mine ? "You can't vouch for or defy your own omen" : RESHARE[kind].hint}.</p>
-          </fieldset>
-          <div className="repost-compose">
-            <span className="feed-composer-avatar" aria-hidden="true">
-              {name[0].toUpperCase()}
-            </span>
-            <textarea
-              ref={textRef}
-              value={text}
-              onChange={(event) => setText(event.target.value)}
-              placeholder={PLACEHOLDER[kind]}
-              aria-label="Your words (optional)"
-              maxLength={MAX_WORDS}
-              rows={3}
-            />
-          </div>
-          <div className="repost-quote">
-            <span className="repost-quote-avatar" aria-hidden="true" style={{ background: avatarGradient(post.handle) }}>
-              {post.avatarInitial}
-            </span>
-            <div className="repost-quote-body">
-              <p className="repost-quote-meta">
-                <strong>{post.author}</strong> <span className="muted">{post.handle} · {post.timestamp}</span>
-              </p>
-              <p className="repost-quote-text">{post.content}</p>
-            </div>
-          </div>
-        </div>
-        <footer className="profile-edit-foot">
-          <span className="repost-dialog-count muted" aria-hidden="true">
-            {text.length}/{MAX_WORDS}
-          </span>
-          <div className="profile-edit-buttons">
-            <button type="button" className="profile-follow is-following" onClick={() => dialogRef.current?.close()}>
-              Cancel
-            </button>
-            <button type="submit" className="profile-follow repost-dialog-submit" data-kind={kind}>
-              {RESHARE[kind].label}
-            </button>
-          </div>
-        </footer>
-      </form>
-    </dialog>,
-    document.body,
   );
 }

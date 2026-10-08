@@ -321,9 +321,7 @@ export const postHref = (post: Post) => (post.id.startsWith("local-") ? undefine
 
 // Clicks on the row's background open the post page, like X/Reddit. Anything
 // interactive inside keeps its own click, and selecting text doesn't navigate.
-// The repost dialog is portaled out of the row, but its clicks still bubble
-// here through React, so anything outside the row's DOM is ignored too.
-const INTERACTIVE = "a, button, input, textarea, label, form, dialog, [role='button'], [role='menu']";
+const INTERACTIVE = "a, button, input, textarea, label, form, [role='button'], [role='menu'], [role='dialog']";
 
 // `context` is a line above the row (the For You cover's "Because you're
 // interested in …"); `footer` sits under the actions. `detail` is the post
@@ -397,8 +395,7 @@ export function PostCard({
   const embedded = reshare !== null && !detail;
 
   function openPost(event: MouseEvent<HTMLElement>) {
-    const target = event.target as HTMLElement;
-    if (!url || !event.currentTarget.contains(target) || target.closest(INTERACTIVE) || window.getSelection()?.toString()) return;
+    if (!url || (event.target as HTMLElement).closest(INTERACTIVE) || window.getSelection()?.toString()) return;
     if (event.metaKey || event.ctrlKey) window.open(url, "_blank");
     else router.push(url);
   }

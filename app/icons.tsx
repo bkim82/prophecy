@@ -186,16 +186,6 @@ export function RepostIcon({ className }: { className?: string }) {
   );
 }
 
-// Pen over a line — "Add your words" to a repost.
-export function PenIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 20 20" className={className} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M12.6 3.9a1.8 1.8 0 0 1 2.5 2.5L7.2 14.3l-3.4.9.9-3.4 7.9-7.9Z" />
-      <path d="M11.3 5.2l2.5 2.5M10.5 16.5h6" />
-    </svg>
-  );
-}
-
 // Lidded bin — Delete post in the ⋯ menu.
 export function TrashIcon({ className }: { className?: string }) {
   return (
