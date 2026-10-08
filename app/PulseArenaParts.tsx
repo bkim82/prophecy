@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FlameIcon } from "@/app/icons";
 
 /**
  * Arena pieces shared by solo practice Pulse (app/duel/btc/pulse/page.tsx) and
@@ -390,6 +391,7 @@ export function ArenaResultCard({
   rivalEquity,
   rivalPnl,
   trades,
+  wager,
   playAgain,
 }: {
   marketLabel: string;
@@ -406,6 +408,8 @@ export function ArenaResultCard({
   rivalPnl: number;
   /** The player's own trade events this round. */
   trades: ArenaTrade[];
+  /** Embers each player staked on the match; omitted for practice (nothing at stake). */
+  wager?: number;
   playAgain: React.ReactNode;
 }) {
   const [reviewOpen, setReviewOpen] = useState(false);
@@ -441,6 +445,19 @@ export function ArenaResultCard({
         {title}
       </h3>
       <p className="mt-0.5 text-center text-sm text-[var(--muted)]">{subtitle}</p>
+      {wager !== undefined && (
+        <p
+          className="mx-auto mt-2 flex w-fit items-center gap-1.5 rounded-full border border-[var(--line)] px-3 py-1 text-xs font-semibold tabular-nums"
+          style={{ color: winner === "you" ? "var(--positive)" : winner === "rival" ? "var(--negative)" : "var(--muted)" }}
+        >
+          <FlameIcon className="balance-ember-icon" />
+          {winner === "you"
+            ? `+${wager * 2} Embers · took the pot`
+            : winner === "rival"
+              ? `−${wager} Embers · wager lost`
+              : `${wager} Embers refunded`}
+        </p>
+      )}
 
       <div className="mt-4 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
         <VersusSide name="You" gradient={YOU_GRADIENT} equity={yourEquity} pnl={yourPnl} winner={winner === "you"} align="left" />

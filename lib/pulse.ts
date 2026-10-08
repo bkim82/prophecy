@@ -14,6 +14,13 @@ export const PULSE_STARTING_CASH = 100;
 /** What the stake stepper's −/+ buttons move by. */
 export const PULSE_STAKE_STEP = 25;
 export const PULSE_LEVERAGE_OPTIONS = [100, 1000, 10000] as const;
+/** Embers each player puts in at match entry; the winner takes both (2×). */
+export const PULSE_WAGER_OPTIONS = [50, 100, 200] as const;
+export const PULSE_DEFAULT_WAGER = 100;
+
+export function isPulseWager(value: number) {
+  return (PULSE_WAGER_OPTIONS as readonly number[]).includes(value);
+}
 
 /** Cash reserved by open positions. It is returned when a position closes. */
 export function pulsePositionsStake(positions: PulsePosition[]) {

@@ -5,12 +5,12 @@ import { matches } from "@/db/schema";
 import { refundBalance, reserveBalance } from "@/lib/balance";
 import { productForMarket } from "@/lib/spotPrice";
 import { presenceCutoff, readBody } from "@/lib/match";
+import { isPulseWager } from "@/lib/pulse";
 
 export const dynamic = "force-dynamic";
 
 // Criteria have to agree exactly for two players to share a round, so wagers
-// are bounded rather than free-form.
-const MAX_WAGER = 1_000_000;
+// are a fixed menu (PULSE_WAGER_OPTIONS) rather than free-form.
 const MIN_TIMER = 10;
 const MAX_TIMER = 3600;
 
@@ -43,7 +43,7 @@ export async function POST(request: Request) {
   if (mode !== "pulse") {
     return Response.json({ error: "Unsupported mode" }, { status: 400 });
   }
-  if (!Number.isInteger(wager) || wager <= 0 || wager > MAX_WAGER) {
+  if (!isPulseWager(wager)) {
     return Response.json({ error: "Invalid wager" }, { status: 400 });
   }
   if (

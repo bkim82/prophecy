@@ -1701,6 +1701,12 @@ a.post-avatar { text-decoration: none; }
 .pulse-stage .play-panel-market { display: none; } /* the left box already names the market */
 .pulse-stage .play-panel .control-group, .pulse-stage .play-panel .opponent-status { padding: 12px 0 0; border-left: 0; border-top: 1px solid var(--line); }
 .pulse-stage .control-group--format .muted:not(strong) { font-size: 12px; }
+/* Wager picker: Embers per side; the pot line shows the 2× payout. */
+.wager-option { display: inline-flex; align-items: center; justify-content: center; gap: 4px; font-variant-numeric: tabular-nums; }
+.wager-option .balance-ember-icon, .wager-pot .balance-ember-icon, .wager-detail .balance-ember-icon { width: 12px; height: 12px; }
+.wager-pot { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; }
+.wager-pot strong { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+.wager-detail { display: inline-flex; align-items: center; justify-content: flex-end; gap: 3px; font-variant-numeric: tabular-nums; }
 .pulse-stage .play-actions { display: grid; gap: 10px; width: 100%; margin-top: auto; padding-top: 2px; }
 .pulse-stage .play-actions > * { grid-column: 1 / -1; }
 .pulse-stage .play-button { position: relative; overflow: hidden; width: 100%; min-height: 54px; border-radius: 10px; font-size: 18px; letter-spacing: .01em; }
@@ -1967,6 +1973,7 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
   .data-row .row-market { grid-column: 1; grid-row: 1; min-width: 0; }
   .data-row > .row-detail:nth-child(2) { grid-column: 2; grid-row: 1; text-align: right; }
   .data-row > .row-detail:nth-child(3) { grid-column: 1; grid-row: 2; margin-left: 38px; text-align: left; }
+  .data-row > .wager-detail { justify-content: flex-start; }
   .data-row > .row-age { grid-column: 2; grid-row: 2; text-align: right; }
   .result-row > span:nth-child(2) { grid-column: 2; grid-row: 1; text-align: right; }
   .result-row > .row-detail { grid-column: 1; grid-row: 2; margin-left: 38px; text-align: left; }
@@ -2304,6 +2311,7 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
   .pulse-stage .play-panel { gap: 12px; }
   .pulse-stage .play-panel .control-group, .pulse-stage .play-panel .opponent-status { padding-top: 12px; }
   .pulse-stage .play-panel .control-group--timer { order: 1; padding-top: 0; border-top: 0; }
+  .pulse-stage .play-panel .control-group--wager { order: 1; }
   .pulse-stage .play-actions { order: 2; margin-top: 0; padding-top: 0; }
   .pulse-stage .play-panel-note { order: 3; }
   .pulse-stage .play-panel .opponent-status { order: 4; }

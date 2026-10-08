@@ -3,6 +3,7 @@ import { getDb } from "@/db";
 import { bots, matches } from "@/db/schema";
 import { pulsePositionsUnchanged, type MatchRow } from "@/lib/match";
 import {
+  PULSE_WAGER_OPTIONS,
   pulseAvailableCash,
   pulsePositionPnl,
   type PulsePosition,
@@ -20,8 +21,8 @@ import { getSpotPrice, productForMarket } from "@/lib/spotPrice";
  */
 const BOT_MARKETS: readonly string[] = ["btc"];
 const BOT_TIMERS = [60, 120, 300] as const;
-/** Lobby Play always wagers this (app/duel/page.tsx `play`), so bot rows must match it to be joinable. */
-export const BOT_WAGER = 100;
+/** Every lobby wager gets its own bot host, since matchmaking pairs on the exact wager. */
+const BOT_WAGERS = PULSE_WAGER_OPTIONS;
 
 /** Personas are minted until the pool reaches this size, then reused at random. */
 const POOL_TARGET = 80;
@@ -140,7 +141,7 @@ const freshState = (role: 1 | 2, skill: number): BotState => ({
 let lastEnsure = 0;
 
 /**
- * Keeps one bot-hosted `open` match per (market, timer) slot. Lazy, like the
+ * Keeps one bot-hosted `open` match per (market, timer, wager) slot. Lazy, like the
  * rest of matchmaking: the lobby poll calls it, and a slot only gets a new
  * persona once its bot has been joined (the row leaves `open`). A partial unique index
  * (`matches_one_open_bot_per_slot`) makes concurrent callers harmless.
@@ -152,13 +153,16 @@ export async function ensureBotSlots() {
   const hosted = and(eq(matches.status, "open"), isNotNull(matches.botState));
 
   const live = await db
-    .select({ market: matches.market, timerSeconds: matches.timerSeconds })
+    .select({ market: matches.market, timerSeconds: matches.timerSeconds, wager: matches.wager })
     .from(matches)
     .where(hosted);
 
   const missing = BOT_MARKETS.flatMap((market) =>
-    BOT_TIMERS.filter((timer) => !live.some((row) => row.market === market && row.timerSeconds === timer))
-      .map((timerSeconds) => ({ market, timerSeconds })),
+    BOT_TIMERS.flatMap((timerSeconds) =>
+      BOT_WAGERS.filter((wager) => !live.some((row) =>
+        row.market === market && row.timerSeconds === timerSeconds && row.wager === wager,
+      )).map((wager) => ({ market, timerSeconds, wager })),
+    ),
   );
   if (missing.length === 0) return;
 
@@ -172,7 +176,7 @@ export async function ensureBotSlots() {
         id: crypto.randomUUID(),
         market: slot.market,
         mode: "pulse",
-        wager: BOT_WAGER,
+        wager: slot.wager,
         timerSeconds: slot.timerSeconds,
         status: "open",
         player1Id: crypto.randomUUID(),
