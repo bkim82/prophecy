@@ -1691,35 +1691,51 @@ a.post-avatar { text-decoration: none; }
 @keyframes stage-rise { from { opacity: 0; transform: translateY(14px); } }
 @media (prefers-reduced-motion: reduce) { .pulse-stage > *, .pulse-stage .ticker-copy, .pulse-stage .market-stats { animation: none; } }
 .pulse-stage { display: grid; grid-template-columns: minmax(0, 1.8fr) minmax(300px, 1fr); gap: 16px; align-items: stretch; }
-.pulse-stage .market-overview { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "copy stats" "chart chart"; grid-template-rows: auto 1fr; align-items: start; align-content: start; gap: 16px 28px; padding: 20px 22px 14px; }
+.pulse-stage .market-overview { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "copy stats" "chart chart"; grid-template-rows: auto 1fr; align-items: start; align-content: start; gap: 12px 28px; padding: 16px 20px 12px; }
 .pulse-stage .market-overview.panel { position: relative; overflow: hidden; background:
   radial-gradient(90% 70% at 88% 92%, color-mix(in srgb, var(--brand) 11%, transparent), transparent 62%),
   radial-gradient(70% 60% at 6% 0%, color-mix(in srgb, var(--violet) 14%, transparent), transparent 60%),
   var(--surface); border-color: color-mix(in srgb, var(--violet) 22%, var(--line)); }
 .pulse-stage .ticker-copy { grid-area: copy; }
-.pulse-stage .ticker-price { font-size: clamp(36px, 4vw, 56px); }
+.pulse-stage .ticker-price { font-size: clamp(34px, 3.4vw, 48px); }
 .pulse-stage .ticker-chart-wrap { grid-area: chart; align-self: stretch; }
 .pulse-stage .market-stats { grid-area: stats; grid-column: auto; grid-template-columns: repeat(2, auto); gap: 12px 28px; align-self: center; padding: 0 0 0 24px; border-top: 0; border-left: 1px solid var(--line); }
 .pulse-stage .market-stats div { display: grid; gap: 4px; justify-content: start; }
 .market-stats dd.change-up { color: var(--positive); }
 .market-stats dd.change-down { color: var(--negative); }
-.pulse-stage .call-box { display: flex; flex-direction: column; gap: 12px; padding: 18px 20px 18px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.pulse-stage .call-box { display: flex; flex-direction: column; gap: 10px; padding: 16px 18px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
 .pulse-stage .call-box .section-heading { margin: 0; }
-.pulse-stage .call-box .section-heading h2 { font-size: 26px; }
+.pulse-stage .call-box .section-heading h2 { font-size: 22px; }
+/* Title and its one-line summary share a baseline to save a row. */
+.pulse-stage .call-box .section-heading > div { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 10px; }
+.pulse-stage .call-box .section-heading .eyebrow { flex-basis: 100%; }
+.pulse-stage .call-box .round-meta { margin-top: 0; }
+.pulse-stage .tutorial-callout { padding: 8px 12px; }
 .pulse-stage .call-box > .panel { flex: 1; padding: 0; border: 0; border-radius: 0; background: none; }
-.pulse-stage .play-panel { display: flex; flex-direction: column; align-items: stretch; gap: 12px; }
+/* Format, timer and wager pack at the top; spare height collects in the 1fr
+   row, so Opponent sits directly above Play on the bottom edge, level with
+   the chart. */
+.pulse-stage .play-panel { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto 1fr; align-items: stretch; gap: 10px; }
+.pulse-stage .play-panel > .opponent-status { align-self: end; }
 .pulse-stage .play-panel-market { display: none; } /* the left box already names the market */
-.pulse-stage .play-panel .control-group, .pulse-stage .play-panel .opponent-status { padding: 12px 0 0; border-left: 0; border-top: 1px solid var(--line); }
+.pulse-stage .play-panel .control-group, .pulse-stage .play-panel .opponent-status { gap: 5px; padding: 10px 0 0; border-left: 0; border-top: 1px solid var(--line); }
+/* "Winner takes" rides on the Wager label row instead of its own line. */
+.pulse-stage .control-group--wager { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+.pulse-stage .control-group--wager .segmented-control { grid-column: 1 / -1; }
+.pulse-stage .control-group--wager .wager-pot { grid-area: 1 / 2; }
 .pulse-stage .control-group--format .muted:not(strong) { font-size: 12px; }
+/* "$100 bankroll" and its note share a line under the label. */
+.pulse-stage .play-panel .control-group--format { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 10px; }
+.pulse-stage .control-group--format .field-label { flex-basis: 100%; }
 /* Wager picker: Embers per side; the pot line shows the 2× payout. */
 .wager-option { display: inline-flex; align-items: center; justify-content: center; gap: 4px; font-variant-numeric: tabular-nums; }
 .wager-option .balance-ember-icon, .wager-pot .balance-ember-icon, .wager-detail .balance-ember-icon { width: 12px; height: 12px; }
 .wager-pot { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; }
 .wager-pot strong { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
 .wager-detail { display: inline-flex; align-items: center; justify-content: flex-end; gap: 3px; font-variant-numeric: tabular-nums; }
-.pulse-stage .play-actions { display: grid; gap: 10px; width: 100%; margin-top: auto; padding-top: 2px; }
+.pulse-stage .play-actions { display: grid; align-self: end; gap: 8px; width: 100%; padding-top: 2px; }
 .pulse-stage .play-actions > * { grid-column: 1 / -1; }
-.pulse-stage .play-button { position: relative; overflow: hidden; width: 100%; min-height: 54px; border-radius: 10px; font-size: 18px; letter-spacing: .01em; }
+.pulse-stage .play-button { position: relative; overflow: hidden; width: 100%; min-height: 48px; border-radius: 10px; font-size: 18px; letter-spacing: .01em; }
 .pulse-stage .play-button span { font-size: 22px; transition: transform .2s ease; }
 /* The one violet thing on the page: every other action (Arena, Wallet, timer)
    is teal, so Play reads as THE button. Sheen sweeps across every few seconds. */
@@ -1729,8 +1745,8 @@ a.post-avatar { text-decoration: none; }
 .pulse-stage .play-button:not(:disabled):hover span { transform: translateX(4px); }
 .pulse-stage { --play-a: #a283f0; --play-b: #6a45d1; --play-a-hover: #b79cf7; }
 [data-theme="light"] .pulse-stage { --play-a: #8a63d2; --play-b: #5b35a8; --play-a-hover: #9b78dc; }
-.pulse-stage .practice-button { width: 100%; padding: 9px; font-size: 12px; }
-/* Practice + Tutorial share one row under Play; the tutorial nudge sits above the play controls until it's finished (app/duel/tutorial/progress.ts). */
+.pulse-stage .practice-button { width: 100%; padding: 8px; font-size: 12px; }
+/* Practice sits under Play; the tutorial nudge sits above the play controls until it's finished (app/duel/tutorial/progress.ts). */
 .play-secondary { display: flex; gap: 8px; }
 .pulse-stage .play-secondary { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
 .tutorial-callout { display: flex; align-items: center; gap: 12px; border: 1px solid color-mix(in srgb, var(--brand) 40%, var(--line)); border-radius: 10px; background: color-mix(in srgb, var(--brand) 8%, var(--surface)); padding: 10px 12px; color: var(--text); text-decoration: none; transition: border-color .15s ease, background .15s ease; }
@@ -1745,6 +1761,30 @@ a.post-avatar { text-decoration: none; }
 @keyframes play-sheen { 0% { transform: translateX(-100%); } 45%, 100% { transform: translateX(100%); } }
 @media (prefers-reduced-motion: reduce) { .pulse-stage .play-button:not(:disabled), .pulse-stage .play-button::after { animation: none; } }
 @media (max-width: 1000px) { .pulse-stage { grid-template-columns: 1fr; } }
+/* Desktop: tabs + market row + stage fit one screen, so the chart's bottom and
+   Play never need a scroll. Fold = viewport minus the 65px header, the shell's
+   24px top padding and 16px of air, capped so tall monitors don't get a giant
+   plot. The chart takes whatever height is left, so anything added above or
+   beside it shrinks the plot instead of growing the page; the call box scrolls
+   inside itself only as a last resort. After touching the stage, check /duel at
+   1280x720 and 1440x900: no page scroll, no call-box scroll. */
+@media (min-width: 1001px) {
+  .arena-fold { display: flex; flex-direction: column; height: clamp(540px, calc(100dvh - 105px), 720px); }
+  .arena-fold > .arena-mode-tabs { align-self: flex-start; margin-bottom: 10px; }
+  .arena-fold > .market-nav { margin-bottom: 10px; }
+  .arena-fold > .pulse-stage { flex: 1 1 0; min-height: 0; grid-template-rows: minmax(0, 1fr); }
+  .arena-fold .call-box { min-height: 0; overflow-y: auto; scrollbar-width: thin; }
+  .arena-fold .control-group--timer .segmented-control button { padding-block: 5px; }
+}
+/* Short desktop screens: drop the call box title, as phones do — the mode tabs
+   and market row above already say what this card is. */
+@media (min-width: 1001px) and (max-height: 760px) {
+  .arena-fold .call-box .section-heading { display: none; }
+  .arena-fold .tutorial-callout .muted { display: none; }
+  .arena-fold .opponent-status { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 10px; }
+  .arena-fold .opponent-status .field-label { flex-basis: 100%; }
+  .arena-fold .opponent-status .muted { margin-top: 0; }
+}
 @media (max-width: 640px) {
   .pulse-stage .market-overview { grid-template-columns: 1fr; grid-template-areas: "copy" "chart" "stats"; grid-template-rows: none; gap: 16px; padding: 16px; }
   .pulse-stage .market-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 14px 0 0; border-left: 0; border-top: 1px solid var(--line); }
@@ -2327,7 +2367,7 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
   .pulse-stage .call-box { gap: 12px; padding: 14px; }
   /* The mode tabs and market row above already say what this card is. */
   .pulse-stage .call-box .section-heading { display: none; }
-  .pulse-stage .play-panel { gap: 12px; }
+  .pulse-stage .play-panel { display: flex; flex-direction: column; gap: 12px; }
   .pulse-stage .play-panel .control-group, .pulse-stage .play-panel .opponent-status { padding-top: 12px; }
   .pulse-stage .play-panel .control-group--timer { order: 1; padding-top: 0; border-top: 0; }
   .pulse-stage .play-panel .control-group--wager { order: 1; }
