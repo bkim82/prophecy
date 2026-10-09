@@ -399,6 +399,8 @@ export default function Page() {
     <main className="lobby-shell" data-market={market}>
       <h1 className="sr-only">Arena</h1>
 
+      {/* Pulse: tabs, markets and the stage share one screen-tall fold on desktop (.arena-fold). */}
+      <div className={mode === "pulse" ? "arena-fold" : undefined}>
       <div className="feed-tabs arena-mode-tabs" role="group" aria-label="Choose a mode">
         {modes.map((option) => (
           <button key={option.id} type="button" className={option.id === mode ? "active" : ""} aria-pressed={option.id === mode} onClick={() => setMode(option.id)}>
@@ -414,8 +416,6 @@ export default function Page() {
           <span className="field-label">Markets</span>
           <button className={market === "btc" ? "active" : ""} aria-pressed={market === "btc"} type="button" onClick={() => setMarket("btc")}><span className="market-symbol btc-symbol">₿</span> BTC</button>
           <button className={market === "eth" ? "active" : ""} aria-pressed={market === "eth"} type="button" onClick={() => setMarket("eth")}><span className="market-symbol eth-symbol">Ξ</span> ETH</button>
-        </div>
-        <div className="market-switcher">
           <DailyCoin active={market === dailyCoinId} symbol={MARKETS[dailyCoinId].symbol} symbolClass={SYMBOL_CLASS[dailyCoinId]} onSelect={() => setMarket(dailyCoinId)} />
         </div>
       </nav>
@@ -525,15 +525,10 @@ export default function Page() {
             : isPlayable
               ? <Link href={playHref} className="play-button">Play <span aria-hidden="true">→</span></Link>
               : <button type="button" className="play-button" disabled>Soon</button>}
-          {takesCall && (
+          {takesCall && practiceHref && (
             <div className="play-secondary">
-              {practiceHref && (
-                <Link href={practiceHref} className="practice-button">
-                  Practice
-                </Link>
-              )}
-              <Link href={TUTORIAL_HREF} className="practice-button">
-                How to play
+              <Link href={practiceHref} className="practice-button">
+                Practice
               </Link>
             </div>
           )}
@@ -545,6 +540,7 @@ export default function Page() {
         )}
       </section>
       )}
+      </div>
       </div>
       </div>
 

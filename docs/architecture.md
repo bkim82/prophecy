@@ -17,7 +17,7 @@ app/layout.tsx (root shell: desktop header, compact mobile header, Clerk account
   ├── app/sanctum/page.tsx (Sanctum: Oracle Room live Pulse + feed + chat, app/lib/roomsMocks.ts)
   ├── app/exclusive/page.tsx (Exclusive feed: rank-gated via app/lib/rank.ts stub, unlinked from nav)
   ├── app/wallet/page.tsx (wallet dashboard: Coinbase Wallet SDK connection, Portfolio/Advanced tabs — docs/wallet.md)
-  └── app/duel/page.tsx (live lobby: screen-reader-only `Arena` h1 → Pulse/24h Portfolio `.feed-tabs.arena-mode-tabs` → market row (BTC/ETH left, `DailyCoin` "Daily · Ð DOGE" chip right (market symbol from `MARKETS`), selectable) → Pulse = `.pulse-stage` grid — ticker + MarketChart (app/MarketChart.tsx) left, call box (format/timer/Play) right, stacks <1000px; ≤640px: 220px plot, 24h stats behind `.market-stats-toggle`, call box reorders timer → Play first; match rows)
+  └── app/duel/page.tsx (live lobby: screen-reader-only `Arena` h1 → Pulse/24h Portfolio `.feed-tabs.arena-mode-tabs` → market row (BTC, ETH, then the `DailyCoin` "Daily · Ð DOGE" chip (market symbol from `MARKETS`), all in one `.market-switcher`, selectable) → Pulse = `.pulse-stage` grid — ticker + MarketChart (app/MarketChart.tsx) left, call box (format, timer, wager packed at top; opponent directly above Play at the bottom) right, stacks <1000px; >1000px tabs + market row + stage sit in `.arena-fold` (`app/duel/page.tsx:403`), a viewport-tall flex column (`app/globals.css:1771-1787`, `clamp(540px, 100dvh - 105px, 720px)`; ≤760px tall: call-box title and callout subline hidden, opponent on one line) — **invariant: the whole stage fits the screen with no page scroll**; the chart absorbs leftover height, the call box scrolls itself only as a last resort; verify at 1280×720 and 1440×900 after any stage change; ≤640px: 220px plot, 24h stats behind `.market-stats-toggle`, call box reorders timer → Play first; match rows)
         └── usePriceFeed() → price, sampled series, status, now
 app/duel/[market]/pulse/[matchId]/page.tsx (multiplayer Pulse positions, countdown, result)
 app/duel/portfolio/page.tsx (solo 24h Portfolio: freely-tradeable spot/leverage positions on Base meme coins)
@@ -47,7 +47,7 @@ Clerk sign-up → /welcome (server: auth, prefill, finished → /) → step 1 sa
 /api/history → api.exchange.coinbase.com (trades + candles, both, merged)
 /api/price   → lib/spotPrice.ts → Coinbase Exchange ticker → api.coinbase.com spot → api.binance.com fallback chain
 
-duel/page.tsx Play controls → compact Practice action beside Play, "How to play" + first-timer nudge → /duel/tutorial (client-only lessons + live round vs bot, docs/tutorial.md)
+duel/page.tsx Play controls → compact Practice action under Play; first-timer nudge (hidden once finished) → /duel/tutorial (client-only lessons + live round vs bot, docs/tutorial.md)
 ```
 
 Multiplayer BTC and ETH Pulse are wired up (same room, `/duel/[market]/pulse/[matchId]`; solo practice serves both via `app/duel/btc/pulse/page.tsx?practice=1&market=`). The 24h Portfolio (solo,

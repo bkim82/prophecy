@@ -172,35 +172,42 @@ export default defineConfig({
 ## TanStack Start
 
 ```typescript
-// app/routes/api/webhooks.ts
+// src/routes/api/webhooks.ts
 import { verifyWebhook } from '@clerk/tanstack-react-start/webhooks'
-import { createServerFileRoute } from '@tanstack/react-start/server'
+import { createFileRoute } from '@tanstack/react-router'
 
-export const ServerRoute = createServerFileRoute().methods({
-  POST: async ({ request }) => {
-    try {
-      const evt = await verifyWebhook(request)
+export const Route = createFileRoute('/api/webhooks')({
+  server: {
+    handlers: {
+      POST: async ({ request }) => {
+        try {
+          const evt = await verifyWebhook(request)
 
-      if (evt.type === 'user.created') {
-        const { id } = evt.data
-        console.log(`New user: ${id}`)
-      }
+          if (evt.type === 'user.created') {
+            const { id } = evt.data
+            console.log(`New user: ${id}`)
+          }
 
-      return new Response('Webhook received', { status: 200 })
-    } catch (err) {
-      console.error('Error verifying webhook:', err)
-      return new Response('Error verifying webhook', { status: 400 })
-    }
+          return new Response('Webhook received', { status: 200 })
+        } catch (err) {
+          console.error('Error verifying webhook:', err)
+          return new Response('Error verifying webhook', { status: 400 })
+        }
+      },
+    },
   },
 })
 ```
 
-When tunneling via ngrok in dev, allow the host in `app.config.ts`:
+When tunneling via ngrok in dev, allow the host in `vite.config.ts`:
 
 ```typescript
+import { tanstackStart } from '@tanstack/react-start/plugin/vite'
+import viteReact from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
 export default defineConfig({
+  plugins: [tanstackStart(), viteReact()],
   server: {
     allowedHosts: ['fawn-two-nominally.ngrok-free.app'],
   },
@@ -211,6 +218,6 @@ export default defineConfig({
 
 - All `verifyWebhook` adapters return the same `WebhookEvent` discriminated union, so handler logic (`if (evt.type === ...)`) is identical.
 - All adapters read `CLERK_WEBHOOK_SIGNING_SECRET` automatically except Astro (pass `signingSecret` option).
-- All adapters require a public webhook route, exclude `/api/webhooks(.*)` from middleware protection.
+- All adapters require an unprotected webhook route: nothing calls `auth.protect()` (or the framework's equivalent) for `/api/webhooks(.*)`, in middleware or in the handler.
 - Vite-based frameworks (Nuxt, React Router, TanStack Start) need `allowedHosts` configured when tunneling localhost via ngrok in development.
 - Express specifically needs `express.raw({ type: 'application/json' })` for the webhook route, raw body bytes are required for signature verification.
