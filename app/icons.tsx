@@ -60,6 +60,15 @@ export function ProfileIcon({ className }: { className?: string }) {
   );
 }
 
+export function BellIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" className={className} fill="none" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M5.2 8.2a4.8 4.8 0 0 1 9.6 0c0 3.6 1.5 5 1.9 5.5H3.3c.4-.5 1.9-1.9 1.9-5.5Z" />
+      <path d="M8.3 16.2a1.9 1.9 0 0 0 3.4 0" />
+    </svg>
+  );
+}
+
 export function FlameIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

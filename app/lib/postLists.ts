@@ -62,6 +62,7 @@ function createIdStore(key: string, fallback: string[] = EMPTY) {
 const bookmarks = createIdStore("omens-bookmarks-v1");
 const interests = createIdStore("omens-interests-v2", DEFAULT_INTERESTS);
 const mutedTopics = createIdStore("omens-muted-topics-v1");
+const seenNotifications = createIdStore("omens-notifs-seen-v1");
 
 export function useBookmarks() {
   const ids = useSyncExternalStore(bookmarks.subscribe, bookmarks.snapshot, () => EMPTY);
@@ -120,4 +121,12 @@ export function useMutedTopics() {
     interests.write([...followed.slice(0, followAt), id, ...followed.slice(followAt)]);
   };
   return { ids, has: (id: TopicId) => ids.includes(id), mute, unmute };
+}
+
+// Notification ids this browser has opened the header bell on
+// (app/NotificationsMenu.tsx). `ids` is null on the server render so the
+// unseen badge only appears once storage has been read.
+export function useSeenNotifications() {
+  const ids = useSyncExternalStore(seenNotifications.subscribe, seenNotifications.snapshot, () => null);
+  return { ids, markSeen: (next: string[]) => seenNotifications.write(next) };
 }

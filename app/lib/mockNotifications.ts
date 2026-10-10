@@ -1,4 +1,5 @@
-// Mock inbox for the Omens rail's Notifications (app/FeedNotifications.tsx).
+// Mock inbox for the header bell's Notifications (app/NotificationsMenu.tsx →
+// app/FeedNotifications.tsx).
 // Display-only like mockPosts.ts. Incoming challenges are hand-written too:
 // real ones (lib/challenges.ts) only go out to mock traders, so nobody can
 // send you one yet. Every challenger is someone canChallenge() (app/lib/rank.ts)
@@ -35,3 +36,6 @@ export const NOTIFICATIONS: Notification[] = [
   { id: "nt3", kind: "follow", handle: "@lena_q", timestamp: "1h ago" },
   { id: "nt4", kind: "copy", handle: "@priya_p", market: "btc", side: "LONG", timestamp: "2h ago" },
 ];
+
+// Every inbox id, challenges included — what the bell's unseen badge counts.
+export const NOTIFICATION_IDS = [...CHALLENGE_REQUESTS, ...NOTIFICATIONS].map((item) => item.id);

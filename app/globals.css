@@ -139,6 +139,40 @@ button { cursor: pointer; }
 .theme-menu-text strong { font-size: 13px; font-weight: 600; }
 .theme-menu-text small { color: var(--muted); font-size: 11px; }
 .theme-menu-check { margin-left: auto; color: var(--brand-strong); font-size: 12px; font-weight: 700; }
+/* Notifications bell (app/NotificationsMenu.tsx), beside the avatar; signed-in only. Badge = inbox items not yet opened (violet like the Accept button). The popover holds app/FeedNotifications.tsx: challenge requests as cards on top (avatar + text, then a full-width Accept/Decline row), then mention/copy/follow rows. */
+.notif-menu { position: relative; }
+.notif-bell { position: relative; display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid var(--structure-line); border-radius: 8px; background: transparent; color: var(--structure-muted); padding: 0; }
+.notif-bell:hover, .notif-bell[aria-expanded="true"] { border-color: var(--brand); color: var(--structure-text); }
+.notif-bell svg { width: 19px; height: 19px; }
+.notif-badge { position: absolute; top: -6px; right: -6px; display: grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--violet-strong); color: var(--bg); box-shadow: 0 0 0 2px var(--structure); font-size: 10.5px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
+.notif-popover { --surface: var(--surface-raised); position: absolute; top: calc(100% + 8px); right: 0; z-index: 40; width: 340px; max-height: min(72vh, 560px); overflow-y: auto; overscroll-behavior: contain; padding: 6px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-raised); color: var(--text); box-shadow: 0 10px 28px rgba(0, 0, 0, .3); }
+.notif-popover[hidden] { display: none; }
+.feed-notifs-title { margin: 6px 12px 10px; font-size: 15px; font-weight: 700; }
+.feed-notif-list { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.feed-notif { display: flex; align-items: flex-start; gap: 10px; width: 100%; border-radius: 8px; padding: 7px 12px; color: var(--text); text-align: left; text-decoration: none; }
+a.feed-notif:hover { background: var(--surface-hover); }
+.feed-notif--challenge { display: grid; grid-template-columns: 24px minmax(0, 1fr); column-gap: 10px; margin-bottom: 4px; padding: 10px 12px; border: 1px solid var(--line); background: color-mix(in srgb, var(--surface-raised) 45%, transparent); }
+.feed-notif-avatar { position: relative; flex: none; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 999px; color: #fff; font-size: 10px; font-weight: 700; text-decoration: none; text-shadow: 0 1px 2px rgba(0, 0, 0, .35); }
+.feed-notif-kind { position: absolute; right: -5px; bottom: -5px; display: grid; place-items: center; width: 15px; height: 15px; border-radius: 999px; background: var(--surface); color: var(--muted); text-shadow: none; }
+.feed-notif-kind svg { width: 9px; height: 9px; }
+.feed-notif-body { min-width: 0; display: grid; gap: 1px; }
+.feed-notif-line, .feed-notif-detail { margin: 0; }
+.feed-notif-line { color: var(--muted); font-size: 12px; line-height: 1.35; }
+.feed-notif-line strong { color: var(--text); font-weight: 600; }
+.feed-notif-line a { color: inherit; text-decoration: none; }
+.feed-notif-line a:hover { text-decoration: underline; }
+.feed-notif-detail { overflow: hidden; color: var(--muted); font-size: 11.5px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+.feed-notif--challenge .feed-notif-detail { white-space: normal; }
+.feed-notif-meta:not([hidden]) { display: flex; flex-wrap: wrap; column-gap: 8px; }
+.feed-notif-more { padding: 0; border: 0; background: none; color: var(--text); font: inherit; font-weight: 600; cursor: pointer; }
+.feed-notif-more:hover { text-decoration: underline; }
+.feed-notif-actions { grid-column: 1 / -1; display: flex; gap: 6px; margin-top: 8px; }
+.feed-notif-actions button { flex: 1; min-height: 28px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 999px; background: transparent; color: var(--muted); font-size: 11.5px; font-weight: 700; transition: color .15s ease, border-color .15s ease, filter .15s ease; }
+.feed-notif-actions button:hover { border-color: color-mix(in srgb, var(--negative) 45%, var(--line-strong)); color: var(--text); }
+.feed-notif-actions .feed-notif-accept { border-color: color-mix(in srgb, var(--violet) 45%, transparent); background: color-mix(in srgb, var(--violet) 16%, transparent); color: var(--violet-strong); }
+.feed-notif-actions .feed-notif-accept:hover { border-color: var(--violet-strong); background: color-mix(in srgb, var(--violet) 24%, transparent); color: var(--violet-strong); }
+.feed-notif-status { grid-column: 1 / -1; margin: 8px 0 0; color: var(--muted); font-size: 11.5px; font-weight: 700; }
+.feed-notif-status[data-answer="accepted"] { color: var(--text); }
 .account-signed-out { display: flex; align-items: center; gap: 8px; }
 .account-menu-icon { width: 15px; height: 15px; }
 .header-actions .account-avatar-box { width: 32px; height: 32px; }
@@ -229,49 +263,25 @@ button { cursor: pointer; }
 .feed-tabs button.active { border-color: color-mix(in srgb, var(--brand) 45%, transparent); background: var(--selected-bg); color: var(--brand-strong); font-weight: 700; }
 .feed-tabs button:hover:not(.active) { color: var(--text); }
 /* Reddit-style left rail on `/`: feeds as a vertical icon list. Above 960px only — below that .feed-nav falls back to the .feed-tabs pill/segmented styles. */
-.feed-nav-label, .feed-notifs { display: none; }
 .feed-nav { min-width: 0; }
 .feed-nav .feed-tabs button { display: inline-flex; align-items: center; gap: 6px; }
 .feed-nav-live { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-family: var(--font-mono), ui-monospace, monospace; font-size: 11px; font-weight: 600; }
 .feed-nav-live::before { content: ""; width: 6px; height: 6px; border-radius: 999px; background: var(--violet-strong); }
 @media (min-width: 961px) {
   .feed-shell--nav { grid-template-columns: 200px minmax(0, 1fr) 340px; }
-  /* Capped to the viewport so Notifications stay reachable on short screens while the rail is stuck. */
-  .feed-nav { position: sticky; top: 24px; align-self: start; max-height: calc(100vh - 48px); overflow-y: auto; scrollbar-width: thin; padding: 4px 16px 4px 0; border-right: 1px solid var(--line); }
-  .feed-nav-label { display: block; margin: 6px 12px 8px; color: var(--muted-dim); font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
-  .feed-nav-label::before { content: "◆ "; }
+  /* Capped to the viewport so the stuck rail never runs off a short screen. */
+  .feed-nav { position: sticky; top: 24px; align-self: start; max-height: calc(100vh - 48px); overflow-y: auto; scrollbar-width: thin; margin-top: 24px; padding: 4px 0; }
+  /* X-style columns, no boxes: the feed is a full-height column between two hairlines (flush under the header, down to the page bottom), rail + sidebar sit open on the page. --surface → --bg so avatar cutouts and chip fills match the page. */
+  .feed-shell--nav { --surface: var(--bg); padding-block: 0; }
+  .feed-shell--nav > .feed-sidebar { margin-top: 24px; }
+  .feed-shell--nav .feed-main { min-height: calc(100vh - 64px); padding-bottom: 64px; border-inline: 1px solid var(--line); }
+  .feed-shell--nav .feed-panel { border: 0; border-radius: 0; background: none; }
+  .feed-shell--nav .feed-list { border-bottom: 1px solid var(--line); }
   .feed-nav .feed-tabs { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; }
   .feed-nav .feed-tabs button { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 38px; border: 0; border-radius: 8px; padding: 8px 12px; color: var(--muted); font-weight: 500; text-align: left; }
   .feed-nav-live { margin-left: auto; }
   .feed-nav .feed-tabs button:hover:not(.active) { background: var(--surface-hover); color: var(--text); }
   .feed-nav .feed-tabs button.active { border: 0; background: var(--surface-raised); color: var(--text); font-weight: 700; }
-  /* Notifications: section break under the feed tabs, rail-only. Challenge requests on top as cards (avatar + text, then a full-width Accept/Decline row so it fits the 180px rail). */
-  .feed-notifs { display: block; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
-  .feed-notif-list { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
-  .feed-notif { display: flex; align-items: flex-start; gap: 10px; width: 100%; border-radius: 8px; padding: 7px 12px; color: var(--text); text-align: left; text-decoration: none; }
-  a.feed-notif:hover { background: var(--surface-hover); }
-  .feed-notif--challenge { display: grid; grid-template-columns: 24px minmax(0, 1fr); column-gap: 10px; margin-bottom: 4px; padding: 10px 12px; border: 1px solid var(--line); background: color-mix(in srgb, var(--surface-raised) 45%, transparent); }
-  .feed-notif-avatar { position: relative; flex: none; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 999px; color: #fff; font-size: 10px; font-weight: 700; text-decoration: none; text-shadow: 0 1px 2px rgba(0, 0, 0, .35); }
-  .feed-notif-kind { position: absolute; right: -5px; bottom: -5px; display: grid; place-items: center; width: 15px; height: 15px; border-radius: 999px; background: var(--surface); color: var(--muted); text-shadow: none; }
-  .feed-notif-kind svg { width: 9px; height: 9px; }
-  .feed-notif-body { min-width: 0; display: grid; gap: 1px; }
-  .feed-notif-line, .feed-notif-detail { margin: 0; }
-  .feed-notif-line { color: var(--muted); font-size: 12px; line-height: 1.35; }
-  .feed-notif-line strong { color: var(--text); font-weight: 600; }
-  .feed-notif-line a { color: inherit; text-decoration: none; }
-  .feed-notif-line a:hover { text-decoration: underline; }
-  .feed-notif-detail { overflow: hidden; color: var(--muted); font-size: 11.5px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
-  .feed-notif--challenge .feed-notif-detail { white-space: normal; }
-  .feed-notif-meta:not([hidden]) { display: flex; flex-wrap: wrap; column-gap: 8px; }
-  .feed-notif-more { padding: 0; border: 0; background: none; color: var(--text); font: inherit; font-weight: 600; cursor: pointer; }
-  .feed-notif-more:hover { text-decoration: underline; }
-  .feed-notif-actions { grid-column: 1 / -1; display: flex; gap: 6px; margin-top: 8px; }
-  .feed-notif-actions button { flex: 1; min-height: 28px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 999px; background: transparent; color: var(--muted); font-size: 11.5px; font-weight: 700; transition: color .15s ease, border-color .15s ease, filter .15s ease; }
-  .feed-notif-actions button:hover { border-color: color-mix(in srgb, var(--negative) 45%, var(--line-strong)); color: var(--text); }
-  .feed-notif-actions .feed-notif-accept { border-color: color-mix(in srgb, var(--violet) 45%, transparent); background: color-mix(in srgb, var(--violet) 16%, transparent); color: var(--violet-strong); }
-  .feed-notif-actions .feed-notif-accept:hover { border-color: var(--violet-strong); background: color-mix(in srgb, var(--violet) 24%, transparent); color: var(--violet-strong); }
-  .feed-notif-status { grid-column: 1 / -1; margin: 8px 0 0; color: var(--muted); font-size: 11.5px; font-weight: 700; }
-  .feed-notif-status[data-answer="accepted"] { color: var(--text); }
 }
 @media (min-width: 961px) and (max-width: 1180px) {
   .feed-shell--nav { grid-template-columns: 180px minmax(0, 1fr) 280px; gap: 20px; }
@@ -284,8 +294,10 @@ button { cursor: pointer; }
   .feed-shell--nav .feed-main { display: contents; }
   .feed-shell--nav .feed-nav { order: -1; }
   .feed-shell--nav .feed-sidebar { margin-top: 28px; }
+  /* X-style here too: the feed runs edge to edge (negative margin = the shell gutter) with hairlines only, no box. */
+  .feed-shell--nav .feed-panel { --surface: var(--bg); margin-inline: -28px; border-width: 1px 0; border-radius: 0; background: none; }
 }
-@media (max-width: 768px) { .feed-shell--nav .feed-sidebar { margin-top: 16px; } }
+@media (max-width: 768px) { .feed-shell--nav .feed-sidebar { margin-top: 16px; } .feed-shell--nav .feed-panel { margin-inline: -16px; } }
 /* The feed is one bordered panel (composer → call strip → posts); posts are
    flat rows split by hairlines, not separate cards. Rank shows on the badge;
    only Oracle authors also get an avatar ring + glow. */
@@ -732,7 +744,13 @@ button { cursor: pointer; }
 .topic-chips { display: flex; align-items: center; gap: 8px; padding: 12px 18px; overflow-x: auto; border-bottom: 1px solid var(--line); scrollbar-width: none; }
 .topic-chips::-webkit-scrollbar { display: none; }
 .topic-chips-list { display: flex; flex: none; gap: 8px; }
-.topic-chip { flex: none; display: inline-flex; align-items: center; gap: 7px; min-height: 34px; padding: 0 14px; border: 1px solid var(--line-strong); border-radius: 999px; background: transparent; color: var(--text); font-size: 13px; font-weight: 600; white-space: nowrap; transition: background .15s ease, border-color .15s ease; }
+/* Round icon chips sized to match the + button (name in aria-label/title); the selected chip widens to icon + name, with a badge icon tucked into the pill's round end. */
+.topic-chip { flex: none; display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 1px solid var(--line-strong); border-radius: 999px; background: transparent; color: var(--text); font-size: 16px; font-weight: 600; transition: background .15s ease, border-color .15s ease; }
+.topic-chip .topic-icon:is([data-kind="coin"], [data-kind="company"], [data-kind="person"]) { width: 22px; height: 22px; font-size: 11px; }
+.topic-chip .topic-icon[data-kind="person"] { font-size: 8.5px; }
+.topic-chip[aria-selected="true"] { display: inline-flex; gap: 7px; width: auto; padding: 0 14px 0 11px; }
+.topic-chip[aria-selected="true"]:has(.topic-icon:is([data-kind="coin"], [data-kind="company"], [data-kind="person"])) { padding-left: 5px; }
+.topic-chip-label { font-size: 13px; white-space: nowrap; }
 .topic-chip:hover { background: var(--surface-hover); }
 .topic-chip[aria-selected="true"] { border-color: color-mix(in srgb, var(--violet) 75%, transparent); background: color-mix(in srgb, var(--violet) 16%, var(--surface)); }
 .topic-chip[aria-selected="true"] .topic-chip-spark { color: var(--violet-strong); }
@@ -801,7 +819,8 @@ button { cursor: pointer; }
   .mix-banner { padding: 8px 14px; font-size: 12px; }
   .mix-banner button { font-size: 12px; }
   .topic-chips { padding: 10px 14px; }
-  .topic-chip { min-height: 32px; padding: 0 12px; font-size: 12.5px; }
+  .topic-chip, .topic-chip-add { width: 32px; height: 32px; }
+  .topic-chip-label { font-size: 12.5px; }
   .interest-picker, .topic-header, .feed-section-label, .feed-covers-empty { padding-inline: 14px; }
 }
 /* Sticky, so a rail taller than the viewport scrolls itself rather than
@@ -855,7 +874,7 @@ button { cursor: pointer; }
 .post-menu-dropdown .post-menu-delete.is-confirming:hover { background: var(--negative); color: var(--bg); filter: brightness(1.08); }
 .post-menu-confirm { max-width: 220px; margin: 0; padding: 8px 10px 10px; color: var(--muted); font-size: 12px; line-height: 1.45; }
 .post-menu-confirm strong { display: block; margin-bottom: 2px; color: var(--text); font-size: 13px; }
-/* The Oracles leaderboard (app/OraclesLeaderboard.tsx). A night panel in both
+/* Top Oracles leaderboard (app/OraclesLeaderboard.tsx). A night panel in both
    themes, so it carries its own --o-* palette rather than theme tokens.
    Choreography on mount, replayed on each period switch by a keyed remount:
    cards rise face-down and flip III → II → I (--deal × --deal-step), rank I
@@ -984,6 +1003,13 @@ button { cursor: pointer; }
 }
 @media (max-width: 960px) { .sidebar-panel.oracles-panel { grid-column: 1 / -1; } .oracles-panel > * { max-width: 400px; margin-inline: auto; } }
 @media (prefers-reduced-motion: reduce) { .oracles-panel *, .oracles-panel *::before, .oracles-panel *::after { animation: none !important; } }
+/* `/` sidebar above 960px: panels (Oracles included) drop their boxes and split on hairlines, like the open rail + feed column. After the Oracles rules so it beats their light-theme background. */
+@media (min-width: 961px) {
+  .feed-shell--nav .feed-sidebar { gap: 0; }
+  .feed-shell--nav .feed-sidebar .sidebar-panel { padding: 20px 0; border: 0; border-radius: 0; background: none; }
+  .feed-shell--nav .feed-sidebar .sidebar-panel:first-child { padding-top: 0; }
+  .feed-shell--nav .feed-sidebar .sidebar-panel + .sidebar-panel { border-top: 1px solid var(--line); }
+}
 /* Rooms: each rank is its own themed room. [data-room] sets --room (accent),
    --room-strong (text-safe accent) and --room-glow; set on the shell for the
    active theme and on each switcher tab / ladder row for its own gem colour. */
@@ -1932,16 +1958,6 @@ html.pulse-screen-shake { animation: pulse-screen-shake .24s ease-in-out; }
 .active-match-bar-cta { flex: none; border-radius: 999px; background: var(--btn-bg); color: var(--btn-text); padding: 8px 14px; font-size: 12px; font-weight: 700; }
 @keyframes active-match-bar-in { 0% { opacity: 0; transform: translateY(12px); } 100% { opacity: 1; transform: translateY(0); } }
 @media (prefers-reduced-motion: reduce) { .active-match-bar-dot { animation: none; } .active-match-bar-link { animation: none; } }
-/* Idle-state ticket tab. It shares the active-match bar's bottom slot and
-   unfolds upward when pressed. */
-.quick-ticket-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 39; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; padding: 0 14px calc(10px + env(safe-area-inset-bottom)); pointer-events: none; }
-.quick-ticket-popover { pointer-events: auto; width: min(100%, 380px); max-height: min(72vh, 560px); overflow-y: auto; border: 1px solid color-mix(in srgb, var(--brand) 42%, var(--line-strong)); border-radius: 14px; background: var(--surface); box-shadow: 0 12px 34px rgba(0, 0, 0, .3); animation: quick-ticket-popover-in .16s ease-out; }
-.quick-ticket-popover .wallet-ticket { position: static; border: 0; border-radius: 0; box-shadow: none; }
-.quick-ticket-tab { pointer-events: auto; display: inline-grid; place-items: center; width: 40px; height: 40px; border: 1px solid color-mix(in srgb, var(--brand) 42%, var(--line-strong)); border-radius: 999px; background: var(--surface); color: var(--text); padding: 0; box-shadow: 0 8px 22px rgba(0, 0, 0, .22); font-size: 21px; font-weight: 400; line-height: 1; transition: background .15s ease, color .15s ease, border-color .15s ease; }
-.quick-ticket-tab:hover, .quick-ticket-tab:focus-visible { border-color: var(--brand); background: var(--surface-hover); color: var(--brand-strong); outline: none; }
-@keyframes quick-ticket-popover-in { 0% { opacity: 0; transform: translateY(10px); } 100% { opacity: 1; transform: translateY(0); } }
-@media (prefers-reduced-motion: reduce) { .quick-ticket-popover { animation: none; } }
-@media (max-width: 640px) { .quick-ticket-bar { padding-inline: 10px; } .quick-ticket-popover { width: min(100%, 380px); max-height: min(78vh, 560px); } .quick-ticket-popover .wallet-card { padding: 16px; } }
 /* Minified Pulse trading controls, popped up above the bar on hover (desktop)
    or tap (touch) — see app/PulseMiniDock.tsx. */
 .pulse-mini-dock { pointer-events: auto; display: flex; flex-direction: column; gap: 10px; width: min(100%, 380px); max-height: min(60vh, 420px); overflow-y: auto; border: 1px solid var(--line-strong); border-radius: 16px; background: var(--surface); padding: 14px; box-shadow: 0 10px 30px rgba(0, 0, 0, .28); animation: active-match-bar-in .16s ease-out; }
@@ -2061,11 +2077,16 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
   .app-header-inner { min-height: 60px; width: 100%; padding: 0 16px; flex-wrap: nowrap; }
   .desktop-header-content { display: none; }
   .mobile-header-content { display: flex; width: 100%; min-width: 0; align-items: center; justify-content: space-between; gap: 12px; }
-  .mobile-header-content .brand { min-width: 0; overflow: hidden; white-space: nowrap; font-size: 19px; letter-spacing: .2em; line-height: 1; }
-  .mobile-header-actions { display: flex; flex: none; align-items: center; gap: 8px; }
-  .mobile-header-actions .theme-toggle { width: 38px; height: 38px; }
+  /* Shrinkable so a long Embers balance squeezes the wordmark, never pushes the avatar off-screen. */
+  .mobile-header-content .brand { flex: 0 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; font-size: 19px; letter-spacing: .2em; line-height: 1; }
+  .mobile-header-actions { display: flex; flex: none; align-items: center; gap: 6px; }
+  .mobile-header-actions .theme-toggle, .mobile-header-actions .notif-bell { width: 38px; height: 38px; }
+  /* Phone popover spans the screen under the header instead of hanging off the bell. */
+  .notif-popover { position: fixed; top: 64px; right: 12px; left: 12px; width: auto; max-height: min(70vh, 560px); }
   .mobile-account-control { display: flex; min-width: 40px; height: 40px; align-items: center; justify-content: center; flex: none; }
   .mobile-header-actions .balance-display { min-height: 34px; padding: 0 8px 0 9px; font-size: 12px; white-space: nowrap; }
+  /* Room for the notifications bell: no caret on the balance pill, tighter wordmark on narrow phones. */
+  .mobile-header-actions .balance-caret { display: none; }
   .mobile-account-control .account-user-button-box,
   .mobile-account-control .account-user-button-trigger,
   .mobile-account-control .account-avatar-box { width: 40px; height: 40px; }
@@ -2171,23 +2192,23 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
   .promo-text, .post-card--promo { font-size: 9px; }
   .post-read-more { min-height: 36px; margin-top: 0; }
 
-  .quick-ticket-bar, .active-match-bar { bottom: calc(80px + env(safe-area-inset-bottom)); }
-  .quick-ticket-bar { padding-bottom: 0; }
+  .active-match-bar { bottom: calc(80px + env(safe-area-inset-bottom)); }
   .active-match-bar { padding-bottom: 0; }
 
   /* Scroll-down auto-hide (app/MobileChromeAutoHide.tsx sets html[data-chrome]). Header and nav slide off their edges; the ticket/match bars drop 70px to sit 10px off the bottom, as on desktop. Keyboard focus inside a bar holds it in view. */
-  .app-header, .mobile-bottom-nav, .quick-ticket-bar, .active-match-bar { transition: transform .22s ease; }
+  .app-header, .mobile-bottom-nav, .active-match-bar { transition: transform .22s ease; }
   html[data-chrome="hidden"] .app-header:not(:has(:focus-visible)) { transform: translateY(-100%); }
   html[data-chrome="hidden"] .mobile-bottom-nav:not(:has(:focus-visible)) { transform: translateY(100%); }
-  html[data-chrome="hidden"] .quick-ticket-bar, html[data-chrome="hidden"] .active-match-bar { transform: translateY(70px); }
+  html[data-chrome="hidden"] .active-match-bar { transform: translateY(70px); }
 }
-@media (prefers-reduced-motion: reduce) { .app-header, .mobile-bottom-nav, .quick-ticket-bar, .active-match-bar { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .app-header, .mobile-bottom-nav, .active-match-bar { transition: none; } }
 /* ProfileShowcase skips the flip itself under reduced motion; this drops the cards' rise and the toggle's pulse. */
 @media (prefers-reduced-motion: reduce) { .profile-face--panel :is(.profile-record-hero, .sidebar-row, .profile-reel-card), .profile-face-toggle { animation: none !important; } }
 
+@media (max-width: 420px) { .mobile-header-content .brand { font-size: 17px; letter-spacing: .16em; } }
+@media (max-width: 380px) { .mobile-header-content .brand { font-size: 16px; letter-spacing: .12em; } .mobile-header-actions .theme-toggle, .mobile-header-actions .notif-bell { width: 34px; height: 34px; } }
 @media (max-width: 340px) {
   .app-header { padding-inline: 16px; }
-  .mobile-header-actions { gap: 8px; }
 }
 
 /* 24h Battle: a focused, single-purpose game screen rather than a dashboard
@@ -2379,8 +2400,7 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
 }
 
 /* Wallet dashboard (app/wallet/*). `.wd-*` prefix, separate from the shared
-   `.wallet-*` rules above (still used by WalletDesk's connect card and the
-   QuickTicketBar ticket). Reuses .pf-flash-up/.pf-flash-down (price flash),
+   `.wallet-*` rules above (still used by WalletDesk's connect card). Reuses .pf-flash-up/.pf-flash-down (price flash),
    .pf-crossfade/.pf-live-dot/.pf-shimmer/.pf-select-indicator/.pf-row-star
    (shared with app/duel/portfolio, since AdvancedTab embeds TokenExplorer
    directly) and .panel/.eyebrow (shared chrome). */

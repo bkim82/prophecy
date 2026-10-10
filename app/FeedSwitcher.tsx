@@ -2,7 +2,6 @@
 
 import { useMemo, useRef, useState } from "react";
 import { FeedComposer } from "@/app/FeedComposer";
-import { FeedNotifications } from "@/app/FeedNotifications";
 import { CoverEyebrow, InterestPicker, MixBanner, MutedNotice, SeeMore, TopicChips, TopicHeader, type TopicView } from "@/app/FeedTopics";
 import { PostCard } from "@/app/PostCard";
 import { FOLLOWED_HANDLES, LIVE_CALL_COUNT, SHARES, type Post, type Share } from "@/app/lib/mockPosts";
@@ -134,7 +133,6 @@ export function FeedSwitcher({ posts }: { posts: Post[] }) {
   return (
     <>
       <nav className="feed-nav" aria-label="Feeds">
-        <p className="feed-nav-label">Feeds</p>
         <div className="feed-tabs" role="tablist" aria-label="Feed filter">
           {FILTERS.map(({ id, label }) => (
             <button
@@ -154,7 +152,6 @@ export function FeedSwitcher({ posts }: { posts: Post[] }) {
             </button>
           ))}
         </div>
-        <FeedNotifications />
       </nav>
       <div className="feed-main">
         <div className="feed-panel" ref={panelRef}>

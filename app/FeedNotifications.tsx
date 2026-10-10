@@ -1,17 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { ArenaIcon } from "@/app/icons";
 import { avatarGradient } from "@/app/lib/avatar";
 import { challengeTerms } from "@/app/lib/challengeRules";
 import { CHALLENGE_REQUESTS, NOTIFICATIONS, type ChallengeRequest, type Notification } from "@/app/lib/mockNotifications";
 import { getProfile, profileHref, type Profile } from "@/app/lib/mockProfiles";
 
-// The Omens rail's Notifications (app/FeedSwitcher.tsx): incoming challenge
-// requests on top, then mentions / copies / follows. All mock
+// The header bell's Notifications list (app/NotificationsMenu.tsx): incoming
+// challenge requests on top, then mentions / copies / follows. All mock
 // (app/lib/mockNotifications.ts). Accept and Decline only mark the request
-// for this page view — there's no match to start against a mock trader.
+// until reload — there's no match to start against a mock trader.
 
 type Answer = "accepted" | "declined";
 
@@ -39,13 +39,13 @@ function Avatar({ profile, href, challenge = false }: { profile: Profile; href?:
   );
 }
 
-// Collapsed to who + when so the rail stays short; "Show more" reveals the terms.
+// Collapsed to who + when so the list stays short; "Show more" reveals the terms.
 function ChallengeRow({ request, answer, onAnswer }: { request: ChallengeRequest; answer?: Answer; onAnswer: (answer: Answer) => void }) {
   const [open, setOpen] = useState(false);
+  const termsId = useId();
   const profile = getProfile(request.handle);
   if (!profile) return null;
   const href = profileHref(profile.handle);
-  const termsId = `challenge-terms-${request.id}`;
   return (
     <li className="feed-notif feed-notif--challenge">
       <Avatar profile={profile} href={href} challenge />
@@ -114,11 +114,12 @@ function NotificationRow({ notification }: { notification: Notification }) {
 
 export function FeedNotifications() {
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
+  const labelId = useId();
   return (
-    <section className="feed-notifs" aria-labelledby="feed-notifs-label">
-      <p className="feed-nav-label" id="feed-notifs-label">
+    <section className="feed-notifs" aria-labelledby={labelId}>
+      <h2 className="feed-notifs-title" id={labelId}>
         Notifications
-      </p>
+      </h2>
       <ul className="feed-notif-list">
         {CHALLENGE_REQUESTS.map((request) => (
           <ChallengeRow
