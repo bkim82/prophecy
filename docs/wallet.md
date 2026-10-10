@@ -11,8 +11,8 @@ modeled on the 24h Portfolio game's UI but not time-boxed).
 `app/lib/useWalletConnection.ts` owns the Coinbase Wallet SDK state machine
 (connect/disconnect/switch, the Smart Wallet handshake-race handling, the
 `accountsChanged`/`chainChanged` listeners, the `wallet-updated` event). Both
-`app/wallet/page.tsx` (dashboard) and `app/WalletDesk.tsx` (still backs
-`QuickTicketBar`'s floating ticket, `docs/architecture.md`) call this one
+`app/wallet/page.tsx` (dashboard) and `app/WalletDesk.tsx` (backed the
+removed quick ticket; nothing mounts it now) call this one
 hook rather than each keeping their own copy.
 
 ## No-auth data routes

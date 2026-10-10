@@ -8,8 +8,8 @@ export const EMPTY_WALLET: WalletState = { address: null, chainId: null, chain: 
 
 /**
  * Coinbase Wallet SDK connect/disconnect/switch state machine, shared by
- * every surface that needs a connected wallet (the wallet dashboard, the
- * quick ticket). Pulled out of app/WalletDesk.tsx so the handshake-race
+ * every surface that needs a connected wallet (the wallet dashboard,
+ * WalletDesk). Pulled out of app/WalletDesk.tsx so the handshake-race
  * handling below has exactly one copy.
  */
 export function useWalletConnection() {

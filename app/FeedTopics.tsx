@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { NotInterestedIcon } from "@/app/icons";
 import { TOPIC_KINDS, TOPICS, topicById, type Topic, type TopicId } from "@/app/lib/topics";
 
@@ -23,8 +23,10 @@ export function TopicIcon({ topic }: { topic: Topic }) {
   );
 }
 
-// ✦ home chip, one chip per followed topic, then + to edit interests. The
-// row scrolls sideways when it overflows.
+// ✦ home chip, one chip per followed topic, then + to edit interests. Chips
+// are icons; only the selected one also shows its name (the rest carry it as
+// the accessible label + hover title). The row scrolls sideways when it
+// overflows.
 export function TopicChips({
   interests,
   view,
@@ -46,30 +48,15 @@ export function TopicChips({
   return (
     <div className="topic-chips">
       <div className="topic-chips-list" role="tablist" aria-label="Topics">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={view === "forYou"}
-          className="topic-chip topic-chip--home"
-          onClick={() => onSelect("forYou")}
-        >
+        <TopicChip label={homeLabel} selected={view === "forYou"} onSelect={() => onSelect("forYou")}>
           <span className="topic-chip-spark" aria-hidden="true">✦</span>
-          {homeLabel}
-        </button>
+        </TopicChip>
         {ids.map((id) => {
           const topic = topicById(id);
           return (
-            <button
-              key={id}
-              type="button"
-              role="tab"
-              aria-selected={view === id}
-              className="topic-chip"
-              onClick={() => onSelect(id)}
-            >
+            <TopicChip key={id} label={topic.label} short={topic.short} selected={view === id} onSelect={() => onSelect(id)}>
               <TopicIcon topic={topic} />
-              {topic.short ?? topic.label}
-            </button>
+            </TopicChip>
           );
         })}
       </div>
@@ -77,6 +64,35 @@ export function TopicChips({
         +
       </button>
     </div>
+  );
+}
+
+function TopicChip({
+  label,
+  short,
+  selected,
+  onSelect,
+  children,
+}: {
+  label: string;
+  short?: string;
+  selected: boolean;
+  onSelect: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={selected}
+      className="topic-chip"
+      aria-label={label}
+      title={selected ? undefined : label}
+      onClick={onSelect}
+    >
+      {children}
+      {selected && <span className="topic-chip-label">{short ?? label}</span>}
+    </button>
   );
 }
 

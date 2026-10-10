@@ -13,7 +13,7 @@ export const LIVE_ARENAS: LiveArena[] = [
   { id: "d3", market: "doge", players: "Marcus vs Priya", timer: "0:08", tier: "silver" },
 ];
 
-// "The Oracles" leaderboard (app/OraclesLeaderboard.tsx): top traders per
+// "Top Oracles" leaderboard (app/OraclesLeaderboard.tsx): top traders per
 // period, already in rank order. No score is shown; winRate (0–1) only drives
 // the avatar ring.
 export type LeaderboardPeriod = "24h" | "7d" | "all";
