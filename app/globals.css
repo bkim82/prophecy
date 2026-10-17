@@ -2654,10 +2654,16 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
    debrief in a left column and pins the chart (.tut-stage) on the right. */
 .tut-shell { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "brief" "chart" "dock" "debrief"; row-gap: 14px; align-items: start; width: min(100% - 32px, 1180px); margin: 0 auto; padding: 16px 0 40px; }
 .tut-shell:not(.is-split) { width: min(100% - 32px, 760px); }
+/* The ranked room's column (max-w-4xl less its px-4). */
+.tut-shell.is-live { width: min(100% - 32px, 864px); }
 .tut-head { grid-area: head; display: grid; gap: 10px; min-width: 0; }
 .tut-head-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
 .tut-back { display: inline-flex; min-height: 32px; align-items: center; color: var(--muted-dim); font-size: 11px; letter-spacing: .08em; text-decoration: none; text-transform: uppercase; transition: color .15s ease; }
 .tut-back:hover { color: var(--text); }
+/* Onboarding's skip: a pill at the row's right end (after the balance chip when shown). */
+.tut-skip { margin-left: auto; border: 1px solid var(--line); border-radius: 999px; background: transparent; padding: 0 12px; color: var(--muted); }
+.tut-skip:hover { border-color: var(--line-strong); }
+.tut-balance + .tut-skip { margin-left: 0; }
 .tut-head .arena-market-title { margin: 0; gap: 8px; font-size: 11px; letter-spacing: .16em; }
 .tut-head .arena-market-badge { gap: 5px; padding: 2px 9px 2px 4px; box-shadow: none; font-size: 11px; }
 .tut-head .arena-market-badge .market-symbol { width: 16px; height: 16px; font-size: 12px; }
@@ -2696,10 +2702,10 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
 .tut-button-primary:hover { background: var(--btn-bg-hover); box-shadow: 0 0 20px color-mix(in srgb, var(--brand) 35%, transparent); }
 .tut-button-secondary { border: 1px solid var(--line); background: transparent; color: var(--text); font-weight: 600; }
 .tut-button-secondary:hover { border-color: var(--line-strong); background: var(--surface-hover); }
+.tut-skip-all { min-height: 44px; margin-right: auto; border: 0; background: transparent; padding: 0 4px; color: var(--muted); font-size: 13px; text-decoration: underline; text-underline-offset: 3px; transition: color .15s ease; }
+.tut-skip-all:hover { color: var(--text); }
 
 .tut-stage { grid-area: chart; min-width: 0; scroll-margin-top: 12px; }
-.tut-live-price { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: center; gap: 4px 10px; margin: 10px 0 8px; }
-.tut-live-price strong { color: var(--text); font-size: 26px; font-weight: 600; }
 .tut-stage-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; margin-bottom: 8px; padding: 0 2px; }
 .tut-stage-price { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; font-size: 13px; font-weight: 600; }
 .tut-stage-price strong { color: var(--text); font-size: 18px; font-weight: 700; }
@@ -2739,9 +2745,6 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
 .tut-choice button span { font-size: 10.5px; line-height: 1.3; }
 .tut-choice button:hover { border-color: var(--line-strong); }
 .tut-choice button.is-selected { border-color: var(--market-accent); background: color-mix(in srgb, var(--market-accent) 14%, var(--surface-raised)); box-shadow: inset 0 0 0 1px var(--market-accent); color: var(--text); }
-.tut-choice.is-compact { grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 8px 0; }
-.tut-choice.is-compact button { padding: 6px 4px; }
-.tut-choice.is-compact button strong { font-size: 14px; }
 
 .tut-debrief { grid-area: debrief; min-width: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: inset 0 2px 0 color-mix(in srgb, var(--market-accent) 75%, transparent); padding: 18px 20px; scroll-margin-bottom: 16px; }
 .tut-debrief-headline { margin: 4px 0 0; font-size: clamp(28px, 6vw, 34px); font-weight: 800; letter-spacing: -.02em; line-height: 1.1; }
@@ -2768,5 +2771,4 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
   .tut-actions { flex-direction: column-reverse; }
   .tut-actions > * { width: 100%; }
   .tut-choice { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .tut-choice.is-compact { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
