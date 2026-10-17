@@ -13,7 +13,8 @@ function securityResponse(request: NextRequest) {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' blob: data: https:",
     "font-src 'self' data:",
-    `connect-src 'self' https://*.coinbase.com https://*.coinbasecdn.net https://*.clerk.accounts.dev${isDev ? " ws: wss:" : ""}`,
+    // wss://ws-feed is the client price feed (app/usePriceFeed.ts).
+    `connect-src 'self' https://*.coinbase.com https://*.coinbasecdn.net https://*.clerk.accounts.dev wss://ws-feed.exchange.coinbase.com${isDev ? " ws: wss:" : ""}`,
     "frame-src 'self' https://*.coinbase.com https://*.coinbasecdn.net https://*.clerk.accounts.dev",
     "object-src 'none'",
     "base-uri 'self'",
