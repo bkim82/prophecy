@@ -1,55 +1,19 @@
 # Wallet dashboard
 
-Status: built. `/wallet` (`app/wallet/page.tsx`) connects a Coinbase Wallet
-SDK wallet (no browser extension, no Clerk sign-in) and shows its real Base
-holdings across two tabs: **Portfolio** (a balance chip + a plain list of
-owned coins) and **Advanced** (a token explorer + detail/buy-sell layout,
-modeled on the 24h Portfolio game's UI but not time-boxed).
-
-## Connection
-
-`app/lib/useWalletConnection.ts` owns the Coinbase Wallet SDK state machine
-(connect/disconnect/switch, the Smart Wallet handshake-race handling, the
-`accountsChanged`/`chainChanged` listeners, the `wallet-updated` event). Both
-`app/wallet/page.tsx` (dashboard) and `app/WalletDesk.tsx` (still backs
-`QuickTicketBar`'s floating ticket, `docs/architecture.md`) call this one
-hook rather than each keeping their own copy.
-
-## No-auth data routes
-
-The wallet page has never required Clerk sign-in, only a connected wallet
-(`app/api/wallet/holdings/route.ts` has no `auth()` check — "public on-chain
-data"). The dashboard's other data needs are served by no-auth mirrors of the
-Clerk-gated `/api/tokens/*` routes the 24h Portfolio game uses, so the gate
-doesn't leak into the wallet page — same lib functions underneath, just
-without `auth()`:
-
-| Route | Wraps | Notes |
-| --- | --- | --- |
-| `GET /api/wallet/holdings?address=` | `lib/alchemy.ts getWalletHoldings` | `WalletTokenHolding` carries `change24h`; balances cached 20s + in-flight dedupe, contract discovery cached 5 min and rescanned incrementally from last block, token metadata cached permanently (all per-instance, in-memory) — a newly received token can take up to 5 min to appear |
-| `GET /api/wallet/eth` | `lib/basePrices.ts getTokenSummaries` | native ETH has no pool of its own — priced via its WETH proxy (`0x4200…0006`), relabeled `address: "eth"`, `symbol: "ETH"` |
-| `POST /api/wallet/history {addresses, period?}` | `lib/tokenHistory.ts getTokenHistories` | mirrors `/api/tokens/history`; the `"eth"` sentinel is swapped for the WETH address before the lookup and swapped back in the response |
-| `GET /api/wallet/search?q=` | `lib/basePrices.ts searchTokens` | mirrors `/api/tokens/search` |
-| `GET /api/wallet/trending`, `GET /api/wallet/new` | `lib/tokenHistory.ts getTrendingTokens`/`getNewTokens` | mirror `/api/tokens/trending`/`/api/tokens/new` |
-| `POST /api/wallet/prices {addresses}` | `lib/basePrices.ts getTokenPrices`/`getTokenSummaries` | mirrors `/api/tokens/prices` |
-| `GET /api/wallet/activity?address=` | `lib/alchemy.ts getWalletActivity` | kept as working infra but **not called by any UI right now** — Recent activity was pulled from the dashboard (see Known non-behaviors) |
-
-All: `force-dynamic`, `Cache-Control: no-store`, never throw — same invariants as every other route (`docs/architecture.md`).
-
-## Client (`app/wallet/`)
-
-- `WalletDashboard.tsx` — orchestrator: polls holdings (~30s, paused while the tab is hidden, refetched on return) and the ETH quote (~10s); builds one unified `Coin[]` (native ETH + ERC-20, `types.ts`); derives the chip's 24h $/% change from each coin's own real `change24h`; holds the Portfolio/Advanced tab, expanded-coin, and action-sheet state.
-- A Portfolio/Advanced switcher uses its own `.wd-tabs` underline style (Coinbase Wallet home's Coins/Collectibles/Orders look), not the shared `.feed-tabs` pill used elsewhere in the app.
-- **Portfolio tab**: `BalanceChip.tsx` (big centerpiece total on a dotted-grid card + 24h change + Swap/Send/Deposit tiles, digit-diff tint on change) above `CoinList.tsx` (search + sort over a Coinbase-style table — `CoinRow.tsx` rows under an Asset/Balance/Portfolio/Price header, portfolio % computed from each coin's share of `totalUsd`; no per-row charts; the Portfolio column and its header drop out under 620px. Frozen ordering — re-sorted only when the sort/search view or the coin set changes, never on a price tick, same idiom as `app/duel/portfolio/TokenExplorer.tsx`). Selecting a row expands into `CoinDetailPanel.tsx` (its own big chart via `app/MarketChart.tsx`, same usage as `app/duel/portfolio/TokenDetail.tsx`; states plainly that avg-entry/return aren't tracked rather than faking them).
-- **Advanced tab**: `AdvancedTab.tsx` lays out `app/duel/portfolio/TokenExplorer.tsx` (reused directly, not forked — see its `endpoints` prop, `docs/portfolio.md`) next to `AdvancedTokenDetail.tsx` (chart + market stats + factual description + Buy/Sell, modeled on `app/duel/portfolio/TokenDetail.tsx` minus its Embers-based `OrderForm`). Below `lg` only one pane shows (no tab switcher): tapping a row opens the detail, its "← Explore" button returns to the table. Explorer rows aren't limited to owned coins — Buy/Sell on any Base token opens the Swap sheet with that token preselected (`SwapSheet`'s `initialFrom`/`initialTo`/`extraToken` props cover a token that isn't in the wallet's own holdings yet).
-- `ActionSheet.tsx` + `ActionSheets.tsx` (Deposit/Send/Swap) — presentation only. Deposit shows the real connected address (safe, already-public) with copy-to-clipboard; Send/Swap collect inputs but end in a "not wired up yet" notice.
-- `useWalletHistory.ts` — client cache pointed at `/api/wallet/history`, same pattern as `app/duel/portfolio/ui.tsx useTokenHistory`; used by `CoinDetailPanel.tsx` and `AdvancedTokenDetail.tsx` for their charts (not by the Portfolio tab's list, which has no charts at all).
-
-Reuses `app/duel/portfolio/ui.tsx`'s `CoinImage`/`Change`/`LivePrice`/`StarButton`/`useFlash`/`usd` and `app/duel/portfolio/watchlist.ts`'s `useWatchlist` rather than re-implementing them — the watchlist is shared app-wide (one "tokens I'm watching" concept, not per-feature).
-
-## Known non-behaviors (see also `docs/roadmap.md`)
-
-- **No cost basis.** Avg entry and total return are not shown for any holding — Prophecy only ever sees the balance currently in a connected wallet, never what was paid for it.
-- **Deposit/Send/Swap are UI-only.** Deposit shows the real connected address; Send/Swap collect inputs but never call `eth_sendTransaction` or any swap router, on either tab.
-- **Recent activity and Creator earnings are out of the UI.** `getWalletActivity`/`/api/wallet/activity` (confirmed on-chain transfers, Received/Sent/Swapped) still exist and work but have no caller; the mock creator-earnings stub and its card were deleted outright rather than left unrendered. Re-adding either is mostly a presentation-layer job.
-- **No pending-transaction state**, for the same reason Send/Swap don't move funds yet.
+- Status: canonical CDP smart-account identity and durable Send foundation built; feature-gated/inactive until schema, credentialed Base Sepolia, Paymaster-decoder, policy, and production controls pass. Swap signing and hosted Onramp remain blocked.
+- `/wallet` requires application sign-in and reads the canonical Base smart-account address from `useAppAuth()` through `app/lib/useWalletConnection.ts:18`; no external-wallet connect, disconnect, switch-wallet, switch-chain, or owner-EOA display flow remains.
+- `app/lib/wallet.ts` contains display/Base helpers only. `@coinbase/wallet-sdk` is removed from `package.json`.
+- `app/wallet/page.tsx`, `app/wallet/WalletDashboard.tsx`, `app/WalletDesk.tsx`, `app/BalancePill.tsx`, and `app/sanctum/SanctumView.tsx` use the session-derived smart account. Sanctum's preview balance/trading model is unchanged.
+- Native balance is a public Base read through `GET /api/wallet/balance?address=` (`app/api/wallet/balance/route.ts:9`, `lib/alchemy.ts`); ERC-20 holdings remain `GET /api/wallet/holdings?address=`.
+- Public onchain/market routes retain caller-supplied addresses because the data is public. When embedded auth is active, balance/holdings/activity/ETH/history reads use database-backed per-IP limits (`app/api/wallet/readLimit.ts`).
+- `GET /api/wallet/activity?address=` merges confirmed Alchemy activity with the signed-in canonical account's durable local intents (symbol + display amount from `curatedToken`, raw amount kept), skips unconfirmed `created` intents, and deduplicates confirmed transaction hashes (`app/api/wallet/activity/route.ts:13`).
+- Portfolio tab: `BalanceChip.tsx` + `CoinList.tsx`; Activity tab: `ActivityList.tsx` (30s visible-only poll, 15s while a local intent is `submitted`; calls `POST /api/wallet/reconcile` first and refreshes holdings when one reaches `included`; Basescan link only for real tx hashes); Advanced tab: shared `TokenExplorer.tsx` + `AdvancedTokenDetail.tsx`; `useWalletHistory.ts` backs detail charts.
+- Deposit always retains canonical-address copy with the Base-only warning. Hosted Onramp is not exposed until provider credentials, allowed origins, runtime quote/eligibility, and order reconciliation pass.
+- Send supports native ETH and Base USDC policy definitions only (`app/lib/embeddedWallet/tokens.ts`). Decimal input is converted directly to raw `bigint`; one native/ERC-20 call is encoded and independently decoded; self/zero/unknown-token/over-limit/batch calls fail closed (`app/lib/embeddedWallet/intents.ts`).
+- Send preparation creates an idempotent `transaction_intents` row, then requires an explicit full-address/network/token/amount/sponsorship confirmation (`app/wallet/ActionSheets.tsx`, `app/api/wallet/intents/route.ts`, `app/api/wallet/intents/[id]/confirm/route.ts`).
+- Only `app/lib/embeddedWallet/sign.ts:14` imports the CDP send hook. It rechecks browser user and exactly one smart account against the application session, validates final calls, claims the intent, and reports the user-operation hash.
+- Submission requires both `WALLET_TRANSACTIONS_ENABLED=true` and `CDP_PAYMASTER_DECODER_VERIFIED=true`; the browser gate additionally requires `NEXT_PUBLIC_WALLET_TRANSACTIONS_ENABLED=true`. `/api/wallet/paymaster` stays fail-closed until the credentialed nested-call decoder test exists.
+- `lib/transactionIntents.ts` owns idempotency, guarded status transitions, call hashes, per-token UTC-day sponsored-spend counters, audit events, and bounded reconciliation. `POST /api/wallet/reconcile` maps CDP complete/failed/dropped results to local terminal states and leaves transient provider failures pending.
+- Transaction vocabulary: `created | confirmed_by_user | submitted | included | reverted | dropped | replaced | canceled`; submitted is displayed as pending, never success.
+- Swap UI is disabled until a selected aggregator/installed CDP quote path supplies a persisted normalized quote, supported-router calldata decoder, allowance policy, price-impact/slippage/deadline checks, and pre-sign simulation.
+- No cost basis: average entry and total return are not inferred from current holdings.

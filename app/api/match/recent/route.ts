@@ -1,6 +1,6 @@
-import { auth } from "@clerk/nextjs/server";
 import { historyEntryFor, settledMatchesFor } from "@/lib/match";
 import { opponentNames } from "@/lib/opponentNames";
+import { getViewer } from "@/lib/viewer";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +12,7 @@ const LIMIT = 5;
  * opponent naming as the profile Matches tab (app/profile/page.tsx).
  */
 export async function GET() {
-  const { userId } = await auth();
+  const userId = (await getViewer())?.userId;
   if (!userId) return Response.json({ error: "Not signed in" }, { status: 401 });
 
   const entries = (await settledMatchesFor(userId, LIMIT)).map((row) => historyEntryFor(row, userId));

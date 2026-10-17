@@ -1,18 +1,23 @@
-import { clerkClient } from "@clerk/nextjs/server";
+import { inArray } from "drizzle-orm";
+import { getDb } from "@/db";
+import { profiles } from "@/db/schema";
 
-// Opponents by Clerk @username, else first name (this instance doesn't
-// collect usernames) — never a last name or email. Ids missing from the map
-// (neither set, or the lookup failed) are the caller's "Opponent" fallback.
+// Opponents by Prophecy @handle, else display name. Ids missing from the map
+// use the caller's "Opponent" fallback.
 export async function opponentNames(ids: (string | null)[]): Promise<Map<string, string>> {
-  const unique = [...new Set(ids.filter((id) => id !== null))];
+  const unique = [...new Set(ids.filter((id): id is string => id !== null))];
   if (unique.length === 0) return new Map();
+
   try {
-    const client = await clerkClient();
-    const { data } = await client.users.getUserList({ userId: unique, limit: unique.length });
+    const rows = await getDb()
+      .select({ userId: profiles.userId, handle: profiles.handle, displayName: profiles.displayName })
+      .from(profiles)
+      .where(inArray(profiles.userId, unique));
+
     return new Map(
-      data.flatMap((user) => {
-        const name = user.username ? `@${user.username}` : user.firstName;
-        return name ? [[user.id, name]] : [];
+      rows.flatMap((profile) => {
+        const name = profile.handle ? `@${profile.handle}` : profile.displayName;
+        return name ? [[profile.userId, name] as const] : [];
       }),
     );
   } catch {

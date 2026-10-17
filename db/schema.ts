@@ -6,16 +6,152 @@ import {
   timestamp,
   doublePrecision,
   jsonb,
+  check,
+  index,
+  numeric,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import type { PulsePosition } from "@/lib/pulse";
 
 export const users = pgTable("users", {
-  id: text("id").primaryKey(), // Clerk user id
+  id: text("id").primaryKey(), // Clerk during transition; stable CDP end-user id after reset
   balance: integer("balance").notNull().default(1000),
+  // Nullable only while Clerk-backed rows coexist before the Phase 2 reset.
+  smartAccountAddress: text("smart_account_address"),
+  ownerAddress: text("owner_address"),
+  walletChainId: integer("wallet_chain_id"),
+  walletStatus: text("wallet_status"), // "active" | "locked" | "deleted"
+  walletCreatedAt: timestamp("wallet_created_at", { withTimezone: true }),
+  walletUpdatedAt: timestamp("wallet_updated_at", { withTimezone: true }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (table) => [
+  uniqueIndex("users_smart_account_address_unique").on(table.smartAccountAddress),
+  check(
+    "users_wallet_chain_id_base",
+    sql`${table.walletChainId} IS NULL OR ${table.walletChainId} = 8453`,
+  ),
+  check(
+    "users_wallet_status_valid",
+    sql`${table.walletStatus} IS NULL OR ${table.walletStatus} IN ('active', 'locked', 'deleted')`,
+  ),
+]);
+
+// Only the opaque token is sent to the browser. Its keyed hash is the primary
+// key here, so a database read cannot be replayed as an application session.
+export const appSessions = pgTable("app_sessions", {
+  tokenHash: text("token_hash").primaryKey(),
+  userId: text("user_id").notNull(),
+  issuedAt: timestamp("issued_at", { withTimezone: true }).notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  idleExpiresAt: timestamp("idle_expires_at", { withTimezone: true }).notNull(),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull(),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  ipHash: text("ip_hash"),
+  userAgentHash: text("user_agent_hash"),
+}, (table) => [
+  index("app_sessions_user_id_idx").on(table.userId),
+  index("app_sessions_expiry_idx").on(table.expiresAt),
+  check("app_sessions_expiry_order", sql`${table.expiresAt} > ${table.issuedAt}`),
+  check("app_sessions_idle_expiry_order", sql`${table.idleExpiresAt} > ${table.issuedAt}`),
+]);
+
+// Fixed-window request limits are claimed with one INSERT ... ON CONFLICT
+// statement. Subjects are keyed hashes, never raw IP addresses or user ids.
+export const requestRateLimits = pgTable("request_rate_limits", {
+  scopeKey: text("scope_key").primaryKey(),
+  windowStartedAt: timestamp("window_started_at", { withTimezone: true }).notNull(),
+  count: integer("count").notNull(),
+}, (table) => [
+  check("request_rate_limits_positive_count", sql`${table.count} > 0`),
+]);
+
+// Durable embedded-wallet operations. Every amount is stored as an integer
+// decimal string (numeric(78,0)); browser display values are never persisted.
+export const transactionIntents = pgTable("transaction_intents", {
+  id: text("id").primaryKey(),
+  schemaVersion: integer("schema_version").notNull().default(1),
+  userId: text("user_id").notNull(),
+  idempotencyKey: text("idempotency_key").notNull(),
+  kind: text("kind").notNull(), // "send" | "swap"
+  chainId: integer("chain_id").notNull(),
+  smartAccountAddress: text("smart_account_address").notNull(),
+  tokenIn: text("token_in").notNull(),
+  tokenOut: text("token_out"),
+  recipient: text("recipient").notNull(),
+  inputAmount: numeric("input_amount", { precision: 78, scale: 0 }).notNull(),
+  minimumOutputAmount: numeric("minimum_output_amount", { precision: 78, scale: 0 }),
+  quoteProvider: text("quote_provider"),
+  quoteId: text("quote_id"),
+  quoteExpiresAt: timestamp("quote_expires_at", { withTimezone: true }),
+  calls: jsonb("calls").$type<Array<{ to: string; value: string; data: string }>>().notNull(),
+  normalizedCallHash: text("normalized_call_hash").notNull(),
+  userOperationHash: text("user_operation_hash"),
+  transactionHash: text("transaction_hash"),
+  status: text("status").notNull().default("created"),
+  failureCode: text("failure_code"),
+  submissionClaimedAt: timestamp("submission_claimed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("transaction_intents_user_idempotency_unique")
+    .on(table.userId, table.idempotencyKey),
+  index("transaction_intents_user_created_idx").on(table.userId, table.createdAt),
+  index("transaction_intents_reconcile_idx").on(table.status, table.updatedAt),
+  check("transaction_intents_chain_base", sql`${table.chainId} = 8453`),
+  check("transaction_intents_kind_valid", sql`${table.kind} IN ('send', 'swap')`),
+  check(
+    "transaction_intents_status_valid",
+    sql`${table.status} IN ('created', 'confirmed_by_user', 'submitted', 'included', 'reverted', 'dropped', 'replaced', 'canceled')`,
+  ),
+  check("transaction_intents_input_positive", sql`${table.inputAmount} > 0`),
+]);
+
+// One guarded UPSERT increments raw sponsored value per user/token/day.
+export const walletSpendCounters = pgTable("wallet_spend_counters", {
+  scopeKey: text("scope_key").primaryKey(),
+  userId: text("user_id").notNull(),
+  tokenAddress: text("token_address").notNull(),
+  dayStartedAt: timestamp("day_started_at", { withTimezone: true }).notNull(),
+  rawAmount: numeric("raw_amount", { precision: 78, scale: 0 }).notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("wallet_spend_counters_user_day_idx").on(table.userId, table.dayStartedAt),
+  check("wallet_spend_counters_nonnegative", sql`${table.rawAmount} >= 0`),
+]);
+
+// Security-relevant actions only; detail is deliberately small and excludes
+// tokens, cookies, private material, full calldata, and provider responses.
+export const walletAuditEvents = pgTable("wallet_audit_events", {
+  id: text("id").primaryKey(),
+  userId: text("user_id"),
+  event: text("event").notNull(),
+  targetId: text("target_id"),
+  detail: jsonb("detail").$type<Record<string, string | number | boolean | null>>(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("wallet_audit_events_user_created_idx").on(table.userId, table.createdAt),
+]);
+
+export const onrampOrders = pgTable("onramp_orders", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  smartAccountAddress: text("smart_account_address").notNull(),
+  asset: text("asset").notNull(),
+  providerOrderId: text("provider_order_id"),
+  status: text("status").notNull().default("created"),
+  providerUrl: text("provider_url"),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  transactionHash: text("transaction_hash"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("onramp_orders_user_created_idx").on(table.userId, table.createdAt),
+  check(
+    "onramp_orders_status_valid",
+    sql`${table.status} IN ('created', 'pending', 'completed', 'failed', 'abandoned', 'refunded')`,
+  ),
+]);
 
 export const matchPayouts = pgTable("match_payouts", {
   id: text("id").primaryKey(),
@@ -138,8 +274,9 @@ export const portfolioPayouts = pgTable("portfolio_payouts", {
   amount: integer("amount").notNull(),
 });
 
-// One row per Clerk user who has edited their profile (/profile's Edit
-// profile dialog, app/profile/actions.ts). Avatar lives in Clerk, not here.
+// One row per application user who has edited their profile (/profile's Edit
+// profile dialog, app/profile/actions.ts). Avatar and banner image bytes are
+// owned by Prophecy so they survive the auth-provider transition.
 // `handle` is stored lowercase without the "@"; NULLs don't collide in a
 // Postgres unique index, so any number of users can have no handle. The
 // banner is either a preset id (app/lib/profileEdit.ts BANNER_PRESETS) or an
@@ -155,6 +292,8 @@ export const profiles = pgTable("profiles", {
   bannerPreset: text("banner_preset"),
   bannerImage: text("banner_image"),
   bannerMime: text("banner_mime"),
+  avatarImage: text("avatar_image"),
+  avatarMime: text("avatar_mime"),
   // Highlight reel: up to 3 won `matches` ids, in pin order (app/profile/actions.ts togglePinnedMatch).
   pinnedMatches: jsonb("pinned_matches").$type<string[]>(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

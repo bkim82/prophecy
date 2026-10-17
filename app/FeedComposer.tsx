@@ -1,15 +1,15 @@
 "use client";
 
-import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
 import { useState } from "react";
+import { useAppAuth } from "@/app/auth/AuthProvider";
 import type { Post } from "@/app/lib/mockPosts";
 
 // Local-only composer: Post prepends a plain take to this tab's feed — no
 // backend, gone on reload (docs/roadmap.md "Post composer"). Authorship uses
-// the signed-in Clerk user's name when there is one.
+// the signed-in provider user's name when there is one.
 export function FeedComposer({ onPost }: { onPost: (post: Post) => void }) {
-  const { user } = useUser();
+  const { user } = useAppAuth();
   const [text, setText] = useState("");
   const name = user?.firstName ?? user?.username ?? "You";
   const handle = `@${user?.username ?? "you"}`;

@@ -1,4 +1,3 @@
-import { auth } from "@clerk/nextjs/server";
 import { notFound } from "next/navigation";
 import { challengeTerms } from "@/app/lib/challengeRules";
 import { ACCURACY, PINNED_OMENS, RECORDS, STYLES } from "@/app/lib/mockAchievements";
@@ -12,6 +11,7 @@ import { HighlightReel } from "@/app/profile/[handle]/HighlightReel";
 import { AchievementsPanel, ProfileAchievements } from "@/app/profile/[handle]/ProfileAchievements";
 import { ProfileView } from "@/app/profile/[handle]/ProfileView";
 import { pendingChallengeTo } from "@/lib/challenges";
+import { getViewer } from "@/lib/viewer";
 
 export default async function ProfilePage({ params }: { params: Promise<{ handle: string }> }) {
   const { handle } = await params;
@@ -24,7 +24,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ handle
 
   // Rank lock first — it doesn't depend on being signed in (VIEWER_RANK is a
   // stub shared by everyone); then sign-in, then an already-pending challenge.
-  const { userId } = await auth();
+  const userId = (await getViewer())?.userId;
   let challenge: ChallengeState;
   if (!canChallenge(profile.rank, VIEWER_RANK)) {
     challenge = { kind: "locked", tierNeeded: challengeTierNeeded(profile.rank) };

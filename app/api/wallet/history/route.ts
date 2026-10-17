@@ -1,4 +1,5 @@
 import { getTokenHistories, isHistoryPeriod } from "@/lib/tokenHistory";
+import { allowWalletRead, walletReadLimited } from "../readLimit";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,7 @@ const ETH_SENTINEL = "eth";
  * WETH's pool and mapped back to "eth" in the response.
  */
 export async function POST(request: Request) {
+  if (!await allowWalletRead(request, "history", 30)) return walletReadLimited();
   const body = await request.json().catch(() => ({}) as Record<string, unknown>);
   const rawAddresses: unknown[] = Array.isArray(body.addresses) ? body.addresses : [];
   const requested = rawAddresses.filter((address): address is string => typeof address === "string");

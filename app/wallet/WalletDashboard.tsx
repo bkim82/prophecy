@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { WalletState } from "@/app/lib/useWalletConnection";
-import { isBaseChain, shortenAddress } from "@/app/lib/wallet";
+import { shortenAddress } from "@/app/lib/wallet";
 import type { WalletTokenHolding } from "@/lib/alchemy";
 import { AdvancedTab } from "./AdvancedTab";
 import { DepositSheet, SendSheet, SwapSheet } from "./ActionSheets";
+import { ActivityList } from "./ActivityList";
 import { BalanceChip } from "./BalanceChip";
 import { CoinDetailPanel } from "./CoinDetailPanel";
 import { CoinList } from "./CoinList";
@@ -16,21 +17,15 @@ const HOLDINGS_POLL_MS = 30_000;
 const ETH_POLL_MS = 10_000;
 
 type EthSummary = { priceUsd: number; change24h: number | null; imageUrl: string | null };
-type Tab = "portfolio" | "advanced";
+type Tab = "portfolio" | "activity" | "advanced";
 type SwapPreset = { initialFrom?: string; initialTo?: string; extraToken?: { symbol: string } };
 
 export function WalletDashboard({
   wallet,
-  switching,
-  switchWallet,
-  switchNetwork,
-  disconnectWallet,
+  signOut,
 }: {
   wallet: WalletState;
-  switching: boolean;
-  switchWallet: () => Promise<void>;
-  switchNetwork: () => Promise<void>;
-  disconnectWallet: () => Promise<void>;
+  signOut: () => Promise<void>;
 }) {
   const [tab, setTab] = useState<Tab>("portfolio");
   const [tokenHoldings, setTokenHoldings] = useState<WalletTokenHolding[]>([]);
@@ -38,8 +33,11 @@ export function WalletDashboard({
   const [selected, setSelected] = useState<string | null>(null);
   const [sheet, setSheet] = useState<"deposit" | "send" | "swap" | null>(null);
   const [swapPreset, setSwapPreset] = useState<SwapPreset | null>(null);
+  // Bumped when a local intent reaches inclusion so holdings refresh without waiting out the poll.
+  const [holdingsNonce, setHoldingsNonce] = useState(0);
+  const refreshHoldings = useCallback(() => setHoldingsNonce((n) => n + 1), []);
 
-  const onBase = !!wallet.chainId && isBaseChain(wallet.chainId);
+  const onBase = wallet.chainId === 8453;
   const address = wallet.address;
 
   useEffect(() => {
@@ -55,7 +53,7 @@ export function WalletDashboard({
     const onVisible = () => { if (document.visibilityState === "visible") load(); };
     document.addEventListener("visibilitychange", onVisible);
     return () => { cancelled = true; clearInterval(id); document.removeEventListener("visibilitychange", onVisible); };
-  }, [address, onBase]);
+  }, [address, onBase, holdingsNonce]);
 
   useEffect(() => {
     if (!onBase) { setEth(null); return; }
@@ -130,18 +128,16 @@ export function WalletDashboard({
       <div className="wd-connection-strip">
         <span className="wd-status-dot" aria-hidden="true" />
         <span>{shortenAddress(address)}</span>
-        {!onBase && (
-          <button type="button" onClick={switchNetwork} disabled={switching} className="wd-strip-link">
-            {switching ? "Switching…" : "Switch to Base"}
-          </button>
-        )}
-        <button type="button" onClick={switchWallet} className="wd-strip-link">Switch wallet</button>
-        <button type="button" onClick={disconnectWallet} className="wd-strip-link">Disconnect</button>
+        <span>Base</span>
+        <button type="button" onClick={() => void signOut()} className="wd-strip-link">Sign out</button>
       </div>
 
       <div className="wd-tabs" role="group" aria-label="Wallet view">
         <button type="button" className={tab === "portfolio" ? "active" : ""} aria-pressed={tab === "portfolio"} onClick={() => setTab("portfolio")}>
           Portfolio
+        </button>
+        <button type="button" className={tab === "activity" ? "active" : ""} aria-pressed={tab === "activity"} onClick={() => setTab("activity")}>
+          Activity
         </button>
         <button type="button" className={tab === "advanced" ? "active" : ""} aria-pressed={tab === "advanced"} onClick={() => setTab("advanced")}>
           Advanced
@@ -178,12 +174,14 @@ export function WalletDashboard({
             </>
           )}
         </div>
+      ) : tab === "activity" ? (
+        <ActivityList address={address} onIncluded={refreshHoldings} />
       ) : (
         <AdvancedTab coins={coins} onBuy={openBuy} onSell={openSell} />
       )}
 
       {sheet === "deposit" && <DepositSheet address={address} onClose={closeSheet} />}
-      {sheet === "send" && <SendSheet coins={coins} onClose={closeSheet} />}
+      {sheet === "send" && <SendSheet accountAddress={address} coins={coins} onClose={closeSheet} />}
       {sheet === "swap" && (
         <SwapSheet coins={coins} initialFrom={swapPreset?.initialFrom} initialTo={swapPreset?.initialTo} extraToken={swapPreset?.extraToken} onClose={closeSheet} />
       )}

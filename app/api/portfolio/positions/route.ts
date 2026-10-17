@@ -1,4 +1,3 @@
-import { auth } from "@clerk/nextjs/server";
 import { getTokenPrices } from "@/lib/basePrices";
 import {
   PORTFOLIO_MAX_STAKE,
@@ -8,6 +7,7 @@ import {
   isPositionSide,
   openPosition,
 } from "@/lib/portfolio";
+import { getViewer } from "@/lib/viewer";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
  * close route); leverage positions require both.
  */
 export async function POST(request: Request) {
-  const { userId } = await auth();
+  const userId = (await getViewer())?.userId;
   if (!userId) return Response.json({ error: "Sign in to play" }, { status: 401 });
 
   const session = await currentSessionFor(userId);

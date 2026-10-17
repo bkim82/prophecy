@@ -52,6 +52,12 @@ async function rpc<T>(method: string, params: unknown[]): Promise<T> {
   return json.result as T;
 }
 
+/** Native Base ETH balance as an exact raw-unit decimal string. */
+export async function getNativeBalance(address: string) {
+  const value = await rpc<string>("eth_getBalance", [address.toLowerCase(), "latest"]);
+  return BigInt(value).toString();
+}
+
 type TokenBalanceEntry = { contractAddress: string; tokenBalance: string | null };
 type TokenMetadata = { decimals: number | null; symbol: string | null; name: string | null; logo: string | null };
 type Erc20Transfer = { blockNum?: string; rawContract?: { address?: string | null } };

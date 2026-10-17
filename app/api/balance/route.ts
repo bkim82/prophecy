@@ -1,12 +1,12 @@
-import { auth } from "@clerk/nextjs/server";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { users } from "@/db/schema";
+import { getViewer } from "@/lib/viewer";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const { userId } = await auth();
+  const userId = (await getViewer())?.userId;
   if (!userId) {
     return Response.json({ error: "Not signed in" }, { status: 401 });
   }

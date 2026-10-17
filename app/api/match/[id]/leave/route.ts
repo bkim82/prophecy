@@ -1,9 +1,9 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { getDb } from "@/db";
 import { matches } from "@/db/schema";
-import { auth } from "@clerk/nextjs/server";
 import { refundBalance } from "@/lib/balance";
 import { findMatch, readBody, roleOf } from "@/lib/match";
+import { getViewer } from "@/lib/viewer";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
  * leaving is refused (409) — the round settles either way.
  */
 export async function POST(request: Request, ctx: { params: Promise<{ id: string }> }) {
-  const { userId } = await auth();
+  const userId = (await getViewer())?.userId;
   if (!userId) return Response.json({ error: "Sign in to play" }, { status: 401 });
   const { id } = await ctx.params;
   const body = await readBody(request);

@@ -1,6 +1,6 @@
 # architecture
 
-- Root header (`app/layout.tsx`) is brand | `Omens`/`Arena`/`Sanctum`/`Wallet` nav | balance + avatar on desktop (see [feeds.md](feeds.md)), while `app/MobileBottomNav.tsx` supplies the dedicated phone navigation (`Omens`/`Arena`/`Sanctum`/`Wallet`) at or below 768px and the compact mobile header keeps the brand, theme picker, balance, and account control. Routes: `/` (Global feed), `/sanctum` (Oracle Room: rank-only live Pulse room with room feed + mini chat, `app/sanctum/page.tsx`), `/duel` (the market lobby, moved from `app/page.tsx`), `/wallet` (wallet dashboard: Coinbase Wallet SDK connection, Portfolio/Advanced tabs — [wallet.md](wallet.md)). Outside `/duel` and its games, the root shell shows the compact bottom-right plus chip `QuickTicketBar`; an active match takes that slot instead. `/exclusive` (rank-gated feed) still exists but is no longer linked from the header nav. Live ticker on `/duel` reads the client-side BTC feed.
+- Root header (`app/layout.tsx`) is brand | `Omens`/`Arena`/`Sanctum`/`Wallet` nav | balance + avatar on desktop (see [feeds.md](feeds.md)); `/wallet` uses the signed-in canonical CDP Base smart account, not an external wallet connection ([wallet.md](wallet.md)).
 - Multiplayer Pulse is server-authoritative: a `matches` row owns the round (`db/schema.ts:20`), `/api/match/*` routes own the transitions, clients poll. See [multiplayer-plan.md](multiplayer-plan.md).
 - Practice is client-only: Pulse practice reuses `app/duel/btc/pulse/page.tsx?practice=1` without creating a match or reserving a wager. See [practice-mode.md](practice-mode.md).
 - `/api/price` and `/api/history` remain stateless proxies to public exchange APIs. The price feed and chart stay client-side in every mode.
@@ -8,15 +8,15 @@
 ## Graph
 
 ```
-app/layout.tsx (root shell: desktop header, compact mobile header, Clerk account controls)
+app/layout.tsx (root shell: desktop header, compact mobile header, feature-gated auth provider)
   ├── app/TabNav.tsx (desktop Omens / Arena / Sanctum / Wallet nav, icons + active pill)
   ├── app/BalancePill.tsx (ember balance button + balances dropdown)
-  ├── app/AccountMenu.tsx (Clerk avatar menu + Profile link; signed-out Sign in)
+  ├── app/AccountMenu.tsx (provider-neutral avatar menu + Profile/sign-out; signed-out Sign in)
   ├── app/MobileBottomNav.tsx (phone Omens / Arena / Sanctum / Wallet navigation)
   ├── app/page.tsx (Global feed: mock PostCard list, app/lib/mockPosts.ts)
   ├── app/sanctum/page.tsx (Sanctum: Oracle Room live Pulse + feed + chat, app/lib/roomsMocks.ts)
   ├── app/exclusive/page.tsx (Exclusive feed: rank-gated via app/lib/rank.ts stub, unlinked from nav)
-  ├── app/wallet/page.tsx (wallet dashboard: Coinbase Wallet SDK connection, Portfolio/Advanced tabs — docs/wallet.md)
+  ├── app/wallet/page.tsx (canonical embedded Base wallet, Portfolio/Advanced tabs — docs/wallet.md)
   └── app/duel/page.tsx (live lobby: screen-reader-only `Arena` h1 → Pulse/24h Portfolio `.feed-tabs.arena-mode-tabs` → market row (BTC/ETH left, `DailyCoin` "Daily · Ð DOGE" chip right (market symbol from `MARKETS`), selectable) → Pulse = `.pulse-stage` grid — ticker + MarketChart (app/MarketChart.tsx) left, call box (format/timer/Play) right, stacks <1000px; ≤640px: 220px plot, 24h stats behind `.market-stats-toggle`, call box reorders timer → Play first; match rows)
         └── usePriceFeed() → price, sampled series, status, now
 app/duel/[market]/pulse/[matchId]/page.tsx (multiplayer Pulse positions, countdown, result)
@@ -40,7 +40,11 @@ match room → POST /api/match/[id]/{action,leave}
 portfolio room → GET /api/portfolio/session (3s poll: session/positions/history + lazy settle)
 portfolio room → POST /api/portfolio/session {stake}, POST /api/portfolio/positions {...}, POST /api/portfolio/positions/[id]/close
 /api/portfolio/* → Neon Postgres (portfolio_sessions, positions, portfolio_payouts); pricing → lib/basePrices.ts (DexScreener, Base chain)
-/profile (server) → Clerk currentUser + lib/profile.ts (profiles) + lib/match.ts (settled matches); Edit profile → saveProfile server action (app/profile/actions.ts) → profiles upsert; photo → Clerk setProfileImage; banner bytes → GET /api/profile/banner
+/profile (server) → lib/viewer.ts provider display/join-date bridge + lib/profile.ts (profiles) + lib/match.ts (settled matches); Edit profile → saveProfile server action (app/profile/actions.ts) → profiles upsert; feature-gated app-owned avatar + banner bytes → owner-only GET /api/profile/{avatar,banner}; Clerk photo remains the default-path fallback until cutover
+/api/session POST → same-origin/Bearer validation → CDP validateAccessToken → canonical smart account → atomic users upsert + old-session revoke + app_sessions insert; DELETE → guarded current-session revoke; DELETE /api/session/all → current-token authentication + atomic all-session revoke; both clear the cookie (feature-gated, inactive by default)
+getViewer() → Clerk by default; when EMBEDDED_WALLET_AUTH_ENABLED=true, hashed __Host-prophecy_session lookup → users canonical wallet, with no Clerk fallback
+/api/wallet/intents → typed send validation → transaction_intents; confirm/submit/broadcast → guarded state transitions + sponsored-spend counters
+/api/wallet/reconcile → CDP user-operation status → included/reverted/dropped; /api/wallet/activity merges local durable rows with confirmed Alchemy activity
 /api/tokens/search, /api/tokens/prices → lib/basePrices.ts (token search + batch price quote); /api/tokens/trending, /api/tokens/history → lib/tokenHistory.ts (GeckoTerminal)
 
 /api/history → api.exchange.coinbase.com (trades + candles, both, merged)
@@ -79,10 +83,11 @@ its stake and leverage in-round; so does the 24h Portfolio.
 | `app/lib/mockPosts.ts` | hardcoded `GLOBAL_POSTS`/`EXCLUSIVE_POSTS` mock data, no persistence |
 | `app/lib/rank.ts` | hardcoded mock rank/threshold stub gating `/exclusive` — no real rank system exists |
 | `app/duel/page.tsx` | live lobby, BTC ticker/chart, mode switcher, Pulse controls, matchmaking + open-match list, your Recent results (moved from `app/page.tsx`) |
-| `app/wallet/page.tsx` + `app/wallet/*` | wallet dashboard: balance hero, coin grid/detail, activity timeline, mock creator earnings — see [wallet.md](wallet.md) |
-| `app/lib/useWalletConnection.ts` | Coinbase Wallet SDK connect/disconnect/switch state machine, shared by `app/wallet/page.tsx` and `app/WalletDesk.tsx` (QuickTicketBar's ticket) |
-| `app/lib/wallet.ts` | memoized Coinbase Wallet SDK provider (`getWalletProvider`, `@coinbase/wallet-sdk`, appChainIds `[8453]`/Base), `isBaseChain`/`switchToBase` network helpers, chain labels, ETH formatting, and address shortening |
-| `app/api/wallet/*` (`holdings`, `eth`, `history`, `search`, `trending`, `new`, `prices`, `activity`) | no-auth mirrors of `lib/alchemy.ts`/`lib/basePrices.ts`/`lib/tokenHistory.ts` for a connected wallet (see [wallet.md](wallet.md)); never throws, degrades to `[]`/cached data; `activity` is unused by any UI right now |
+| `app/wallet/page.tsx` + `app/wallet/*` | wallet dashboard: Portfolio (balance chip, coin list/detail), Activity (local intents + confirmed transfers), Advanced tabs; Deposit/Send/Swap sheets — see [wallet.md](wallet.md) |
+| `app/lib/useWalletConnection.ts` | canonical smart-account identity + public native-balance polling from the validated auth context |
+| `app/lib/embeddedWallet/{intents,sign,tokens}.ts` | exact raw-unit policies/call decoding, sole CDP signing boundary, curated Base assets |
+| `lib/transactionIntents.ts` | durable intent state machine, idempotency, spend counters, audit events, CDP receipt reconciliation |
+| `app/api/wallet/*` | public Base reads plus authenticated intent/confirm/submit/broadcast/reconcile mutations; metered reads are IP-limited after embedded-auth activation |
 | `app/duel/[market]/pulse/[matchId]/page.tsx` | multiplayer Pulse room: position actions, live P&L, countdown, result |
 | `app/duel/portfolio/PortfolioGame.tsx` + `SessionHeader.tsx`/`TokenSearch.tsx`/`TradeTicket.tsx`/`OpenPositions.tsx`/`ClosedPositions.tsx` | 24h Portfolio game: session start, live-priced token search, spot/leverage trade ticket, open/closed position lists — embedded inline in `app/duel/page.tsx`'s mode switcher and wrapped standalone by `app/duel/portfolio/page.tsx` |
 | `lib/portfolioRules.ts` | pure 24h Portfolio math/constants, no DB import — client-safe, mirrors `lib/pulse.ts` |
@@ -100,8 +105,9 @@ its stake and leverage in-round; so does the 24h Portfolio.
 | `lib/match.ts` | `MatchView` role-scoping, presence, guarded settlement — shared by every `/api/match/*` route |
 | `lib/spotPrice.ts` | Coinbase→Binance fallback chain + `productForMarket`; shared by `/api/price` and settlement |
 | `app/api/match/*` | match lifecycle: find-or-create, view/heartbeat/settle, join, action, leave, open list |
-| `db/schema.ts` | `users` (Clerk id, balance), `matches` (one row per networked round), `portfolio_sessions`/`positions`/`portfolio_payouts` (one row per 24h Portfolio session, its independent spot/leverage position lots, and each session's idempotent payout), `profiles` (one row per Clerk user who edited their profile; unique `handle`, banner preset or base64 image, pinned won-match ids), `challenges` (pending/canceled challenge requests from profiles; one pending per challenger→target via partial unique index; nothing reserved or played yet) — see [profiles.md](profiles.md) |
-| `lib/profile.ts`, `app/profile/actions.ts`, `app/api/profile/banner/route.ts` | own-profile storage: read (no banner bytes), upsert, pins; validated `saveProfile` / `togglePinnedMatch` server actions; owner-only banner image route |
+| `db/schema.ts` | `users` (transitioning Clerk/CDP id, Embers balance, nullable-until-reset canonical wallet fields), `app_sessions` (hashed opaque sessions), `request_rate_limits` (keyed fixed-window claims), `matches` (one row per networked round), `portfolio_sessions`/`positions`/`portfolio_payouts`, `profiles`, and `challenges` (`db/schema.ts:14-236`) — see [profiles.md](profiles.md) and [embedded-wallet-plan.md](embedded-wallet-plan.md) |
+| `app/api/session/**`, `lib/appSession.ts`, `app/lib/authSession.ts`, `lib/cdp.ts`, `lib/embeddedWalletAccount.ts`, `lib/requestSecurity.ts` | Feature-gated CDP access-token exchange and application-session lifecycle: exact smart-account/owner selection, Base assertion, keyed hashes, atomic rotation/current/all-session revocation, idle/absolute expiry, same-origin empty-JSON checks, hardened cookie handling, and database-backed limits; inactive until schema and credentialed gates pass |
+| `lib/profile.ts`, `app/profile/actions.ts`, `app/lib/profileImage.ts`, `app/api/profile/{avatar,banner}/route.ts` | own-profile storage: metadata read (no image bytes), atomic text/avatar/banner upsert, pins; signature/MIME/size/dimension validation; owner-only image routes with safe content headers |
 | `app/duel/btc/pulse/page.tsx` | solo trading state, countdown, leveraged P&L, settlement, layout |
 | `app/api/match/[id]/action/route.ts` | server-priced Pulse entry, close, and reverse actions |
 | `app/duel/btc/pulse/trading.ts` | pure buy/sell portfolio accounting and full-position clamping — **no importers yet**, the page tracks a single leveraged position instead |
@@ -110,7 +116,7 @@ its stake and leverage in-round; so does the 24h Portfolio.
 | `app/feedConfig.ts` | `WINDOW_MS`, `MIN_WINDOW_MS`, `SAMPLE_MS` + axis interval defaults — shared by hook, seed route, chart |
 | `app/api/price/route.ts` | REST spot price, 2-source fallback chain |
 | `app/api/history/route.ts` | chart seed for the full window: trades + candle backfill, merged |
-| `app/layout.tsx` | root HTML, header shell, Clerk provider, metadata, Tailwind import, pre-paint theme script |
+| `app/layout.tsx` | root HTML, header shell, server-selected `AuthProvider` (Clerk default; CDP only behind `EMBEDDED_WALLET_AUTH_ENABLED=true`), metadata, Tailwind import, pre-paint theme script |
 | `app/ThemeToggle.tsx` | `useTheme()` hook (`theme`/`setTheme`, writes `data-theme` + `localStorage`, `MutationObserver` keeps header copies in sync), `ThemeToggle` header picker (swatch → Obsidian/Navy/Moonstone menu) |
 | `app/theme.ts` | `Theme`, `DEFAULT_THEME` (`obsidian`), `THEMES` (picker copy), `normalizeTheme()`, `THEME_STORAGE_KEY`, `THEME_INIT_SCRIPT` — shared by layout (server) and toggle (client) |
 

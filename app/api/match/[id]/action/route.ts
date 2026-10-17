@@ -19,6 +19,7 @@ import {
   type PulsePosition,
 } from "@/lib/pulse";
 import { getSpotPrice, productForMarket } from "@/lib/spotPrice";
+import { getViewer } from "@/lib/viewer";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +30,9 @@ export async function POST(
   request: Request,
   ctx: { params: Promise<{ id: string }> },
 ) {
+  const userId = (await getViewer())?.userId;
+  if (!userId) return Response.json({ error: "Sign in to play" }, { status: 401 });
+
   const { id } = await ctx.params;
   const body = await readBody(request);
   const playerId = typeof body.playerId === "string" ? body.playerId : "";
@@ -42,6 +46,9 @@ export async function POST(
   if (!found) return Response.json({ error: "Match not found" }, { status: 404 });
   const role = roleOf(found, playerId);
   if (!role) return Response.json({ error: "Not in this match" }, { status: 403 });
+  if ((role === 1 ? found.player1UserId : found.player2UserId) !== userId) {
+    return Response.json({ error: "Not in this match" }, { status: 403 });
+  }
   if (found.mode !== "pulse") return Response.json({ error: "Not a Pulse match" }, { status: 409 });
 
   const row = await settleIfDue(await expireLocksIfDue(found));

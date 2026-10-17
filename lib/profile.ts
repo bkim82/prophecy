@@ -1,6 +1,7 @@
 import { eq, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { profiles } from "@/db/schema";
+import { embeddedWalletAuthEnabled } from "@/lib/embeddedWalletFeature";
 
 // Reads/writes for the `profiles` table (db/schema.ts). Validation lives in
 // app/profile/actions.ts; this layer only stores what it's handed.
@@ -13,9 +14,15 @@ export type ProfileFields = {
   website: string | null;
 };
 
-// Everything the page needs except the banner bytes, which stay in the
-// table until GET /api/profile/banner asks for them.
-export type StoredProfile = ProfileFields & { bannerPreset: string | null; hasBannerImage: boolean; pinnedMatches: string[]; updatedAt: Date };
+// Everything the page needs except image bytes, which stay in the table until
+// their owner-only routes ask for them.
+export type StoredProfile = ProfileFields & {
+  bannerPreset: string | null;
+  hasAvatarImage: boolean;
+  hasBannerImage: boolean;
+  pinnedMatches: string[];
+  updatedAt: Date;
+};
 
 export async function storedProfileFor(userId: string): Promise<StoredProfile | null> {
   const [row] = await getDb()
@@ -26,6 +33,9 @@ export async function storedProfileFor(userId: string): Promise<StoredProfile | 
       location: profiles.location,
       website: profiles.website,
       bannerPreset: profiles.bannerPreset,
+      hasAvatarImage: embeddedWalletAuthEnabled()
+        ? sql<boolean>`${profiles.avatarImage} IS NOT NULL`
+        : sql<boolean>`false`,
       hasBannerImage: sql<boolean>`${profiles.bannerImage} IS NOT NULL`,
       pinnedMatches: profiles.pinnedMatches,
       updatedAt: profiles.updatedAt,
@@ -46,6 +56,16 @@ export async function savePinnedMatches(userId: string, ids: string[]): Promise<
 export async function bannerImageFor(userId: string): Promise<{ mime: string; bytes: Buffer } | null> {
   const [row] = await getDb()
     .select({ image: profiles.bannerImage, mime: profiles.bannerMime })
+    .from(profiles)
+    .where(eq(profiles.userId, userId));
+  if (!row?.image || !row.mime) return null;
+  return { mime: row.mime, bytes: Buffer.from(row.image, "base64") };
+}
+
+export async function avatarImageFor(userId: string): Promise<{ mime: string; bytes: Buffer } | null> {
+  if (!embeddedWalletAuthEnabled()) return null;
+  const [row] = await getDb()
+    .select({ image: profiles.avatarImage, mime: profiles.avatarMime })
     .from(profiles)
     .where(eq(profiles.userId, userId));
   if (!row?.image || !row.mime) return null;
@@ -73,14 +93,40 @@ function bannerColumns(banner: BannerUpdate) {
   }
 }
 
+export type AvatarUpdate =
+  | { kind: "keep" }
+  | { kind: "none" }
+  | { kind: "image"; mime: string; base64: string };
+
+function avatarColumns(avatar: AvatarUpdate) {
+  switch (avatar.kind) {
+    case "keep":
+      return {};
+    case "none":
+      return { avatarImage: null, avatarMime: null };
+    case "image":
+      return { avatarImage: avatar.base64, avatarMime: avatar.mime };
+  }
+}
+
 const isUniqueViolation = (error: unknown) => {
   const { code, cause } = (error ?? {}) as { code?: string; cause?: { code?: string } };
   return code === "23505" || cause?.code === "23505";
 };
 
 /** One upsert per save. "handle-taken" when the unique index rejects the handle. */
-export async function saveStoredProfile(userId: string, fields: ProfileFields, banner: BannerUpdate): Promise<"ok" | "handle-taken"> {
-  const set = { ...fields, ...bannerColumns(banner), updatedAt: new Date() };
+export async function saveStoredProfile(
+  userId: string,
+  fields: ProfileFields,
+  banner: BannerUpdate,
+  avatar: AvatarUpdate,
+): Promise<"ok" | "handle-taken"> {
+  const set = {
+    ...fields,
+    ...bannerColumns(banner),
+    ...(embeddedWalletAuthEnabled() ? avatarColumns(avatar) : {}),
+    updatedAt: new Date(),
+  };
   try {
     await getDb()
       .insert(profiles)

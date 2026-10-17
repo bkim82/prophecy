@@ -1,15 +1,15 @@
-import { auth } from "@clerk/nextjs/server";
 import { getTokenPrices } from "@/lib/basePrices";
 import { closePosition } from "@/lib/portfolio";
 import { getDb } from "@/db";
 import { positions } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { getViewer } from "@/lib/viewer";
 
 export const dynamic = "force-dynamic";
 
 /** POST → closes one open position at the live price. Idempotent: closing an already-closed position is a no-op 409. */
 export async function POST(request: Request, ctx: { params: Promise<{ id: string }> }) {
-  const { userId } = await auth();
+  const userId = (await getViewer())?.userId;
   if (!userId) return Response.json({ error: "Sign in to play" }, { status: 401 });
 
   const { id } = await ctx.params;

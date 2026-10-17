@@ -1,4 +1,4 @@
-import { auth, currentUser } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
 import { FOLLOWED_HANDLES } from "@/app/lib/mockPosts";
 import { challengeTerms } from "@/app/lib/challengeRules";
 import { getProfile, profileHref, type Profile } from "@/app/lib/mockProfiles";
@@ -14,10 +14,11 @@ import { historyEntryFor, marketAccuracyFor, matchRecordFor, settledMatchesByIds
 import { opponentNames } from "@/lib/opponentNames";
 import { storedProfileFor } from "@/lib/profile";
 import { playedLabel } from "@/app/lib/playedLabel";
+import { getViewer, getViewerProfile } from "@/lib/viewer";
 
 // The signed-in viewer's own profile, opened from the header avatar menu
-// (app/AccountMenu.tsx). Same layout as /profile/[handle]. Real: Clerk
-// photo + join date, everything the Edit profile dialog saves (`profiles`
+// (app/AccountMenu.tsx). Same layout as /profile/[handle]. Real: join date
+// through the viewer adapter, everything the Edit profile dialog saves (`profiles`
 // table, lib/profile.ts), match history, per-asset accuracy (Arena round
 // P&L) and the highlight reel (pinned won matches). The rest is
 // app/lib/mockViewer.ts.
@@ -29,10 +30,11 @@ const roundLength = (seconds: number) =>
   seconds % 3600 === 0 ? `${seconds / 3600}h` : seconds % 60 === 0 ? `${seconds / 60}m` : `${seconds}s`;
 
 export default async function OwnProfilePage() {
-  const { userId, redirectToSignIn } = await auth();
-  if (!userId) return redirectToSignIn();
-  const user = await currentUser();
-  if (!user) return redirectToSignIn();
+  const viewer = await getViewer();
+  if (!viewer) redirect("/sign-in");
+  const user = await getViewerProfile(viewer);
+  if (!user) redirect("/sign-in");
+  const { userId } = viewer;
 
   const [rows, record, stored, marketAccuracy, sent] = await Promise.all([
     settledMatchesFor(userId, MATCH_LIMIT),
@@ -86,8 +88,8 @@ export default async function OwnProfilePage() {
     .filter((row) => row.calls > 0)
     .map((row) => ({ asset: row.market.toUpperCase(), accuracy: row.right / row.calls, calls: row.calls }));
 
-  const clerkName = user.fullName ?? user.username ?? "You";
-  const name = stored?.displayName ?? clerkName;
+  const accountName = user.displayName;
+  const name = stored?.displayName ?? accountName;
   // No handle until the user picks one — the hero offers "Choose your @handle".
   const handle = stored?.handle ? `@${stored.handle}` : "";
   const banner: ProfileBanner | undefined = stored?.hasBannerImage
@@ -95,8 +97,12 @@ export default async function OwnProfilePage() {
     : stored?.bannerPreset
       ? { kind: "preset", id: stored.bannerPreset }
       : undefined;
-  // Clerk always has an imageUrl; without an upload it's a generic default, so use the gradient initial instead.
-  const imageUrl = user.hasImage ? user.imageUrl : undefined;
+  // Without an app-owned upload, use the gradient initial.
+  const imageUrl = stored?.hasAvatarImage
+    ? `/api/profile/avatar?v=${stored.updatedAt.getTime()}`
+    : user.hasImage && user.imageUrl
+      ? user.imageUrl
+      : undefined;
   const profile: Profile = {
     handle,
     name,
@@ -137,7 +143,7 @@ export default async function OwnProfilePage() {
           copyEarnings: VIEWER_COPY_EARNINGS,
           edit: {
             displayName: stored?.displayName ?? "",
-            namePlaceholder: clerkName,
+            namePlaceholder: accountName,
             handle: stored?.handle ?? "",
             bio: profile.bio,
             location: profile.location ?? "",

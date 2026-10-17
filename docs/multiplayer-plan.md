@@ -7,10 +7,10 @@ polling, and lazy settlement.
 
 - One `matches` row = one round, single source of truth (`db/schema.ts:20`). Pulse
   positions, realized P&L, and final P&L live in the same row.
-- Identity: anonymous per-browser UUID in `localStorage.playerId` (`app/lib/playerId.ts:20`). Not Clerk; sign-in stays optional and unrelated.
+- Match-seat identity: anonymous per-browser UUID in `localStorage.playerId` (`app/lib/playerId.ts:20`), separate from the signed-in application viewer.
 - Sync: ~1s polling (`app/duel/[market]/pulse/[matchId]/page.tsx:22`), no WebSocket registry. Lobby list polls at 3s (`app/duel/page.tsx:25`), the queue at 1s (`app/duel/page.tsx:30`).
 - Nobody sits in a room alone: an `open` match is waited out on the lobby page (`app/duel/page.tsx` `queue` panel); the room is entered only once `status` leaves `open`. The queued state exposes a shareable invite URL (`app/duel/page.tsx` `shareInvite`) that auto-joins a friend as player 2 (`app/duel/[market]/pulse/[matchId]/page.tsx:59`, `:89-99`).
-- Requires Clerk sign-in. Each player's `wager` is reserved atomically from `users.balance` on entry; open/predict cancellation refunds it, ties refund both stakes, and the winner receives the 2× pot (`lib/balance.ts`). Pulse reserves each entry's stake from the player's round bankroll and returns that stake when the position closes.
+- Requires an application viewer from `getViewer()` (`lib/viewer.ts:23`). Each player's `wager` is reserved atomically from `users.balance` on entry; open/predict cancellation refunds it, ties refund both stakes, and the winner receives the 2× pot (`lib/balance.ts`). Pulse reserves each entry's stake from the player's round bankroll and returns that stake when the position closes.
 
 ## Status machine
 
@@ -60,13 +60,13 @@ multi-statement transactions or row locks. Every transition is a single guarded
 | `POST /api/match/find-or-create` | join oldest live `open` match with identical criteria, else create one. Returns `status`, which is how the lobby decides between entering the room and queueing (`app/api/match/find-or-create/route.ts:74`,`:97`,`:117`) |
 | `GET /api/match/[id]?playerId=` | role-scoped view + heartbeat + pre-round expiry + lazy settlement (`app/api/match/[id]/route.ts:38`). Polled by the room, and by the lobby while queued |
 | `POST /api/match/[id]/join` | take a specific fresh open match (lobby list or invite link path) |
-| `POST /api/match/[id]/action` | Pulse server-priced `enter` actions up to available bankroll and per-position `close` actions |
+| `POST /api/match/[id]/action` | Pulse server-priced `enter` actions up to available bankroll and per-position `close` actions; rejects unless the application viewer owns the browser player's stored match slot (`app/api/match/[id]/action/route.ts:33-51`) |
 | `POST /api/match/[id]/leave` | delete while `open`/`predict`; 409 once counting down |
 | `GET /api/match/open?market=&mode=&playerId=` | joinable matches with a fresh host heartbeat |
-| `GET /api/match/recent` | signed-in user's newest 5 settled matches, all markets — `settledMatchesFor` + `historyEntryFor` + `opponentNames` (`lib/opponentNames.ts`), same naming as the profile Matches tab. Rendered by the lobby's Recent results: coin, `vs <opponent>`, Won/Lost/Tie, your round P&L, relative time (`app/lib/playedLabel.ts`); fetched once per mount, so returning from a room refreshes it |
+| `GET /api/match/recent` | signed-in user's newest 5 settled matches, all markets — `settledMatchesFor` + `historyEntryFor` + profile-backed `opponentNames` (`lib/opponentNames.ts`), same naming as the profile Matches tab. Rendered by the lobby's Recent results: coin, `vs <opponent>`, Won/Lost/Tie, your round P&L, relative time (`app/lib/playedLabel.ts`); fetched once per mount, so returning from a room refreshes it |
 
 Validation on entry: market must price (`lib/spotPrice.ts:12`), mode must be
-`pulse`, caller must be a signed-in Clerk user, wager integer
+`pulse`, caller must have a signed-in application viewer, wager integer
 1..1,000,000 and no more than the user's balance, timer 10..3600s. Pulse
 actions additionally validate side, stake ≤ $100 and available bankroll, leverage,
 and position id.
@@ -79,7 +79,7 @@ and position id.
 - One ticker drives both deadlines — the pre-round timer in `predict`, the round in `countdown` (`app/duel/[market]/pulse/[matchId]/page.tsx:121-127`).
 - `<PriceChart>` still reads the browser's own `usePriceFeed()` — the chart stays client-direct to Coinbase, no server round trip. Only `roundStart`/trade-marker times come from the poll.
 - Settlement freezes the series with the final point pinned to the deadline, not to whenever the tab noticed (`app/duel/[market]/pulse/[matchId]/page.tsx:132`).
-- Lobby Play button is an async matchmaker, not a `Link` (`app/duel/page.tsx` `play`). Signed out, it is a Clerk `SignInButton` (modal) labelled "Sign in to play", not a disabled button. Styled violet (`.pulse-stage .play-button`, `--play-a/b`) — the only non-teal action on the page. While queued, Share invite uses native sharing when available and clipboard copy otherwise (`app/duel/page.tsx` `shareInvite`).
+- Lobby Play button is an async matchmaker, not a `Link` (`app/duel/page.tsx` `play`). Signed out, provider-neutral `SignInAction` opens the active provider modal with "Sign in to play", not a disabled button. Styled violet (`.pulse-stage .play-button`, `--play-a/b`) — the only non-teal action on the page. While queued, Share invite uses native sharing when available and clipboard copy otherwise (`app/duel/page.tsx` `shareInvite`).
 - Queueing replaces the whole play control panel rather than disabling it — the criteria are already committed to a row. Cancel deletes the row via `leave` (`app/duel/page.tsx` `cancelQueue`); the room is prefetched while waiting so navigation does not eat into the 5s (`app/duel/page.tsx:293`).
 
 ## Verified

@@ -6,7 +6,7 @@ import {
   touchAndRead,
   viewFor,
 } from "@/lib/match";
-import { auth } from "@clerk/nextjs/server";
+import { getViewer } from "@/lib/viewer";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
  * per tick. It is also what the lobby polls while queued in an `open` match.
  */
 export async function GET(request: Request, ctx: { params: Promise<{ id: string }> }) {
-  const { userId } = await auth();
+  const userId = (await getViewer())?.userId;
   if (!userId) return Response.json({ error: "Sign in to play" }, { status: 401 });
   const { id } = await ctx.params;
   const playerId = new URL(request.url).searchParams.get("playerId") ?? "";

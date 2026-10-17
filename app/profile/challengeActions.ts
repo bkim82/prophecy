@@ -1,12 +1,12 @@
 "use server";
 
-import { auth } from "@clerk/nextjs/server";
 import { refresh } from "next/cache";
 import { CHALLENGE_STAKES, PULSE_MARKETS, PULSE_ROUNDS, isChallengeMode, type ChallengeMode } from "@/app/lib/challengeRules";
 import { getProfile } from "@/app/lib/mockProfiles";
 import { VIEWER_RANK, canChallenge, challengeTierNeeded } from "@/app/lib/rank";
 import { ensureUser } from "@/lib/balance";
 import { cancelPendingChallenge, createChallenge } from "@/lib/challenges";
+import { getViewer } from "@/lib/viewer";
 
 export type ChallengeInput = {
   handle: string;
@@ -25,7 +25,7 @@ export type ChallengeResult = { ok: true } | { ok: false; error: string };
  * Nothing is reserved — the stake is only a proposal until it's accepted.
  */
 export async function sendChallenge(input: ChallengeInput): Promise<ChallengeResult> {
-  const { userId } = await auth();
+  const userId = (await getViewer())?.userId;
   if (!userId) return { ok: false, error: "Sign in to send challenges." };
 
   const target = getProfile(input.handle);
@@ -62,7 +62,7 @@ export async function sendChallenge(input: ChallengeInput): Promise<ChallengeRes
 }
 
 export async function cancelChallenge(id: string): Promise<ChallengeResult> {
-  const { userId } = await auth();
+  const userId = (await getViewer())?.userId;
   if (!userId) return { ok: false, error: "Sign in to manage challenges." };
   if (!(await cancelPendingChallenge(userId, id))) return { ok: false, error: "That challenge is no longer pending." };
   refresh();

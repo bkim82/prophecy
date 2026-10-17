@@ -1,14 +1,14 @@
 "use client";
 
-import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useRef, useState, type RefObject } from "react";
+import { useAppAuth } from "@/app/auth/AuthProvider";
 import { BackIcon } from "@/app/icons";
 import type { Post, Reply } from "@/app/lib/mockPosts";
 import { PostCard, ReplyItem } from "@/app/PostCard";
 
 // Local-only, like the feed composer: a reply is prepended to this page's
-// list and gone on reload. Authorship uses the signed-in Clerk user's name.
+// list and gone on reload. Authorship uses the signed-in provider user's name.
 function ReplyComposer({
   inputRef,
   replyingTo,
@@ -18,7 +18,7 @@ function ReplyComposer({
   replyingTo: string;
   onReply: (reply: Reply) => void;
 }) {
-  const { user } = useUser();
+  const { user } = useAppAuth();
   const [text, setText] = useState("");
   const name = user?.firstName ?? user?.username ?? "You";
   const initial = name[0].toUpperCase();

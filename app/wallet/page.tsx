@@ -1,28 +1,28 @@
 "use client";
 
-import { useWalletConnection } from "@/app/lib/useWalletConnection";
+import { useWalletIdentity } from "@/app/lib/useWalletConnection";
 import { WalletDashboard } from "./WalletDashboard";
 
 export default function WalletPage() {
-  const { wallet, notice, connecting, switching, connect, disconnectWallet, switchWallet, switchNetwork } = useWalletConnection();
+  const { wallet, notice, isLoaded, signIn, signOut } = useWalletIdentity();
 
   if (!wallet.address) {
     return (
       <main className="wallet-page">
         <section className="wallet-intro">
           <span className="eyebrow">Wallet</span>
-          <h1 className="display-font">Connect a Wallet</h1>
-          <p>Connect your own wallet to see your balance, holdings, and activity.</p>
+          <h1 className="display-font">Sign in</h1>
+          <p>Sign in to use your Prophecy smart account on Base.</p>
         </section>
         <div className="wallet-page-content">
           <section className="panel wallet-card wallet-connect-card">
             <div className="wallet-card-heading">
-              <div><span className="eyebrow">Connection</span><h2>Connect a wallet</h2></div>
+              <div><span className="eyebrow">Account</span><h2>Your embedded wallet</h2></div>
               <span className="wallet-status-dot" aria-hidden="true" />
             </div>
-            <p className="wallet-card-copy">Scan with Coinbase Wallet, or create one instantly with a passkey. Prophecy never asks for your seed phrase.</p>
-            <button type="button" className="wallet-connect-button" onClick={connect} disabled={connecting}>
-              {connecting ? "Connecting…" : "Connect wallet"}
+            <p className="wallet-card-copy">Your canonical Base smart account is created with your Prophecy account. Prophecy never receives a seed phrase or owner key.</p>
+            <button type="button" className="wallet-connect-button" onClick={signIn} disabled={!isLoaded}>
+              {isLoaded ? "Sign in" : "Loading…"}
             </button>
             {notice && <p className="wallet-notice" role="status">{notice}</p>}
           </section>
@@ -35,10 +35,7 @@ export default function WalletPage() {
     <main className="wd-page">
       <WalletDashboard
         wallet={wallet}
-        switching={switching}
-        switchWallet={switchWallet}
-        switchNetwork={switchNetwork}
-        disconnectWallet={disconnectWallet}
+        signOut={signOut}
       />
     </main>
   );

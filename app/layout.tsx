@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { Cinzel, IBM_Plex_Mono, Inter } from "next/font/google";
 import Link from "next/link";
-import { ClerkProvider, Show } from "@clerk/nextjs";
 import { AccountMenu } from "./AccountMenu";
 import { ActiveMatchBar } from "./ActiveMatchBar";
+import { AuthProvider, SignedIn, type AuthConfiguration } from "./auth/AuthProvider";
 import { BalancePill } from "./BalancePill";
 import { MobileBottomNav } from "./MobileBottomNav";
 import { MobileChromeAutoHide } from "./MobileChromeAutoHide";
@@ -11,6 +11,7 @@ import { QuickTicketBar } from "./QuickTicketBar";
 import { TabNav } from "./TabNav";
 import { DEFAULT_THEME, THEME_INIT_SCRIPT } from "./theme";
 import { ThemeToggle } from "./ThemeToggle";
+import { embeddedWalletAuthEnabled } from "@/lib/embeddedWalletFeature";
 import "./globals.css";
 
 // Cinzel carries the ancient-inscription weight for headings/brand; Inter
@@ -27,6 +28,13 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  let authConfig: AuthConfiguration = { provider: "clerk" };
+  if (embeddedWalletAuthEnabled()) {
+    const projectId = process.env.NEXT_PUBLIC_CDP_PROJECT_ID;
+    if (!projectId) throw new Error("NEXT_PUBLIC_CDP_PROJECT_ID is required when embedded wallet auth is enabled");
+    authConfig = { provider: "cdp", projectId };
+  }
+
   return (
     <html
       lang="en"
@@ -38,7 +46,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
       <body>
-        <ClerkProvider>
+        <AuthProvider config={authConfig}>
           <header className="app-header">
             <div className="app-header-inner">
               <div className="desktop-header-content">
@@ -46,7 +54,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <TabNav />
                 <div className="header-actions">
                   <ThemeToggle />
-                  <Show when="signed-in"><BalancePill /></Show>
+                  <SignedIn><BalancePill /></SignedIn>
                   <AccountMenu />
                 </div>
               </div>
@@ -54,7 +62,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <Link href="/" className="brand">PROPHECY</Link>
                 <div className="mobile-header-actions">
                   <ThemeToggle />
-                  <Show when="signed-in"><BalancePill /></Show>
+                  <SignedIn><BalancePill /></SignedIn>
                   <div className="mobile-account-control">
                     <AccountMenu compact />
                   </div>
@@ -67,7 +75,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <MobileChromeAutoHide />
           <QuickTicketBar />
           <ActiveMatchBar />
-        </ClerkProvider>
+        </AuthProvider>
       </body>
     </html>
   );

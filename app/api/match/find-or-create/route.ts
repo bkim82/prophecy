@@ -1,10 +1,10 @@
 import { and, asc, eq, gt, isNull, isNotNull } from "drizzle-orm";
-import { auth } from "@clerk/nextjs/server";
 import { getDb } from "@/db";
 import { matches } from "@/db/schema";
 import { refundBalance, reserveBalance } from "@/lib/balance";
 import { productForMarket } from "@/lib/spotPrice";
 import { presenceCutoff, readBody } from "@/lib/match";
+import { getViewer } from "@/lib/viewer";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +25,7 @@ const MAX_TIMER = 3600;
  * next candidate and finally to creating its own row.
  */
 export async function POST(request: Request) {
-  const { userId } = await auth();
+  const userId = (await getViewer())?.userId;
   if (!userId) return Response.json({ error: "Sign in to play" }, { status: 401 });
   const body = await readBody(request);
   const playerId = typeof body.playerId === "string" ? body.playerId : "";

@@ -1,45 +1,70 @@
 "use client";
 
-import { Show, SignInButton, UserButton } from "@clerk/nextjs";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { SignInAction, useAppAuth } from "./auth/AuthProvider";
 import { ProfileIcon } from "./icons";
 
 /**
- * Header avatar: Clerk's menu when signed in (with a Profile link to the
- * viewer's own /profile ahead of Clerk's defaults), Sign in otherwise. The
- * theme picker sits beside it in the header (app/ThemeToggle.tsx).
+ * Provider-neutral header account control. Provider-specific sign-in and
+ * account management stay behind app/auth/AuthProvider.tsx.
  */
 export function AccountMenu({ compact = false }: { compact?: boolean }) {
+  const { error, isLoaded, isSignedIn, openAccountSettings, provider, signOut, user } = useAppAuth();
+  const [avatarVersion, setAvatarVersion] = useState(0);
+
+  useEffect(() => {
+    const updated = () => setAvatarVersion(Date.now());
+    window.addEventListener("profile-avatar-updated", updated);
+    return () => window.removeEventListener("profile-avatar-updated", updated);
+  }, []);
+
+  if (!isLoaded) {
+    return <span className={compact ? "mobile-signin-avatar account-loading" : "signin-button account-loading"} aria-hidden="true" />;
+  }
+
+  if (!isSignedIn || !user) {
+    return (
+      <div className="account-signed-out" title={error ?? undefined}>
+        <SignInAction>
+          {compact ? (
+            <button type="button" className="mobile-signin-avatar" aria-label="Sign in">
+              <ProfileIcon className="mobile-profile-icon" />
+            </button>
+          ) : (
+            <button type="button" className="signin-button">Sign in</button>
+          )}
+        </SignInAction>
+      </div>
+    );
+  }
+
+  const label = user.firstName ?? user.username ?? "Account";
+  const initial = label.charAt(0).toUpperCase();
   return (
-    <Show
-      when="signed-in"
-      fallback={
-        <div className="account-signed-out">
-          <SignInButton mode="modal">
-            {compact ? (
-              <button type="button" className="mobile-signin-avatar" aria-label="Sign in">
-                <ProfileIcon className="mobile-profile-icon" />
-              </button>
-            ) : (
-              <button type="button" className="signin-button">Sign in</button>
-            )}
-          </SignInButton>
-        </div>
-      }
-    >
-      <UserButton
-        appearance={{
-          elements: {
-            userButtonBox: "account-user-button-box",
-            userButtonTrigger: "account-user-button-trigger",
-            avatarBox: "account-avatar-box",
-          },
-        }}
-      >
-        <UserButton.MenuItems>
-          <UserButton.Link label="Profile" labelIcon={<ProfileIcon className="account-menu-icon" />} href="/profile" />
-          <UserButton.Action label="manageAccount" />
-        </UserButton.MenuItems>
-      </UserButton>
-    </Show>
+    <details className="account-menu">
+      <summary className="account-avatar" aria-label="Open account menu">
+        {initial}
+        {(user.imageUrl || provider === "cdp") && (
+          <span
+            className="account-avatar-image"
+            style={{
+              backgroundImage: user.imageUrl
+                ? `url(${JSON.stringify(user.imageUrl)})`
+                : `url("/api/profile/avatar${avatarVersion ? `?v=${avatarVersion}` : ""}")`,
+            }}
+          />
+        )}
+      </summary>
+      <div className="account-menu-popover">
+        <span className="account-menu-name">{label}</span>
+        <Link href="/profile"><ProfileIcon className="account-menu-icon" /> Profile</Link>
+        {provider === "cdp" && <Link href="/account/security">Security</Link>}
+        {openAccountSettings && (
+          <button type="button" onClick={openAccountSettings}>Manage account</button>
+        )}
+        <button type="button" onClick={() => void signOut().catch(() => undefined)}>Sign out</button>
+      </div>
+    </details>
   );
 }

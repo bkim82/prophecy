@@ -1,4 +1,5 @@
 import { getTokenSummaries } from "@/lib/basePrices";
+import { allowWalletRead, walletReadLimited } from "../readLimit";
 
 export const dynamic = "force-dynamic";
 
@@ -8,7 +9,8 @@ export const dynamic = "force-dynamic";
 const BASE_WETH_ADDRESS = "0x4200000000000000000000000000000000000006";
 
 /** GET -> ETH's live price/24h-change/logo via its WETH proxy. No auth: public market data, same as /api/wallet/holdings. */
-export async function GET() {
+export async function GET(request: Request) {
+  if (!await allowWalletRead(request, "eth", 60)) return walletReadLimited();
   const [summary] = await getTokenSummaries([BASE_WETH_ADDRESS]);
   if (!summary) return Response.json({ eth: null }, { headers: { "Cache-Control": "no-store" } });
 

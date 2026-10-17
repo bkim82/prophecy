@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import PriceChart, { type TradeMarker } from "@/app/PriceChart";
+import { useAppAuth } from "@/app/auth/AuthProvider";
 import { usePriceFeed } from "@/app/usePriceFeed";
-import { getWalletProvider, shortenAddress } from "@/app/lib/wallet";
+import { shortenAddress } from "@/app/lib/wallet";
 import {
   ROOM,
   ROOM_COINS,
@@ -76,28 +77,6 @@ function OracleSigil() {
   );
 }
 
-function useWalletAddress() {
-  const [address, setAddress] = useState<string | null>(null);
-  useEffect(() => {
-    const provider = getWalletProvider();
-    if (!provider) return;
-    // eth_accounts never prompts — it only reports an already-granted connection.
-    const refresh = () => provider.request({ method: "eth_accounts" }).then(
-      (accounts) => setAddress((accounts as string[])[0] ?? null),
-      () => {},
-    );
-    void refresh();
-    const onAccounts = (...args: unknown[]) => setAddress(((args[0] as string[]) ?? [])[0] ?? null);
-    provider.on?.("accountsChanged", onAccounts);
-    // Coinbase Wallet SDK's disconnect() only emits "disconnect", not "accountsChanged" —
-    // the Wallet tab's Disconnect button dispatches this app-level event instead so every
-    // wallet-aware component (here, BalancePill) stays in sync.
-    window.addEventListener("wallet-updated", refresh);
-    return () => { provider.removeListener?.("accountsChanged", onAccounts); window.removeEventListener("wallet-updated", refresh); };
-  }, []);
-  return address;
-}
-
 export function SanctumView({ previewRank }: { previewRank?: string }) {
   const gateTier = isRoomId(previewRank) ? previewRank : ROOM.tier;
   const feeds = {
@@ -108,7 +87,8 @@ export function SanctumView({ previewRank }: { previewRank?: string }) {
   const feedsRef = useRef(feeds);
   feedsRef.current = feeds;
 
-  const wallet = useWalletAddress();
+  const { user } = useAppAuth();
+  const wallet = user?.walletChainId === 8453 ? user.smartAccountAddress : null;
   const [coin, setCoin] = useState<RoomCoin>("btc");
   const [balance, setBalance] = useState(PREVIEW_BALANCE);
   const [positions, setPositions] = useState<Partial<Record<RoomCoin, Position>>>({});
@@ -275,7 +255,7 @@ export function SanctumView({ previewRank }: { previewRank?: string }) {
             <span className="oracle-chip is-wallet">USD · {shortenAddress(wallet)}</span>
           ) : (
             <Link href="/wallet" className="oracle-chip is-wallet is-disconnected">
-              Wallet not connected · Connect →
+              Sign in for wallet · Open →
             </Link>
           )}
         </div>

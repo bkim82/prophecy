@@ -1,4 +1,5 @@
 import { getWalletHoldings } from "@/lib/alchemy";
+import { allowWalletRead, walletReadLimited } from "../readLimit";
 
 export const dynamic = "force-dynamic";
 
@@ -6,6 +7,7 @@ const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 
 /** GET ?address=0x... -> real Base ERC-20 holdings for that address. Public on-chain data, no auth. */
 export async function GET(request: Request) {
+  if (!await allowWalletRead(request, "holdings", 30)) return walletReadLimited();
   const address = new URL(request.url).searchParams.get("address");
   if (!address || !ADDRESS_RE.test(address)) {
     return Response.json({ error: "Invalid address" }, { status: 400 });

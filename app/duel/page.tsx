@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { SignInButton, useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { SignInAction, useAppAuth } from "@/app/auth/AuthProvider";
 import { DailyCoin, pickDailyCoin } from "@/app/DailyCoin";
 import { PortfolioGame } from "@/app/duel/portfolio/PortfolioGame";
 import {
@@ -117,7 +117,7 @@ const SYMBOL_CLASS: Record<MarketId, string> = {
 };
 
 export default function Page() {
-  const { isSignedIn } = useUser();
+  const { isSignedIn } = useAppAuth();
   const router = useRouter();
   const [market, setMarket] = useState<MarketId>("btc");
   const dailyCoinId = pickDailyCoin().toLowerCase() as MarketId;
@@ -493,7 +493,7 @@ export default function Page() {
           {activeMode.matched
             ? isSignedIn === false
               // Signed out: still the bright call to action — it opens sign-in.
-              ? <SignInButton mode="modal"><button type="button" className="play-button">Sign in to play <span aria-hidden="true">→</span></button></SignInButton>
+              ? <SignInAction><button type="button" className="play-button">Sign in to play <span aria-hidden="true">→</span></button></SignInAction>
               : <button type="button" className="play-button" onClick={play} disabled={!playerId || !isSignedIn || pending !== null || queue !== null || activeMatch !== null}>{pending === "play" ? "Finding a match…" : <>Play <span aria-hidden="true">→</span></>}</button>
             : isPlayable
               ? <Link href={playHref} className="play-button">Play <span aria-hidden="true">→</span></Link>

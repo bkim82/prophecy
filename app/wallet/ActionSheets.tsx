@@ -1,6 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { useAppAuth } from "@/app/auth/AuthProvider";
+import { createSendIntent, confirmIntent } from "@/app/lib/embeddedWallet/client";
+import { walletTransactionsEnabled } from "@/app/lib/embeddedWallet/config";
+import { useSubmitTypedIntent } from "@/app/lib/embeddedWallet/sign";
+import { NATIVE_ETH, curatedToken } from "@/app/lib/embeddedWallet/tokens";
 import { ActionSheet } from "./ActionSheet";
 import type { Coin } from "./types";
 
@@ -26,25 +31,122 @@ export function DepositSheet({ address, onClose }: { address: string; onClose: (
   );
 }
 
-export function SendSheet({ coins, onClose }: { coins: Coin[]; onClose: () => void }) {
-  const [asset, setAsset] = useState(coins[0]?.symbol ?? "ETH");
+type PreparedSend = {
+  id: string;
+  symbol: string;
+  amount: string;
+  recipient: string;
+};
+
+function CdpSendSubmit({
+  prepared,
+  onSubmitted,
+}: {
+  prepared: PreparedSend;
+  onSubmitted: (hash: string) => void;
+}) {
+  const submit = useSubmitTypedIntent();
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <>
+      <button
+        type="button"
+        className="wd-sheet-primary-button"
+        disabled={pending}
+        onClick={() => {
+          setPending(true);
+          setError(null);
+          void submit(prepared.id)
+            .then(onSubmitted)
+            .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : "Could not submit transaction."))
+            .finally(() => setPending(false));
+        }}
+      >
+        {pending ? "Submitting…" : "Confirm and send"}
+      </button>
+      {error && <p className="wd-sheet-note" role="alert">{error}</p>}
+    </>
+  );
+}
+
+export function SendSheet({
+  accountAddress,
+  coins,
+  onClose,
+}: {
+  accountAddress: string;
+  coins: Coin[];
+  onClose: () => void;
+}) {
+  const { provider } = useAppAuth();
+  const sendable = coins
+    .map((coin) => ({
+      ...coin,
+      tokenAddress: coin.address === "eth" ? NATIVE_ETH : coin.address.toLowerCase(),
+    }))
+    .filter((coin) => curatedToken(coin.tokenAddress));
+  const [asset, setAsset] = useState(sendable[0]?.tokenAddress ?? NATIVE_ETH);
   const [to, setTo] = useState("");
   const [amount, setAmount] = useState("");
-  const [sent, setSent] = useState(false);
+  const [prepared, setPrepared] = useState<PreparedSend | null>(null);
+  const [hash, setHash] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const enabled = walletTransactionsEnabled() && provider === "cdp";
+  const token = curatedToken(asset);
 
   return (
     <ActionSheet title="Send" onClose={onClose}>
-      {sent ? (
-        <p className="wd-sheet-note">Sending isn&apos;t wired up yet — this is a preview of the flow, no funds moved.</p>
+      {hash ? (
+        <>
+          <p className="wd-sheet-note">Submitted to Base. This is pending until a receipt confirms inclusion.</p>
+          <code>{hash}</code>
+        </>
+      ) : prepared ? (
+        <div className="wd-sheet-form">
+          <p className="wd-sheet-note">Review every field. Blockchain transfers are irreversible.</p>
+          <dl>
+            <div><dt>From</dt><dd><code>{accountAddress}</code></dd></div>
+            <div><dt>Network</dt><dd>Base (8453)</dd></div>
+            <div><dt>Asset</dt><dd>{prepared.symbol}</dd></div>
+            <div><dt>Amount</dt><dd>{prepared.amount} {prepared.symbol}</dd></div>
+            <div><dt>Recipient</dt><dd><code>{prepared.recipient}</code></dd></div>
+            <div><dt>Gas</dt><dd>Sponsored, subject to policy</dd></div>
+          </dl>
+          <CdpSendSubmit prepared={prepared} onSubmitted={setHash} />
+          <button type="button" className="wd-sheet-swap-flip" onClick={() => setPrepared(null)}>Back</button>
+        </div>
       ) : (
         <form
           className="wd-sheet-form"
-          onSubmit={(event) => { event.preventDefault(); setSent(true); }}
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!token || !enabled) return;
+            setPending(true);
+            setError(null);
+            const idempotencyKey = crypto.randomUUID();
+            void createSendIntent({
+              idempotencyKey,
+              tokenAddress: token.address,
+              recipient: to,
+              amount,
+            })
+              .then(({ intent }) => confirmIntent(intent.id))
+              .then(({ intent }) => setPrepared({
+                id: intent.id,
+                symbol: token.symbol,
+                amount,
+                recipient: to.toLowerCase(),
+              }))
+              .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : "Could not prepare send."))
+              .finally(() => setPending(false));
+          }}
         >
           <label className="wd-sheet-field">
             <span>Asset</span>
             <select value={asset} onChange={(event) => setAsset(event.target.value)}>
-              {coins.map((coin) => <option key={coin.address} value={coin.symbol}>{coin.symbol}</option>)}
+              {sendable.map((coin) => <option key={coin.tokenAddress} value={coin.tokenAddress}>{coin.symbol}</option>)}
             </select>
           </label>
           <label className="wd-sheet-field">
@@ -55,7 +157,11 @@ export function SendSheet({ coins, onClose }: { coins: Coin[]; onClose: () => vo
             <span>Amount</span>
             <input value={amount} onChange={(event) => setAmount(event.target.value)} inputMode="decimal" placeholder="0.0" />
           </label>
-          <button type="submit" className="wd-sheet-primary-button" disabled={!to || !amount}>Review send</button>
+          <button type="submit" className="wd-sheet-primary-button" disabled={!enabled || pending || !to || !amount}>
+            {pending ? "Preparing…" : "Review send"}
+          </button>
+          {!enabled && <p className="wd-sheet-note">Sending remains disabled until the Base Sepolia policy and Paymaster decoder gates pass.</p>}
+          {error && <p className="wd-sheet-note" role="alert">{error}</p>}
         </form>
       )}
     </ActionSheet>
@@ -117,7 +223,8 @@ export function SwapSheet({
             <span>Amount</span>
             <input value={amount} onChange={(event) => setAmount(event.target.value)} inputMode="decimal" placeholder="0.0" />
           </label>
-          <button type="submit" className="wd-sheet-primary-button" disabled={!amount || from === to}>Review swap</button>
+          <button type="submit" className="wd-sheet-primary-button" disabled>Review swap</button>
+          <p className="wd-sheet-note">Swaps remain disabled until the credentialed quote, calldata-decoder, simulation, and Paymaster gates pass.</p>
         </form>
       )}
     </ActionSheet>

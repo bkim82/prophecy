@@ -1,7 +1,7 @@
 "use client";
 
-import { SignInButton } from "@clerk/nextjs";
 import { useEffect, useId, useRef, useState, useTransition } from "react";
+import { SignInAction } from "@/app/auth/AuthProvider";
 import { ArenaIcon, LockIcon, PatientIcon, SwiftIcon } from "@/app/icons";
 import {
   CHALLENGE_MODES,
@@ -52,11 +52,11 @@ export function ChallengeControl({ state, target, viewerRank, children }: Challe
   let note: React.ReactNode = null;
   if (state.kind === "signed-out") {
     button = (
-      <SignInButton mode="modal">
+      <SignInAction>
         <button type="button" className="profile-challenge-button">
           {label}
         </button>
-      </SignInButton>
+      </SignInAction>
     );
   } else if (state.kind === "locked") {
     button = (

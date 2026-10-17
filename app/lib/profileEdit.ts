@@ -43,6 +43,9 @@ export function websiteLabel(website: string): string {
 
 export const BANNER_MAX_BYTES = 512 * 1024;
 export const BANNER_TYPES = ["image/jpeg", "image/png", "image/webp"];
+export const AVATAR_MAX_BYTES = 256 * 1024;
+export const AVATAR_TYPES = BANNER_TYPES;
+export const AVATAR_SIZE = 512;
 
 // Prophecy's own motifs, so a banner reads as part of the app: the Oracle's
 // sunburst (OraclesLeaderboard rays), the doom → destiny call track, the

@@ -1,5 +1,5 @@
-import { auth } from "@clerk/nextjs/server";
 import { getTokenHistories, isHistoryPeriod } from "@/lib/tokenHistory";
+import { getViewer } from "@/lib/viewer";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
  * says when. `cachedOnly` never triggers an upstream fetch.
  */
 export async function POST(request: Request) {
-  const { userId } = await auth();
+  const userId = (await getViewer())?.userId;
   if (!userId) return Response.json({ error: "Sign in to play" }, { status: 401 });
 
   const body = await request.json().catch(() => ({}) as Record<string, unknown>);

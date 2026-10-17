@@ -1,4 +1,3 @@
-import { auth } from "@clerk/nextjs/server";
 import { getTokenMetas } from "@/lib/basePrices";
 import {
   PORTFOLIO_MAX_STAKE,
@@ -10,6 +9,7 @@ import {
   settlePortfolioIfDue,
   startSession,
 } from "@/lib/portfolio";
+import { getViewer } from "@/lib/viewer";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +22,7 @@ export const dynamic = "force-dynamic";
  * the same lazy pattern as GET /api/match/[id] and the retired /api/reading.
  */
 export async function GET() {
-  const { userId } = await auth();
+  const userId = (await getViewer())?.userId;
   if (!userId) return Response.json({ error: "Sign in to play" }, { status: 401 });
 
   await settlePortfolioIfDue(userId);
@@ -54,7 +54,7 @@ export async function GET() {
 
 /** POST { stake } → starts a new 24h session. 409 if one is already active. */
 export async function POST(request: Request) {
-  const { userId } = await auth();
+  const userId = (await getViewer())?.userId;
   if (!userId) return Response.json({ error: "Sign in to play" }, { status: 401 });
 
   const body = await request.json().catch(() => ({}) as Record<string, unknown>);

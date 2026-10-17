@@ -12,9 +12,11 @@ Agent-readable fact sheets, not prose. Format: flat bullets, `file:line` refs, n
 - [practice-mode.md](practice-mode.md) — client-only Pulse practice round
 - [portfolio.md](portfolio.md) — 24h Portfolio: solo, freely-tradeable spot/leverage positions on Base meme coins, lazy settlement
 - [wallet.md](wallet.md) — Wallet dashboard: connected-wallet balance/holdings/activity, no-auth data routes, mock creator earnings
-- [wallet-trading-plan.md](wallet-trading-plan.md) — plan to make Send/Swap real (not built): phases, security protocols, open decisions
+- [embedded-wallet-plan.md](embedded-wallet-plan.md) — implementation/launch plan: local auth, canonical-wallet, transaction-intent, Send confirmation, reconciliation, CSP, account-security, and reset foundations are feature-gated; credentialed provider/Paymaster/Swap/Onramp/mainnet gates remain
+- [embedded-wallet-spike.md](embedded-wallet-spike.md) — Phase -1 compatibility record: installed SDK/API surface, completed local gates, unresolved credential/security gates
+- [wallet-operations.md](wallet-operations.md) — feature gates, schema/reset sequence, monitoring, incident response, rollback, and credential/session rotation
 - [chart.md](chart.md) — SVG chart geometry, layers, scaling
 - [roadmap.md](roadmap.md) — unbuilt features, known gaps
 - [multiplayer-plan.md](multiplayer-plan.md) — server-authoritative multiplayer Pulse: match lifecycle, guarded updates, presence
 
-Multiplayer Pulse is server-authoritative (Neon Postgres `matches` table, anonymous per-browser ids); the chart and price feed stay client-side. Solo Pulse remains client-only. `/api/price` and `/api/history` stay stateless proxies. Solo Pulse needs no auth. The 24h Portfolio is also server-authoritative (Neon Postgres `portfolio_sessions`/`positions` tables) but is Clerk-`userId`-scoped, not anonymous — signing in is required (see [portfolio.md](portfolio.md)).
+Multiplayer Pulse is server-authoritative (Neon Postgres `matches` table, anonymous per-browser ids); the chart and price feed stay client-side. Solo Pulse remains client-only. `/api/price` and `/api/history` stay stateless proxies. Solo Pulse needs no auth. The 24h Portfolio is also server-authoritative (Neon Postgres `portfolio_sessions`/`positions` tables) but is application-viewer-scoped through `getViewer()`, not anonymous — signing in is required (see [portfolio.md](portfolio.md)).

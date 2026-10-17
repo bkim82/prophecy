@@ -2,8 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { isBaseChain, shortenAddress } from "@/app/lib/wallet";
-import { useWalletConnection } from "@/app/lib/useWalletConnection";
+import { shortenAddress } from "@/app/lib/wallet";
+import { useWalletIdentity } from "@/app/lib/useWalletConnection";
 import type { WalletTokenHolding } from "@/lib/alchemy";
 
 type TicketKind = "directional" | "spot";
@@ -16,7 +16,7 @@ const formatUsd = (n: number) => n.toLocaleString("en-US", { style: "currency", 
 
 export function WalletDesk({ showHoldings = false, showConnection = true, showTicket = true }: { showHoldings?: boolean; showConnection?: boolean; showTicket?: boolean }) {
   const router = useRouter();
-  const { wallet, notice, setNotice, connecting, switching, connect, disconnectWallet: disconnectConnection, switchWallet, switchNetwork } = useWalletConnection();
+  const { wallet, notice, setNotice, isLoaded, signIn, signOut } = useWalletIdentity();
   const [tokenHoldings, setTokenHoldings] = useState<WalletTokenHolding[]>([]);
   const [holdingsLoading, setHoldingsLoading] = useState(false);
   const [asset, setAsset] = useState("BTC");
@@ -25,7 +25,7 @@ export function WalletDesk({ showHoldings = false, showConnection = true, showTi
   const [leverage, setLeverage] = useState("100");
 
   useEffect(() => {
-    if (!wallet.address || !wallet.chainId || !isBaseChain(wallet.chainId)) { setTokenHoldings([]); return; }
+    if (!wallet.address || wallet.chainId !== 8453) { setTokenHoldings([]); return; }
     let cancelled = false;
     setHoldingsLoading(true);
     fetch(`/api/wallet/holdings?address=${wallet.address}`)
@@ -36,11 +36,6 @@ export function WalletDesk({ showHoldings = false, showConnection = true, showTi
     return () => { cancelled = true; };
   }, [wallet.address, wallet.chainId]);
 
-  const disconnectWallet = async () => {
-    await disconnectConnection();
-    setTokenHoldings([]);
-  };
-
   const trade = (side: Side) => {
     if (!wallet.address) return;
     if (kind === "directional" && asset === "BTC") router.push(`/duel/btc/pulse?side=${side}&leverage=${leverage}`);
@@ -50,10 +45,9 @@ export function WalletDesk({ showHoldings = false, showConnection = true, showTi
 
   return <>
     {showConnection && <section className="panel wallet-card wallet-connect-card">
-      <div className="wallet-card-heading"><div><span className="eyebrow">Connection</span><h2>{wallet.address ? "Wallet connected" : "Connect a wallet"}</h2></div><span className={`wallet-status-dot${wallet.address ? " is-connected" : ""}`} aria-hidden="true" /></div>
+      <div className="wallet-card-heading"><div><span className="eyebrow">Account</span><h2>{wallet.address ? "Smart account" : "Sign in"}</h2></div><span className={`wallet-status-dot${wallet.address ? " is-connected" : ""}`} aria-hidden="true" /></div>
       {wallet.address ? <><div className="wallet-address">{shortenAddress(wallet.address)}</div><div className="wallet-meta"><span>{wallet.chain}</span><span>{wallet.balance ?? "—"} ETH</span></div>
-        {wallet.chainId && !isBaseChain(wallet.chainId) && <div className="wallet-notice" role="status"><span>Prophecy runs on Base — you&apos;re connected to {wallet.chain}.</span><button type="button" className="wallet-secondary-button" onClick={switchNetwork} disabled={switching}>{switching ? "Switching…" : "Switch to Base"}</button></div>}
-        <div className="wallet-button-row"><button type="button" className="wallet-secondary-button" onClick={switchWallet}>Switch wallet</button><button type="button" className="wallet-secondary-button" onClick={disconnectWallet}>Disconnect</button></div></> : <><p className="wallet-card-copy">Scan with Coinbase Wallet, or create one instantly with a passkey. Prophecy never asks for your seed phrase.</p><button type="button" className="wallet-connect-button" onClick={connect} disabled={connecting}>{connecting ? "Connecting…" : "Connect wallet"}</button></>}
+        <div className="wallet-button-row"><button type="button" className="wallet-secondary-button" onClick={() => void signOut()}>Sign out</button></div></> : <><p className="wallet-card-copy">Sign in to use your canonical Prophecy smart account on Base.</p><button type="button" className="wallet-connect-button" onClick={signIn} disabled={!isLoaded}>{isLoaded ? "Sign in" : "Loading…"}</button></>}
       {notice && <p className="wallet-notice" role="status">{notice}</p>}
     </section>}
 
@@ -63,7 +57,7 @@ export function WalletDesk({ showHoldings = false, showConnection = true, showTi
         <div className="wallet-holding-row"><span><strong>ETH</strong><small>Ether</small></span><span className="wallet-ticket-value">{wallet.balance ?? "—"}</span></div>
         {tokenHoldings.map((item) => <div className="wallet-holding-row" key={item.address}><span><strong>{item.symbol}</strong><small>{item.name}</small></span><span className="wallet-ticket-value">{formatQty(item.balance)}{item.valueUsd != null && <small> · {formatUsd(item.valueUsd)}</small>}</span></div>)}
       </div>
-      {!wallet.chainId || !isBaseChain(wallet.chainId) ? <p className="wallet-ticket-note">Switch to Base to see your token holdings.</p>
+      {wallet.chainId !== 8453 ? <p className="wallet-ticket-note">A canonical Base smart account is required.</p>
         : holdingsLoading ? <p className="wallet-ticket-note">Loading token holdings…</p>
         : tokenHoldings.length === 0 && <p className="wallet-ticket-note">No Base tokens found for this wallet yet.</p>}
     </section>}
@@ -75,7 +69,7 @@ export function WalletDesk({ showHoldings = false, showConnection = true, showTi
       <div className="wallet-ticket-row"><span>{kind === "directional" ? "Stake" : "Amount"}</span><label className="wallet-input-wrap"><input value={stake} onChange={(event) => setStake(event.target.value)} inputMode="decimal" aria-label={kind === "directional" ? "Stake" : "Amount"} /><span>{kind === "directional" ? "embers" : asset}</span></label></div>
       {kind === "directional" && <div className="wallet-ticket-row"><span>Leverage</span><div className="wallet-leverage-picker">{["10", "50", "100"].map((value) => <button type="button" key={value} className={leverage === value ? "is-selected" : ""} onClick={() => setLeverage(value)}>{value}×</button>)}</div></div>}
       <div className="wallet-actions">{(kind === "directional" ? [["long", "Long", "↗"], ["short", "Short", "↘"]] : [["buy", "Buy", "↗"], ["sell", "Sell", "↘"]]).map(([side, label, icon]) => <button type="button" key={side} className={`wallet-side-button ${side === "long" || side === "buy" ? "is-long" : "is-short"}`} disabled={!wallet.address} onClick={() => trade(side as Side)}><span>{label}</span><span>{icon}</span></button>)}</div>
-      <p className="wallet-ticket-note">{wallet.address ? kind === "directional" ? `Opens ${asset} Pulse at ${leverage}× leverage.` : `Spot ${asset} orders need a connected trading venue.` : "Connect your wallet to unlock the ticket."}</p>
+      <p className="wallet-ticket-note">{wallet.address ? kind === "directional" ? `Opens ${asset} Pulse at ${leverage}× leverage.` : `Spot ${asset} orders need a connected trading venue.` : "Sign in to unlock the ticket."}</p>
       {notice && <p className="wallet-notice" role="status">{notice}</p>}
     </section>}
   </>;

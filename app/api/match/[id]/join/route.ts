@@ -1,9 +1,9 @@
 import { and, eq, gt, isNull } from "drizzle-orm";
-import { auth } from "@clerk/nextjs/server";
 import { getDb } from "@/db";
 import { matches } from "@/db/schema";
 import { findMatch, presenceCutoff, readBody, roleOf } from "@/lib/match";
 import { refundBalance, reserveBalance } from "@/lib/balance";
+import { getViewer } from "@/lib/viewer";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
  * the seat, everyone else gets 409.
  */
 export async function POST(request: Request, ctx: { params: Promise<{ id: string }> }) {
-  const { userId } = await auth();
+  const userId = (await getViewer())?.userId;
   if (!userId) return Response.json({ error: "Sign in to play" }, { status: 401 });
   const { id } = await ctx.params;
   const body = await readBody(request);

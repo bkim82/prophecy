@@ -1,5 +1,5 @@
-import { auth } from "@clerk/nextjs/server";
 import { getTokenPrices, getTokenSummaries } from "@/lib/basePrices";
+import { getViewer } from "@/lib/viewer";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
  * live selected-coin header.
  */
 export async function POST(request: Request) {
-  const { userId } = await auth();
+  const userId = (await getViewer())?.userId;
   if (!userId) return Response.json({ error: "Sign in to play" }, { status: 401 });
 
   const body = await request.json().catch(() => ({}) as Record<string, unknown>);

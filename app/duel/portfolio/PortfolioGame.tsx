@@ -1,7 +1,7 @@
 "use client";
 
-import { SignInButton, useUser } from "@clerk/nextjs";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { SignInAction, useAppAuth } from "@/app/auth/AuthProvider";
 import { ClosedPositions } from "./ClosedPositions";
 import { OpenPositions } from "./OpenPositions";
 import type { TradeInput } from "./OrderForm";
@@ -28,7 +28,7 @@ const EMPTY_STATE: SessionState = { serverNow: Date.now(), session: null, positi
  * Battle24h widget followed for 24h Reading).
  */
 export function PortfolioGame() {
-  const { isSignedIn, isLoaded } = useUser();
+  const { isSignedIn, isLoaded } = useAppAuth();
   const [state, setState] = useState<SessionState>(EMPTY_STATE);
   const [loaded, setLoaded] = useState(false);
   const [nowTick, setNowTick] = useState(() => Date.now());
@@ -216,11 +216,11 @@ export function PortfolioGame() {
         <h2 className="mt-1 text-lg font-medium text-[var(--text)]">Sign in to play</h2>
         <p className="mt-1 text-sm text-[var(--muted)]">Your sessions, positions and stats are tied to your account.</p>
         <div className="mt-4 flex items-center justify-center">
-          <SignInButton mode="modal">
+          <SignInAction>
             <button className="min-h-11 rounded-lg bg-[var(--btn-bg)] px-5 text-sm font-semibold text-[var(--btn-text)] transition hover:bg-[var(--btn-bg-hover)]">
               Sign in
             </button>
-          </SignInButton>
+          </SignInAction>
         </div>
       </div>
     );
