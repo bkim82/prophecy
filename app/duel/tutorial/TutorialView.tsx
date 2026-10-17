@@ -21,8 +21,10 @@ const usd = (n: number) =>
 
 /**
  * `onExit` is set when the tutorial runs as the last stage of /welcome
- * (app/welcome/OnboardingFlow.tsx): the back link becomes "Skip tutorial" and
- * the done screen's Continue hands back to onboarding instead of the Arena.
+ * (app/welcome/OnboardingFlow.tsx): the back link gives way to a skip (intro
+ * button, then a header pill on each lesson and the live round) that leaves the lessons and the
+ * live round, and the done screen's Continue hands back to onboarding instead
+ * of the Arena.
  */
 export function TutorialView({ onExit }: { onExit?: () => void } = {}) {
   // One feed for the whole tutorial: it anchors the scripted lessons to the
@@ -56,24 +58,31 @@ export function TutorialView({ onExit }: { onExit?: () => void } = {}) {
 
   return (
     // Lessons split the screen: steps + lesson on the left, the chart on the
-    // right (see .tut-shell.is-split). Intro and done stay one centered column.
-    <main className={`arena-shell tut-shell${typeof step === "number" ? " is-split" : ""}`} data-market="btc">
+    // right (see .tut-shell.is-split). The live round is one column at the
+    // ranked room's width, so it looks like the real thing (.is-live). Intro
+    // and done stay one centered column.
+    <main
+      className={`arena-shell tut-shell${step === LIVE_INDEX ? " is-live" : typeof step === "number" ? " is-split" : ""}`}
+      data-market="btc"
+    >
       <header className="tut-head">
         <div className="tut-head-row">
-          {!onExit ? (
+          {!onExit && (
             <Link href="/duel" className="tut-back">
               ← Arena
             </Link>
-          ) : step !== "done" && (
-            <button type="button" className="tut-back" onClick={onExit}>
-              Skip tutorial
-            </button>
           )}
           <PulseMarketTitle market="btc">Learn Pulse</PulseMarketTitle>
           {typeof step === "number" && step < LIVE_INDEX && (
             <p className="tut-balance" title="Practice money only. No Embers at stake.">
               Practice <strong className="tabular-nums">{usd(balance)}</strong>
             </p>
+          )}
+          {/* The intro has its own skip button; done has Continue. */}
+          {onExit && typeof step === "number" && (
+            <button type="button" className="tut-back tut-skip" onClick={onExit}>
+              {step === LIVE_INDEX ? "Skip practice round" : "Skip tutorial"}
+            </button>
           )}
         </div>
         <nav aria-label="Tutorial lessons">
@@ -122,6 +131,11 @@ export function TutorialView({ onExit }: { onExit?: () => void } = {}) {
               </li>
             </ul>
             <div className="tut-actions">
+              {onExit && (
+                <button type="button" className="tut-skip-all" onClick={onExit}>
+                  Skip tutorial &amp; practice round
+                </button>
+              )}
               <button type="button" className="tut-button-secondary" onClick={() => goTo(LIVE_INDEX)}>
                 Skip to the live round
               </button>

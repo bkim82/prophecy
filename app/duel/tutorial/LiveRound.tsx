@@ -107,6 +107,7 @@ export default function LiveRound({
   const [frozenPoints, setFrozenPoints] = useState<PricePoint[] | null>(null);
   const [isActing, setIsActing] = useState(false);
   const maxLeadRef = useRef(1);
+  const leverageDetailsRef = useRef<HTMLDetailsElement>(null);
 
   const positionRef = useRef(position);
   positionRef.current = position;
@@ -351,6 +352,9 @@ export default function LiveRound({
   const canManage = phase === "open" && getLivePrice() !== null && !isActing;
   const tip = coachTip({ started, position, price, peakPnl, secondsLeft, lastClosedPnl, liquidated });
 
+  // Your latest closing leg, for the room-style "Last: long closed @ …" note.
+  const lastClose = trades.findLast((trade) => trade.owner === "you" && trade.closed);
+
   const markers: TradeMarker[] = trades.map((trade) => ({
     t: trade.t,
     p: trade.price,
@@ -363,19 +367,22 @@ export default function LiveRound({
   return (
     <>
       <PulseMovementAlert total={yourEquity} />
-      <section className="tut-card arena-panel">
+      {/* Folds to its title once the round starts, so the room below reads like ranked. */}
+      <section className={`tut-card arena-panel${started ? " is-collapsed" : ""}`}>
         <p className="tut-kicker">
           Lesson {STEP_LABELS.length} of {STEP_LABELS.length} · Live round
         </p>
         <h2 className="tut-title">Live round vs Sibyl</h2>
         <p className="tut-body">
-          Live Bitcoin prices, a real 60-second clock, and Sibyl, our practice bot, trading against you. You each start with <b>{usd(LIVE_STARTING_CASH)}</b>. Trade as often as you like; most money at the bell wins.
+          This is the same screen you&apos;ll play ranked on: live Bitcoin, a real 60-second clock, and Sibyl, our practice bot, trading against you. You each start with <b>{usd(LIVE_STARTING_CASH)}</b>; most money at the bell wins.
         </p>
         <p className="tut-key">
-          Real Bitcoin moves far less than our lessons, often under 0.1% a minute, so leverage starts at <b>100×</b>. Same liquidation rule: at 100× a 1% move against you wipes you out. At 1,000×, just 0.1%.
+          Real Bitcoin moves far less than our lessons, so leverage starts at <b>100×</b>, where a 1% move against you wipes you out. At 1,000×, just 0.1%.
         </p>
       </section>
 
+      {/* From here down it mirrors the ranked room (app/duel/[market]/pulse/[matchId]/page.tsx):
+          scoreboard, centered price, chart, then the same setup dock. */}
       <section className="tut-stage">
         <div className="arena-panel rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 py-2.5">
           <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1 sm:gap-2">
@@ -388,7 +395,7 @@ export default function LiveRound({
             <div className="flex flex-col items-center gap-0.5">
               <span className="text-[9px] font-semibold uppercase tracking-[0.25em] text-[var(--muted-dim)]">VS</span>
               <CountdownRing seconds={secondsLeft} total={LIVE_ROUND_SECONDS} urgent={secondsLeft <= 10 && started} />
-              <span className="text-[9px] uppercase tracking-wider text-[var(--muted)]">{started ? "Time left" : "Ready"}</span>
+              <span className="text-[9px] uppercase tracking-wider text-[var(--muted)]">{outcome ? "Final" : started ? "Time left" : "Ready"}</span>
             </div>
             <div className="flex min-w-0 items-center justify-end gap-1.5 sm:gap-2">
               <ArenaScore name="Sibyl · AI" equity={botEquity} pnl={botPnl} align="right" />
@@ -403,30 +410,35 @@ export default function LiveRound({
           </p>
         </div>
 
-        <div className="tut-live-price">
-          <span className="tut-stage-label">{outcome ? "FINAL BTC / USD" : "BTC / USD"}</span>
-          {!outcome && (
-            <span className="flex items-center gap-1.5 text-xs text-[var(--muted)]">
-              <span className={`h-1.5 w-1.5 rounded-full ${status === "live" ? "animate-pulse bg-[var(--brand)]" : "bg-[var(--muted-dim)]"}`} />
-              {status === "live" ? "live" : status}
-            </span>
-          )}
-          <strong className="tabular-nums">
+        <div className="mt-6 text-center">
+          <div className="flex items-center justify-center gap-2">
+            <p className="text-xs font-semibold uppercase tracking-wider text-[var(--market-accent-strong)]">{outcome ? "Final BTC / USD" : "BTC / USD"}</p>
+            {!outcome && (
+              <span className="flex items-center gap-1.5 text-xs text-[var(--muted)]">
+                <span className={`h-1.5 w-1.5 rounded-full ${status === "live" ? "animate-pulse bg-[var(--brand)]" : "bg-[var(--muted-dim)]"}`} />
+                {status === "live" ? "live" : status}
+              </span>
+            )}
+            {started && !outcome && <span className="text-xs uppercase tracking-wider text-[var(--brand)]">· round live</span>}
+          </div>
+          <p className="mt-1 text-4xl font-semibold tabular-nums text-[var(--text)]">
             <FlashingPrice price={outcome?.finalPrice ?? price} />
-          </strong>
+          </p>
         </div>
 
-        <PriceChart
-          points={frozenPoints ?? points}
-          trades={markers}
-          roundStart={roundStart}
-          frozen={frozenPoints !== null}
-          openEntry={position ? { t: position.openedAt ?? 0, p: position.entryPrice, side: position.side } : null}
-          now={now}
-        />
-        <div className="mt-2 flex items-center justify-between px-1 text-xs text-[var(--muted-dim)]">
-          <span>Entries ○ · exits □ · reversals ◇ · dashed = Sibyl</span>
-          <SoundToggle muted={muted} onToggle={toggleMuted} />
+        <div className="mt-4">
+          <PriceChart
+            points={frozenPoints ?? points}
+            trades={markers}
+            roundStart={roundStart}
+            frozen={frozenPoints !== null}
+            openEntry={position ? { t: position.openedAt ?? 0, p: position.entryPrice, side: position.side } : null}
+            now={now}
+          />
+          <div className="mt-2 flex items-center justify-between px-1 text-xs text-[var(--muted-dim)]">
+            <span>Entries ○ · exits □ · reversals ◇ · dashed = Sibyl</span>
+            <SoundToggle muted={muted} onToggle={toggleMuted} />
+          </div>
         </div>
       </section>
 
@@ -448,31 +460,39 @@ export default function LiveRound({
         >
           {phase === "setup" && (
             <>
-              {lastClosedPnl !== null && (
+              {lastClose?.closed && (
                 <p className="dock-last-note">
-                  {liquidated ? "Liquidated" : "Last trade"}:{" "}
-                  <span style={{ color: pnlColor(lastClosedPnl) }}>{signedUsd(lastClosedPnl)}</span>
+                  {liquidated ? "Liquidated" : "Last"}: <span style={{ color: sideColor(lastClose.closed.side) }}>{lastClose.closed.side}</span> closed @{" "}
+                  {usd(lastClose.closed.exit)} · <span style={{ color: pnlColor(lastClose.pnl ?? 0) }}>{signedUsd(lastClose.pnl ?? 0)}</span>
                 </p>
               )}
               <div className="dock-row dock-row-wrap">
                 <div className="dock-stake">
                   <PulseStakeStepper stake={tradeStake} availableCash={availableCash} disabled={false} onChange={setStake} />
                 </div>
-              </div>
-              <div className="tut-choice is-compact" role="radiogroup" aria-label="Leverage">
-                {PULSE_LEVERAGE_OPTIONS.map((option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    role="radio"
-                    aria-checked={leverage === option}
-                    className={leverage === option ? "is-selected" : undefined}
-                    onClick={() => setLeverage(option)}
-                  >
-                    <strong>{option.toLocaleString("en-US")}×</strong>
-                    <span>wiped out by {distanceLabel(option)}</span>
-                  </button>
-                ))}
+                <details className="dock-select dock-select-compact" ref={leverageDetailsRef}>
+                  <summary>
+                    <span className="dock-select-label">Leverage</span>
+                    <span className="dock-select-value">{leverage}×</span>
+                    <span className="dock-select-chevron">▾</span>
+                  </summary>
+                  <div className="dock-select-menu">
+                    {PULSE_LEVERAGE_OPTIONS.map((option) => (
+                      <button
+                        key={option}
+                        type="button"
+                        className={leverage === option ? "is-selected" : ""}
+                        onClick={() => {
+                          setLeverage(option);
+                          if (leverageDetailsRef.current) leverageDetailsRef.current.open = false;
+                        }}
+                      >
+                        {option}×
+                      </button>
+                    ))}
+                  </div>
+                </details>
+                <span className="dock-gear" role="img" aria-label="Setup">⚙</span>
               </div>
               <div className="dock-row">
                 {(["long", "short"] as const).map((side) => (
@@ -486,7 +506,7 @@ export default function LiveRound({
                   ? "Waiting for a live market connection…"
                   : availableCash <= 0
                     ? "You're out of practice money for this round."
-                    : `Available ${usd(availableCash)} · ${started ? "press a side to enter at the live price" : "your first trade starts the clock"}`}
+                    : `${started ? "Press a side to enter at the live market price." : "Your first trade starts the clock."} At ${leverage}×, a ${distanceLabel(leverage)} move against you wipes you out.`}
               </p>
             </>
           )}
@@ -505,7 +525,7 @@ export default function LiveRound({
                     {usd(position.entryPrice)} → {price !== null ? usd(price) : "—"}
                   </span>
                   <span>
-                    {usd(position.stake)} · {position.leverage.toLocaleString("en-US")}×
+                    {usd(position.stake)} · {position.leverage}×
                   </span>
                 </span>
               </div>
