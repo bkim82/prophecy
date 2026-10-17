@@ -1,11 +1,12 @@
 // One source of truth for "how do we get a settlement price": used by the
 // public /api/price proxy and by server-side match settlement (lib/match.ts).
 
-export const SUPPORTED_PRODUCTS = new Set(["BTC-USD", "ETH-USD"]);
+export const SUPPORTED_PRODUCTS = new Set(["BTC-USD", "ETH-USD", "HYPE-USD"]);
 
 const PRODUCT_BY_MARKET: Record<string, string> = {
   btc: "BTC-USD",
   eth: "ETH-USD",
+  hype: "HYPE-USD",
 };
 
 /** "btc" → "BTC-USD". Returns null for a market we don't price. */

@@ -34,8 +34,8 @@ const LOBBY_POLL_MS = 3000;
 // very list it is waiting to be found in (lib/match.ts PRESENCE_MS).
 const QUEUE_POLL_MS = 1000;
 
-// Cents by default; pass the market's tick size so sub-dollar coins (DOGE
-// quotes to $0.00001) aren't rounded to $0.09.
+// Cents by default; pass the market's tick size so a sub-dollar coin's finer
+// quote increment isn't rounded away.
 const usd = (value: number | null, tickSize = 0.01) => {
   if (value === null) return "—";
   const decimals = Math.max(2, Math.round(-Math.log10(tickSize)));
@@ -88,16 +88,16 @@ const signedUsd = (value: number | null) =>
   value === null ? "—" : `${value >= 0 ? "+" : "−"}${usd(Math.abs(value))}`;
 
 type ModeId = "pulse" | "battle-24h";
-type MarketId = "btc" | "eth" | "doge";
+type MarketId = "btc" | "eth" | "hype";
 
 const MARKETS: Record<MarketId, { label: string; symbol: string; name: string; tickSize: number }> = {
   btc: { label: "BTC", symbol: "₿", name: "BTC-USD", tickSize: 0.01 },
   eth: { label: "ETH", symbol: "Ξ", name: "ETH-USD", tickSize: 0.01 },
-  doge: { label: "DOGE", symbol: "Ð", name: "DOGE-USD", tickSize: 0.00001 },
+  hype: { label: "HYPE", symbol: "H", name: "HYPE-USD", tickSize: 0.01 },
 };
 
-// BTC and ETH Pulse go through matchmaking; DOGE gets the same mode list with
-// no href, which the panel below renders as "soon" and leaves inert.
+// Every market's Pulse goes through matchmaking. A mode with neither `href`
+// nor `matched` renders as "soon" and stays inert.
 const MODES_BY_MARKET: Record<MarketId, { id: ModeId; label: string; meta: string; href?: string; matched?: boolean }[]> = {
   btc: [
     { id: "pulse", label: "Pulse", meta: "BTC · head to head · trade live", matched: true },
@@ -107,8 +107,8 @@ const MODES_BY_MARKET: Record<MarketId, { id: ModeId; label: string; meta: strin
     { id: "pulse", label: "Pulse", meta: "ETH · head to head · trade live", matched: true },
     { id: "battle-24h", label: "24h Portfolio", meta: "Base meme coins · spot & leverage · 24h session", href: "/duel/portfolio" },
   ],
-  doge: [
-    { id: "pulse", label: "Pulse", meta: "DOGE · solo · trade live for 60 seconds" },
+  hype: [
+    { id: "pulse", label: "Pulse", meta: "HYPE · head to head · trade live", matched: true },
     { id: "battle-24h", label: "24h Portfolio", meta: "Base meme coins · spot & leverage · 24h session", href: "/duel/portfolio" },
   ],
 };
@@ -116,7 +116,7 @@ const MODES_BY_MARKET: Record<MarketId, { id: ModeId; label: string; meta: strin
 const SYMBOL_CLASS: Record<MarketId, string> = {
   btc: "btc-symbol",
   eth: "eth-symbol",
-  doge: "doge-symbol",
+  hype: "hype-symbol",
 };
 
 export default function Page() {

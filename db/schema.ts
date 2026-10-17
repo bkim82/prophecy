@@ -32,7 +32,7 @@ export const matchPayouts = pgTable("match_payouts", {
 // Player ids are anonymous per-browser UUIDs (app/lib/playerId.ts), not Clerk ids.
 export const matches = pgTable("matches", {
   id: text("id").primaryKey(),
-  market: text("market").notNull(), // "btc" | "eth"
+  market: text("market").notNull(), // "btc" | "eth" | "hype"
   mode: text("mode").notNull(), // "pulse"
   wager: integer("wager").notNull(),
   timerSeconds: integer("timer_seconds").notNull(),
@@ -212,7 +212,7 @@ export const challenges = pgTable("challenges", {
   targetHandle: text("target_handle").notNull(),
   targetRank: text("target_rank").notNull(),
   mode: text("mode").notNull(), // "pulse" | "portfolio"
-  market: text("market"), // pulse only: "btc" | "eth"
+  market: text("market"), // pulse only: "btc" | "eth" | "hype"
   timerSeconds: integer("timer_seconds"), // pulse only
   stake: integer("stake").notNull(), // Embers, proposed — not reserved
   status: text("status").notNull().default("pending"), // "pending" | "canceled"

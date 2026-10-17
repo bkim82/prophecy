@@ -15,7 +15,7 @@
   --structure: #0a1a31; --structure-raised: #102742; --structure-line: #27435d; --structure-text: #f7f0e2; --structure-muted: #a5b6c2;
   --selected-bg: color-mix(in srgb, var(--brand) 18%, var(--surface)); --selection: rgba(24, 212, 192, .24);
   --market-accent: var(--brand); --market-accent-strong: var(--brand-strong); --market-accent-contrast: var(--brand-contrast);
-  --market-btc: #f7931a; --market-eth: #627eea; --market-sol: #2fd6a3; --market-doge: #c2a633;
+  --market-btc: #f7931a; --market-eth: #627eea; --market-sol: #2fd6a3; --market-doge: #c2a633; --market-hype: #7ce0c3;
   --chart-accent: #c0603a; --chart-accent-strong: #e08655; --chart-line: var(--chart-accent); --chart-point: var(--chart-accent-strong); --trade-contrast: #1a0d06;
   --accent: var(--brand); --accent-strong: var(--brand-strong); --accent-contrast: var(--trade-contrast);
   --chart-grid: #241f1c; --chart-axis: #3d3530; --chart-up: #6fae7a; --chart-down: #c94f4f;
@@ -39,7 +39,7 @@
   --structure: #ffffff; --structure-raised: #f4f1fb; --structure-line: #e3def0; --structure-text: #16132b; --structure-muted: #5e5975;
   --selected-bg: color-mix(in srgb, var(--brand) 10%, var(--surface)); --selection: rgba(109, 79, 216, .18);
   --market-accent: var(--brand); --market-accent-strong: var(--brand-strong); --market-accent-contrast: var(--brand-contrast);
-  --market-btc: #f7931a; --market-eth: #627eea; --market-sol: #12a07c; --market-doge: #c2a633;
+  --market-btc: #f7931a; --market-eth: #627eea; --market-sol: #12a07c; --market-doge: #c2a633; --market-hype: #0f9e86;
   --chart-accent: #a8452a; --chart-accent-strong: #832f1a; --trade-contrast: #ffffff;
   --accent: var(--brand); --accent-strong: var(--brand-strong); --accent-contrast: var(--trade-contrast);
   --chart-grid: #ebe7f4; --chart-axis: #cfc8e0; --chart-up: #18935f; --chart-down: #cc3f55;
@@ -81,6 +81,7 @@
 /* The dark-theme "strong" tints are lighter than the base and wash out on light surfaces. */
 [data-theme="light"] [data-market="eth"] { --market-accent-strong: #3d58c9; }
 [data-theme="light"] [data-market="doge"] { --market-accent-strong: #8f7820; }
+[data-theme="light"] [data-market="hype"] { --market-accent-strong: #0b7a68; --chart-line: #0f9e86; --chart-point: #0b7a68; }
 [data-market="eth"] {
   --market-accent: #627eea; --market-accent-strong: #8296ef; --market-accent-contrast: #ffffff;
   --chart-line: #627eea; --chart-point: #8296ef;
@@ -88,6 +89,11 @@
 [data-market="doge"] {
   --market-accent: #c2a633; --market-accent-strong: #ddc158; --market-accent-contrast: #1c1200;
   --chart-line: #c2a633; --chart-point: #ddc158;
+}
+/* Hyperliquid mint; light theme darkens it (above) so it reads on white. */
+[data-market="hype"] {
+  --market-accent: #7ce0c3; --market-accent-strong: #a6f0da; --market-accent-contrast: #06252b;
+  --chart-line: #7ce0c3; --chart-point: #a6f0da;
 }
 * { box-sizing: border-box; }
 html { background: var(--bg); }
@@ -1686,6 +1692,7 @@ a.post-avatar { text-decoration: none; }
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 1.75 4.2 12.4 12 16.9l7.8-4.5L12 1.75Z' fill='black'/%3E%3Cpath d='M12 16.9v5.35l7.8-10.95-7.8 5.6Z' fill='black' fill-opacity='.62'/%3E%3Cpath d='M12 16.9 4.2 11.3 12 22.25V16.9Z' fill='black' fill-opacity='.82'/%3E%3Cpath d='m12 8.65-7.8 3.75 7.8 4.5 7.8-4.5L12 8.65Z' fill='black' fill-opacity='.45'/%3E%3C/svg%3E") center / 68% 68% no-repeat;
 }
 .doge-symbol { color: var(--market-doge); }
+.hype-symbol { color: var(--market-hype); }
 .sol-symbol { color: var(--market-sol); }
 .control-group { display: grid; gap: 7px; min-width: 0; padding-left: 22px; border-left: 1px solid var(--line); }
 .field-label { color: var(--muted); font-size: 10px; letter-spacing: .09em; text-transform: uppercase; }

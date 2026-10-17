@@ -32,4 +32,4 @@
 ## Not built
 
 - No server persistence of tutorial progress (per-browser flag only); no rank or Embers reward for finishing.
-- Lesson paths are BTC-only; the ETH/DOGE lobby tabs link to the same BTC tutorial.
+- Lesson paths are BTC-only; the ETH/HYPE lobby tabs link to the same BTC tutorial.

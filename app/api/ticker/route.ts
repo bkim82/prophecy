@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic";
 
-const SUPPORTED_PRODUCTS = new Set(["BTC-USD", "ETH-USD", "DOGE-USD"]);
+const SUPPORTED_PRODUCTS = new Set(["BTC-USD", "ETH-USD", "HYPE-USD"]);
 
 /**
  * REST fallback for the live feed (app/usePriceFeed.ts): last trade plus best
