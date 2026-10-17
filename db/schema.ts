@@ -13,6 +13,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import type { PulsePosition } from "@/lib/pulse";
+import type { BotState } from "@/lib/bots";
 
 export const users = pgTable("users", {
   id: text("id").primaryKey(), // Clerk during transition; stable CDP end-user id after reset
@@ -167,7 +168,7 @@ export const matchPayouts = pgTable("match_payouts", {
 // Player ids are anonymous per-browser UUIDs (app/lib/playerId.ts), not Clerk ids.
 export const matches = pgTable("matches", {
   id: text("id").primaryKey(),
-  market: text("market").notNull(), // "btc" | "eth"
+  market: text("market").notNull(), // "btc" | "eth" | "hype"
   mode: text("mode").notNull(), // "pulse"
   wager: integer("wager").notNull(),
   timerSeconds: integer("timer_seconds").notNull(),
@@ -208,6 +209,27 @@ export const matches = pgTable("matches", {
   roundStartAt: timestamp("round_start_at", { withTimezone: true }),
   finalPrice: doublePrecision("final_price"),
   winner: text("winner"), // "1" | "2" | "tie"
+  // Non-null when one seat is a house bot (lib/bots.ts): which role it plays
+  // and its per-round decision state. Never sent to clients.
+  botState: jsonb("bot_state").$type<BotState>(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  // One bot-hosted waiting match per lobby slot, so concurrent
+  // `ensureBotSlots` calls can't stack duplicates (`ON CONFLICT DO NOTHING`).
+  oneOpenBotPerSlot: uniqueIndex("matches_one_open_bot_per_slot")
+    .on(table.market, table.mode, table.wager, table.timerSeconds)
+    .where(sql`${table.status} = 'open' AND ${table.botState} IS NOT NULL`),
+}));
+
+// House-bot personas (lib/bots.ts). `id` is Clerk-shaped and lands in
+// `matches.player{N}_user_id` like a real user's; `name` is what
+// lib/opponentNames.ts shows. `skill` (0 reckless .. 1 disciplined) shapes
+// trading habits and is never exposed. Bots have no `users` row, so payouts
+// to a bot are no-ops.
+export const bots = pgTable("bots", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  skill: doublePrecision("skill").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -301,6 +323,21 @@ export const profiles = pgTable("profiles", {
   handleUnique: uniqueIndex("profiles_handle_unique").on(table.handle),
 }));
 
+// One row per Clerk user who finished the post-sign-up flow at /welcome
+// (app/welcome/actions.ts finishOnboarding); no row = not onboarded yet.
+// Answers are option ids from app/lib/onboardingQuestions.ts, not copy.
+// Finishing requires confirming 18+, so a row also records that.
+export const onboarding = pgTable("onboarding", {
+  userId: text("user_id").primaryKey(),
+  goals: jsonb("goals").$type<string[]>().notNull(), // ≥1 GOALS id
+  experience: text("experience").notNull(), // EXPERIENCE id
+  paces: jsonb("paces").$type<string[]>().notNull(), // PACES ids, may be empty
+  interests: jsonb("interests").$type<string[]>().notNull(), // TopicIds, may be empty
+  referral: text("referral"), // REFERRALS id, null = skipped
+  timezone: text("timezone"), // IANA zone reported by the browser
+  completedAt: timestamp("completed_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // One row per challenge sent from a profile (app/profile/challengeActions.ts).
 // Requests only for now: profiles you can open are mock traders who can't
 // reply, so nothing reserves Embers or creates a `matches` row yet — that
@@ -314,7 +351,7 @@ export const challenges = pgTable("challenges", {
   targetHandle: text("target_handle").notNull(),
   targetRank: text("target_rank").notNull(),
   mode: text("mode").notNull(), // "pulse" | "portfolio"
-  market: text("market"), // pulse only: "btc" | "eth"
+  market: text("market"), // pulse only: "btc" | "eth" | "hype"
   timerSeconds: integer("timer_seconds"), // pulse only
   stake: integer("stake").notNull(), // Embers, proposed — not reserved
   status: text("status").notNull().default("pending"), // "pending" | "canceled"

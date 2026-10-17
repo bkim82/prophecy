@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SignInAction, useAppAuth } from "@/app/auth/AuthProvider";
 import { DailyCoin, pickDailyCoin } from "@/app/DailyCoin";
+import { FlameIcon } from "@/app/icons";
 import { PortfolioGame } from "@/app/duel/portfolio/PortfolioGame";
+import { hasFinishedTutorial, TUTORIAL_HREF } from "@/app/duel/tutorial/progress";
 import {
   getActiveMatch,
   setQueueing,
@@ -16,6 +18,7 @@ import { getPlayerId } from "@/app/lib/playerId";
 import { playedLabel } from "@/app/lib/playedLabel";
 import { usePriceFeed } from "@/app/usePriceFeed";
 import { clockLabel, MARKET_CHART_WINDOW_MS, MarketChart, priceAt, type ScrubPoint } from "@/app/MarketChart";
+import { PULSE_DEFAULT_WAGER, PULSE_WAGER_OPTIONS } from "@/lib/pulse";
 
 const TIMER_PRESETS = [
   { label: "60s", value: 60 },
@@ -31,8 +34,8 @@ const LOBBY_POLL_MS = 3000;
 // very list it is waiting to be found in (lib/match.ts PRESENCE_MS).
 const QUEUE_POLL_MS = 1000;
 
-// Cents by default; pass the market's tick size so sub-dollar coins (DOGE
-// quotes to $0.00001) aren't rounded to $0.09.
+// Cents by default; pass the market's tick size so a sub-dollar coin's finer
+// quote increment isn't rounded away.
 const usd = (value: number | null, tickSize = 0.01) => {
   if (value === null) return "—";
   const decimals = Math.max(2, Math.round(-Math.log10(tickSize)));
@@ -85,16 +88,16 @@ const signedUsd = (value: number | null) =>
   value === null ? "—" : `${value >= 0 ? "+" : "−"}${usd(Math.abs(value))}`;
 
 type ModeId = "pulse" | "battle-24h";
-type MarketId = "btc" | "eth" | "doge";
+type MarketId = "btc" | "eth" | "hype";
 
 const MARKETS: Record<MarketId, { label: string; symbol: string; name: string; tickSize: number }> = {
   btc: { label: "BTC", symbol: "₿", name: "BTC-USD", tickSize: 0.01 },
   eth: { label: "ETH", symbol: "Ξ", name: "ETH-USD", tickSize: 0.01 },
-  doge: { label: "DOGE", symbol: "Ð", name: "DOGE-USD", tickSize: 0.00001 },
+  hype: { label: "HYPE", symbol: "H", name: "HYPE-USD", tickSize: 0.01 },
 };
 
-// BTC and ETH Pulse go through matchmaking; DOGE gets the same mode list with
-// no href, which the panel below renders as "soon" and leaves inert.
+// Every market's Pulse goes through matchmaking. A mode with neither `href`
+// nor `matched` renders as "soon" and stays inert.
 const MODES_BY_MARKET: Record<MarketId, { id: ModeId; label: string; meta: string; href?: string; matched?: boolean }[]> = {
   btc: [
     { id: "pulse", label: "Pulse", meta: "BTC · head to head · trade live", matched: true },
@@ -104,8 +107,8 @@ const MODES_BY_MARKET: Record<MarketId, { id: ModeId; label: string; meta: strin
     { id: "pulse", label: "Pulse", meta: "ETH · head to head · trade live", matched: true },
     { id: "battle-24h", label: "24h Portfolio", meta: "Base meme coins · spot & leverage · 24h session", href: "/duel/portfolio" },
   ],
-  doge: [
-    { id: "pulse", label: "Pulse", meta: "DOGE · solo · trade live for 60 seconds" },
+  hype: [
+    { id: "pulse", label: "Pulse", meta: "HYPE · head to head · trade live", matched: true },
     { id: "battle-24h", label: "24h Portfolio", meta: "Base meme coins · spot & leverage · 24h session", href: "/duel/portfolio" },
   ],
 };
@@ -113,7 +116,7 @@ const MODES_BY_MARKET: Record<MarketId, { id: ModeId; label: string; meta: strin
 const SYMBOL_CLASS: Record<MarketId, string> = {
   btc: "btc-symbol",
   eth: "eth-symbol",
-  doge: "doge-symbol",
+  hype: "hype-symbol",
 };
 
 export default function Page() {
@@ -126,6 +129,8 @@ export default function Page() {
   // While the chart is being scrubbed, the headline reads the scrubbed point.
   const [scrub, setScrub] = useState<ScrubPoint>(null);
   const [timer, setTimer] = useState(60);
+  // Embers each side puts in; matchmaking only pairs identical wagers.
+  const [wager, setWager] = useState<number>(PULSE_DEFAULT_WAGER);
   // Phones only: 24h high/low/players collapse so Play stays above the fold.
   const [statsOpen, setStatsOpen] = useState(false);
   const [mode, setMode] = useState<ModeId>("pulse");
@@ -143,6 +148,8 @@ export default function Page() {
   const [inviteState, setInviteState] = useState<"idle" | "shared" | "copied" | "error">("idle");
   // null until loaded; finishing a match navigates back here, which remounts and refetches.
   const [recentResults, setRecentResults] = useState<RecentResult[] | null>(null);
+  // First-timer nudge toward the tutorial; read after mount (localStorage), so it never flashes for players who finished it.
+  const [tutorialNudge, setTutorialNudge] = useState(false);
   const modes = MODES_BY_MARKET[market];
   // The chart's head (bid/ask midpoint), so the headline matches the pill.
   const livePrice = points.at(-1)?.p ?? price;
@@ -169,6 +176,7 @@ export default function Page() {
   const playHref = activeMode.href ?? "/duel";
 
   useEffect(() => setPlayerId(getPlayerId()), []);
+  useEffect(() => setTutorialNudge(!hasFinishedTutorial()), []);
 
   useEffect(() => {
     setActiveMatchState(getActiveMatch());
@@ -274,9 +282,7 @@ export default function Page() {
           playerId,
           market,
           mode: matchMode,
-          // Pulse chooses its position stake in the room; this value only
-          // keeps its lobby rows compatible with the shared match schema.
-          wager: 100,
+          wager,
           timerSeconds: timer,
         }),
       });
@@ -286,7 +292,7 @@ export default function Page() {
         status: string;
       };
       if (matchStatus === "open") {
-        setQueue({ matchId, market, mode: matchMode, wager: 100, timerSeconds: timer, since: Date.now() });
+        setQueue({ matchId, market, mode: matchMode, wager, timerSeconds: timer, since: Date.now() });
         setQueuedFor(0);
         setPending(null);
         return;
@@ -393,6 +399,8 @@ export default function Page() {
     <main className="lobby-shell" data-market={market}>
       <h1 className="sr-only">Arena</h1>
 
+      {/* Pulse: tabs, markets and the stage share one screen-tall fold on desktop (.arena-fold). */}
+      <div className={mode === "pulse" ? "arena-fold" : undefined}>
       <div className="feed-tabs arena-mode-tabs" role="group" aria-label="Choose a mode">
         {modes.map((option) => (
           <button key={option.id} type="button" className={option.id === mode ? "active" : ""} aria-pressed={option.id === mode} onClick={() => setMode(option.id)}>
@@ -408,8 +416,6 @@ export default function Page() {
           <span className="field-label">Markets</span>
           <button className={market === "btc" ? "active" : ""} aria-pressed={market === "btc"} type="button" onClick={() => setMarket("btc")}><span className="market-symbol btc-symbol">₿</span> BTC</button>
           <button className={market === "eth" ? "active" : ""} aria-pressed={market === "eth"} type="button" onClick={() => setMarket("eth")}><span className="market-symbol eth-symbol">Ξ</span> ETH</button>
-        </div>
-        <div className="market-switcher">
           <DailyCoin active={market === dailyCoinId} symbol={MARKETS[dailyCoinId].symbol} symbolClass={SYMBOL_CLASS[dailyCoinId]} onSelect={() => setMarket(dailyCoinId)} />
         </div>
       </nav>
@@ -451,6 +457,16 @@ export default function Page() {
       </div>
       )}
 
+      {takesCall && tutorialNudge && !queue && (
+        <Link href={TUTORIAL_HREF} className="tutorial-callout">
+          <span>
+            <strong>New to Pulse?</strong>
+            <span className="muted">Learn it in a few minutes with practice money.</span>
+          </span>
+          <span className="tutorial-callout-cta">Start tutorial <span aria-hidden="true">→</span></span>
+        </Link>
+      )}
+
       {queue ? (
         <section className="queue-panel panel" aria-live="polite">
           <span className="queue-pulse" aria-hidden="true" />
@@ -458,7 +474,7 @@ export default function Page() {
             <span className="field-label">In queue</span>
             <strong>Waiting for an opponent…</strong>
             <span className="muted">
-              {MARKETS[queue.market].label} Pulse · {queue.timerSeconds}s round
+              {MARKETS[queue.market].label} Pulse · {queue.timerSeconds}s round · {queue.wager} Embers each, winner takes {queue.wager * 2}
             </span>
           </div>
           <span className="queue-elapsed">{queuedFor}s</span>
@@ -488,6 +504,17 @@ export default function Page() {
             ))}
           </div>
         </div>
+        <div className="control-group control-group--wager">
+          <span className="field-label">Wager</span>
+          <div className="segmented-control" role="group" aria-label="Choose wager">
+            {PULSE_WAGER_OPTIONS.map((option) => (
+              <button key={option} type="button" disabled={!takesCall} className={`wager-option${wager === option ? " is-selected" : ""}`} aria-pressed={wager === option} onClick={() => setWager(option)}>
+                <FlameIcon className="balance-ember-icon" /> {option}
+              </button>
+            ))}
+          </div>
+          <span className="muted wager-pot">Winner takes <FlameIcon className="balance-ember-icon" /> <strong>{wager * 2}</strong></span>
+        </div>
         <div className="opponent-status"><span className="field-label">Opponent</span><strong><span className={`status-dot ${isPlayable ? "is-online" : ""}`} /> {takesCall ? "Open lobby" : isPlayable ? "Solo · NOVA AI" : "Unavailable"}</strong><span className="muted">{takesCall ? `${openMatches.length} Pulse match${openMatches.length === 1 ? "" : "es"} waiting` : isPlayable ? "Stake and leverage set in-round" : "Mode in development"}</span></div>
         <div className="play-actions">
           {activeMode.matched
@@ -499,9 +526,11 @@ export default function Page() {
               ? <Link href={playHref} className="play-button">Play <span aria-hidden="true">→</span></Link>
               : <button type="button" className="play-button" disabled>Soon</button>}
           {takesCall && practiceHref && (
-            <Link href={practiceHref} className="practice-button">
-              Practice
-            </Link>
+            <div className="play-secondary">
+              <Link href={practiceHref} className="practice-button">
+                Practice
+              </Link>
+            </div>
           )}
         </div>
         {activeMatch ? (
@@ -511,6 +540,7 @@ export default function Page() {
         )}
       </section>
       )}
+      </div>
       </div>
       </div>
 
@@ -525,7 +555,7 @@ export default function Page() {
               <button type="button" className="data-row" key={match.id} onClick={() => join(match)} disabled={pending !== null || queue !== null || match.isYours || activeMatch !== null}>
                 <div className="row-market"><span className={`market-symbol ${match.market === "btc" ? "btc-symbol" : "eth-symbol"}`}>{match.market === "btc" ? "₿" : "Ξ"}</span><span><strong>{label}</strong><span className="muted">{match.timerSeconds}s · {match.isYours ? "yours" : "Pulse"}</span></span></div>
                 <span className="row-detail">1 / 2</span>
-                <span className="row-detail">live trade</span>
+                <span className="row-detail wager-detail"><FlameIcon className="balance-ember-icon" /> {match.wager}</span>
                 <span className="row-age">{pending === match.id ? "joining…" : age(match.createdAt)}</span>
               </button>
             );

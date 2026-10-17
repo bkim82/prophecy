@@ -41,6 +41,11 @@ export function websiteLabel(website: string): string {
   }
 }
 
+// Large source images are accepted only long enough to crop/re-encode them
+// client-side; the saved avatar must fit AVATAR_MAX_BYTES.
+export const SOURCE_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
+export const IMAGE_ACCEPT = "image/jpeg,image/png,image/webp";
+
 export const BANNER_MAX_BYTES = 512 * 1024;
 export const BANNER_TYPES = ["image/jpeg", "image/png", "image/webp"];
 export const AVATAR_MAX_BYTES = 256 * 1024;

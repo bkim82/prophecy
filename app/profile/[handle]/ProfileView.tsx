@@ -63,6 +63,8 @@ export type OwnProfile = {
   edit: EditableProfile;
   pinnedMatchIds: string[];
   challenges: SentChallenge[];
+  // False until /welcome is finished; shows a card linking back to it.
+  onboarded: boolean;
 };
 
 // A pending challenge you sent, resolved for display (target name/rank from
@@ -204,6 +206,18 @@ export function ProfileView({ profile, activity, portfolio, portfolioLocked, vie
         )}
       </ProfileShowcase>
 
+      {self && !self.onboarded && (
+        <Link href="/welcome" className="profile-setup">
+          <span className="profile-setup-mark" aria-hidden="true">
+            ✦
+          </span>
+          <span className="profile-setup-text">
+            <strong>Finish setting up your account</strong>
+            <span className="muted">Two minutes: why you&apos;re here, your experience, what to follow.</span>
+          </span>
+          <span aria-hidden="true">→</span>
+        </Link>
+      )}
       {self && <CopyEarningsCard earnings={self.copyEarnings} />}
       {self && editing && <EditProfileDialog initial={self.edit} onClose={() => setEditing(false)} />}
 

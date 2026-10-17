@@ -49,7 +49,7 @@ server-side. There is no loop back: "play again" is a new row, not a reset.
 ## settleIfDue(row) — `lib/match.ts:98`
 
 1. No-ops unless `status='countdown'` and the deadline has passed (`:99-101`).
-2. `getSpotPrice()` walks Coinbase → Binance (`lib/spotPrice.ts:39`).
+2. `getSpotPrice()` walks Coinbase Exchange ticker → Coinbase spot → Binance (`lib/spotPrice.ts:47`).
 3. Remaining positions close at that price; `profit{N}` = realized + their P&L (`:108-114`).
 4. Winner = higher profit; equal → tie (`:115`).
 5. Written under `status='countdown'` (`:116-130`), so two simultaneous polls cannot double-settle — the loser re-reads and uses the winner's values (`:132`).

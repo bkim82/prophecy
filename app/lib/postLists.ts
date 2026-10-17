@@ -62,6 +62,7 @@ function createIdStore(key: string, fallback: string[] = EMPTY) {
 const bookmarks = createIdStore("omens-bookmarks-v1");
 const interests = createIdStore("omens-interests-v2", DEFAULT_INTERESTS);
 const mutedTopics = createIdStore("omens-muted-topics-v1");
+const seenNotifications = createIdStore("omens-notifs-seen-v1");
 
 export function useBookmarks() {
   const ids = useSyncExternalStore(bookmarks.subscribe, bookmarks.snapshot, () => EMPTY);
@@ -90,6 +91,14 @@ export function useInterests() {
   return { ids, has: (id: TopicId) => ids.includes(id), toggle };
 }
 
+// Swaps the whole interest list at once — the topics picked during /welcome
+// (app/welcome/OnboardingFlow.tsx) become this browser's feed. Following
+// takes back "Not interested", same as toggle.
+export function replaceInterests(ids: TopicId[]) {
+  interests.write(ids);
+  mutedTopics.write(mutedTopics.snapshot().filter((id) => !ids.includes(id as TopicId)));
+}
+
 // "Not interested" topics: kept out of the For You suggestions (covers, the
 // feed under them, Mix it up). Muting also unfollows; `mute` returns where the
 // topic sat in your interests (-1 if it wasn't followed) so an Undo can put it
@@ -112,4 +121,12 @@ export function useMutedTopics() {
     interests.write([...followed.slice(0, followAt), id, ...followed.slice(followAt)]);
   };
   return { ids, has: (id: TopicId) => ids.includes(id), mute, unmute };
+}
+
+// Notification ids this browser has opened the header bell on
+// (app/NotificationsMenu.tsx). `ids` is null on the server render so the
+// unseen badge only appears once storage has been read.
+export function useSeenNotifications() {
+  const ids = useSyncExternalStore(seenNotifications.subscribe, seenNotifications.snapshot, () => null);
+  return { ids, markSeen: (next: string[]) => seenNotifications.write(next) };
 }

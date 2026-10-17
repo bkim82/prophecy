@@ -3,7 +3,7 @@
 import { useId, useState, type CSSProperties } from "react";
 import { TOP_TRADERS, type LeaderboardPeriod, type TopTrader } from "@/app/lib/sidebarMocks";
 
-// "The Oracles": the Omens leaderboard as a tarot spread. Ranks I–III are
+// "Top Oracles": the Omens leaderboard as a tarot spread. Ranks I–III are
 // cards on a podium, dealt face-down and flipped III → II → I; the rest is a
 // ranked list. Rank only, no score. Switching period remounts the board
 // (keyed by period) so the whole deal replays. Timing lives in globals.css
@@ -75,7 +75,7 @@ export function OraclesLeaderboard() {
     <section className="panel sidebar-panel oracles-panel" aria-labelledby={`${id}-title`}>
       <div className="oracles-head">
         <h3 className="oracles-title" id={`${id}-title`}>
-          The Oracles
+          Top Oracles
         </h3>
         <div className="oracles-periods" role="group" aria-label="Leaderboard period">
           {PERIODS.map(({ id, label }) => (

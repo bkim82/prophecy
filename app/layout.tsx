@@ -7,7 +7,7 @@ import { AuthProvider, SignedIn, type AuthConfiguration } from "./auth/AuthProvi
 import { BalancePill } from "./BalancePill";
 import { MobileBottomNav } from "./MobileBottomNav";
 import { MobileChromeAutoHide } from "./MobileChromeAutoHide";
-import { QuickTicketBar } from "./QuickTicketBar";
+import { NotificationsMenu } from "./NotificationsMenu";
 import { TabNav } from "./TabNav";
 import { DEFAULT_THEME, THEME_INIT_SCRIPT } from "./theme";
 import { ThemeToggle } from "./ThemeToggle";
@@ -55,6 +55,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <div className="header-actions">
                   <ThemeToggle />
                   <SignedIn><BalancePill /></SignedIn>
+                  <SignedIn><NotificationsMenu /></SignedIn>
                   <AccountMenu />
                 </div>
               </div>
@@ -63,6 +64,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <div className="mobile-header-actions">
                   <ThemeToggle />
                   <SignedIn><BalancePill /></SignedIn>
+                  <SignedIn><NotificationsMenu /></SignedIn>
                   <div className="mobile-account-control">
                     <AccountMenu compact />
                   </div>
@@ -73,7 +75,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           {children}
           <MobileBottomNav />
           <MobileChromeAutoHide />
-          <QuickTicketBar />
           <ActiveMatchBar />
         </AuthProvider>
       </body>

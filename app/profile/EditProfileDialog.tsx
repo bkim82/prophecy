@@ -11,7 +11,9 @@ import {
   AVATAR_TYPES,
   BANNER_MAX_BYTES,
   BANNER_PRESETS,
+  IMAGE_ACCEPT,
   PROFILE_LIMITS,
+  SOURCE_IMAGE_MAX_BYTES,
   bannerBackground,
   handleProblem,
   normalizeHandle,
@@ -44,9 +46,6 @@ type BannerDraft = { kind: "keep" } | { kind: "none" } | { kind: "preset"; id: s
 type AvatarDraft = { kind: "keep" } | { kind: "remove" } | { kind: "new"; file: File; previewUrl: string };
 type FormError = { message: string; field?: ProfileField };
 
-const IMAGE_ACCEPT = "image/jpeg,image/png,image/webp";
-// Large source images are accepted only long enough to crop/re-encode them.
-const SOURCE_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
 const BANNER_WIDTH = 1500;
 const BANNER_RATIO = 3;
 

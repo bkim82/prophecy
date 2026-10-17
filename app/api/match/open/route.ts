@@ -1,7 +1,8 @@
-import { and, desc, eq, gt, isNotNull } from "drizzle-orm";
+import { and, desc, eq, gt, isNotNull, or } from "drizzle-orm";
 import { getDb } from "@/db";
 import { matches } from "@/db/schema";
 import { presenceCutoff } from "@/lib/match";
+import { ensureBotSlots, listedCreatedAt } from "@/lib/bots";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,7 @@ export async function GET(request: Request) {
   const mode = searchParams.get("mode");
   const playerId = searchParams.get("playerId");
 
+  await ensureBotSlots();
   const rows = await getDb()
     .select()
     .from(matches)
@@ -26,7 +28,8 @@ export async function GET(request: Request) {
       and(
         eq(matches.status, "open"),
         isNotNull(matches.player1UserId),
-        gt(matches.player1LastSeen, presenceCutoff()),
+        // Bot hosts never heartbeat; they are always "here".
+        or(gt(matches.player1LastSeen, presenceCutoff()), isNotNull(matches.botState)),
         ...(market ? [eq(matches.market, market)] : []),
         ...(mode ? [eq(matches.mode, mode)] : []),
       ),
@@ -42,7 +45,7 @@ export async function GET(request: Request) {
         mode: row.mode,
         wager: row.wager,
         timerSeconds: row.timerSeconds,
-        createdAt: row.createdAt.getTime(),
+        createdAt: listedCreatedAt(row),
         isYours: playerId !== null && row.player1Id === playerId,
       })),
       serverNow: Date.now(),

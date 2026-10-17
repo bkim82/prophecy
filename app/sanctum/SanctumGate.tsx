@@ -26,10 +26,23 @@ const EMBLEMS: Record<RoomId, React.ReactNode> = {
       ))}
     </>
   ),
+  platinum: (
+    <>
+      <path d="M32 16 45.9 24v16L32 48 18.1 40V24Z" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+      <path d="M32 23 39.8 27.5v9L32 41 24.2 36.5v-9Z" fill="currentColor" opacity=".35" />
+      <path d="M32 16v7M45.9 24l-6.1 3.5M45.9 40l-6.1-3.5M32 48v-7M18.1 40l6.1-3.5M18.1 24l6.1 3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" opacity=".7" />
+    </>
+  ),
   diamond: (
     <>
       <path d="M24 22h16l7 9-15 17-15-17Z" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
       <path d="M17 31h30M24 22l4 9 4 17 4-17 4-9M28 31l4-9 4 9" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" opacity=".7" />
+    </>
+  ),
+  prophet: (
+    <>
+      <path d="M32 17c4 6 10 10.5 10 18.5a10 10 0 0 1-20 0c0-4 2-7 4.5-9 .2 3 1.6 5 3.5 6-.8-6 .5-11 2-15.5Z" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+      <path d="M32 32c2 2.6 4 4.4 4 7a4 4 0 0 1-8 0c0-2.6 2-4.4 4-7Z" fill="currentColor" opacity=".8" />
     </>
   ),
   oracle: (

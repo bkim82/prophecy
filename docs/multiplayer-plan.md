@@ -10,7 +10,7 @@ polling, and lazy settlement.
 - Match-seat identity: anonymous per-browser UUID in `localStorage.playerId` (`app/lib/playerId.ts:20`), separate from the signed-in application viewer.
 - Sync: ~1s polling (`app/duel/[market]/pulse/[matchId]/page.tsx:22`), no WebSocket registry. Lobby list polls at 3s (`app/duel/page.tsx:25`), the queue at 1s (`app/duel/page.tsx:30`).
 - Nobody sits in a room alone: an `open` match is waited out on the lobby page (`app/duel/page.tsx` `queue` panel); the room is entered only once `status` leaves `open`. The queued state exposes a shareable invite URL (`app/duel/page.tsx` `shareInvite`) that auto-joins a friend as player 2 (`app/duel/[market]/pulse/[matchId]/page.tsx:59`, `:89-99`).
-- Requires an application viewer from `getViewer()` (`lib/viewer.ts:23`). Each player's `wager` is reserved atomically from `users.balance` on entry; open/predict cancellation refunds it, ties refund both stakes, and the winner receives the 2× pot (`lib/balance.ts`). Pulse reserves each entry's stake from the player's round bankroll and returns that stake when the position closes.
+- Requires application sign-in (`getViewer()`, `lib/viewer.ts`). Wager is picked in the lobby from `PULSE_WAGER_OPTIONS` (50/100/200 Embers, default 100; `lib/pulse.ts`, Wager segmented control in `app/duel/page.tsx`). Each player's `wager` is reserved atomically from `users.balance` on entry; open/predict cancellation refunds it, ties refund both stakes, and the winner receives the 2× pot (`lib/balance.ts`). Pulse reserves each entry's stake from the player's round bankroll and returns that stake when the position closes.
 
 ## Status machine
 
@@ -53,6 +53,15 @@ multi-statement transactions or row locks. Every transition is a single guarded
 - `matches` timestamps are `timestamptz`, unlike `users.createdAt` (`db/schema.ts:35-47`). Bare `timestamp` columns store whatever local time the writer was in — a row written from a laptop and read on a UTC server lands hours out, which reads as "that player went offline".
 - Server sends `serverNow` with every view (`lib/match.ts:223`); the client subtracts the skew before running the pre-round timer, the countdown, or chart markers (`app/duel/[market]/pulse/[matchId]/page.tsx:55-62`).
 
+## House bots (`lib/bots.ts`)
+
+- Personas: `bots` table (`db/schema.ts`), Clerk-shaped `user_…` id, random name (`randomBotName`, `lib/bots.ts:74`) in the same `@handle`/first-name shapes as real opponents, hidden `skill` 0..1. Pool minted up to `POOL_TARGET`=80, then reused (`pickPersonas`). Names resolve via `lib/opponentNames.ts` → `botNames` before Clerk.
+- Per-round brain: `matches.bot_state` jsonb (`BotState`, role + skill + next tick). Non-null = a bot holds that seat; never in `viewFor`. A bot opponent always reads `opponentPresent: true`.
+- Always online: `ensureBotSlots` (`lib/bots.ts:149`, called from `GET /api/match/open`, throttled 4s/instance) keeps one bot-hosted `open` row per BTC × 60/120/300s × 50/100/200 wager (`BOT_WAGERS` = `PULSE_WAGER_OPTIONS`; `BOT_MARKETS`; ETH stays human-only so invites aren't sniped); unique partial index `matches_one_open_bot_per_slot` dedupes. A slot gets a new persona only after its bot is joined; the listed age cycles every 90s (`listedCreatedAt`, display only). Bot hosts skip presence (`or(... isNotNull(botState))` in open list + join).
+- Play (`find-or-create`) pairs humans only (`isNull(botState)`); a queued human on a `BOT_MARKETS` market gets a bot after a deterministic 3–9s per match (`seatBotIfWaiting`, `lib/bots.ts:209`, run off the poll), same guarded seat UPDATE so a real joiner still wins.
+- Trading: `driveBot` (`lib/bots.ts:241`) runs off `GET /api/match/[id]` between pre-round expiry and settlement (`app/api/match/[id]/route.ts:47-48`); CAS on `bot_state`. Skill shapes habits only (stake fraction, leverage, momentum-follow, TP/SL, tick rate) — no lookahead. Only trades while someone polls.
+- Economy: bots have no `users` row and reserve nothing; a human beating a bot is paid the full 2× pot (half minted), a bot win just keeps the human's stake.
+
 ## Routes
 
 | Route | Does |
@@ -66,10 +75,10 @@ multi-statement transactions or row locks. Every transition is a single guarded
 | `GET /api/match/recent` | signed-in user's newest 5 settled matches, all markets — `settledMatchesFor` + `historyEntryFor` + profile-backed `opponentNames` (`lib/opponentNames.ts`), same naming as the profile Matches tab. Rendered by the lobby's Recent results: coin, `vs <opponent>`, Won/Lost/Tie, your round P&L, relative time (`app/lib/playedLabel.ts`); fetched once per mount, so returning from a room refreshes it |
 
 Validation on entry: market must price (`lib/spotPrice.ts:12`), mode must be
-`pulse`, caller must have a signed-in application viewer, wager integer
-1..1,000,000 and no more than the user's balance, timer 10..3600s. Pulse
-actions additionally validate side, stake ≤ $100 and available bankroll, leverage,
-and position id.
+`pulse`, caller must have an application viewer (`getViewer()`), wager one of
+`PULSE_WAGER_OPTIONS` (`isPulseWager`) and no more than the user's balance, timer 10..3600s. Pulse
+actions additionally validate side, stake > 0 and ≤ available bankroll (no fixed
+cap, so winnings can be staked), leverage, and position id.
 
 ## Client
 

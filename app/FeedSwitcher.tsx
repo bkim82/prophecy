@@ -1,9 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { CallStrip } from "@/app/CallStrip";
 import { FeedComposer } from "@/app/FeedComposer";
-import { FeedNotifications } from "@/app/FeedNotifications";
 import { CoverEyebrow, InterestPicker, MixBanner, MutedNotice, SeeMore, TopicChips, TopicHeader, type TopicView } from "@/app/FeedTopics";
 import { PostCard } from "@/app/PostCard";
 import { FOLLOWED_HANDLES, LIVE_CALL_COUNT, SHARES, type Post, type Share } from "@/app/lib/mockPosts";
@@ -50,7 +48,8 @@ export function FeedSwitcher({ posts }: { posts: Post[] }) {
   // "Mix it up": the For You home as a round-robin blend instead of covers.
   const [mixed, setMixed] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
-  // Posts written in the composer this session, newest first. Never persisted.
+  // Posts written in the composer this session, newest first. Never persisted;
+  // deleting one (its ⋯ menu) just drops it from here.
   const [localPosts, setLocalPosts] = useState<Post[]>([]);
   const { ids: bookmarkIds } = useBookmarks();
   const interests = useInterests();
@@ -134,7 +133,6 @@ export function FeedSwitcher({ posts }: { posts: Post[] }) {
   return (
     <>
       <nav className="feed-nav" aria-label="Feeds">
-        <p className="feed-nav-label">Feeds</p>
         <div className="feed-tabs" role="tablist" aria-label="Feed filter">
           {FILTERS.map(({ id, label }) => (
             <button
@@ -154,7 +152,6 @@ export function FeedSwitcher({ posts }: { posts: Post[] }) {
             </button>
           ))}
         </div>
-        <FeedNotifications />
       </nav>
       <div className="feed-main">
         <div className="feed-panel" ref={panelRef}>
@@ -188,7 +185,6 @@ export function FeedSwitcher({ posts }: { posts: Post[] }) {
               onNotInterested={() => notInterested(openTopicData.id)}
             />
           )}
-          <CallStrip posts={visible} />
           <div className="feed-list">
             {home && !mixed && interests.ids.length === 0 && (
               <p className="feed-covers-empty">
@@ -212,6 +208,7 @@ export function FeedSwitcher({ posts }: { posts: Post[] }) {
                   post={post}
                   share={FOLLOWED_SHARES.get(post.id)}
                   onNotInterested={onNotInterested}
+                  onDelete={post.mine ? () => setLocalPosts((current) => current.filter((local) => local.id !== post.id)) : undefined}
                   context={cover && <CoverEyebrow topic={cover} onNotInterested={() => notInterested(cover.id, post.id)} />}
                   footer={cover && <SeeMore topic={cover} onClick={() => openTopic(cover.id)} />}
                 />

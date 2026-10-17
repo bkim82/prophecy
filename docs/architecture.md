@@ -1,6 +1,6 @@
 # architecture
 
-- Root header (`app/layout.tsx`) is brand | `Omens`/`Arena`/`Sanctum`/`Wallet` nav | balance + avatar on desktop (see [feeds.md](feeds.md)); `/wallet` uses the signed-in canonical CDP Base smart account, not an external wallet connection ([wallet.md](wallet.md)).
+- Root header (`app/layout.tsx`) is brand | `Omens`/`Arena`/`Sanctum`/`Wallet` nav | balance + avatar on desktop (see [feeds.md](feeds.md)), while `app/MobileBottomNav.tsx` supplies the dedicated phone navigation (`Omens`/`Arena`/`Sanctum`/`Wallet`) at or below 768px and the compact mobile header keeps the brand, theme picker, balance, and account control. Routes: `/` (Global feed), `/sanctum` (Oracle Room: rank-only live Pulse room with room feed + mini chat, `app/sanctum/page.tsx`), `/duel` (the market lobby, moved from `app/page.tsx`), `/wallet` (canonical embedded Base wallet, Portfolio/Activity/Advanced tabs — [wallet.md](wallet.md)), `/welcome` (post-sign-up onboarding — [onboarding.md](onboarding.md)). The bottom-right slot only shows `ActiveMatchBar` during an active match (the idle `QuickTicketBar` plus chip was removed). `/exclusive` (rank-gated feed) still exists but is no longer linked from the header nav. Live ticker on `/duel` reads the client-side BTC feed.
 - Multiplayer Pulse is server-authoritative: a `matches` row owns the round (`db/schema.ts:20`), `/api/match/*` routes own the transitions, clients poll. See [multiplayer-plan.md](multiplayer-plan.md).
 - Practice is client-only: Pulse practice reuses `app/duel/btc/pulse/page.tsx?practice=1` without creating a match or reserving a wager. See [practice-mode.md](practice-mode.md).
 - `/api/price` and `/api/history` remain stateless proxies to public exchange APIs. The price feed and chart stay client-side in every mode.
@@ -17,7 +17,7 @@ app/layout.tsx (root shell: desktop header, compact mobile header, feature-gated
   ├── app/sanctum/page.tsx (Sanctum: Oracle Room live Pulse + feed + chat, app/lib/roomsMocks.ts)
   ├── app/exclusive/page.tsx (Exclusive feed: rank-gated via app/lib/rank.ts stub, unlinked from nav)
   ├── app/wallet/page.tsx (canonical embedded Base wallet, Portfolio/Advanced tabs — docs/wallet.md)
-  └── app/duel/page.tsx (live lobby: screen-reader-only `Arena` h1 → Pulse/24h Portfolio `.feed-tabs.arena-mode-tabs` → market row (BTC/ETH left, `DailyCoin` "Daily · Ð DOGE" chip right (market symbol from `MARKETS`), selectable) → Pulse = `.pulse-stage` grid — ticker + MarketChart (app/MarketChart.tsx) left, call box (format/timer/Play) right, stacks <1000px; ≤640px: 220px plot, 24h stats behind `.market-stats-toggle`, call box reorders timer → Play first; match rows)
+  └── app/duel/page.tsx (live lobby: screen-reader-only `Arena` h1 → Pulse/24h Portfolio `.feed-tabs.arena-mode-tabs` → market row (BTC, ETH, then the `DailyCoin` "Daily · H HYPE" chip (market symbol from `MARKETS`), all in one `.market-switcher`, selectable) → Pulse = `.pulse-stage` grid — ticker + MarketChart (app/MarketChart.tsx) left, call box (format, timer, wager packed at top; opponent directly above Play at the bottom) right, stacks <1000px; >1000px tabs + market row + stage sit in `.arena-fold` (`app/duel/page.tsx:403`), a viewport-tall flex column (`app/globals.css:1771-1787`, `clamp(540px, 100dvh - 105px, 720px)`; ≤760px tall: call-box title and callout subline hidden, opponent on one line) — **invariant: the whole stage fits the screen with no page scroll**; the chart absorbs leftover height, the call box scrolls itself only as a last resort; verify at 1280×720 and 1440×900 after any stage change; ≤640px: 220px plot, 24h stats behind `.market-stats-toggle`, call box reorders timer → Play first; match rows)
         └── usePriceFeed() → price, sampled series, status, now
 app/duel/[market]/pulse/[matchId]/page.tsx (multiplayer Pulse positions, countdown, result)
 app/duel/portfolio/page.tsx (solo 24h Portfolio: freely-tradeable spot/leverage positions on Base meme coins)
@@ -48,18 +48,17 @@ getViewer() → Clerk by default; when EMBEDDED_WALLET_AUTH_ENABLED=true, hashed
 /api/tokens/search, /api/tokens/prices → lib/basePrices.ts (token search + batch price quote); /api/tokens/trending, /api/tokens/history → lib/tokenHistory.ts (GeckoTerminal)
 
 /api/history → api.exchange.coinbase.com (trades + candles, both, merged)
-/api/price   → lib/spotPrice.ts → api.coinbase.com → api.binance.com fallback chain
+/api/price   → lib/spotPrice.ts → Coinbase Exchange ticker → api.coinbase.com spot → api.binance.com fallback chain
 
-duel/page.tsx Play controls → compact Practice action beside Play
+duel/page.tsx Play controls → compact Practice action under Play; first-timer nudge (hidden once finished) → /duel/tutorial (client-only lessons + live round vs bot, docs/tutorial.md)
 ```
 
-Multiplayer BTC and ETH Pulse are wired up (same room, `/duel/[market]/pulse/[matchId]`; solo practice serves both via `app/duel/btc/pulse/page.tsx?practice=1&market=`). The 24h Portfolio (solo,
+Multiplayer BTC, ETH and HYPE (daily coin) Pulse are wired up (same room, `/duel/[market]/pulse/[matchId]`; solo practice serves both via `app/duel/btc/pulse/page.tsx?practice=1&market=`). The 24h Portfolio (solo,
 DB-backed — see [portfolio.md](portfolio.md)) is wired up identically across
 all three market tabs, since it's asset-agnostic (token search picks the
-coin, not the lobby's market switcher). DOGE's Pulse
-is still a lobby-only placeholder — selectable in the mode switcher, which
+coin, not the lobby's market switcher). The mode switcher
 locks the play panel when the chosen mode has neither `href` nor `matched`
-(`app/duel/page.tsx:111-127`, `:163`). `matched` marks a mode that goes
+(`app/duel/page.tsx:101-115`, `:173`). `matched` marks a mode that goes
 through matchmaking with no fixed URL: Play posts to `find-or-create` and
 routes to the mode-specific room. `href` marks a mode with a fixed,
 non-matchmade URL, normally reached via a plain `Link` (`app/duel/page.tsx`
@@ -83,11 +82,10 @@ its stake and leverage in-round; so does the 24h Portfolio.
 | `app/lib/mockPosts.ts` | hardcoded `GLOBAL_POSTS`/`EXCLUSIVE_POSTS` mock data, no persistence |
 | `app/lib/rank.ts` | hardcoded mock rank/threshold stub gating `/exclusive` — no real rank system exists |
 | `app/duel/page.tsx` | live lobby, BTC ticker/chart, mode switcher, Pulse controls, matchmaking + open-match list, your Recent results (moved from `app/page.tsx`) |
-| `app/wallet/page.tsx` + `app/wallet/*` | wallet dashboard: Portfolio (balance chip, coin list/detail), Activity (local intents + confirmed transfers), Advanced tabs; Deposit/Send/Swap sheets — see [wallet.md](wallet.md) |
+| `app/wallet/page.tsx` + `app/wallet/*` | wallet dashboard: balance hero, coin grid/detail, activity timeline, mock creator earnings — see [wallet.md](wallet.md) |
 | `app/lib/useWalletConnection.ts` | canonical smart-account identity + public native-balance polling from the validated auth context |
-| `app/lib/embeddedWallet/{intents,sign,tokens}.ts` | exact raw-unit policies/call decoding, sole CDP signing boundary, curated Base assets |
-| `lib/transactionIntents.ts` | durable intent state machine, idempotency, spend counters, audit events, CDP receipt reconciliation |
-| `app/api/wallet/*` | public Base reads plus authenticated intent/confirm/submit/broadcast/reconcile mutations; metered reads are IP-limited after embedded-auth activation |
+| `app/lib/wallet.ts` | display/Base helpers only: `BASE_CHAIN_ID`, `isBaseChain`, ETH formatting, address shortening (no wallet provider) |
+| `app/api/wallet/*` (`holdings`, `eth`, `history`, `search`, `trending`, `new`, `prices`, `activity`) | no-auth mirrors of `lib/alchemy.ts`/`lib/basePrices.ts`/`lib/tokenHistory.ts` for a connected wallet (see [wallet.md](wallet.md)); never throws, degrades to `[]`/cached data; `activity` is unused by any UI right now |
 | `app/duel/[market]/pulse/[matchId]/page.tsx` | multiplayer Pulse room: position actions, live P&L, countdown, result |
 | `app/duel/portfolio/PortfolioGame.tsx` + `SessionHeader.tsx`/`TokenSearch.tsx`/`TradeTicket.tsx`/`OpenPositions.tsx`/`ClosedPositions.tsx` | 24h Portfolio game: session start, live-priced token search, spot/leverage trade ticket, open/closed position lists — embedded inline in `app/duel/page.tsx`'s mode switcher and wrapped standalone by `app/duel/portfolio/page.tsx` |
 | `lib/portfolioRules.ts` | pure 24h Portfolio math/constants, no DB import — client-safe, mirrors `lib/pulse.ts` |
@@ -99,16 +97,16 @@ its stake and leverage in-round; so does the 24h Portfolio.
 | `app/api/tokens/search/route.ts`, `app/api/tokens/prices/route.ts` | thin wrappers over `lib/basePrices.ts` |
 | `app/api/tokens/trending/route.ts`, `app/api/tokens/history/route.ts` | thin wrappers over `lib/tokenHistory.ts` |
 | `app/ActiveMatchBar.tsx` | global bottom pill for a match running off-page; mounts `PulseMiniDock` while the active match is Pulse in `countdown` |
-| `app/QuickTicketBar.tsx` | idle-state global bottom tab; expands the shared `WalletDesk` ticket upward when no match or queue is active; hidden on `/duel` and all `/duel/*` |
 | `app/PulseMiniDock.tsx` | condensed Pulse trading controls (stake/leverage/long/short/close) shown from `ActiveMatchBar` on hover (desktop) or tap (touch), same `/api/match/[id]/action` calls as the full room |
 | `app/lib/playerId.ts` | anonymous per-browser id in `localStorage` |
 | `lib/match.ts` | `MatchView` role-scoping, presence, guarded settlement — shared by every `/api/match/*` route |
-| `lib/spotPrice.ts` | Coinbase→Binance fallback chain + `productForMarket`; shared by `/api/price` and settlement |
+| `lib/spotPrice.ts` | Coinbase Exchange→Coinbase spot→Binance fallback chain + `productForMarket`; shared by `/api/price` and settlement |
 | `app/api/match/*` | match lifecycle: find-or-create, view/heartbeat/settle, join, action, leave, open list |
-| `db/schema.ts` | `users` (transitioning Clerk/CDP id, Embers balance, nullable-until-reset canonical wallet fields), `app_sessions` (hashed opaque sessions), `request_rate_limits` (keyed fixed-window claims), `matches` (one row per networked round), `portfolio_sessions`/`positions`/`portfolio_payouts`, `profiles`, and `challenges` (`db/schema.ts:14-236`) — see [profiles.md](profiles.md) and [embedded-wallet-plan.md](embedded-wallet-plan.md) |
-| `app/api/session/**`, `lib/appSession.ts`, `app/lib/authSession.ts`, `lib/cdp.ts`, `lib/embeddedWalletAccount.ts`, `lib/requestSecurity.ts` | Feature-gated CDP access-token exchange and application-session lifecycle: exact smart-account/owner selection, Base assertion, keyed hashes, atomic rotation/current/all-session revocation, idle/absolute expiry, same-origin empty-JSON checks, hardened cookie handling, and database-backed limits; inactive until schema and credentialed gates pass |
-| `lib/profile.ts`, `app/profile/actions.ts`, `app/lib/profileImage.ts`, `app/api/profile/{avatar,banner}/route.ts` | own-profile storage: metadata read (no image bytes), atomic text/avatar/banner upsert, pins; signature/MIME/size/dimension validation; owner-only image routes with safe content headers |
+| `db/schema.ts` | `users` (Clerk id until cutover, then CDP end-user id; balance, canonical wallet columns), `matches` (one row per networked round), `portfolio_sessions`/`positions`/`portfolio_payouts` (one row per 24h Portfolio session, its independent spot/leverage position lots, and each session's idempotent payout), `profiles` (one row per Clerk user who edited their profile; unique `handle`, banner preset or base64 image, pinned won-match ids), `challenges` (pending/canceled challenge requests from profiles; one pending per challenger→target via partial unique index; nothing reserved or played yet) — see [profiles.md](profiles.md) |
+| `lib/profile.ts`, `app/profile/actions.ts`, `app/api/profile/banner/route.ts` | own-profile storage: read (no banner bytes), upsert (partial), handle owner lookup, pins; validated `saveProfile` / `saveProfileBasics` / `checkHandle` / `togglePinnedMatch` server actions; owner-only banner image route |
+| `app/welcome/*`, `app/lib/onboardingQuestions.ts`, `lib/onboarding.ts` | post-sign-up flow: profile basics + survey, `finishOnboarding` action, `onboarding` table reads/writes, then the Pulse tutorial — see [onboarding.md](onboarding.md) |
 | `app/duel/btc/pulse/page.tsx` | solo trading state, countdown, leveraged P&L, settlement, layout |
+| `app/duel/tutorial/*` | Pulse tutorial: scripted lessons (`lessons.ts` paths/math, `LessonChart.tsx`, `ScriptedLesson.tsx`), live round vs bot (`LiveRound.tsx`, `live.ts`), done flag (`progress.ts`) — see [tutorial.md](tutorial.md) |
 | `app/api/match/[id]/action/route.ts` | server-priced Pulse entry, close, and reverse actions |
 | `app/duel/btc/pulse/trading.ts` | pure buy/sell portfolio accounting and full-position clamping — **no importers yet**, the page tracks a single leveraged position instead |
 | `app/usePriceFeed.ts` | websocket, history seed, reconnection, sampled series |
@@ -136,7 +134,7 @@ its stake and leverage in-round; so does the 24h Portfolio.
 - Match state transitions are single guarded `UPDATE ... WHERE <guard> RETURNING *` statements, never read-then-write: `neon-http` has no transactions or row locks, so the guard *is* the lock (`app/api/match/[id]/action/route.ts:89`). 0 rows back means someone else won — re-read, never retry blindly.
 - The opponent's positions are withheld server-side until `countdown`, not hidden in the client (`lib/match.ts:182-187`). Anything added to `MatchView` must be safe for the other player to read.
 - `matches` timestamps are `timestamptz`; a bare `timestamp` column stores the writer's local time and silently breaks presence across timezones (`db/schema.ts:29-35`).
-- All fetch paths degrade, never throw to the user: history → trades ∪ candles → `[]` (`app/api/history/route.ts:88-110`); price → Coinbase → Binance → 502 (`lib/spotPrice.ts:39-52`); match poll failure → keep polling, never eject the player (`app/duel/[market]/pulse/[matchId]/page.tsx:111-114`); settlement price outage → row stays in `countdown`, next poll retries (`lib/match.ts:103-106`).
+- All fetch paths degrade, never throw to the user: history → trades ∪ candles → `[]` (`app/api/history/route.ts:88-110`); price → Coinbase Exchange → Coinbase spot → Binance → 502 (`lib/spotPrice.ts:47-63`); match poll failure → keep polling, never eject the player (`app/duel/[market]/pulse/[matchId]/page.tsx:111-114`); settlement price outage → row stays in `countdown`, next poll retries (`lib/match.ts:103-106`).
 - `PriceChart` holds only its time and price wheel zoom levels (`docs/chart.md` → Zoom), and otherwise stays a pure function of props — including its clock, which arrives as the `now` prop rather than a `Date.now()` read or an interval of its own (`app/duel/[market]/pulse/[matchId]/page.tsx:201`). Round/freeze logic belongs in the match room (`app/duel/[market]/pulse/[matchId]/page.tsx:132`), not the chart. Same for server timestamps: the room converts them off the server clock (`app/duel/[market]/pulse/[matchId]/page.tsx:55-62`, `:121`), and the chart just draws whatever `roundStart`/`trades` it gets.
 - Color literals stay out of components: add a token to `app/globals.css` and define it in the `:root` and light blocks (and obsidian if Navy's value doesn't fit), or the toggle silently breaks in one theme.
 - The arena lobby may read `usePriceFeed()` for live market display (`app/duel/page.tsx:139`), but settlement logic stays out of it — multiplayer Pulse settles on the server (`lib/match.ts:98`), solo Pulse in its own page.

@@ -184,7 +184,7 @@ function PostShot({ shot }: { shot: Shot<"post"> }) {
   return (
     <div className="shot shot--post" role="img" aria-label={shot.alt}>
       <div className="shot-post-head">
-        <span className="shot-post-avatar" style={{ background: avatarGradient(shot.handle) }}>
+        <span className="shot-post-avatar" style={{ background: avatarGradient(shot.handle, 70) }}>
           {shot.avatarInitial}
         </span>
         <span className="shot-post-who">
@@ -290,7 +290,7 @@ function ChatShot({ shot }: { shot: Shot<"chat"> }) {
   return (
     <div className="shot shot--chat" role="img" aria-label={shot.alt}>
       <div className="shot-chat-head">
-        <span className="shot-chat-avatar" style={{ background: avatarGradient(shot.title) }}>
+        <span className="shot-chat-avatar" style={{ background: avatarGradient(shot.title, 70) }}>
           {shot.title[0].toUpperCase()}
         </span>
         <span className="shot-chat-who">
@@ -452,7 +452,7 @@ function MemeShot({ shot }: { shot: Shot<"meme"> }) {
       className={`shot shot--meme${shot.top || shot.bottom ? " has-caption" : ""}`}
       role="img"
       aria-label={shot.alt}
-      style={{ background: avatarGradient(shot.seed) }}
+      style={{ background: avatarGradient(shot.seed, 70) }}
     >
       {shot.top && <span className="shot-meme-caption">{shot.top}</span>}
       <span className="shot-meme-emoji">{shot.emoji}</span>

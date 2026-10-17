@@ -13,6 +13,7 @@ import {
   useSignOut,
 } from "@coinbase/cdp-hooks";
 import { CDPReactProvider, SignInModal, SignInModalContent } from "@coinbase/cdp-react";
+import { useRouter } from "next/navigation";
 import {
   cloneElement,
   createContext,
@@ -25,6 +26,7 @@ import {
   type ReactElement,
   type ReactNode,
 } from "react";
+import { needsOnboarding } from "@/app/welcome/actions";
 import {
   applicationSessionMatches,
   createApplicationSession,
@@ -82,7 +84,8 @@ export function AuthProvider({
   }
 
   return (
-    <ClerkProvider>
+    // Every new account goes through /welcome (profile + a short survey) first.
+    <ClerkProvider signUpForceRedirectUrl="/welcome">
       <ClerkAuthBridge>{children}</ClerkAuthBridge>
     </ClerkProvider>
   );
@@ -143,6 +146,10 @@ function CdpAuthBridge({ children }: { children: ReactNode }) {
   const [sessionResult, setSessionResult] = useState<SessionResult | null>(null);
   const syncRef = useRef<SessionSync | null>(null);
   const clearedSignedOutRef = useRef(false);
+  // Set by the sign-in modal so only a fresh sign-in, not a restored session,
+  // can send a not-yet-onboarded user to /welcome.
+  const justSignedInRef = useRef(false);
+  const router = useRouter();
 
   useEffect(() => {
     if (!isInitialized) return;
@@ -213,6 +220,14 @@ function CdpAuthBridge({ children }: { children: ReactNode }) {
     ?? null;
   const currentSession = sessionResult?.userId === currentUser?.userId ? sessionResult : null;
   const sessionReady = currentSession?.status === "ready";
+
+  useEffect(() => {
+    if (!sessionReady || !justSignedInRef.current) return;
+    justSignedInRef.current = false;
+    void needsOnboarding()
+      .then((needed) => { if (needed) router.push("/welcome"); })
+      .catch(() => undefined);
+  }, [router, sessionReady]);
   const value = useMemo<AppAuthContext>(() => ({
     provider: "cdp",
     isLoaded: isInitialized && (!providerSignedIn || currentSession !== null),
@@ -241,7 +256,10 @@ function CdpAuthBridge({ children }: { children: ReactNode }) {
       <SignInModal
         open={signInOpen}
         setIsOpen={setSignInOpen}
-        onSuccess={() => setSignInOpen(false)}
+        onSuccess={() => {
+          justSignedInRef.current = true;
+          setSignInOpen(false);
+        }}
       >
         {/* Content only: without children the SDK also renders its own trigger
             button, duplicating the header's SignInAction. */}

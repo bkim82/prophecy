@@ -11,7 +11,7 @@ type Point = { t: number; p: number };
 
 const HEADERS = { "User-Agent": "btc-arena" };
 const NO_STORE = { "Cache-Control": "no-store" };
-const SUPPORTED_PRODUCTS = new Set(["BTC-USD", "ETH-USD", "DOGE-USD"]);
+const SUPPORTED_PRODUCTS = new Set(["BTC-USD", "ETH-USD", "HYPE-USD"]);
 
 /**
  * Seeds the chart at the same resolution the live socket produces, by bucketing

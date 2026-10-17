@@ -2,7 +2,7 @@
 
 // One coin so far — add more here and the day-of-year rotation spreads them
 // out automatically, no rotation logic to touch.
-const DAILY_COINS = ["DOGE"];
+const DAILY_COINS = ["HYPE"];
 
 function dayOfYear(date: Date) {
   const start = Date.UTC(date.getUTCFullYear(), 0, 1);
