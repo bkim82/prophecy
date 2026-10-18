@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Cinzel, IBM_Plex_Mono, Inter } from "next/font/google";
 import Link from "next/link";
+import { headers } from "next/headers";
 import { AccountMenu } from "./AccountMenu";
 import { ActiveMatchBar } from "./ActiveMatchBar";
 import { AuthProvider, SignedIn, type AuthConfiguration } from "./auth/AuthProvider";
@@ -27,7 +28,12 @@ export const metadata: Metadata = {
   description: "Wager your foresight against the market. Live crypto arenas, decided in seconds.",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // proxy.ts sends a per-request nonce CSP; Next.js only stamps that nonce on
+  // scripts while rendering a request, so a prerendered page's scripts would
+  // all be blocked. Reading headers makes every route render dynamically.
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
+
   let authConfig: AuthConfiguration = { provider: "clerk" };
   if (embeddedWalletAuthEnabled()) {
     const projectId = process.env.NEXT_PUBLIC_CDP_PROJECT_ID;
@@ -43,7 +49,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`${cinzel.variable} ${inter.variable} ${plexMono.variable}`}
     >
       <head>
-        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
       <body>
         <AuthProvider config={authConfig}>
