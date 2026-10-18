@@ -1,6 +1,6 @@
 import { formatUnits } from "@/app/lib/embeddedWallet/intents";
 import { curatedToken } from "@/app/lib/embeddedWallet/tokens";
-import { getWalletActivity } from "@/lib/alchemy";
+import { getTokenMetadata, getWalletActivity } from "@/lib/alchemy";
 import { listTransactionIntents } from "@/lib/transactionIntents";
 import { getViewer } from "@/lib/viewer";
 import { allowWalletRead, walletReadLimited } from "../readLimit";
@@ -23,12 +23,13 @@ export async function GET(request: Request) {
   }
   const intents = await listTransactionIntents(viewer.userId, 50);
   const confirmedHashes = new Set(activity.map((item) => item.hash.toLowerCase()));
-  const local = intents
+  const pending = intents
     // An unconfirmed intent never left the confirmation sheet; it is not a transaction.
     .filter((intent) => intent.status !== "created")
-    .filter((intent) => !intent.transactionHash || !confirmedHashes.has(intent.transactionHash))
-    .map((intent) => {
-      const token = curatedToken(intent.tokenIn);
+    .filter((intent) => !intent.transactionHash || !confirmedHashes.has(intent.transactionHash));
+  const local = await Promise.all(pending.map(async (intent) => {
+      const meta = curatedToken(intent.tokenIn) ?? await getTokenMetadata(intent.tokenIn);
+      const token = meta?.symbol && meta.decimals != null ? { symbol: meta.symbol, decimals: meta.decimals } : null;
       return {
         hash: intent.transactionHash ?? intent.userOperationHash ?? intent.id,
         kind: intent.kind === "swap" ? "swapped" : "sent",
@@ -45,7 +46,7 @@ export async function GET(request: Request) {
         failureCode: intent.failureCode,
         local: true,
       };
-    });
+    }));
   const merged = [...local, ...activity].sort(
     (a, b) => (b.timestamp ?? 0) - (a.timestamp ?? 0),
   );

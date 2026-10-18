@@ -69,7 +69,7 @@ const discoveryCache = new Map<string, DiscoveryEntry>();
 // the life of the instance instead of being re-fetched every refresh.
 const metadataCache = new Map<string, TokenMetadata>();
 
-async function getTokenMetadata(contract: string): Promise<TokenMetadata | null> {
+export async function getTokenMetadata(contract: string): Promise<TokenMetadata | null> {
   const key = contract.toLowerCase();
   const hit = metadataCache.get(key);
   if (hit) return hit;

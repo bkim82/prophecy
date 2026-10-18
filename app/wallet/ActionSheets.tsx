@@ -4,14 +4,14 @@ import { useEffect, useState } from "react";
 import { useAppAuth } from "@/app/auth/AuthProvider";
 import { createSendIntent, confirmIntent, searchRecipients, type WalletRecipient } from "@/app/lib/embeddedWallet/client";
 import { walletTransactionsEnabled } from "@/app/lib/embeddedWallet/config";
-import { formatUnits } from "@/app/lib/embeddedWallet/intents";
+import { formatUnits, normalizeAmount } from "@/app/lib/embeddedWallet/intents";
 import { useSubmitTypedIntent } from "@/app/lib/embeddedWallet/sign";
-import { GAS_ALLOWANCE_RAW, USDC_BASE, curatedToken } from "@/app/lib/embeddedWallet/tokens";
+import { GAS_ALLOWANCE_RAW, NATIVE_ETH, USDC_BASE } from "@/app/lib/embeddedWallet/tokens";
 import { ActionSheet } from "./ActionSheet";
-import type { Coin } from "./types";
+import { ETH_SENTINEL, type Coin } from "./types";
 
 // See docs/wallet.md: Deposit shows the canonical address with copy-to-clipboard;
-// Send (USDC only) signs through app/lib/embeddedWallet/sign.ts; Swap is still a UI preview.
+// Send (any held token, gas in USDC) signs through app/lib/embeddedWallet/sign.ts; Swap is still a UI preview.
 
 export function DepositSheet({ address, onClose }: { address: string; onClose: () => void }) {
   const [copied, setCopied] = useState(false);
@@ -21,7 +21,7 @@ export function DepositSheet({ address, onClose }: { address: string; onClose: (
   };
   return (
     <ActionSheet title="Deposit" onClose={onClose}>
-      <p className="wd-sheet-copy">Send USDC on Base to this address. Other Prophecy users can send to your @username.</p>
+      <p className="wd-sheet-copy">Send ETH or any Base token to this address. Other Prophecy users can send to your @username. Keep some USDC here to pay gas when you send.</p>
       <div className="wd-sheet-address">
         <code>{address}</code>
         <button type="button" onClick={copy} className="wd-sheet-primary-button">{copied ? "Copied" : "Copy address"}</button>
@@ -152,18 +152,32 @@ function RecipientField({
   );
 }
 
+const tokenAddressOf = (coin: Coin) => (coin.address === ETH_SENTINEL ? NATIVE_ETH : coin.address.toLowerCase());
+
 export function SendSheet({
   accountAddress,
   coins,
+  initialAsset,
   onClose,
 }: {
   accountAddress: string;
   coins: Coin[];
+  /** Coin address (or "eth") to preselect, e.g. from a coin's detail panel. */
+  initialAsset?: string;
   onClose: () => void;
 }) {
   const { provider } = useAppAuth();
-  const token = curatedToken(USDC_BASE)!;
-  const balance = coins.find((coin) => coin.address.toLowerCase() === USDC_BASE)?.qty ?? 0;
+  const sendable = coins.filter((coin) => coin.qty > 0);
+  const [asset, setAsset] = useState(() => {
+    const preferred = sendable.find((coin) => coin.address === initialAsset)
+      ?? sendable.find((coin) => tokenAddressOf(coin) === USDC_BASE)
+      ?? sendable[0];
+    return preferred ? tokenAddressOf(preferred) : USDC_BASE;
+  });
+  const coin = sendable.find((candidate) => tokenAddressOf(candidate) === asset) ?? null;
+  const symbol = coin?.symbol ?? "USDC";
+  const balance = coin?.qty ?? 0;
+  const usdcBalance = coins.find((candidate) => tokenAddressOf(candidate) === USDC_BASE)?.qty ?? 0;
   const [recipient, setRecipient] = useState<Recipient | null>(null);
   const [amount, setAmount] = useState("");
   const [prepared, setPrepared] = useState<PreparedSend | null>(null);
@@ -173,7 +187,7 @@ export function SendSheet({
   const enabled = walletTransactionsEnabled() && provider === "cdp";
 
   return (
-    <ActionSheet title="Send USDC" onClose={onClose}>
+    <ActionSheet title="Send" onClose={onClose}>
       {hash ? (
         <>
           <p className="wd-sheet-note">Submitted to Base. This is pending until a receipt confirms inclusion.</p>
@@ -187,7 +201,7 @@ export function SendSheet({
             <div><dt>Network</dt><dd>Base (8453)</dd></div>
             <div><dt>Amount</dt><dd>{prepared.amount} {prepared.symbol}</dd></div>
             <div><dt>To</dt><dd>{prepared.label && <>{prepared.label}<br /></>}<code>{prepared.recipient}</code></dd></div>
-            <div><dt>Gas</dt><dd>Paid in USDC (usually cents, at most {formatUnits(GAS_ALLOWANCE_RAW, token.decimals)} USDC)</dd></div>
+            <div><dt>Gas</dt><dd>Paid in USDC (usually cents, at most {formatUnits(GAS_ALLOWANCE_RAW, 6)} USDC)</dd></div>
           </dl>
           <CdpSendSubmit prepared={prepared} onSubmitted={setHash} />
           <button type="button" className="wd-sheet-swap-flip" onClick={() => setPrepared(null)}>Back</button>
@@ -198,20 +212,21 @@ export function SendSheet({
           onSubmit={(event) => {
             event.preventDefault();
             if (!recipient || !enabled) return;
+            const value = normalizeAmount(amount);
             setPending(true);
             setError(null);
             const idempotencyKey = crypto.randomUUID();
             void createSendIntent({
               idempotencyKey,
-              tokenAddress: token.address,
+              tokenAddress: asset,
               recipient: recipient.address,
-              amount,
+              amount: value,
             })
               .then(({ intent }) => confirmIntent(intent.id))
               .then(({ intent }) => setPrepared({
                 id: intent.id,
-                symbol: token.symbol,
-                amount,
+                symbol,
+                amount: value,
                 recipient: recipient.address,
                 label: recipient.label,
               }))
@@ -219,14 +234,23 @@ export function SendSheet({
               .finally(() => setPending(false));
           }}
         >
+          <label className="wd-sheet-field">
+            <span>Asset</span>
+            <select value={asset} onChange={(event) => setAsset(event.target.value)}>
+              {sendable.map((candidate) => (
+                <option key={candidate.address} value={tokenAddressOf(candidate)}>{candidate.symbol}</option>
+              ))}
+            </select>
+          </label>
           <RecipientField value={recipient} onChange={setRecipient} />
           <label className="wd-sheet-field">
-            <span>Amount (USDC) · balance {balance.toLocaleString(undefined, { maximumFractionDigits: 6 })}</span>
+            <span>Amount ({symbol}) · balance {balance.toLocaleString(undefined, { maximumFractionDigits: 6 })}</span>
             <input value={amount} onChange={(event) => setAmount(event.target.value)} inputMode="decimal" placeholder="0.00" />
           </label>
           <button type="submit" className="wd-sheet-primary-button" disabled={!enabled || pending || !recipient || !amount}>
             {pending ? "Preparing…" : "Review send"}
           </button>
+          {usdcBalance === 0 && <p className="wd-sheet-note">Gas is paid in USDC. Deposit a little USDC on Base before sending.</p>}
           {!enabled && <p className="wd-sheet-note">Sending is currently disabled.</p>}
           {error && <p className="wd-sheet-note" role="alert">{error}</p>}
         </form>

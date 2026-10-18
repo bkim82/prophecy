@@ -1,4 +1,4 @@
-import { CDP_ERC20_PAYMASTER, GAS_ALLOWANCE_RAW, curatedToken } from "./tokens";
+import { CDP_ERC20_PAYMASTER, GAS_ALLOWANCE_RAW, NATIVE_ETH, USDC_BASE, type SendToken } from "./tokens";
 
 export const BASE_CHAIN_ID = 8453 as const;
 export const INTENT_SCHEMA_VERSION = 1 as const;
@@ -30,12 +30,23 @@ export function normalizeAddress(value: string) {
   return value.toLowerCase();
 }
 
+/**
+ * Canonicalizes typed amounts (" .5", "2.", "007") into parseUnits' strict form.
+ * Commas are left in (and rejected): "0,5" vs "1,000" is locale-ambiguous.
+ */
+export function normalizeAmount(value: string) {
+  let amount = value.trim();
+  if (amount.startsWith(".")) amount = `0${amount}`;
+  if (amount.endsWith(".")) amount = amount.slice(0, -1);
+  return amount.replace(/^0+(?=\d)/, "");
+}
+
 export function parseUnits(value: string, decimals: number) {
   if (!Number.isInteger(decimals) || decimals < 0 || decimals > 36) {
     throw new IntentValidationError("invalid-decimals", "Unsupported token decimals.");
   }
   if (!/^(?:0|[1-9]\d*)(?:\.\d+)?$/.test(value)) {
-    throw new IntentValidationError("invalid-amount", "Enter a positive decimal amount.");
+    throw new IntentValidationError("invalid-amount", "Enter an amount like 0.50 (digits and one dot, no commas).");
   }
   const [whole, fraction = ""] = value.split(".");
   if (fraction.length > decimals) {
@@ -96,9 +107,11 @@ export function decodeErc20Approve(data: string) {
   return { spender: address, amount };
 }
 
+/** `token` is resolved server-side (curated or Alchemy metadata), never taken from the client. */
 export function buildSendIntent(
   input: SendIntentInput,
   smartAccountAddress: string,
+  token: SendToken,
 ) {
   if (!IDEMPOTENCY_RE.test(input.idempotencyKey)) {
     throw new IntentValidationError("invalid-idempotency-key", "The operation id is invalid.");
@@ -108,16 +121,19 @@ export function buildSendIntent(
   if (recipient === "0x0000000000000000000000000000000000000000" || recipient === account) {
     throw new IntentValidationError("blocked-recipient", "Choose a different non-zero recipient.");
   }
-  const token = curatedToken(normalizeAddress(input.tokenAddress));
-  if (!token) throw new IntentValidationError("unsupported-token", "This token is not enabled for sends.");
+  if (normalizeAddress(input.tokenAddress) !== token.address) {
+    throw new IntentValidationError("unsupported-token", "This token is not enabled for sends.");
+  }
   const rawAmount = parseUnits(input.amount, token.decimals);
-  if (rawAmount > token.maxSendRaw) {
+  if (token.maxSendRaw !== null && rawAmount > token.maxSendRaw) {
     throw new IntentValidationError("transaction-limit", `The maximum send is ${formatUnits(token.maxSendRaw, token.decimals)} ${token.symbol}.`);
   }
-  // The approve lets CDP's ERC-20 paymaster take the gas fee in the same token.
+  // The approve lets CDP's ERC-20 paymaster take the gas fee in USDC, whatever is sent.
   const calls: NormalizedCall[] = [
-    { to: token.address, value: "0", data: encodeErc20Approve(CDP_ERC20_PAYMASTER, GAS_ALLOWANCE_RAW) },
-    { to: token.address, value: "0", data: encodeErc20Transfer(recipient, rawAmount) },
+    { to: USDC_BASE, value: "0", data: encodeErc20Approve(CDP_ERC20_PAYMASTER, GAS_ALLOWANCE_RAW) },
+    token.address === NATIVE_ETH
+      ? { to: recipient, value: rawAmount.toString(), data: "0x" }
+      : { to: token.address, value: "0", data: encodeErc20Transfer(recipient, rawAmount) },
   ];
   assertSendCalls({ tokenAddress: token.address, recipient, rawAmount, calls });
   return {
@@ -144,12 +160,22 @@ export function assertSendCalls(input: {
   const [approveCall, transferCall] = input.calls;
   const approval = decodeErc20Approve(approveCall.data);
   if (
-    normalizeAddress(approveCall.to) !== input.tokenAddress
+    normalizeAddress(approveCall.to) !== USDC_BASE
     || BigInt(approveCall.value) !== 0n
     || approval.spender !== CDP_ERC20_PAYMASTER
     || approval.amount !== GAS_ALLOWANCE_RAW
   ) {
     throw new IntentValidationError("call-mismatch", "The gas approval does not match policy.");
+  }
+  if (input.tokenAddress === NATIVE_ETH) {
+    if (
+      normalizeAddress(transferCall.to) !== input.recipient
+      || transferCall.data !== "0x"
+      || BigInt(transferCall.value) !== input.rawAmount
+    ) {
+      throw new IntentValidationError("call-mismatch", "The native transfer does not match the intent.");
+    }
+    return;
   }
   const decoded = decodeErc20Transfer(transferCall.data);
   if (

@@ -1,3 +1,4 @@
+export const NATIVE_ETH = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee" as const;
 export const USDC_BASE = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913" as const;
 
 /**
@@ -9,28 +10,36 @@ export const CDP_ERC20_PAYMASTER = "0x2faeb0760d4230ef2ac21496bb4f0b47d634fd4c" 
 /** USDC allowance re-approved to the paymaster on every send; caps the gas fee it can pull. */
 export const GAS_ALLOWANCE_RAW = 1_000_000n;
 
-export type CuratedToken = {
+/**
+ * A token a send can move. Limits are set only for the curated tokens below;
+ * any other ERC-20 (decimals from Alchemy metadata) is bounded by its balance.
+ */
+export type SendToken = {
   address: string;
   symbol: string;
-  name: string;
   decimals: number;
-  maxSendRaw: bigint;
-  maxDailySponsoredRaw: bigint;
+  maxSendRaw: bigint | null;
+  maxDailyRaw: bigint | null;
 };
 
-// USDC only for now; gas is also paid in USDC.
 export const CURATED_BASE_TOKENS = [
+  {
+    address: NATIVE_ETH,
+    symbol: "ETH",
+    decimals: 18,
+    maxSendRaw: 100_000_000_000_000_000n,
+    maxDailyRaw: 250_000_000_000_000_000n,
+  },
   {
     address: USDC_BASE,
     symbol: "USDC",
-    name: "USD Coin",
     decimals: 6,
     maxSendRaw: 100_000_000n,
-    maxDailySponsoredRaw: 250_000_000n,
+    maxDailyRaw: 250_000_000n,
   },
-] as const satisfies readonly CuratedToken[];
+] as const satisfies readonly SendToken[];
 
-export function curatedToken(address: string) {
+export function curatedToken(address: string): SendToken | null {
   const normalized = address.toLowerCase();
   return CURATED_BASE_TOKENS.find((token) => token.address === normalized) ?? null;
 }

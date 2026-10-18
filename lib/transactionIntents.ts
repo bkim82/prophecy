@@ -9,18 +9,26 @@ import {
   walletSpendCounters,
 } from "@/db/schema";
 import {
+  IntentValidationError,
   assertSendCalls,
   buildSendIntent,
+  normalizeAddress,
   type NormalizedCall,
   type SendIntentInput,
 } from "@/app/lib/embeddedWallet/intents";
-import { curatedToken } from "@/app/lib/embeddedWallet/tokens";
+import { curatedToken, type SendToken } from "@/app/lib/embeddedWallet/tokens";
+import { getTokenMetadata } from "@/lib/alchemy";
 import { getCdpUserOperation } from "@/lib/cdp";
 
 export type TransactionIntentRow = typeof transactionIntents.$inferSelect;
 
-function callHash(calls: NormalizedCall[]) {
-  return createHash("sha256").update(JSON.stringify(calls)).digest("hex");
+/**
+ * Hashes calls as ordered tuples: `calls` round-trips through jsonb, which
+ * reorders object keys, so JSON.stringify of the object form is not stable.
+ */
+export function callHash(calls: NormalizedCall[]) {
+  const tuples = calls.map((call) => [call.to.toLowerCase(), BigInt(call.value).toString(), call.data.toLowerCase()]);
+  return createHash("sha256").update(JSON.stringify(tuples)).digest("hex");
 }
 
 export async function auditWalletEvent(
@@ -38,12 +46,30 @@ export async function auditWalletEvent(
   });
 }
 
+/** Curated ETH/USDC, else any Base ERC-20 whose decimals Alchemy reports. */
+export async function resolveSendToken(address: string): Promise<SendToken | null> {
+  const normalized = normalizeAddress(address);
+  const curated = curatedToken(normalized);
+  if (curated) return curated;
+  const meta = await getTokenMetadata(normalized);
+  if (meta?.decimals == null || !Number.isInteger(meta.decimals)) return null;
+  return {
+    address: normalized,
+    symbol: meta.symbol?.slice(0, 16) || "token",
+    decimals: meta.decimals,
+    maxSendRaw: null,
+    maxDailyRaw: null,
+  };
+}
+
 export async function createSendIntent(
   userId: string,
   smartAccountAddress: string,
   input: SendIntentInput,
 ) {
-  const normalized = buildSendIntent(input, smartAccountAddress);
+  const token = await resolveSendToken(input.tokenAddress);
+  if (!token) throw new IntentValidationError("unsupported-token", "This token can't be sent.");
+  const normalized = buildSendIntent(input, smartAccountAddress, token);
   const hash = callHash(normalized.calls);
   const inserted = await getDb()
     .insert(transactionIntents)
@@ -165,16 +191,13 @@ export async function claimTransactionIntent(
       await markTransactionTerminal(userId, id, "dropped", "call-hash-mismatch", now);
       return null;
     }
+    // Only curated tokens carry a daily cap; others are bounded by balance.
     const token = curatedToken(row.tokenIn);
-    if (!token) {
-      await markTransactionTerminal(userId, id, "dropped", "unsupported-token", now);
-      return null;
-    }
-    const allowed = await reserveDailySponsoredSpend(
+    const allowed = !token?.maxDailyRaw || await reserveDailySpend(
       userId,
       token.address,
       BigInt(row.inputAmount),
-      token.maxDailySponsoredRaw,
+      token.maxDailyRaw,
       now,
     );
     if (!allowed) {
@@ -186,7 +209,7 @@ export async function claimTransactionIntent(
   return row;
 }
 
-export async function reserveDailySponsoredSpend(
+export async function reserveDailySpend(
   userId: string,
   tokenAddress: string,
   amount: bigint,

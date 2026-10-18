@@ -8,7 +8,7 @@ const { allowWalletReadMock, getViewerMock, getWalletActivityMock, listTransacti
 }));
 
 vi.mock("@/lib/viewer", () => ({ getViewer: getViewerMock }));
-vi.mock("@/lib/alchemy", () => ({ getWalletActivity: getWalletActivityMock }));
+vi.mock("@/lib/alchemy", () => ({ getWalletActivity: getWalletActivityMock, getTokenMetadata: vi.fn() }));
 vi.mock("@/lib/transactionIntents", () => ({ listTransactionIntents: listTransactionIntentsMock }));
 vi.mock("../readLimit", () => ({ allowWalletRead: allowWalletReadMock, walletReadLimited: vi.fn() }));
 

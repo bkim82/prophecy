@@ -181,7 +181,7 @@ export function WalletDashboard({
       )}
 
       {sheet === "deposit" && <DepositSheet address={address} onClose={closeSheet} />}
-      {sheet === "send" && <SendSheet accountAddress={address} coins={coins} onClose={closeSheet} />}
+      {sheet === "send" && <SendSheet accountAddress={address} coins={coins} initialAsset={selected ?? undefined} onClose={closeSheet} />}
       {sheet === "swap" && (
         <SwapSheet coins={coins} initialFrom={swapPreset?.initialFrom} initialTo={swapPreset?.initialTo} extraToken={swapPreset?.extraToken} onClose={closeSheet} />
       )}
