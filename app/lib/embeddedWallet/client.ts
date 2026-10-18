@@ -27,6 +27,7 @@ export async function createSendIntent(input: {
   idempotencyKey: string;
   tokenAddress: string;
   recipient: string;
+  recipientHandle?: string;
   amount: string;
 }) {
   return jsonRequest<{ intent: ClientIntent & { status: string } }>("/api/wallet/intents", {
@@ -77,7 +78,7 @@ export async function reconcileIntents() {
   });
 }
 
-export type WalletRecipient = { handle: string | null; displayName: string | null; address: string };
+export type WalletRecipient = { handle: string; displayName: string | null; address: string };
 
 export async function searchRecipients(q: string, signal?: AbortSignal) {
   return jsonRequest<{ recipients: WalletRecipient[] }>(

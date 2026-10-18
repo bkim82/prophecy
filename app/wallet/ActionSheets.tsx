@@ -36,16 +36,20 @@ type PreparedSend = {
   symbol: string;
   amount: string;
   recipient: string;
-  label: string | null;
+  handle: string | null;
 };
 
-type Recipient = { address: string; label: string | null };
+/** `handle` is set only when picked from the @handle search (the server re-verifies it). */
+type Recipient = { address: string; handle: string | null };
 
-// AA3x / -32002 come back when the ERC-20 paymaster can't collect the USDC gas fee.
+// Shows the provider's own message: paymaster/policy/balance failures all read
+// alike, so a friendly rewrite would hide which one happened.
 function submitErrorMessage(cause: unknown) {
-  const message = cause instanceof Error ? cause.message : "";
-  if (/AA3\d|-32002|allowance|insufficient/i.test(message)) return "Not enough USDC to cover the amount plus gas.";
-  return message || "Could not submit transaction.";
+  console.error("sendUserOperation failed", cause);
+  const message = cause instanceof Error ? cause.message : String(cause ?? "");
+  const code = (cause as { errorType?: unknown; code?: unknown } | null)?.errorType
+    ?? (cause as { code?: unknown } | null)?.code;
+  return `Could not send${code ? ` (${String(code)})` : ""}: ${message || "unknown error"}`;
 }
 
 function CdpSendSubmit({
@@ -75,16 +79,12 @@ function CdpSendSubmit({
       >
         {pending ? "Submitting…" : "Confirm and send"}
       </button>
-      {error && <p className="wd-sheet-note" role="alert">{error}</p>}
+      {error && <p className="wd-sheet-error" role="alert">{error}</p>}
     </>
   );
 }
 
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
-
-function recipientLabel(recipient: WalletRecipient) {
-  return recipient.handle ? `@${recipient.handle}` : recipient.displayName ?? recipient.address;
-}
 
 /** "@handle" / name search over Prophecy users, or a pasted 0x address. */
 function RecipientField({
@@ -115,7 +115,7 @@ function RecipientField({
       <div className="wd-sheet-field">
         <span>To</span>
         <div className="wd-sheet-recipient">
-          <span>{value.label ?? <code>{value.address}</code>}</span>
+          {value.handle ? <strong>@{value.handle}</strong> : <code>{value.address}</code>}
           <button type="button" className="wd-sheet-recipient-clear" onClick={() => { onChange(null); setQuery(""); }}>Change</button>
         </div>
       </div>
@@ -130,7 +130,7 @@ function RecipientField({
         onChange={(event) => {
           const next = event.target.value;
           setQuery(next);
-          if (ADDRESS_RE.test(next.trim())) onChange({ address: next.trim().toLowerCase(), label: null });
+          if (ADDRESS_RE.test(next.trim())) onChange({ address: next.trim().toLowerCase(), handle: null });
         }}
         placeholder="@username or 0x address"
         spellCheck={false}
@@ -140,9 +140,9 @@ function RecipientField({
         <ul className="wd-sheet-recipient-list">
           {results.map((recipient) => (
             <li key={recipient.address}>
-              <button type="button" onClick={() => onChange({ address: recipient.address.toLowerCase(), label: recipientLabel(recipient) })}>
-                <strong>{recipientLabel(recipient)}</strong>
-                {recipient.handle && recipient.displayName && <span>{recipient.displayName}</span>}
+              <button type="button" onClick={() => onChange({ address: recipient.address.toLowerCase(), handle: recipient.handle })}>
+                <strong>@{recipient.handle}</strong>
+                {recipient.displayName && <span>{recipient.displayName}</span>}
               </button>
             </li>
           ))}
@@ -189,22 +189,27 @@ export function SendSheet({
   return (
     <ActionSheet title="Send" onClose={onClose}>
       {hash ? (
-        <>
-          <p className="wd-sheet-note">Submitted to Base. This is pending until a receipt confirms inclusion.</p>
-          <code>{hash}</code>
-        </>
+        <div className="wd-sheet-form">
+          <p className="wd-sheet-sent-title">Sent — waiting for Base to confirm</p>
+          <p className="wd-sheet-note">Track it in the Activity tab. It shows as Pending until the network includes it.</p>
+          <code className="wd-sheet-hash">{hash}</code>
+          <button type="button" className="wd-sheet-primary-button" onClick={onClose}>Done</button>
+        </div>
       ) : prepared ? (
         <div className="wd-sheet-form">
-          <p className="wd-sheet-note">Review every field. Blockchain transfers are irreversible.</p>
-          <dl>
+          <div className="wd-sheet-review-amount">
+            <strong>{prepared.amount} {prepared.symbol}</strong>
+            <span>to {prepared.handle ? `@${prepared.handle}` : "an external address"}</span>
+          </div>
+          <dl className="wd-sheet-review">
+            <div><dt>To</dt><dd>{prepared.handle && <strong>@{prepared.handle}</strong>}<code>{prepared.recipient}</code></dd></div>
             <div><dt>From</dt><dd><code>{accountAddress}</code></dd></div>
-            <div><dt>Network</dt><dd>Base (8453)</dd></div>
-            <div><dt>Amount</dt><dd>{prepared.amount} {prepared.symbol}</dd></div>
-            <div><dt>To</dt><dd>{prepared.label && <>{prepared.label}<br /></>}<code>{prepared.recipient}</code></dd></div>
-            <div><dt>Gas</dt><dd>Paid in USDC (usually cents, at most {formatUnits(GAS_ALLOWANCE_RAW, 6)} USDC)</dd></div>
+            <div><dt>Network</dt><dd>Base</dd></div>
+            <div><dt>Gas</dt><dd>Paid in USDC · usually a cent, at most {formatUnits(GAS_ALLOWANCE_RAW, 6)}</dd></div>
           </dl>
+          <p className="wd-sheet-note">Check the address. Blockchain transfers can&apos;t be reversed.</p>
           <CdpSendSubmit prepared={prepared} onSubmitted={setHash} />
-          <button type="button" className="wd-sheet-swap-flip" onClick={() => setPrepared(null)}>Back</button>
+          <button type="button" className="wd-sheet-secondary-button" onClick={() => setPrepared(null)}>Back</button>
         </div>
       ) : (
         <form
@@ -220,6 +225,7 @@ export function SendSheet({
               idempotencyKey,
               tokenAddress: asset,
               recipient: recipient.address,
+              ...(recipient.handle ? { recipientHandle: recipient.handle } : {}),
               amount: value,
             })
               .then(({ intent }) => confirmIntent(intent.id))
@@ -228,7 +234,7 @@ export function SendSheet({
                 symbol,
                 amount: value,
                 recipient: recipient.address,
-                label: recipient.label,
+                handle: recipient.handle,
               }))
               .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : "Could not prepare send."))
               .finally(() => setPending(false));
@@ -252,7 +258,7 @@ export function SendSheet({
           </button>
           {usdcBalance === 0 && <p className="wd-sheet-note">Gas is paid in USDC. Deposit a little USDC on Base before sending.</p>}
           {!enabled && <p className="wd-sheet-note">Sending is currently disabled.</p>}
-          {error && <p className="wd-sheet-note" role="alert">{error}</p>}
+          {error && <p className="wd-sheet-error" role="alert">{error}</p>}
         </form>
       )}
     </ActionSheet>

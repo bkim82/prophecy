@@ -8,6 +8,8 @@ import {
   walletRateLimit,
 } from "@/app/api/wallet/responses";
 import { createSendIntent, listTransactionIntents } from "@/lib/transactionIntents";
+import { normalizeHandle } from "@/app/lib/profileEdit";
+import { walletAddressForHandle } from "@/lib/profile";
 import { getViewer } from "@/lib/viewer";
 
 export const dynamic = "force-dynamic";
@@ -45,6 +47,17 @@ export async function POST(request: Request) {
       || typeof body.amount !== "string"
     ) {
       return walletJson({ error: "Invalid send intent" }, { status: 400 });
+    }
+    // A picked @handle is re-resolved here so a stale or tampered picker can't
+    // pair one person's handle with another wallet.
+    if (body.recipientHandle !== undefined) {
+      if (typeof body.recipientHandle !== "string") {
+        return walletJson({ error: "Invalid send intent" }, { status: 400 });
+      }
+      const handleAddress = await walletAddressForHandle(normalizeHandle(body.recipientHandle));
+      if (!handleAddress || handleAddress !== body.recipient.toLowerCase()) {
+        return walletJson({ error: "That @handle doesn't match this wallet anymore. Pick the recipient again." }, { status: 409 });
+      }
     }
     const intent = await createSendIntent(viewer.userId, viewer.smartAccountAddress, {
       idempotencyKey: body.idempotencyKey,

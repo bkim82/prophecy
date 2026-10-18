@@ -1,6 +1,6 @@
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { getDb } from "@/db";
-import { profiles } from "@/db/schema";
+import { profiles, users } from "@/db/schema";
 import { embeddedWalletAuthEnabled } from "@/lib/embeddedWalletFeature";
 
 // Reads/writes for the `profiles` table (db/schema.ts). Validation lives in
@@ -51,6 +51,16 @@ export async function savePinnedMatches(userId: string, ids: string[]): Promise<
     .insert(profiles)
     .values({ userId, pinnedMatches: ids })
     .onConflictDoUpdate({ target: profiles.userId, set: { pinnedMatches: ids } });
+}
+
+/** Active Base smart account of the user holding `handle` (stored form), or null. */
+export async function walletAddressForHandle(handle: string): Promise<string | null> {
+  const [row] = await getDb()
+    .select({ address: users.smartAccountAddress })
+    .from(profiles)
+    .innerJoin(users, eq(users.id, profiles.userId))
+    .where(and(eq(profiles.handle, handle), eq(users.walletStatus, "active"), eq(users.walletChainId, 8453)));
+  return row?.address?.toLowerCase() ?? null;
 }
 
 /** Clerk user id holding `handle` (stored form: lowercase, no "@"), or null. */

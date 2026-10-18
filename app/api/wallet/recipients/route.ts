@@ -12,8 +12,9 @@ function likeLiteral(value: string) {
 }
 
 /**
- * Other Prophecy users with an active Base smart account, matched by handle
- * prefix or display-name substring. Smart-account addresses are public onchain.
+ * Other Prophecy users with a handle and an active Base smart account, matched
+ * by handle prefix or display-name substring. Only handled users are listed:
+ * handles are unique, display names are not, so the picker labels by @handle.
  */
 export async function GET(request: Request) {
   const viewer = await getViewer();
@@ -36,6 +37,7 @@ export async function GET(request: Request) {
     .where(and(
       ne(users.id, viewer.userId),
       isNotNull(users.smartAccountAddress),
+      isNotNull(profiles.handle),
       eq(users.walletStatus, "active"),
       eq(users.walletChainId, 8453),
       or(ilike(profiles.handle, `${literal.toLowerCase()}%`), ilike(profiles.displayName, `%${literal}%`)),
