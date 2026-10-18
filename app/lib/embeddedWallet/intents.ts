@@ -1,8 +1,9 @@
-import { NATIVE_ETH, curatedToken } from "./tokens";
+import { CDP_ERC20_PAYMASTER, GAS_ALLOWANCE_RAW, curatedToken } from "./tokens";
 
 export const BASE_CHAIN_ID = 8453 as const;
 export const INTENT_SCHEMA_VERSION = 1 as const;
 export const ERC20_TRANSFER_SELECTOR = "a9059cbb";
+export const ERC20_APPROVE_SELECTOR = "095ea7b3";
 
 export type NormalizedCall = { to: string; value: string; data: string };
 export type SendIntentInput = {
@@ -62,19 +63,37 @@ function uint256Hex(value: bigint) {
   return value.toString(16).padStart(64, "0");
 }
 
+function encodeAddressAmount(selector: string, address: string, rawAmount: bigint) {
+  return `0x${selector}${normalizeAddress(address).slice(2).padStart(64, "0")}${uint256Hex(rawAmount)}`;
+}
+
+function decodeAddressAmount(selector: string, data: string) {
+  const normalized = data.toLowerCase();
+  if (!new RegExp(`^0x${selector}0{24}[0-9a-f]{40}[0-9a-f]{64}$`).test(normalized)) {
+    throw new IntentValidationError("unknown-calldata", "The ERC-20 calldata is invalid.");
+  }
+  return {
+    address: normalizeAddress(`0x${normalized.slice(34, 74)}`),
+    amount: BigInt(`0x${normalized.slice(74)}`),
+  };
+}
+
 export function encodeErc20Transfer(recipient: string, rawAmount: bigint) {
-  const address = normalizeAddress(recipient);
-  return `0x${ERC20_TRANSFER_SELECTOR}${address.slice(2).padStart(64, "0")}${uint256Hex(rawAmount)}`;
+  return encodeAddressAmount(ERC20_TRANSFER_SELECTOR, recipient, rawAmount);
 }
 
 export function decodeErc20Transfer(data: string) {
-  const normalized = data.toLowerCase();
-  if (!new RegExp(`^0x${ERC20_TRANSFER_SELECTOR}[0-9a-f]{128}$`).test(normalized)) {
-    throw new IntentValidationError("unknown-calldata", "The ERC-20 transfer calldata is invalid.");
-  }
-  const recipient = normalizeAddress(`0x${normalized.slice(34, 74)}`);
-  const amount = BigInt(`0x${normalized.slice(74)}`);
-  return { recipient, amount };
+  const { address, amount } = decodeAddressAmount(ERC20_TRANSFER_SELECTOR, data);
+  return { recipient: address, amount };
+}
+
+export function encodeErc20Approve(spender: string, rawAmount: bigint) {
+  return encodeAddressAmount(ERC20_APPROVE_SELECTOR, spender, rawAmount);
+}
+
+export function decodeErc20Approve(data: string) {
+  const { address, amount } = decodeAddressAmount(ERC20_APPROVE_SELECTOR, data);
+  return { spender: address, amount };
 }
 
 export function buildSendIntent(
@@ -95,9 +114,11 @@ export function buildSendIntent(
   if (rawAmount > token.maxSendRaw) {
     throw new IntentValidationError("transaction-limit", `The maximum send is ${formatUnits(token.maxSendRaw, token.decimals)} ${token.symbol}.`);
   }
-  const calls: NormalizedCall[] = token.address === NATIVE_ETH
-    ? [{ to: recipient, value: rawAmount.toString(), data: "0x" }]
-    : [{ to: token.address, value: "0", data: encodeErc20Transfer(recipient, rawAmount) }];
+  // The approve lets CDP's ERC-20 paymaster take the gas fee in the same token.
+  const calls: NormalizedCall[] = [
+    { to: token.address, value: "0", data: encodeErc20Approve(CDP_ERC20_PAYMASTER, GAS_ALLOWANCE_RAW) },
+    { to: token.address, value: "0", data: encodeErc20Transfer(recipient, rawAmount) },
+  ];
   assertSendCalls({ tokenAddress: token.address, recipient, rawAmount, calls });
   return {
     schemaVersion: INTENT_SCHEMA_VERSION,
@@ -117,21 +138,23 @@ export function assertSendCalls(input: {
   rawAmount: bigint;
   calls: NormalizedCall[];
 }) {
-  if (input.calls.length !== 1) {
-    throw new IntentValidationError("unexpected-batch", "Send requires exactly one call.");
+  if (input.calls.length !== 2) {
+    throw new IntentValidationError("unexpected-batch", "Send requires exactly a gas approval and a transfer.");
   }
-  const [call] = input.calls;
-  const to = normalizeAddress(call.to);
-  if (input.tokenAddress === NATIVE_ETH) {
-    if (to !== input.recipient || call.data !== "0x" || BigInt(call.value) !== input.rawAmount) {
-      throw new IntentValidationError("call-mismatch", "The native transfer does not match the intent.");
-    }
-    return;
-  }
-  const decoded = decodeErc20Transfer(call.data);
+  const [approveCall, transferCall] = input.calls;
+  const approval = decodeErc20Approve(approveCall.data);
   if (
-    to !== input.tokenAddress
-    || BigInt(call.value) !== 0n
+    normalizeAddress(approveCall.to) !== input.tokenAddress
+    || BigInt(approveCall.value) !== 0n
+    || approval.spender !== CDP_ERC20_PAYMASTER
+    || approval.amount !== GAS_ALLOWANCE_RAW
+  ) {
+    throw new IntentValidationError("call-mismatch", "The gas approval does not match policy.");
+  }
+  const decoded = decodeErc20Transfer(transferCall.data);
+  if (
+    normalizeAddress(transferCall.to) !== input.tokenAddress
+    || BigInt(transferCall.value) !== 0n
     || decoded.recipient !== input.recipient
     || decoded.amount !== input.rawAmount
   ) {

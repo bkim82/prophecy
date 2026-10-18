@@ -3,13 +3,15 @@ import {
   IntentValidationError,
   assertSendCalls,
   buildSendIntent,
+  decodeErc20Approve,
   decodeErc20Transfer,
+  encodeErc20Approve,
   encodeErc20Transfer,
   formatUnits,
   normalizeAddress,
   parseUnits,
 } from "./intents";
-import { NATIVE_ETH } from "./tokens";
+import { CDP_ERC20_PAYMASTER, GAS_ALLOWANCE_RAW } from "./tokens";
 
 const ACCOUNT = "0x1111111111111111111111111111111111111111";
 const RECIPIENT = "0x2222222222222222222222222222222222222222";
@@ -30,47 +32,57 @@ describe("raw unit conversion", () => {
 });
 
 describe("send intent", () => {
-  it("normalizes a native transfer into one immutable call", () => {
+  it("batches a fixed USDC gas approval for the paymaster before the transfer", () => {
     const intent = buildSendIntent({
       idempotencyKey: "operation_123456789",
-      tokenAddress: NATIVE_ETH,
+      tokenAddress: USDC,
       recipient: RECIPIENT.toUpperCase().replace("0X", "0x"),
-      amount: "0.01",
+      amount: "1.5",
     }, ACCOUNT);
-    expect(intent.rawAmount).toBe(10_000_000_000_000_000n);
-    expect(intent.calls).toEqual([{
-      to: RECIPIENT,
-      value: "10000000000000000",
-      data: "0x",
-    }]);
+    expect(intent.rawAmount).toBe(1_500_000n);
+    expect(intent.calls).toEqual([
+      { to: USDC, value: "0", data: encodeErc20Approve(CDP_ERC20_PAYMASTER, GAS_ALLOWANCE_RAW) },
+      { to: USDC, value: "0", data: encodeErc20Transfer(RECIPIENT, 1_500_000n) },
+    ]);
+    expect(decodeErc20Approve(intent.calls[0].data)).toEqual({ spender: CDP_ERC20_PAYMASTER, amount: GAS_ALLOWANCE_RAW });
   });
 
   it("round-trips and independently validates ERC-20 transfer calldata", () => {
     const data = encodeErc20Transfer(RECIPIENT, 12_345_678n);
     expect(decodeErc20Transfer(data)).toEqual({ recipient: RECIPIENT, amount: 12_345_678n });
+    const approve = { to: USDC, value: "0", data: encodeErc20Approve(CDP_ERC20_PAYMASTER, GAS_ALLOWANCE_RAW) };
     expect(() => assertSendCalls({
       tokenAddress: USDC,
       recipient: RECIPIENT,
       rawAmount: 1n,
-      calls: [{ to: USDC, value: "0", data }],
+      calls: [approve, { to: USDC, value: "0", data }],
     })).toThrowError(/does not match/);
+    expect(() => assertSendCalls({
+      tokenAddress: USDC,
+      recipient: RECIPIENT,
+      rawAmount: 12_345_678n,
+      calls: [{ ...approve, data: encodeErc20Approve(RECIPIENT, GAS_ALLOWANCE_RAW) }, { to: USDC, value: "0", data }],
+    })).toThrowError(/gas approval/);
   });
 
-  it("rejects batches, self sends, unknown tokens, and over-limit sends", () => {
+  it("rejects unexpected batches, ETH, self sends, unknown tokens, and over-limit sends", () => {
     expect(() => assertSendCalls({
-      tokenAddress: NATIVE_ETH,
+      tokenAddress: USDC,
       recipient: RECIPIENT,
       rawAmount: 1n,
-      calls: [
-        { to: RECIPIENT, value: "1", data: "0x" },
-        { to: RECIPIENT, value: "1", data: "0x" },
-      ],
-    })).toThrowError(/exactly one/);
+      calls: [{ to: USDC, value: "0", data: encodeErc20Transfer(RECIPIENT, 1n) }],
+    })).toThrowError(/exactly a gas approval/);
     expect(() => buildSendIntent({
       idempotencyKey: "operation_123456789",
-      tokenAddress: NATIVE_ETH,
-      recipient: ACCOUNT,
+      tokenAddress: "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      recipient: RECIPIENT,
       amount: "0.01",
+    }, ACCOUNT)).toThrowError(/not enabled/);
+    expect(() => buildSendIntent({
+      idempotencyKey: "operation_123456789",
+      tokenAddress: USDC,
+      recipient: ACCOUNT,
+      amount: "1",
     }, ACCOUNT)).toThrowError(/different/);
     expect(() => buildSendIntent({
       idempotencyKey: "operation_123456789",

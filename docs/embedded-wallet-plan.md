@@ -162,7 +162,7 @@ Transaction status vocabulary: `created | confirmed_by_user | submitted | includ
 - Implement background/on-request reconciliation for submitted transactions, receipt backoff, dropped/replaced/reverted handling, and holdings-cache invalidation after inclusion.
 - Add a global transaction kill switch that disables signing/sponsorship while leaving read-only balances/activity available.
 - Implemented: `transaction_intents`, spend counters, audit events, exact-unit parsing, native/ERC-20 transfer encoding/decoding, single-call/nested-batch rejection, immutable call hashes, idempotent create, guarded confirm/claim/broadcast/terminal transitions, per-token/day limits, reconciliation, and server/browser kill switches (`db/schema.ts:71-134`, `app/lib/embeddedWallet/intents.ts`, `lib/transactionIntents.ts`).
-- Implemented fail-closed: `/api/wallet/paymaster` cannot forward until a credentialed Base Sepolia test proves the installed smart-account nested-call decoder; setting an upstream URL alone cannot bypass this gate (`app/api/wallet/paymaster/route.ts`).
+- Replaced: the custom paymaster proxy was dropped; Send is USDC-only and gas is paid in USDC through CDP's ERC-20 paymaster (`useCdpPaymaster` + `paymasterContext.erc20`, approve batched with the transfer; `app/lib/embeddedWallet/sign.ts`).
 
 ### Phase 5 — Send (repository complete; launch gated)
 
@@ -170,7 +170,7 @@ Transaction status vocabulary: `created | confirmed_by_user | submitted | includ
 - Confirmation shows full recipient, account, network, token contract/symbol, raw-derived amount, sponsorship/fee, and irreversible-action warning.
 - Re-read raw balance, validate destination code/risk rules, simulate, and re-check session/account coherence immediately before signing.
 - `Max` is computed from raw balance and the actual sponsorship decision; no optimistic success on broadcast.
-- Implemented: native ETH/Base USDC typed intents, mandatory full-field confirmation, sole CDP hook import, browser/application identity coherence check, durable pending hash, and no optimistic success. `Max` is intentionally absent until the exact raw token-balance/sponsorship read is available (`app/wallet/ActionSheets.tsx`, `app/lib/embeddedWallet/sign.ts:14`).
+- Implemented: Base USDC typed intents (USDC-paid gas, `@handle` recipient picker), mandatory full-field confirmation, sole CDP hook import, browser/application identity coherence check, durable pending hash, and no optimistic success. `Max` is intentionally absent until the exact raw token-balance/sponsorship read is available (`app/wallet/ActionSheets.tsx`, `app/lib/embeddedWallet/sign.ts:14`).
 
 ### Phase 6 — exact-input Swap (blocked by credentialed quote/decoder decision)
 

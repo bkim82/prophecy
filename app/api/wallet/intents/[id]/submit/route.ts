@@ -10,9 +10,6 @@ export async function POST(request: Request, context: RouteContext<"/api/wallet/
   if (!walletServerTransactionsEnabled()) {
     return walletJson({ error: "Wallet transactions are disabled" }, { status: 503 });
   }
-  if (process.env.CDP_PAYMASTER_DECODER_VERIFIED !== "true") {
-    return walletJson({ error: "Sponsorship policy is not verified" }, { status: 503 });
-  }
   const viewer = await getViewer();
   if (!viewer?.smartAccountAddress) return walletJson({ error: "Not signed in" }, { status: 401 });
   if (!await walletRateLimit(request, viewer, "wallet-intent-submit", 10)) {

@@ -76,3 +76,12 @@ export async function reconcileIntents() {
     body: "{}",
   });
 }
+
+export type WalletRecipient = { handle: string | null; displayName: string | null; address: string };
+
+export async function searchRecipients(q: string, signal?: AbortSignal) {
+  return jsonRequest<{ recipients: WalletRecipient[] }>(
+    `/api/wallet/recipients?q=${encodeURIComponent(q)}`,
+    { signal, cache: "no-store" },
+  );
+}

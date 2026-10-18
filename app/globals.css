@@ -2535,6 +2535,13 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
 .wd-sheet-form { display: grid; gap: 10px; }
 .wd-sheet-field { display: grid; gap: 4px; font-size: 11px; color: var(--muted); }
 .wd-sheet-field input, .wd-sheet-field select { border: 1px solid var(--line); border-radius: 6px; background: var(--field-bg); color: var(--text); padding: 8px 10px; font-size: 13px; }
+.wd-sheet-recipient { display: flex; align-items: center; justify-content: space-between; gap: 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--field-bg); color: var(--text); padding: 8px 10px; font-size: 13px; }
+.wd-sheet-recipient code { font-size: 11px; overflow-wrap: anywhere; }
+.wd-sheet-recipient-clear { border: 0; background: none; color: var(--brand); font-size: 12px; padding: 0; }
+.wd-sheet-recipient-list { list-style: none; margin: 0; padding: 4px; display: grid; gap: 2px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface-raised); }
+.wd-sheet-recipient-list button { display: flex; width: 100%; align-items: baseline; gap: 6px; border: 0; border-radius: 4px; background: none; color: var(--text); padding: 6px 8px; font-size: 13px; text-align: left; }
+.wd-sheet-recipient-list button:hover { background: var(--field-bg); }
+.wd-sheet-recipient-list span { color: var(--muted); font-size: 11px; }
 .wd-sheet-swap-flip { justify-self: center; display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-raised); color: var(--muted); }
 .wd-sheet-swap-flip:hover { color: var(--text); border-color: var(--line-strong); }
 .wd-sheet-primary-button { border: 1px solid var(--brand); border-radius: 6px; background: var(--brand); color: var(--brand-contrast); padding: 10px 12px; font-size: 13px; font-weight: 700; }
