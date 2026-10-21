@@ -324,3 +324,68 @@ export function SparkleIcon({ className }: { className?: string }) {
     </svg>
   );
 }
+
+// Composer (app/compose): new post, then the toolbar's attachments.
+export function ComposeIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" className={className} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M13.6 3.4a1.9 1.9 0 0 1 2.7 2.7L7.5 14.9 4 16l1.1-3.5Z" />
+      <path d="M12 5l3 3" />
+    </svg>
+  );
+}
+
+export function ImageIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="2" y="2.5" width="12" height="11" rx="2" />
+      <circle cx="5.8" cy="6.2" r="1.2" />
+      <path d="m2.5 12 3.6-3.4 2.4 2.2 2-1.8 3 2.8" />
+    </svg>
+  );
+}
+
+export function GifIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="1.5" y="3" width="13" height="10" rx="2" />
+      <path d="M6.4 6.6a1.6 1.6 0 0 0-2.6 1.4 1.5 1.5 0 0 0 2.7.9V8H5.4M8.3 6v4M10.4 10V6h1.9M10.4 8h1.5" />
+    </svg>
+  );
+}
+
+export function PollIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 4h7M3 8h10M3 12h5" />
+    </svg>
+  );
+}
+
+export function EmojiIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="8" cy="8" r="6.2" />
+      <path d="M5.4 9.6a3 3 0 0 0 5.2 0" />
+      <path d="M6 6.3h.01M10 6.3h.01" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
+export function CloseIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
+      <path d="M4 4l8 8M12 4l-8 8" />
+    </svg>
+  );
+}
+
+// Shield with a tick: a trade pulled from your history, not typed in.
+export function VerifiedIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M8 1.8 13 3.6v3.9c0 3.1-2.1 5.6-5 6.7-2.9-1.1-5-3.6-5-6.7V3.6Z" />
+      <path d="m5.7 8 1.6 1.6 3-3.2" />
+    </svg>
+  );
+}

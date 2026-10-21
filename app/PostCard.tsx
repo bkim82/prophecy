@@ -16,8 +16,10 @@ import { BookmarkIcon, ClashIcon, CommentIcon, FlameIcon, HeartIcon, TrendIcon }
 import { postTopics, topicById, type TopicId } from "@/app/lib/topics";
 import { PostMedia } from "@/app/PostMedia";
 import { PostMenu } from "@/app/PostMenu";
+import { PostPoll } from "@/app/PostPoll";
 import { ReshareHead, type Reshare } from "@/app/PostShare";
 import { RepostMenu } from "@/app/RepostMenu";
+import { TradeCard, TradeUnavailable } from "@/app/TradeCard";
 
 // Short tag at the right of the meta row; the full sentence is its tooltip.
 const FLAIRS: Record<PostFlair, { tag: string; title: string }> = {
@@ -332,8 +334,10 @@ const INTERACTIVE = "a, button, input, textarea, label, form, [role='button'], [
 // is a followed account's vouch/defy: like an X quote post, the sharer gets
 // their own header row and the original post drops into a bordered card
 // under it (your own repost/vouch/defy does the same, with your words if you
-// added any, replacing theirs). None of it applies to streak/promo/clash
-// cards.
+// added any, replacing theirs). `fresh` flashes a post you just published
+// from /compose. Topics you picked in the composer show as tags under your
+// own posts; `onTopic` makes them open that topic in the feed. None of it
+// applies to streak/promo/clash cards.
 export function PostCard({
   post,
   context,
@@ -343,6 +347,8 @@ export function PostCard({
   onNotInterested,
   onDelete,
   share,
+  fresh = false,
+  onTopic,
 }: {
   post: Post;
   context?: ReactNode;
@@ -352,6 +358,8 @@ export function PostCard({
   onNotInterested?: (id: TopicId) => void;
   onDelete?: () => void;
   share?: Share;
+  fresh?: boolean;
+  onTopic?: (id: TopicId) => void;
 }) {
   const router = useRouter();
   const [repliesOpen, setRepliesOpen] = useState(false);
@@ -417,7 +425,7 @@ export function PostCard({
           {post.handle}
           {!detail && (
             <>
-              {" · "}
+              {post.handle && " · "}
               {url ? (
                 <Link href={url} className="post-time">
                   {post.timestamp}
@@ -437,18 +445,40 @@ export function PostCard({
           <PostMenu firstName={firstName} topics={topics} onNotInterested={onNotInterested} mine={mine} onDelete={deletePost} />
         </span>
       </div>
-      <div className={`post-content${isLongPost && !expanded ? " is-collapsed" : ""}`}>
-        {post.content.split(/\n\n+/).map((paragraph, index) => (
-          <p key={`${post.id}-paragraph-${index}`}>{paragraph}</p>
-        ))}
-      </div>
+      {post.content && (
+        <div className={`post-content${isLongPost && !expanded ? " is-collapsed" : ""}`}>
+          {post.content.split(/\n\n+/).map((paragraph, index) => (
+            <p key={`${post.id}-paragraph-${index}`}>{paragraph}</p>
+          ))}
+        </div>
+      )}
       {isLongPost && (
         <button type="button" className="post-read-more" onClick={() => setExpanded((value) => !value)}>
           {expanded ? "Show less" : "Read more"}
         </button>
       )}
+      {post.trade && <TradeCard trade={post.trade} />}
+      {post.tradeUnavailable && <TradeUnavailable />}
+      {post.poll && <PostPoll poll={post.poll} postId={post.saved ? post.id : undefined} />}
       {post.media && <PostMedia media={post.media} />}
       {post.call && <MarketCallCard call={post.call} />}
+      {mine && !detail && post.topics && post.topics.length > 0 && (
+        <p className="post-topic-tags">
+          {post.topics.map(topicById).map((topic) =>
+            onTopic ? (
+              <button key={topic.id} type="button" className="post-topic-tag" title={`See more on ${topic.label}`} onClick={() => onTopic(topic.id)}>
+                <TopicIcon topic={topic} />
+                {topic.label}
+              </button>
+            ) : (
+              <span key={topic.id} className="post-topic-tag">
+                <TopicIcon topic={topic} />
+                {topic.label}
+              </span>
+            ),
+          )}
+        </p>
+      )}
       {detail && (
         <p className="post-detail-meta">
           <span>{post.timestamp}</span>
@@ -500,7 +530,7 @@ export function PostCard({
 
   return (
     <article
-      className={`post-card${context || reshare ? " post-card--context" : ""}${embedded ? " post-card--reshared" : ""}${detail ? " post-card--detail" : ""}${url ? " is-linkable" : ""}`}
+      className={`post-card${context || reshare ? " post-card--context" : ""}${embedded ? " post-card--reshared" : ""}${detail ? " post-card--detail" : ""}${url ? " is-linkable" : ""}${fresh ? " is-fresh" : ""}`}
       id={`post-${post.id}`}
       data-rank={rankTier(post.rank)}
       onClick={openPost}

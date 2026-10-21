@@ -1,13 +1,15 @@
+import { hueFromHandle } from "@/app/lib/avatar";
 import type { Market, Post, PostKind } from "@/app/lib/mockPosts";
 
 // Interest topics for the Omens feed (app/FeedSwitcher.tsx, app/FeedTopics.tsx).
 // Currencies (the majors), coins (trending tokens), companies, people and
 // general themes share one shape so a viewer can follow any mix of them. Posts
 // are tagged by hand (Post.topics) plus the asset implied by their market —
-// there's no classifier behind it.
-export type TopicKind = "currency" | "coin" | "company" | "person" | "theme";
+// there's no classifier behind it. Authors can also name their own topic in
+// the composer ("custom" kind, below).
+export type TopicKind = "currency" | "coin" | "company" | "person" | "theme" | "custom";
 
-export type TopicId =
+export type BuiltinTopicId =
   | "bitcoin"
   | "ethereum"
   | "solana"
@@ -29,12 +31,18 @@ export type TopicId =
   | "airdrops"
   | "defi";
 
+// A topic someone named in the composer: "#" + the name as typed ("#Base").
+// The id carries the name, so it needs no registry and survives in stored
+// interests like any other id. Local only — nobody else sees it.
+export type CustomTopicId = `#${string}`;
+export type TopicId = BuiltinTopicId | CustomTopicId;
+
 // `glyph` is a currency symbol, a coin/company/person monogram or a theme
 // mark — no brand logos. Coins go by $TICKER. `short` is the chip label when
 // the full name is long.
 export type Topic = { id: TopicId; label: string; short?: string; kind: TopicKind; glyph: string; color: string };
 
-export const TOPICS: Topic[] = [
+export const TOPICS: (Topic & { id: BuiltinTopicId })[] = [
   { id: "bitcoin", label: "Bitcoin", kind: "currency", glyph: "₿", color: "#f7931a" },
   { id: "ethereum", label: "Ethereum", kind: "currency", glyph: "Ξ", color: "#7b8ff0" },
   { id: "solana", label: "Solana", kind: "currency", glyph: "◎", color: "#2fd6a3" },
@@ -70,9 +78,38 @@ export const TOPIC_KINDS: { kind: TopicKind; label: string; singular: string }[]
 // kind-turn order (see coverOrder) so the chips match the covers.
 export const DEFAULT_INTERESTS: TopicId[] = ["bitcoin", "pepe", "coinbase", "saylor", "macro", "ethereum", "bonk", "elon"];
 
-const TOPIC_BY_ID = new Map(TOPICS.map((topic) => [topic.id, topic]));
-export const topicById = (id: TopicId) => TOPIC_BY_ID.get(id)!;
-export const isTopicId = (id: string): id is TopicId => TOPIC_BY_ID.has(id as TopicId);
+// Custom topics aren't in TOPIC_KINDS (nothing to list them from); this
+// labels them wherever a kind is shown.
+export const CUSTOM_KIND = { kind: "custom" as const, label: "Your topics", singular: "Community topic" };
+export const topicKindLabel = (topic: Topic) =>
+  topic.kind === "custom" ? CUSTOM_KIND.singular : TOPIC_KINDS.find((k) => k.kind === topic.kind)!.singular;
+
+export const CUSTOM_TOPIC_MAX = 24;
+
+// "  #pump.fun " → "pump.fun": no leading #, single spaces, ≤ CUSTOM_TOPIC_MAX.
+// Letters/digits plus space $ . & ' _ - only, at least 2 characters; null if
+// nothing usable is left.
+export function customTopicName(raw: string): string | null {
+  const name = raw.replace(/^[#\s]+/, "").replace(/\s+/g, " ").trim().slice(0, CUSTOM_TOPIC_MAX).trim();
+  return name.length >= 2 && /^[\p{L}\p{N}$][\p{L}\p{N} $.&'_-]*$/u.test(name) ? name : null;
+}
+
+export const isCustomTopicId = (id: string): id is CustomTopicId => id.startsWith("#") && customTopicName(id.slice(1)) === id.slice(1);
+
+const customTopic = (id: CustomTopicId): Topic => ({
+  id,
+  label: id.slice(1),
+  kind: "custom",
+  glyph: "#",
+  color: `hsl(${hueFromHandle(id.toLowerCase())} 62% 62%)`,
+});
+
+const TOPIC_BY_ID = new Map<TopicId, Topic>(TOPICS.map((topic) => [topic.id, topic]));
+export const topicById = (id: TopicId): Topic => TOPIC_BY_ID.get(id) ?? customTopic(id as CustomTopicId);
+// Only the built-in list: what the server accepts (onboarding answers).
+export const isBuiltinTopicId = (id: string): id is BuiltinTopicId => TOPIC_BY_ID.has(id as TopicId);
+// Built-in or a well-formed custom topic: what the browser keeps (interests, mutes).
+export const isTopicId = (id: string): id is TopicId => isBuiltinTopicId(id) || isCustomTopicId(id);
 
 const MARKET_TOPIC: Record<Market, TopicId> = { btc: "bitcoin", eth: "ethereum", sol: "solana", doge: "dogecoin" };
 
@@ -80,6 +117,55 @@ export function postTopics(post: Post): TopicId[] {
   const market = post.market ?? post.call?.market ?? post.clash?.market;
   const topics = post.topics ?? [];
   return market && !topics.includes(MARKET_TOPIC[market]) ? [MARKET_TOPIC[market], ...topics] : topics;
+}
+
+// Most topics an author can put on one post (app/compose/TopicPicker.tsx).
+export const MAX_POST_TOPICS = 3;
+
+// Words that point at a topic, so the composer can put topics you're writing
+// about first in its chip row. Only reorders suggestions — nothing is tagged
+// automatically.
+const TOPIC_WORDS: Record<BuiltinTopicId, string[]> = {
+  bitcoin: ["btc", "bitcoin", "sats"],
+  ethereum: ["eth", "ethereum", "ether"],
+  solana: ["sol", "solana"],
+  dogecoin: ["doge", "dogecoin"],
+  pepe: ["pepe"],
+  bonk: ["bonk"],
+  wif: ["wif"],
+  brett: ["brett"],
+  hype: ["hype", "hyperliquid"],
+  coinbase: ["coinbase"],
+  blackrock: ["blackrock", "ibit"],
+  nvidia: ["nvidia", "nvda"],
+  saylor: ["saylor", "mstr"],
+  vitalik: ["vitalik"],
+  elon: ["elon", "musk"],
+  memecoins: ["meme", "memes", "memecoin", "memecoins"],
+  macro: ["macro", "fed", "fomc", "cpi", "rates"],
+  ai: ["ai"],
+  airdrops: ["airdrop", "airdrops"],
+  defi: ["defi"],
+};
+
+export function mentionedTopics(text: string): TopicId[] {
+  const words = new Set(text.toLowerCase().match(/[a-z0-9]+/g) ?? []);
+  return TOPICS.filter((topic) => TOPIC_WORDS[topic.id].some((word) => words.has(word))).map((topic) => topic.id);
+}
+
+const wordKey = (word: string) => word.toLowerCase().replace(/^\$/, "");
+
+// What a name typed into the composer's topic search means: a built-in topic
+// if it names one (label, short name, id or keyword — "pepe", "$PEPE", "btc",
+// "Macro"), else a custom topic you already have (`known`, case-insensitive,
+// so "base" reuses "#Base"), else a new "#name". Null for an unusable name.
+export function topicForName(raw: string, known: TopicId[]): TopicId | null {
+  const name = customTopicName(raw);
+  if (!name) return null;
+  const key = wordKey(name);
+  const builtin = TOPICS.find((topic) => [topic.id, topic.label, topic.short ?? "", ...TOPIC_WORDS[topic.id]].some((word) => wordKey(word) === key));
+  if (builtin) return builtin.id;
+  return known.find((id) => isCustomTopicId(id) && id.slice(1).toLowerCase() === name.toLowerCase()) ?? `#${name}`;
 }
 
 const matchesAny = (post: Post, interests: TopicId[]) => postTopics(post).some((id) => interests.includes(id));

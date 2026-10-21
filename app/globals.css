@@ -749,6 +749,7 @@ a.feed-notif:hover { background: var(--surface-hover); }
 .feed-composer-trade:hover { background: var(--surface-hover); }
 .feed-composer-post { flex: none; min-height: 32px; padding: 0 16px; border: 0; border-radius: 8px; background: var(--violet-strong); color: var(--bg); font-size: 12px; font-weight: 700; }
 .feed-composer-post:disabled { opacity: .45; cursor: default; }
+.feed-composer-error { margin: 0; padding: 0 18px 12px 64px; color: var(--negative); font-size: 12.5px; }
 /* Interest topics (app/FeedTopics.tsx), inside .feed-panel under the
    composer: Mix it up banner → topic chips → interests picker → topic header.
    Topic icons are neutral; only the open topic's header uses --topic, the
@@ -2813,4 +2814,301 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
   .tut-actions { flex-direction: column-reverse; }
   .tut-actions > * { width: 100%; }
   .tut-choice { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* Composer (/compose, app/compose): the feed's Post button + floating compose
+   button, the page itself, its toolbar popovers (trade, GIF, emoji), the
+   attached trade card (app/TradeCard.tsx, also on posts), composer polls
+   (app/PostPoll.tsx) and the built-in reaction GIFs (app/lib/gifs.ts). */
+.feed-post-button { display: none; }
+.compose-fab { display: none; }
+@media (min-width: 961px) {
+  .feed-post-button { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 46px; margin-top: 16px; border-radius: 999px; background: var(--violet-strong); color: var(--bg); font-size: 15px; font-weight: 700; text-decoration: none; transition: filter .15s ease, transform .15s ease; }
+  .feed-post-button:hover { filter: brightness(1.08); }
+  .feed-post-button:active { transform: scale(.98); }
+  .feed-post-button svg { width: 18px; height: 18px; }
+}
+@media (max-width: 960px) {
+  .compose-fab { position: fixed; right: 20px; bottom: 24px; z-index: 45; display: grid; place-items: center; width: 56px; height: 56px; border-radius: 999px; background: var(--violet-strong); color: var(--bg); box-shadow: 0 8px 22px rgba(0, 0, 0, .35); transition: transform .22s ease; }
+  .compose-fab svg { width: 24px; height: 24px; }
+  .compose-fab:active { transform: scale(.94); }
+}
+@media (max-width: 768px) {
+  .compose-fab { right: 16px; bottom: calc(80px + env(safe-area-inset-bottom)); }
+  /* Rides down with the bottom nav when it auto-hides (app/MobileChromeAutoHide.tsx). */
+  html[data-chrome="hidden"] .compose-fab { transform: translateY(64px); }
+  /* Clear of the live-match ticket, which sits in the same corner band. */
+  body:has(.active-match-bar) .compose-fab { bottom: calc(144px + env(safe-area-inset-bottom)); }
+}
+@media (prefers-reduced-motion: reduce) { .compose-fab { transition: none; } }
+
+.compose-shell { width: min(100% - 56px, 680px); margin: 0 auto; padding: 24px 0 64px; }
+.compose-head { display: flex; align-items: center; gap: 12px; margin: 0 2px 14px; }
+.compose-head h1 { flex: 1; margin: 0; font-size: 20px; font-weight: 700; }
+.compose-post { min-height: 38px; padding: 0 22px; border: 0; border-radius: 999px; background: var(--violet-strong); color: var(--bg); font-size: 14px; font-weight: 700; transition: filter .15s ease, opacity .15s ease; }
+.compose-post:hover:not(:disabled) { filter: brightness(1.08); }
+.compose-post:disabled { opacity: .45; cursor: default; }
+.compose-panel { padding: 16px 18px 10px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); transition: border-color .15s ease, background .15s ease; }
+.compose-panel:focus-within { border-color: color-mix(in srgb, var(--violet) 40%, var(--line)); }
+.compose.is-dragging .compose-panel { border-style: dashed; border-color: var(--violet-strong); background: color-mix(in srgb, var(--violet) 6%, var(--surface)); }
+.compose-row { display: flex; gap: 12px; }
+.compose-row .feed-composer-avatar { width: 40px; height: 40px; font-size: 15px; }
+.compose-body { flex: 1; min-width: 0; display: grid; gap: 12px; }
+.compose-text { display: block; width: 100%; min-height: 96px; padding: 7px 0 0; border: 0; outline: 0; resize: none; field-sizing: content; background: transparent; color: var(--text); font: inherit; font-size: 18px; line-height: 1.45; }
+.compose-text::placeholder { color: var(--muted-dim); }
+.compose-attachment--trade { animation: compose-attach .28s cubic-bezier(.2, .9, .3, 1.2); }
+@keyframes compose-attach { from { opacity: 0; transform: translateY(6px) scale(.97); } }
+.compose-notice { justify-self: start; margin: 0; padding: 6px 10px; border-radius: 8px; background: color-mix(in srgb, var(--gold) 14%, transparent); color: var(--text); font-size: 12.5px; }
+.compose-hint { margin: 12px 4px 0; color: var(--muted-dim); font-size: 12px; }
+.compose-hint strong { color: var(--muted); font-weight: 600; }
+.compose-hint kbd { margin: 0 2px; padding: 0 5px; border: 1px solid var(--line-strong); border-radius: 4px; font-family: var(--font-mono), ui-monospace, monospace; font-size: 10.5px; }
+
+/* Topic row (app/compose/TopicPicker.tsx): the feed's topics as one-tap pills, scrolling sideways, + opens all of them. */
+.compose-topics { position: relative; display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+.compose-topics-label { flex: none; color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.compose-topics-list { flex: 1; min-width: 0; display: flex; gap: 6px; padding: 2px 0; overflow-x: auto; scrollbar-width: none; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
+.compose-topics-list::-webkit-scrollbar { display: none; }
+.compose-topic { flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px 0 6px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--text); font-size: 12.5px; font-weight: 600; white-space: nowrap; transition: border-color .15s ease, background .15s ease, opacity .15s ease; }
+.compose-topic:has(.topic-icon:is([data-kind="currency"], [data-kind="theme"], [data-kind="custom"])), .post-topic-tag:has(.topic-icon:is([data-kind="currency"], [data-kind="theme"], [data-kind="custom"])) { padding-left: 10px; }
+.compose-topic:hover:not(:disabled) { border-color: var(--line-strong); background: var(--surface-hover); }
+.compose-topic[aria-pressed="true"] { border-color: color-mix(in srgb, var(--violet) 65%, transparent); background: color-mix(in srgb, var(--violet) 14%, var(--surface)); }
+.compose-topic:disabled { opacity: .4; cursor: default; }
+.compose-topic-mark { color: var(--violet-strong); font-size: 11px; }
+.compose-topics-more { width: 32px; height: 32px; }
+.topic-menu { display: grid; gap: 12px; width: min(460px, 100%); }
+.topic-menu .interest-group { padding: 0 6px; }
+.topic-menu .interest-option:disabled { opacity: .4; cursor: default; }
+.topic-menu-search { margin: 0 6px; }
+/* "+ Create # name": the one dashed, violet option, so a new topic reads as new. */
+.topic-menu-create { border-style: dashed; border-color: color-mix(in srgb, var(--violet) 60%, var(--line)); color: var(--violet-strong); }
+.topic-menu-create strong { color: var(--text); font-weight: 700; }
+.topic-menu-create .topic-icon { color: var(--violet-strong); }
+.topic-menu-hint { margin: 0; color: var(--muted); font-size: 12.5px; }
+.topic-menu > .interest-options { padding: 0 6px 6px; }
+/* A composer post's picked topics; on the feed each opens that topic. */
+.post-topic-tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 0; }
+.post-topic-tag { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 11px 0 5px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--text); font-size: 12px; font-weight: 600; transition: border-color .15s ease, color .15s ease; }
+button.post-topic-tag:hover { border-color: color-mix(in srgb, var(--violet) 60%, var(--line)); color: var(--violet-strong); }
+
+.compose-toolbar { position: relative; display: flex; align-items: center; gap: 10px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+.compose-tools { flex: 1; min-width: 0; display: flex; align-items: center; gap: 2px; }
+.compose-tool { display: inline-grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 999px; background: transparent; color: var(--violet-strong); transition: background .15s ease, color .15s ease, opacity .15s ease; }
+.compose-tool svg { width: 19px; height: 19px; }
+.compose-tool:hover:not(:disabled), .compose-tool[aria-expanded="true"], .compose-tool[aria-pressed="true"] { background: color-mix(in srgb, var(--violet) 15%, transparent); }
+.compose-tool:disabled { opacity: .35; cursor: default; }
+/* Trade leads the row, labelled, so it reads as the main thing to add. */
+.compose-tool--trade { display: inline-flex; align-items: center; gap: 7px; width: auto; margin-right: 8px; padding: 0 15px 0 12px; border: 1px solid color-mix(in srgb, var(--violet) 45%, transparent); background: color-mix(in srgb, var(--violet) 12%, transparent); font-size: 13.5px; font-weight: 700; white-space: nowrap; }
+.compose-tool--trade svg { width: 17px; height: 17px; }
+.compose-tool--trade.is-attached { border-color: transparent; background: var(--violet-strong); color: var(--bg); }
+.compose-tool--trade.is-attached:hover, .compose-tool--trade.is-attached[aria-expanded="true"] { background: var(--violet-strong); filter: brightness(1.08); }
+.compose-ring { position: relative; flex: none; display: inline-grid; place-items: center; width: 26px; height: 26px; }
+.compose-ring[data-state="near"], .compose-ring[data-state="over"] { width: 32px; height: 32px; }
+.compose-ring svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.compose-ring-track { fill: none; stroke: var(--line-strong); stroke-width: 2.2; }
+.compose-ring-fill { fill: none; stroke: var(--violet-strong); stroke-width: 2.2; stroke-linecap: round; transition: stroke-dasharray .15s ease; }
+.compose-ring[data-state="near"] .compose-ring-fill { stroke: var(--gold); }
+.compose-ring[data-state="over"] .compose-ring-fill { stroke: var(--negative); }
+.compose-ring-count { position: relative; color: var(--muted); font-family: var(--font-mono), ui-monospace, monospace; font-size: 10px; font-variant-numeric: tabular-nums; }
+.compose-ring[data-state="over"] .compose-ring-count { color: var(--negative); }
+
+.compose-popover { --surface: var(--surface-raised); position: absolute; top: calc(100% + 8px); left: 0; z-index: 40; width: min(420px, 100%); max-height: min(62vh, 460px); overflow-y: auto; overscroll-behavior: contain; padding: 8px; border: 1px solid var(--line); border-radius: 14px; outline: 0; background: var(--surface-raised); color: var(--text); box-shadow: 0 14px 34px rgba(0, 0, 0, .34); animation: compose-pop .16s ease-out; }
+[data-theme="light"] .compose-popover { box-shadow: 0 14px 34px rgba(48, 30, 110, .14); }
+@keyframes compose-pop { from { opacity: 0; transform: translateY(-4px); } }
+.compose-popover-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 4px 4px 10px 6px; }
+.compose-popover-head h2 { margin: 0; font-size: 15px; font-weight: 700; }
+.compose-popover-head p { margin: 2px 0 0; color: var(--muted); font-size: 12px; }
+.compose-popover-close { flex: none; display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 999px; background: transparent; color: var(--muted); }
+.compose-popover-close:hover { background: var(--surface-hover); color: var(--text); }
+.compose-popover-close svg { width: 14px; height: 14px; }
+
+.trade-picker-list, .trade-picker-loading { display: grid; gap: 2px; }
+.trade-pick { --tone: var(--muted); display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: center; gap: 12px; width: 100%; padding: 10px; border: 1px solid transparent; border-radius: 10px; outline: 0; background: transparent; color: var(--text); text-align: left; transition: background .12s ease, border-color .12s ease; }
+.trade-pick[data-tone="up"] { --tone: var(--positive); }
+.trade-pick[data-tone="down"] { --tone: var(--negative); }
+.trade-pick:hover, .trade-pick:focus-visible { background: var(--surface-hover); }
+.trade-pick:focus-visible { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--violet) 60%, transparent); }
+.trade-pick[aria-current="true"] { border-color: color-mix(in srgb, var(--violet) 50%, transparent); background: color-mix(in srgb, var(--violet) 10%, transparent); }
+.trade-pick-main { display: grid; gap: 3px; min-width: 0; }
+.trade-pick-title { display: flex; align-items: center; gap: 7px; min-width: 0; font-size: 14px; }
+.trade-pick-title strong { font-weight: 700; }
+.trade-pick-sub { overflow: hidden; color: var(--muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.trade-pick-roi { display: grid; justify-items: end; gap: 2px; font-family: var(--font-mono), ui-monospace, monospace; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.trade-pick-roi strong { color: var(--tone); font-size: 14.5px; font-weight: 600; }
+.trade-pick-roi span { color: var(--muted); font-size: 11.5px; }
+.trade-pick[aria-current="true"] .trade-pick-roi span { color: var(--violet-strong); font-weight: 600; }
+.trade-pick-open { padding: 1px 6px; border-radius: 999px; background: color-mix(in srgb, var(--violet) 16%, transparent); color: var(--violet-strong); font-size: 10px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+.trade-pick-skeleton { display: grid; grid-template-columns: 34px minmax(0, 1fr) 56px; align-items: center; gap: 12px; padding: 10px; }
+.trade-pick-skeleton > :nth-child(1) { width: 34px; height: 34px; border-radius: 999px; }
+.trade-pick-skeleton > :nth-child(2) { width: 70%; height: 12px; border-radius: 6px; }
+.trade-pick-skeleton > :nth-child(3) { height: 12px; border-radius: 6px; }
+.trade-picker-empty { display: grid; justify-items: start; gap: 12px; padding: 4px 6px 10px; color: var(--muted); font-size: 13.5px; line-height: 1.45; }
+.trade-picker-empty p { margin: 0; }
+.trade-picker-links { display: flex; align-items: center; gap: 16px; }
+.trade-picker-cta { display: inline-flex; align-items: center; min-height: 34px; padding: 0 16px; border: 0; border-radius: 999px; background: var(--violet-strong); color: var(--bg); font-size: 13px; font-weight: 700; text-decoration: none; }
+.trade-picker-link { color: var(--text); font-size: 13px; font-weight: 600; text-decoration: none; }
+.trade-picker-link:hover { text-decoration: underline; }
+
+.gif-picker .compose-popover-head { position: sticky; top: -8px; z-index: 1; align-items: center; margin: -8px -8px 0; padding: 8px; background: var(--surface-raised); }
+.gif-picker-search { flex: 1; min-width: 0; height: 36px; padding: 0 14px; border: 1px solid var(--line); border-radius: 999px; outline: 0; background: var(--field-bg); color: var(--text); font: inherit; font-size: 13.5px; }
+.gif-picker-search:focus { border-color: color-mix(in srgb, var(--violet) 60%, var(--line)); }
+.gif-picker-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.gif-picker-item { display: block; padding: 0; overflow: hidden; border: 0; border-radius: 10px; outline: 0; background: none; }
+.gif-picker-item:hover, .gif-picker-item:focus-visible { box-shadow: 0 0 0 2px var(--violet-strong); }
+.gif-picker-item .shot--gif { aspect-ratio: 4 / 3; }
+.gif-picker-empty { margin: 0; padding: 14px 6px; color: var(--muted); font-size: 13px; }
+.emoji-picker { width: min(340px, 100%); }
+.emoji-picker-grid { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 2px; }
+.emoji-picker-item { display: grid; place-items: center; aspect-ratio: 1; padding: 0; border: 0; border-radius: 8px; background: transparent; font-size: 21px; line-height: 1; }
+.emoji-picker-item:hover, .emoji-picker-item:focus-visible { outline: 0; background: var(--surface-hover); }
+
+.compose-photos { margin-top: 0; }
+.compose-photo { position: relative; min-width: 0; min-height: 0; background: #000; }
+.compose-photo img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.compose-photos[data-count="1"] .compose-photo img { height: auto; max-height: 460px; object-fit: contain; }
+.compose-photos.post-media--grid { aspect-ratio: 16 / 9; grid-auto-rows: minmax(0, 1fr); }
+.compose-gif { position: relative; margin-top: 0; }
+.compose-media-remove { position: absolute; top: 8px; right: 8px; z-index: 3; display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 999px; background: rgba(0, 0, 0, .66); color: #fff; backdrop-filter: blur(4px); }
+.compose-media-remove:hover { background: rgba(0, 0, 0, .82); }
+.compose-media-remove svg { width: 14px; height: 14px; }
+
+.compose-poll { display: grid; gap: 8px; min-width: 0; margin: 0; padding: 12px; border: 1px solid var(--line); border-radius: 14px; }
+.compose-poll-choice { position: relative; display: block; }
+.compose-poll-choice input { width: 100%; height: 44px; padding: 0 60px 0 14px; border: 1px solid var(--line-strong); border-radius: 10px; outline: 0; background: var(--field-bg); color: var(--text); font: inherit; font-size: 14px; }
+.compose-poll-choice input:focus { border-color: color-mix(in srgb, var(--violet) 60%, var(--line)); }
+.compose-poll-count { position: absolute; top: 50%; right: 12px; color: var(--muted-dim); font-family: var(--font-mono), ui-monospace, monospace; font-size: 11px; transform: translateY(-50%); }
+.compose-poll-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; padding-top: 2px; }
+.compose-poll-add, .compose-poll-remove { padding: 6px 0; border: 0; background: none; font-size: 13px; font-weight: 700; }
+.compose-poll-add { color: var(--violet-strong); }
+.compose-poll-remove { color: var(--negative); font-weight: 600; }
+.compose-poll-length { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; color: var(--muted); font-size: 12.5px; }
+.compose-poll-length select { height: 32px; padding: 0 8px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--field-bg); color: var(--text); font: inherit; font-size: 13px; }
+
+/* A trade on a post: P&L carries the only color (green/red via --tone), the
+   side tag is green long / red short like the call cards, Verified is violet. */
+.trade-card { --tone: var(--muted); position: relative; display: grid; gap: 10px; margin-top: 2px; padding: 14px 16px 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--hud-fill); box-shadow: inset 3px 0 0 color-mix(in srgb, var(--tone) 70%, transparent); }
+.trade-card[data-tone="up"] { --tone: var(--positive); }
+.trade-card[data-tone="down"] { --tone: var(--negative); }
+.trade-card-head { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center; gap: 12px; }
+.trade-coin { flex: none; display: inline-grid; place-items: center; border-radius: 999px; background: var(--surface-hover); font-weight: 700; line-height: 1; }
+/* Sized box: .eth-symbol is a mask over its own background, not a text glyph. */
+.trade-coin > span { display: grid; place-items: center; width: 62%; height: 62%; }
+.trade-card-name { display: grid; gap: 2px; min-width: 0; }
+.trade-card-asset { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; font-size: 15px; }
+.trade-card-asset strong { font-weight: 700; }
+.trade-card-sub { overflow: hidden; color: var(--muted); font-size: 12.5px; text-overflow: ellipsis; white-space: nowrap; }
+.trade-side { padding: 2px 7px; border-radius: 6px; background: color-mix(in srgb, var(--text) 7%, transparent); color: var(--muted); font-family: var(--font-mono), ui-monospace, monospace; font-size: 10.5px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; white-space: nowrap; }
+.trade-side[data-position="long"] { background: color-mix(in srgb, var(--chart-up) 13%, transparent); color: var(--chart-up); }
+.trade-side[data-position="short"] { background: color-mix(in srgb, var(--chart-down) 13%, transparent); color: var(--chart-down); }
+.trade-card-roi { display: grid; justify-items: end; gap: 2px; font-family: var(--font-mono), ui-monospace, monospace; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.trade-card-roi strong { color: var(--tone); font-size: 22px; font-weight: 600; line-height: 1.1; }
+/* Embers carry their own sign: an Arena round can be won on a negative round P&L. */
+.trade-card-roi span { color: var(--muted); font-size: 12px; }
+.trade-card-roi span[data-sign="1"] { color: color-mix(in srgb, var(--positive) 80%, var(--muted)); }
+.trade-card-roi span[data-sign="-1"] { color: color-mix(in srgb, var(--negative) 80%, var(--muted)); }
+.trade-card-prices { display: flex; align-items: center; gap: 14px; margin: 0; padding: 9px 12px; border-radius: 10px; background: color-mix(in srgb, var(--text) 4%, transparent); }
+.trade-card-prices div { display: grid; gap: 1px; }
+.trade-card-prices dt { color: var(--muted-dim); font-size: 10px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; }
+.trade-card-prices dd { margin: 0; color: var(--text); font-family: var(--font-mono), ui-monospace, monospace; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+.trade-card-arrow { color: var(--muted-dim); }
+/* Open trade on a saved post: its return when posted, right-aligned beside the live prices. */
+.trade-card-posted { margin-left: auto; justify-items: end; text-align: right; }
+.trade-card-posted dd[data-sign="1"] { color: var(--positive); }
+.trade-card-posted dd[data-sign="-1"] { color: var(--negative); }
+.trade-card--unavailable { display: flex; align-items: center; gap: 8px; margin: 2px 0 0; padding: 12px 14px; border-style: dashed; box-shadow: none; color: var(--muted); font-size: 13px; }
+.trade-card--unavailable svg { flex: none; width: 15px; height: 15px; }
+.trade-card-round { margin: 0; padding: 9px 12px; border-radius: 10px; background: color-mix(in srgb, var(--text) 4%, transparent); color: var(--muted); font-size: 13px; }
+.trade-card-round [data-result] { color: var(--text); font-weight: 700; }
+.trade-card-round [data-result="won"] { color: var(--positive); }
+.trade-card-round [data-result="lost"] { color: var(--negative); }
+.trade-card-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; color: var(--muted); font-size: 12px; }
+.trade-card-verified { display: inline-flex; align-items: center; gap: 5px; color: var(--violet-strong); font-weight: 600; }
+.trade-card-verified svg { width: 14px; height: 14px; }
+.trade-card-live { display: inline-block; width: 6px; height: 6px; margin-right: 6px; border-radius: 999px; background: var(--violet-strong); vertical-align: 1px; animation: trade-live 1.8s ease-in-out infinite; }
+@keyframes trade-live { 50% { opacity: .35; } }
+.trade-card-source { color: var(--text); font-weight: 600; text-decoration: none; }
+.trade-card-source:hover { text-decoration: underline; }
+.trade-card-remove { position: absolute; top: -9px; right: -9px; display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface-raised); color: var(--text); }
+.trade-card-remove:hover { background: var(--surface-hover); }
+.trade-card-remove svg { width: 12px; height: 12px; }
+@media (max-width: 420px) { .trade-card { padding: 12px 13px 11px; } .trade-card-head { gap: 10px; } .trade-card-roi strong { font-size: 19px; } }
+
+.post-poll { display: grid; gap: 6px; margin-top: 4px; }
+.post-poll-choice { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 40px; padding: 0 14px; overflow: hidden; border: 1px solid color-mix(in srgb, var(--violet) 45%, var(--line)); border-radius: 999px; background: transparent; color: var(--violet-strong); font: inherit; font-size: 14px; font-weight: 700; text-align: left; transition: background .15s ease; }
+.post-poll-choice:hover { background: color-mix(in srgb, var(--violet) 10%, transparent); }
+.post-poll[data-voted] .post-poll-choice { border-color: transparent; border-radius: 8px; background: color-mix(in srgb, var(--text) 5%, transparent); color: var(--text); font-weight: 500; }
+.post-poll[data-voted] .post-poll-choice[aria-pressed="true"] { font-weight: 700; }
+.post-poll-fill { position: absolute; inset: 0 auto 0 0; background: color-mix(in srgb, var(--violet) 28%, transparent); transition: width .3s ease; }
+.post-poll-label, .post-poll-share { position: relative; }
+.post-poll-share { font-family: var(--font-mono), ui-monospace, monospace; font-size: 13px; }
+.post-poll-meta { margin: 2px 0 0; color: var(--muted); font-size: 12.5px; }
+
+.post-card.is-fresh { animation: post-fresh 2.2s ease-out; }
+@keyframes post-fresh { from { background: color-mix(in srgb, var(--violet) 22%, transparent); } }
+
+/* Composer photos on a post: one at its own aspect ratio (capped), 2–4 cropped into a 16:9 grid. */
+/* Explicit width: otherwise the max-height cap carries through aspect-ratio and narrows the box. */
+.shot--photo { width: 100%; max-height: 510px; overflow: hidden; background: #000; }
+.shot--photo img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.post-media--grid:has(.shot--photo) { aspect-ratio: 16 / 9; grid-auto-rows: minmax(0, 1fr); }
+.post-media--grid .shot--photo { aspect-ratio: auto !important; max-height: none; }
+
+/* Built-in reaction GIFs: the emoji loops in its data-motion; pump/dump add
+   candle bars, particles rain or twinkle around it. Fixed palette like the
+   other shots. Still under reduced motion. */
+.shot--gif { display: flex; flex-direction: column; align-items: center; justify-content: space-between; aspect-ratio: 16 / 9; max-height: 380px; padding: 10px 12px 12px; overflow: hidden; isolation: isolate; }
+.shot-gif-badge { position: absolute; bottom: 8px; left: 8px; z-index: 3; padding: 1px 5px; border-radius: 4px; background: rgba(0, 0, 0, .62); color: #fff; font-size: 10px; font-weight: 800; letter-spacing: .05em; }
+.shot-gif-emoji { position: relative; z-index: 2; flex: 1; display: grid; place-items: center; font-size: clamp(34px, 24cqi, 96px); line-height: 1; }
+.shot--gif .shot-meme-caption { position: relative; z-index: 2; font-size: clamp(14px, 9cqi, 36px); }
+.shot-gif-bars { position: absolute; inset: auto 8% 0; z-index: 1; display: flex; align-items: flex-end; gap: 6%; height: 70%; opacity: .55; }
+.shot-gif-bars span { flex: 1; height: calc(18% + var(--i) * 14%); border-radius: 3px 3px 0 0; background: #2ee87a; transform-origin: bottom; animation: gif-bar 1.6s ease-in-out infinite; animation-delay: calc(var(--i) * .12s); }
+.shot--gif[data-motion="dump"] .shot-gif-bars span { height: calc(88% - var(--i) * 14%); background: #ff4d5e; }
+.shot-gif-particles { position: absolute; inset: 0; z-index: 1; }
+.shot-gif-particles span { position: absolute; top: -18%; left: calc(4% + var(--i) * 14%); font-size: clamp(14px, 8cqi, 30px); animation: gif-fall 1.5s linear infinite; animation-delay: calc(var(--i) * -.23s); }
+.shot--gif[data-motion="rocket"] .shot-gif-particles span { color: #fff; font-size: clamp(8px, 4cqi, 16px); animation-duration: .7s; opacity: .8; }
+.shot--gif[data-motion="sparkle"] .shot-gif-particles span { top: calc(12% + mod(var(--i), 3) * 30%); left: calc(6% + var(--i) * 13%); color: #fff7c2; animation: gif-twinkle 1.4s ease-in-out infinite; animation-delay: calc(var(--i) * .2s); }
+.shot--gif[data-motion="rocket"] .shot-gif-emoji { animation: gif-rocket 1.6s ease-in infinite; }
+.shot--gif[data-motion="shake"] .shot-gif-emoji { animation: gif-shake .45s linear infinite; }
+.shot--gif[data-motion="shake"]::before { content: ""; position: absolute; inset: 0; z-index: 1; background: #ff1f3d; animation: gif-flash 1.2s steps(1) infinite; }
+.shot--gif[data-motion="pulse"] .shot-gif-emoji { animation: gif-pulse .9s ease-in-out infinite; }
+.shot--gif[data-motion="wobble"] .shot-gif-emoji { animation: gif-wobble 1.1s ease-in-out infinite; }
+.shot--gif[data-motion="pump"] .shot-gif-emoji { animation: gif-bounce 1.6s ease-in-out infinite; }
+.shot--gif[data-motion="dump"] .shot-gif-emoji { animation: gif-sink 1.6s ease-in infinite; }
+.shot--gif[data-motion="sparkle"] .shot-gif-emoji { animation: gif-pulse 1.4s ease-in-out infinite; }
+.shot--gif[data-motion="flicker"] .shot-gif-emoji { animation: gif-flicker .5s ease-in-out infinite alternate; }
+.shot--gif[data-motion="rise"] .shot-gif-emoji { animation: gif-rise 2.6s ease-out infinite; }
+.shot--gif[data-motion="rain"] .shot-gif-emoji { animation: gif-wobble 1.6s ease-in-out infinite; }
+.shot--gif[data-motion="bounce"] .shot-gif-emoji { animation: gif-bounce .7s ease-in-out infinite; }
+.shot--gif[data-motion="zoom"] .shot-gif-emoji { animation: gif-zoom 1.3s cubic-bezier(.6, 0, .4, 1) infinite; }
+.shot--gif[data-motion="sink"] .shot-gif-emoji { animation: gif-sink 1.9s ease-in infinite; }
+@keyframes gif-bar { 50% { transform: scaleY(.55); } }
+@keyframes gif-fall { to { transform: translateY(620%) rotate(25deg); } }
+@keyframes gif-twinkle { 0%, 100% { opacity: 0; transform: scale(.3); } 50% { opacity: 1; transform: scale(1.1); } }
+@keyframes gif-rocket { 0% { opacity: 0; transform: translate(-35%, 70%); } 15% { opacity: 1; } 75% { opacity: 1; transform: translate(12%, -30%); } 100% { opacity: 0; transform: translate(30%, -80%); } }
+@keyframes gif-shake { 0%, 100% { transform: translate(0) rotate(0); } 25% { transform: translate(-5%, 2%) rotate(-6deg); } 75% { transform: translate(5%, -2%) rotate(6deg); } }
+@keyframes gif-flash { 0%, 60% { opacity: 0; } 61%, 80% { opacity: .28; } }
+@keyframes gif-pulse { 50% { transform: scale(1.18); } }
+@keyframes gif-wobble { 0%, 100% { transform: rotate(-10deg); } 50% { transform: rotate(10deg) scale(1.05); } }
+@keyframes gif-bounce { 0%, 100% { transform: translateY(8%) scale(1.06, .94); } 50% { transform: translateY(-14%) scale(.96, 1.04); } }
+@keyframes gif-sink { 0% { opacity: 1; transform: translateY(-12%); } 80% { opacity: 1; transform: translateY(22%); } 100% { opacity: 0; transform: translateY(30%); } }
+@keyframes gif-flicker { from { filter: brightness(1); transform: scale(1); } to { filter: brightness(1.25); transform: scale(1.07, 1.13) translateY(-3%); } }
+@keyframes gif-rise { 0% { opacity: .2; transform: translateY(70%); } 55%, 100% { opacity: 1; transform: translateY(0); } }
+@keyframes gif-zoom { 0% { transform: translateX(160%); } 100% { transform: translateX(-160%); } }
+@media (prefers-reduced-motion: reduce) {
+  .shot--gif *, .shot--gif::before, .trade-card-live, .compose-attachment--trade, .compose-popover, .post-card.is-fresh { animation: none !important; }
+}
+
+@media (max-width: 768px) {
+  .compose-shell { width: min(100% - 32px, 680px); padding: 12px 0 calc(96px + env(safe-area-inset-bottom)); }
+  .compose-panel { padding: 14px 14px 8px; }
+  .compose-text { min-height: 84px; font-size: 17px; }
+  .compose-hint-keys { display: none; }
+}
+@media (max-width: 560px) {
+  .compose-popover { width: 100%; }
+  .compose-tool { height: 34px; }
+  .compose-tool:not(.compose-tool--trade) { width: 34px; }
+  .compose-tool--trade { margin-right: 4px; padding: 0 12px 0 10px; }
+}
+@media (max-width: 380px) {
+  .compose-row .feed-composer-avatar { display: none; }
 }

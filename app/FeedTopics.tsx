@@ -2,7 +2,7 @@
 
 import type { CSSProperties, ReactNode } from "react";
 import { NotInterestedIcon } from "@/app/icons";
-import { TOPIC_KINDS, TOPICS, topicById, type Topic, type TopicId } from "@/app/lib/topics";
+import { CUSTOM_KIND, TOPIC_KINDS, TOPICS, isCustomTopicId, topicById, topicKindLabel, type Topic, type TopicId } from "@/app/lib/topics";
 
 // Interest-topic pieces of the Omens feed (wired up in app/FeedSwitcher.tsx):
 // the chip row, the interests picker, a topic's header, the "Mix it up"
@@ -147,6 +147,25 @@ export function InterestPicker({
           </div>
         </div>
       ))}
+      {interests.some(isCustomTopicId) && (
+        <div className="interest-group">
+          <p className="interest-group-label">{CUSTOM_KIND.label}</p>
+          <div className="interest-options">
+            {interests.filter(isCustomTopicId).map((id) => {
+              const topic = topicById(id);
+              return (
+                <button key={id} type="button" className="interest-option" aria-pressed onClick={() => onToggle(id)}>
+                  <TopicIcon topic={topic} />
+                  {topic.label}
+                  <span className="interest-option-mark" aria-hidden="true">
+                    ✓
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
       {muted.length > 0 && (
         <div className="interest-group">
           <p className="interest-group-label">Not interested · hidden from For You</p>
@@ -189,7 +208,7 @@ export function TopicHeader({
   onToggle: () => void;
   onNotInterested: () => void;
 }) {
-  const kind = TOPIC_KINDS.find((k) => k.kind === topic.kind)!.singular;
+  const kind = topicKindLabel(topic);
   return (
     <div className="topic-header" style={topicStyle(topic)}>
       <TopicIcon topic={topic} />

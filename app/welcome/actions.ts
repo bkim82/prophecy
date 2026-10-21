@@ -1,7 +1,7 @@
 "use server";
 
 import { isExperience, isGoal, isPace, isReferral } from "@/app/lib/onboardingQuestions";
-import { isTopicId } from "@/app/lib/topics";
+import { isBuiltinTopicId } from "@/app/lib/topics";
 import { isOnboarded, saveOnboarding } from "@/lib/onboarding";
 import { getViewer } from "@/lib/viewer";
 
@@ -42,7 +42,7 @@ export async function finishOnboarding(input: OnboardingInput): Promise<{ ok: tr
     goals,
     experience,
     paces: strings(input.paces).filter(isPace),
-    interests: strings(input.interests).filter(isTopicId),
+    interests: strings(input.interests).filter(isBuiltinTopicId),
     referral: typeof input.referral === "string" && isReferral(input.referral) ? input.referral : null,
     timezone: typeof input.timezone === "string" && TIMEZONE_PATTERN.test(input.timezone) ? input.timezone : null,
   });

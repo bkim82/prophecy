@@ -3,7 +3,7 @@
 Agent-readable fact sheets, not prose. Format: flat bullets, `file:line` refs, no narration. Update per [[AGENTS.md]] orchestration rule when `app/**` behavior changes.
 
 - [architecture.md](architecture.md) — module map, data flow, invariants
-- [feeds.md](feeds.md) — Global/Exclusive Twitter-style feeds, header nav, rank stub
+- [feeds.md](feeds.md) — Global/Exclusive Twitter-style feeds, header nav, rank stub, `/compose` composer (attach a trade, photos, GIF, poll, emoji)
 - [profiles.md](profiles.md) — `/profile/[handle]`: avatar → rank → stats, Omens/Comments/Trades/Portfolio tabs, rank-locked portfolio; archetype, signature asset + per-asset accuracy, highlight reel; own `/profile`: Edit profile (photo, banner, name, handle, bio, location, website → `profiles` table), match history with pinnable wins, mock copy earnings
 - [onboarding.md](onboarding.md) — `/welcome` after Clerk sign-up: profile basics (name/@handle/photo/bio), why you're here, experience + trading pace, feed interests, referral + 18+; `onboarding` table; personalized first move
 - [sanctum.md](sanctum.md) — Oracle Room: rank-only live Pulse room (BTC/ETH/daily), room trade feed, mini chat — mock players/funds
@@ -18,6 +18,7 @@ Agent-readable fact sheets, not prose. Format: flat bullets, `file:line` refs, n
 - [embedded-wallet-spike.md](embedded-wallet-spike.md) — Phase -1 compatibility record: installed SDK/API surface, completed local gates, unresolved credential/security gates
 - [wallet-operations.md](wallet-operations.md) — feature gates, schema/reset sequence, monitoring, incident response, rollback, and credential/session rotation
 - [chart.md](chart.md) — SVG chart geometry, layers, scaling
+- [posts.md](posts.md) — saved omens: `posts`/`post_media`/`poll_votes`, POST/DELETE/vote/media routes, trade refs resolved live with an ownership check, "when posted" ROI
 - [roadmap.md](roadmap.md) — unbuilt features, known gaps
 - [multiplayer-plan.md](multiplayer-plan.md) — server-authoritative multiplayer Pulse: match lifecycle, guarded updates, presence, house bots
 

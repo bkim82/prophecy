@@ -9,6 +9,7 @@ import {
   check,
   index,
   numeric,
+  primaryKey,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
@@ -362,3 +363,61 @@ export const challenges = pgTable("challenges", {
     .on(table.challengerId, table.targetHandle)
     .where(sql`${table.status} = 'pending'`),
 }));
+
+// One row per omen written in the composer (/compose, app/FeedComposer.tsx),
+// created by POST /api/posts (lib/posts.ts). Everything about the author is
+// derived server-side; `authorName`/`authorHandle` are the write-time
+// snapshot used when the author has no `profiles` row to read live.
+// `tradeRef` points at one of the author's own trades ("portfolio:<positions.id>"
+// or "arena:<matches.id>", checked on write) — a post never stores trade
+// numbers; readers resolve the ref against the DB each time (lib/trades.ts
+// tradeReceiptsFor). `tradeRoiAtPost` is the open portfolio trade's return
+// at write time, computed server-side, so a card can show "when posted" next
+// to the live figure. Deleting sets `deletedAt` (soft delete).
+export const posts = pgTable("posts", {
+  id: text("id").primaryKey(),
+  authorId: text("author_id").notNull(),
+  authorName: text("author_name").notNull(),
+  authorHandle: text("author_handle"),
+  content: text("content").notNull().default(""),
+  topics: jsonb("topics").$type<string[]>().notNull().default(sql`'[]'::jsonb`), // TopicIds incl. custom "#name", ≤ 3
+  tradeRef: text("trade_ref"),
+  tradeRoiAtPost: doublePrecision("trade_roi_at_post"),
+  gif: text("gif"), // app/lib/gifs.ts GifId
+  pollChoices: jsonb("poll_choices").$type<string[]>(), // 2–4, null = no poll
+  pollEndsAt: timestamp("poll_ends_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+}, (table) => [
+  index("posts_created_at_idx").on(table.createdAt),
+  index("posts_author_created_at_idx").on(table.authorId, table.createdAt),
+  check("posts_content_length", sql`char_length(${table.content}) <= 280`),
+  check("posts_topics_count", sql`jsonb_array_length(${table.topics}) <= 3`),
+  check("posts_poll_shape", sql`(${table.pollChoices} IS NULL) = (${table.pollEndsAt} IS NULL)`),
+]);
+
+// A post's photos, ≤ 4 in `position` order. Bytes are base64 like the
+// profile banner (db/schema.ts profiles), served by
+// GET /api/posts/[id]/media/[n]; app/lib/postImage.ts caps size and type.
+export const postMedia = pgTable("post_media", {
+  postId: text("post_id").notNull(),
+  position: integer("position").notNull(),
+  mime: text("mime").notNull(),
+  image: text("image").notNull(),
+  width: integer("width").notNull(),
+  height: integer("height").notNull(),
+}, (table) => [
+  primaryKey({ columns: [table.postId, table.position] }),
+  check("post_media_position_range", sql`${table.position} BETWEEN 0 AND 3`),
+]);
+
+// One vote per user per poll post; re-voting replaces it, un-voting deletes it.
+export const pollVotes = pgTable("poll_votes", {
+  postId: text("post_id").notNull(),
+  userId: text("user_id").notNull(),
+  choice: integer("choice").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  primaryKey({ columns: [table.postId, table.userId] }),
+  check("poll_votes_choice_range", sql`${table.choice} BETWEEN 0 AND 3`),
+]);

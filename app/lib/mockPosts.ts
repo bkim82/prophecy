@@ -7,7 +7,9 @@
 // app/lib/playerId.ts, which is only meant for anonymous matchmaking.
 // Trade-off for a future posting pass: signed-out visitors could view feeds
 // but would need to sign in to post.
+import type { GifId } from "@/app/lib/gifs";
 import type { TopicId } from "@/app/lib/topics";
+import type { TradeReceipt } from "@/app/lib/trades";
 
 export type Market = "btc" | "eth" | "sol" | "doge";
 export type Side = "LONG" | "SHORT";
@@ -61,6 +63,9 @@ export type MarketCall = {
 //   high→low as [price, size], `wall` highlighted. "bars": dashboard bar
 //   chart (negative values turn the chart into green/red flows).
 // - "explorer": block-explorer transaction page.
+// - "photo": a real image you attached in the composer (`src` is a blob: URL
+//   that lives as long as the tab). "gif": one of the built-in reaction GIFs
+//   (app/lib/gifs.ts), drawn and animated in HTML/CSS like the rest.
 // `alt` is the accessible description (the media renders as role="img").
 export type PostImage = { alt: string } & (
   | { kind: "meme"; seed: string; emoji: string; top?: string; bottom?: string }
@@ -72,7 +77,15 @@ export type PostImage = { alt: string } & (
   | { kind: "orderbook"; pair: string; group: string; asks: [number, number][]; bids: [number, number][]; wall: number; last: string; note?: string }
   | { kind: "bars"; title: string; subtitle: string; source: string; unit: "B" | "M"; bars: { label: string; value: number }[] }
   | { kind: "explorer"; network: string; hash: string; block: string; age: string; from: string; fromTag: string; to: string; value: string; usd: string; fee: string }
+  | { kind: "photo"; src: string; width: number; height: number }
+  | { kind: "gif"; gif: GifId }
 );
+
+// A poll written in the composer: 2–4 choices. On a saved post the counts,
+// your vote and whether it has ended come from `poll_votes` and votes go to
+// POST /api/posts/[id]/vote; without `counts` voting is local, like clash
+// votes (app/PostPoll.tsx).
+export type Poll = { choices: string[]; endsIn: string; counts?: number[]; yourVote?: number | null; closed?: boolean };
 
 // Every post renders through PostCard, which branches on `kind`:
 // "text" = plain take, "call"/"result" = market-call hero (pending vs
@@ -122,6 +135,15 @@ export type Post = {
   topics?: TopicId[];
   flair?: PostFlair;
   clash?: Clash;
+  // One of your own trades, attached in the composer (app/compose) and
+  // rendered by app/TradeCard.tsx. A snapshot from when you posted.
+  trade?: TradeReceipt;
+  // A saved post's trade ref that no longer resolves to its author's own
+  // trade (lib/trades.ts tradeReceiptsFor) — shown as "Trade unavailable".
+  tradeUnavailable?: boolean;
+  poll?: Poll;
+  // Stored in `posts` (lib/posts.ts) rather than mock data.
+  saved?: boolean;
   // Written by the viewer (FeedComposer posts): deletable from the ⋯ menu,
   // and it can be reposted but not vouched for or defied.
   mine?: boolean;
