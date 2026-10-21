@@ -1,9 +1,12 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { FeedComposer } from "@/app/FeedComposer";
 import { CoverEyebrow, InterestPicker, MixBanner, MutedNotice, SeeMore, TopicChips, TopicHeader, type TopicView } from "@/app/FeedTopics";
+import { ComposeIcon } from "@/app/icons";
 import { PostCard } from "@/app/PostCard";
+import { clearFreshPost, useFreshPostId } from "@/app/lib/freshPost";
 import { FOLLOWED_HANDLES, LIVE_CALL_COUNT, SHARES, type Post, type Share } from "@/app/lib/mockPosts";
 import { useBookmarks, useInterests, useMutedTopics } from "@/app/lib/postLists";
 import { ageMinutes, blendTopics, personalize, pickCovers, postTopics, topicById, type Cover, type Topic, type TopicId } from "@/app/lib/topics";
@@ -41,16 +44,21 @@ type Row =
   | { kind: "label"; key: string }
   | { kind: "notice"; key: string; notice: Notice };
 
-export function FeedSwitcher({ posts }: { posts: Post[] }) {
+// `savedPosts` = omens from the `posts` table (lib/posts.ts feedPosts,
+// rendered by app/page.tsx), newest first, pinned above everything else.
+export function FeedSwitcher({ posts, savedPosts }: { posts: Post[]; savedPosts: Post[] }) {
   const [filter, setFilter] = useState<FilterId>("forYou");
   // Topic chip: "forYou" = every topic, else one followed (or opened) topic.
   const [view, setView] = useState<TopicView>("forYou");
   // "Mix it up": the For You home as a round-robin blend instead of covers.
   const [mixed, setMixed] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
-  // Posts written in the composer this session, newest first. Never persisted;
-  // deleting one (its ⋯ menu) just drops it from here.
-  const [localPosts, setLocalPosts] = useState<Post[]>([]);
+  // Deleting your own saved post hides it at once; it comes back if
+  // DELETE /api/posts/[id] fails.
+  const [deletedIds, setDeletedIds] = useState<string[]>([]);
+  const shownSaved = useMemo(() => savedPosts.filter((post) => !deletedIds.includes(post.id)), [savedPosts, deletedIds]);
+  // Just published from a composer: flashed once on its way in.
+  const freshId = useFreshPostId();
   const { ids: bookmarkIds } = useBookmarks();
   const interests = useInterests();
   const muted = useMutedTopics();
@@ -69,8 +77,8 @@ export function FeedSwitcher({ posts }: { posts: Post[] }) {
       if (filter === "bookmarked" && !bookmarkIds.includes(post.id)) return false;
       return view === "forYou" || postTopics(post).includes(view);
     };
-    // Your own composer posts stay on top, above the covers.
-    const pinned = localPosts.filter(keep);
+    // Saved omens stay on top, above the covers.
+    const pinned = shownSaved.filter(keep);
     const feed = posts.filter(keep);
     // Following runs on when things hit it, so a fresh vouch/defy of an old
     // post lands near the top. (Stable sort keeps ties in feed order.)
@@ -83,7 +91,7 @@ export function FeedSwitcher({ posts }: { posts: Post[] }) {
     const covers = pickCovers(suggestions, interests.ids);
     const coverIds = new Set(covers.map((cover) => cover.post.id));
     return { pinned, covers, rest: personalize(suggestions.filter((post) => !coverIds.has(post.id)), interests.ids) };
-  }, [filter, view, home, mixed, posts, localPosts, bookmarkIds, interests.ids, muted.ids]);
+  }, [filter, view, home, mixed, posts, shownSaved, bookmarkIds, interests.ids, muted.ids]);
 
   const visible = useMemo(() => [...pinned, ...covers.map((cover) => cover.post), ...rest], [pinned, covers, rest]);
 
@@ -128,6 +136,22 @@ export function FeedSwitcher({ posts }: { posts: Post[] }) {
     }
   }
 
+  async function deleteSaved(id: string) {
+    setDeletedIds((current) => [...current, id]);
+    const response = await fetch(`/api/posts/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+    }).catch(() => null);
+    if (!response?.ok) setDeletedIds((current) => current.filter((other) => other !== id));
+  }
+
+  useEffect(() => {
+    if (!freshId) return;
+    const timer = window.setTimeout(clearFreshPost, 2400);
+    return () => window.clearTimeout(timer);
+  }, [freshId]);
+
   const openTopicData = view === "forYou" ? null : topicById(view);
 
   return (
@@ -152,10 +176,17 @@ export function FeedSwitcher({ posts }: { posts: Post[] }) {
             </button>
           ))}
         </div>
+        <Link href="/compose" className="feed-post-button">
+          <ComposeIcon />
+          Create Omen
+        </Link>
       </nav>
+      <Link href="/compose" className="compose-fab" aria-label="Create Omen" title="Create Omen">
+        <ComposeIcon />
+      </Link>
       <div className="feed-main">
         <div className="feed-panel" ref={panelRef}>
-          <FeedComposer onPost={(post) => setLocalPosts((current) => [post, ...current])} />
+          <FeedComposer />
           {home && interests.ids.length > 1 && (
             <MixBanner mixed={mixed} topicCount={interests.ids.length} onToggle={() => setMixed((value) => !value)} />
           )}
@@ -208,7 +239,9 @@ export function FeedSwitcher({ posts }: { posts: Post[] }) {
                   post={post}
                   share={FOLLOWED_SHARES.get(post.id)}
                   onNotInterested={onNotInterested}
-                  onDelete={post.mine ? () => setLocalPosts((current) => current.filter((local) => local.id !== post.id)) : undefined}
+                  onDelete={post.mine && post.saved ? () => void deleteSaved(post.id) : undefined}
+                  fresh={post.id === freshId}
+                  onTopic={openTopic}
                   context={cover && <CoverEyebrow topic={cover} onNotInterested={() => notInterested(cover.id, post.id)} />}
                   footer={cover && <SeeMore topic={cover} onClick={() => openTopic(cover.id)} />}
                 />

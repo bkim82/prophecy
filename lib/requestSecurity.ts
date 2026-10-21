@@ -12,7 +12,12 @@ function oneForwardedValue(value: string | null) {
   return value.trim().toLowerCase();
 }
 
-export function mutationRequestFailure(request: Request): MutationRequestFailure | null {
+// `maxBodyBytes` lets a route that takes real content (POST /api/posts, with
+// photos) raise the cap; everything else keeps the 2 KB default.
+export function mutationRequestFailure(
+  request: Request,
+  { maxBodyBytes = MAX_MUTATION_BODY_BYTES }: { maxBodyBytes?: number } = {},
+): MutationRequestFailure | null {
   const originHeader = request.headers.get("origin");
   const host = oneForwardedValue(
     request.headers.get("x-forwarded-host") ?? request.headers.get("host"),
@@ -54,7 +59,7 @@ export function mutationRequestFailure(request: Request): MutationRequestFailure
   if (contentType !== "application/json") return "invalid-content-type";
 
   const contentLength = request.headers.get("content-length");
-  if (contentLength && (!/^\d+$/.test(contentLength) || Number(contentLength) > MAX_MUTATION_BODY_BYTES)) {
+  if (contentLength && (!/^\d+$/.test(contentLength) || Number(contentLength) > maxBodyBytes)) {
     return "body-too-large";
   }
 

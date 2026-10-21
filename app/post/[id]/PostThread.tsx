@@ -77,7 +77,7 @@ export function PostThread({ post, replies }: { post: Post; replies: Reply[] }) 
       </div>
       <div className="feed-panel">
         <PostCard post={post} detail onReply={() => inputRef.current?.focus()} />
-        <ReplyComposer inputRef={inputRef} replyingTo={post.handle} onReply={(reply) => setMine((current) => [reply, ...current])} />
+        <ReplyComposer inputRef={inputRef} replyingTo={post.handle || post.author} onReply={(reply) => setMine((current) => [reply, ...current])} />
         <div className="post-replies">
           {all.map((reply) => (
             <ReplyItem key={reply.id} reply={reply} />

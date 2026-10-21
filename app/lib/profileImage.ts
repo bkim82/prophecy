@@ -96,8 +96,15 @@ function webpInfo(bytes: Uint8Array): ImageInfo | null {
   return null;
 }
 
-function imageInfo(bytes: Uint8Array): ImageInfo | null {
-  return pngInfo(bytes) ?? jpegInfo(bytes) ?? webpInfo(bytes);
+function gifInfo(bytes: Uint8Array): ImageInfo | null {
+  if (bytes.length < 10 || (ascii(bytes, 0, 6) !== "GIF87a" && ascii(bytes, 0, 6) !== "GIF89a")) return null;
+  return { mime: "image/gif", width: bytes[6] | (bytes[7] << 8), height: bytes[8] | (bytes[9] << 8) };
+}
+
+// Type and size from the file's own header. GIF is only accepted where the
+// caller allows it (post photos, app/lib/postImage.ts), never for profiles.
+export function imageInfo(bytes: Uint8Array): ImageInfo | null {
+  return pngInfo(bytes) ?? jpegInfo(bytes) ?? webpInfo(bytes) ?? gifInfo(bytes);
 }
 
 export function inspectProfileImage(

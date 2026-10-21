@@ -1,4 +1,5 @@
 import { avatarGradient } from "@/app/lib/avatar";
+import { gifById } from "@/app/lib/gifs";
 import type { PostImage } from "@/app/lib/mockPosts";
 
 // X-style media under a post: one item full width, 2–4 tiled in a grid. Each
@@ -461,8 +462,53 @@ function MemeShot({ shot }: { shot: Shot<"meme"> }) {
   );
 }
 
+// A real image attached in the composer, shown at its own aspect ratio (capped
+// in CSS) when it's alone, cropped to the tile in a grid.
+function PhotoShot({ shot }: { shot: Shot<"photo"> }) {
+  return (
+    <div className="shot shot--photo" style={{ aspectRatio: `${shot.width} / ${shot.height}` }}>
+      {/* eslint-disable-next-line @next/next/no-img-element -- local blob: URL from the composer */}
+      <img src={shot.src} alt={shot.alt} width={shot.width} height={shot.height} />
+    </div>
+  );
+}
+
+// Built-in reaction GIF (app/lib/gifs.ts): the emoji loops in its `motion`,
+// with candle bars for pump/dump and drifting particles for rain/sparkle/rocket.
+export function GifShot({ shot }: { shot: Shot<"gif"> }) {
+  const gif = gifById(shot.gif);
+  const bars = gif.motion === "pump" || gif.motion === "dump";
+  return (
+    <div className="shot shot--gif" data-motion={gif.motion} role="img" aria-label={shot.alt} style={{ background: avatarGradient(gif.seed, 70) }}>
+      <span className="shot-gif-badge" aria-hidden="true">GIF</span>
+      {bars && (
+        <span className="shot-gif-bars" aria-hidden="true">
+          {[0, 1, 2, 3, 4, 5].map((i) => (
+            <span key={i} style={{ "--i": i } as React.CSSProperties} />
+          ))}
+        </span>
+      )}
+      {gif.particle && (
+        <span className="shot-gif-particles" aria-hidden="true">
+          {[0, 1, 2, 3, 4, 5, 6].map((i) => (
+            <span key={i} style={{ "--i": i } as React.CSSProperties}>
+              {gif.particle}
+            </span>
+          ))}
+        </span>
+      )}
+      <span className="shot-gif-emoji" aria-hidden="true">{gif.emoji}</span>
+      <span className="shot-meme-caption" aria-hidden="true">{gif.caption}</span>
+    </div>
+  );
+}
+
 function Shot({ shot }: { shot: PostImage }) {
   switch (shot.kind) {
+    case "photo":
+      return <PhotoShot shot={shot} />;
+    case "gif":
+      return <GifShot shot={shot} />;
     case "candles":
       return <CandlesShot shot={shot} />;
     case "post":
