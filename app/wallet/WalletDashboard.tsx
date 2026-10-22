@@ -10,6 +10,7 @@ import { ActivityList } from "./ActivityList";
 import { BalanceChip } from "./BalanceChip";
 import { CoinDetailPanel } from "./CoinDetailPanel";
 import { CoinList } from "./CoinList";
+import { useHiddenCoins } from "./hiddenCoins";
 import { ETH_SENTINEL, type Coin } from "./types";
 
 // Holdings hit Alchemy (metered), so they poll slower than the ETH quote and only while the tab is visible.
@@ -37,6 +38,7 @@ export function WalletDashboard({
   // Bumped when a local intent reaches inclusion so holdings refresh without waiting out the poll.
   const [holdingsNonce, setHoldingsNonce] = useState(0);
   const refreshHoldings = useCallback(() => setHoldingsNonce((n) => n + 1), []);
+  const { isHidden, toggle: toggleHidden } = useHiddenCoins();
 
   const onBase = wallet.chainId === 8453;
   const address = wallet.address;
@@ -95,10 +97,12 @@ export function WalletDashboard({
     })),
   ].filter((coin) => coin.qty > 0);
 
-  const totalUsd = coins.reduce((sum, coin) => sum + (coin.valueUsd ?? 0), 0);
+  // Hidden coins (usually spam airdrops) stay in `coins` for Send/Swap but don't count toward the balance.
+  const countedCoins = coins.filter((coin) => !isHidden(coin.address));
+  const totalUsd = countedCoins.reduce((sum, coin) => sum + (coin.valueUsd ?? 0), 0);
   let yesterdayTotal = 0;
   let hasKnownChange = false;
-  for (const coin of coins) {
+  for (const coin of countedCoins) {
     const value = coin.valueUsd ?? 0;
     if (coin.change24h != null && value > 0) {
       hasKnownChange = true;
@@ -111,7 +115,7 @@ export function WalletDashboard({
   const changePct = hasKnownChange && yesterdayTotal > 0 ? (changeUsd! / yesterdayTotal) * 100 : null;
 
   const selectedCoin = selected ? coins.find((coin) => coin.address === selected) ?? null : null;
-  const selectedShare = selectedCoin && totalUsd > 0 ? ((selectedCoin.valueUsd ?? 0) / totalUsd) * 100 : 0;
+  const selectedShare = selectedCoin && !isHidden(selectedCoin.address) && totalUsd > 0 ? ((selectedCoin.valueUsd ?? 0) / totalUsd) * 100 : 0;
 
   const closeSheet = () => { setSheet(null); setSwapPreset(null); };
   const openBuy = (token: MarketToken) => {
@@ -170,7 +174,7 @@ export function WalletDashboard({
               {!onBase ? (
                 <p className="wd-empty">Switch to Base to see your holdings.</p>
               ) : (
-                <CoinList coins={coins} totalUsd={totalUsd} onSelect={setSelected} />
+                <CoinList coins={coins} totalUsd={totalUsd} isHidden={isHidden} onToggleHidden={toggleHidden} onSelect={setSelected} />
               )}
             </>
           )}

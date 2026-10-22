@@ -33,6 +33,7 @@ import {
   deleteApplicationSession,
   type ApplicationSession,
 } from "@/app/lib/authSession";
+import { WALLET_SIGNED_OUT_EVENT } from "@/app/lib/embeddedWallet/client";
 
 export type AuthConfiguration =
   | { provider: "clerk" }
@@ -213,6 +214,16 @@ function CdpAuthBridge({ children }: { children: ReactNode }) {
     const providerResult = results[1];
     if (providerResult.status === "rejected") throw providerResult.reason;
   }, [cdpSignOut]);
+
+  // The server session can end while this page still looks signed in (a
+  // sign-in elsewhere revokes it, or it expires). Silently re-exchanging the
+  // CDP token would undo "sign out everywhere", so sign out and let the user
+  // sign in again.
+  useEffect(() => {
+    const onSignedOut = () => { void signOut().catch(() => undefined); };
+    window.addEventListener(WALLET_SIGNED_OUT_EVENT, onSignedOut);
+    return () => window.removeEventListener(WALLET_SIGNED_OUT_EVENT, onSignedOut);
+  }, [signOut]);
 
   const email = currentUser?.authenticationMethods.email?.email
     ?? currentUser?.authenticationMethods.google?.email

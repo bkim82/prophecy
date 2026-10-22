@@ -1,4 +1,4 @@
-import { walletJson, walletMutationHeaderFailure, walletRateLimit } from "@/app/api/wallet/responses";
+import { walletJson, walletMutationHeaderFailure, walletRateLimit, walletSignedOut } from "@/app/api/wallet/responses";
 import { cancelTransactionIntent } from "@/lib/transactionIntents";
 import { getViewer } from "@/lib/viewer";
 
@@ -7,7 +7,7 @@ export async function POST(request: Request, context: RouteContext<"/api/wallet/
   const invalid = walletMutationHeaderFailure(request);
   if (invalid) return invalid;
   const viewer = await getViewer();
-  if (!viewer) return walletJson({ error: "Not signed in" }, { status: 401 });
+  if (!viewer) return walletSignedOut();
   if (!await walletRateLimit(request, viewer, "wallet-intent-cancel", 20)) {
     return walletJson({ error: "Too many requests" }, { status: 429 });
   }
