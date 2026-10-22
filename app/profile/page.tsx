@@ -3,7 +3,6 @@ import { challengeTerms } from "@/app/lib/challengeRules";
 import { getProfile, profileHref, type Profile } from "@/app/lib/mockProfiles";
 import type { ProfileBanner } from "@/app/lib/profileEdit";
 import { archetypeFor, isPinnableMatch, type Highlight } from "@/app/lib/profileTraits";
-import { VIEWER_RANK } from "@/app/lib/rank";
 import { HighlightReel } from "@/app/profile/[handle]/HighlightReel";
 import { AchievementsPanel, ProfileAchievements } from "@/app/profile/[handle]/ProfileAchievements";
 import { ProfileView, type ProfileMatch, type SentChallenge } from "@/app/profile/[handle]/ProfileView";
@@ -13,7 +12,7 @@ import { followerCount, followingCount } from "@/lib/follows";
 import { historyEntryFor, marketAccuracyFor, matchRecordFor, settledMatchesByIds, settledMatchesFor } from "@/lib/match";
 import { opponentNames } from "@/lib/opponentNames";
 import { isOnboarded } from "@/lib/onboarding";
-import { storedProfileFor } from "@/lib/profile";
+import { rankForUser, storedProfileFor } from "@/lib/profile";
 import { playedLabel } from "@/app/lib/playedLabel";
 import { getViewer, getViewerProfile } from "@/lib/viewer";
 
@@ -23,7 +22,7 @@ import { getViewer, getViewerProfile } from "@/lib/viewer";
 // table, lib/profile.ts), match history, per-asset accuracy (Arena round
 // P&L), the highlight reel (pinned won matches), follower/following counts
 // (lib/follows.ts), and achievements + trading style from what you played
-// (lib/activity.ts). Rank is the VIEWER_RANK stub; copy earnings are zero
+// (lib/activity.ts). Rank is rankForUser() (stub + per-handle overrides); copy earnings are zero
 // until copy trading exists.
 
 const MATCH_LIMIT = 20;
@@ -39,7 +38,8 @@ export default async function OwnProfilePage() {
   if (!user) redirect("/sign-in");
   const { userId } = viewer;
 
-  const [rows, record, stored, marketAccuracy, sent, onboarded, followers, following, activity] = await Promise.all([
+  const viewerRank = rankForUser(userId);
+  const [rows, record, stored, marketAccuracy, sent, onboarded, followers, following, rank, activity] = await Promise.all([
     settledMatchesFor(userId, MATCH_LIMIT),
     matchRecordFor(userId),
     storedProfileFor(userId),
@@ -48,7 +48,8 @@ export default async function OwnProfilePage() {
     isOnboarded(userId),
     followerCount(userId),
     followingCount(userId),
-    activityFor(userId, VIEWER_RANK),
+    viewerRank,
+    viewerRank.then((rank) => activityFor(userId, rank)),
   ]);
   // Pins can be older than the listed page, so they're fetched by id — and
   // re-checked, so a pin that stopped qualifying just drops out of the reel.
@@ -115,7 +116,7 @@ export default async function OwnProfilePage() {
     handle,
     name,
     avatarInitial: name.charAt(0).toUpperCase(),
-    rank: VIEWER_RANK,
+    rank,
     bio: stored?.bio ?? "",
     joined: joinedFormat.format(user.createdAt),
     followers,
@@ -136,7 +137,7 @@ export default async function OwnProfilePage() {
         activity={{ omens: [], comments: [], trades: [] }}
         portfolio={null}
         portfolioLocked={false}
-        viewerRank={VIEWER_RANK}
+        viewerRank={rank}
         initiallyFollowing={false}
         traits={{
           accuracy,

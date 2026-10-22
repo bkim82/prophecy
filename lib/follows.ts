@@ -2,7 +2,7 @@ import { and, eq, like, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { follows } from "@/db/schema";
 import { getProfile } from "@/app/lib/mockProfiles";
-import { VIEWER_RANK } from "@/app/lib/rank";
+import { rankForHandle } from "@/app/lib/rank";
 import { publicProfileFor, type PublicProfile } from "@/lib/profile";
 
 // Reads/writes for the `follows` table (db/schema.ts). Nothing is seeded: a
@@ -10,7 +10,7 @@ import { publicProfileFor, type PublicProfile } from "@/lib/profile";
 
 // Someone you can follow or challenge. Mock traders are keyed by "@handle"
 // and never follow back; real accounts (any with a handle) by user id, with
-// the shared VIEWER_RANK stub as their rank, and `account` for their page.
+// rankForHandle() as their rank, and `account` for their page.
 export type FollowTarget = { key: string; userId: string | null; handle: string; name: string; rank: string; account: PublicProfile | null };
 
 /** `handle` as in the URL or a form: "@nova_trades", "@Sam". */
@@ -20,7 +20,7 @@ export async function followTarget(handle: string): Promise<FollowTarget | null>
   const account = await publicProfileFor(handle.replace(/^@/, "").toLowerCase());
   if (!account) return null;
   const { userId, displayName } = account;
-  return { key: userId, userId, handle: `@${account.handle}`, name: displayName ?? account.handle, rank: VIEWER_RANK, account };
+  return { key: userId, userId, handle: `@${account.handle}`, name: displayName ?? account.handle, rank: rankForHandle(account.handle), account };
 }
 
 export async function isFollowing(followerId: string, target: string): Promise<boolean> {

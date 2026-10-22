@@ -4,7 +4,7 @@ import { ACCURACY, PINNED_OMENS, RECORDS, STYLES, type ProfileRecords } from "@/
 import { PORTFOLIOS } from "@/app/lib/mockPortfolios";
 import { getProfile, profileActivity, type Profile } from "@/app/lib/mockProfiles";
 import { archetypeFor } from "@/app/lib/profileTraits";
-import { VIEWER_RANK, canChallenge, canViewPortfolio, challengeTierNeeded } from "@/app/lib/rank";
+import { canChallenge, canViewPortfolio, challengeTierNeeded } from "@/app/lib/rank";
 import type { ChallengeState } from "@/app/profile/[handle]/ChallengeDialog";
 import { HighlightReel } from "@/app/profile/[handle]/HighlightReel";
 import { AchievementsPanel, ProfileAchievements } from "@/app/profile/[handle]/ProfileAchievements";
@@ -13,6 +13,7 @@ import { activityFor } from "@/lib/activity";
 import { pendingChallengeTo } from "@/lib/challenges";
 import { followTarget, followerCount, followingCount, isFollowing } from "@/lib/follows";
 import { marketAccuracyFor } from "@/lib/match";
+import { rankForUser } from "@/lib/profile";
 import { getViewer, providerImagesFor } from "@/lib/viewer";
 
 const joinedFormat = new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
@@ -30,10 +31,11 @@ export default async function ProfilePage({ params }: { params: Promise<{ handle
   if (target.userId && target.userId === userId) redirect("/profile");
 
   // Follows are real both ways; mock traders follow no one, so only real accounts can follow you.
-  const [following, followsYou, followers] = await Promise.all([
+  const [following, followsYou, followers, viewerRank] = await Promise.all([
     userId ? isFollowing(userId, target.key) : false,
     userId && target.userId ? isFollowing(target.userId, userId) : false,
     followerCount(target.key),
+    rankForUser(userId),
   ]);
 
   const mock = getProfile(target.handle);
@@ -87,14 +89,14 @@ export default async function ProfilePage({ params }: { params: Promise<{ handle
   }
 
   // Gate on the server: a locked portfolio is never serialized to the client.
-  const portfolioLocked = !canViewPortfolio(profile.rank);
+  const portfolioLocked = !canViewPortfolio(profile.rank, viewerRank);
   const portfolio = portfolioLocked || !mock ? null : (PORTFOLIOS[mock.handle] ?? null);
 
-  // Rank lock first — it doesn't depend on being signed in (VIEWER_RANK is a
-  // stub shared by everyone); then sign-in, then an already-pending challenge.
+  // Rank lock first — it doesn't depend on being signed in (signed out ranks
+  // as VIEWER_RANK); then sign-in, then an already-pending challenge.
   // The friends-only gate is ChallengeControl's, from `following`/`followsYou`.
   let challenge: ChallengeState;
-  if (!canChallenge(profile.rank, VIEWER_RANK)) {
+  if (!canChallenge(profile.rank, viewerRank)) {
     challenge = { kind: "locked", tierNeeded: challengeTierNeeded(profile.rank) };
   } else if (!userId) {
     challenge = { kind: "signed-out" };
@@ -112,7 +114,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ handle
         activity={mock ? profileActivity(mock) : { omens: [], comments: [], trades: [] }}
         portfolio={portfolio}
         portfolioLocked={portfolioLocked}
-        viewerRank={VIEWER_RANK}
+        viewerRank={viewerRank}
         initiallyFollowing={following}
         signedIn={Boolean(userId)}
         followsYou={followsYou}
