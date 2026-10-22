@@ -18,7 +18,8 @@ const ETH_POLL_MS = 10_000;
 
 type EthSummary = { priceUsd: number; change24h: number | null; imageUrl: string | null };
 type Tab = "portfolio" | "activity" | "advanced";
-type SwapPreset = { initialFrom?: string; initialTo?: string; extraToken?: { symbol: string } };
+type MarketToken = { address: string; symbol: string; priceUsd: number | null };
+type SwapPreset = { initialFrom?: string; initialTo?: string; extraToken?: MarketToken };
 
 export function WalletDashboard({
   wallet,
@@ -112,14 +113,13 @@ export function WalletDashboard({
   const selectedShare = selectedCoin && totalUsd > 0 ? ((selectedCoin.valueUsd ?? 0) / totalUsd) * 100 : 0;
 
   const closeSheet = () => { setSheet(null); setSwapPreset(null); };
-  const openBuy = (token: { address: string; symbol: string }) => {
-    const owned = coins.some((coin) => coin.address === token.address);
-    setSwapPreset({ initialTo: token.symbol, extraToken: owned ? undefined : { symbol: token.symbol } });
+  const openBuy = (token: MarketToken) => {
+    setSwapPreset({ initialTo: token.address, extraToken: token });
     setSheet("swap");
   };
-  const openSell = (token: { address: string; symbol: string }) => {
-    const owned = coins.some((coin) => coin.address === token.address);
-    setSwapPreset({ initialFrom: token.symbol, extraToken: owned ? undefined : { symbol: token.symbol } });
+  const openSell = (token: MarketToken) => {
+    // No extraToken: an unheld token can't be sold, and selling must not turn it into a buy target.
+    setSwapPreset({ initialFrom: token.address });
     setSheet("swap");
   };
 
@@ -183,7 +183,7 @@ export function WalletDashboard({
       {sheet === "deposit" && <DepositSheet address={address} onClose={closeSheet} />}
       {sheet === "send" && <SendSheet accountAddress={address} coins={coins} initialAsset={selected ?? undefined} onClose={closeSheet} />}
       {sheet === "swap" && (
-        <SwapSheet coins={coins} initialFrom={swapPreset?.initialFrom} initialTo={swapPreset?.initialTo} extraToken={swapPreset?.extraToken} onClose={closeSheet} />
+        <SwapSheet accountAddress={address} coins={coins} initialFrom={swapPreset?.initialFrom} initialTo={swapPreset?.initialTo} extraToken={swapPreset?.extraToken} onClose={closeSheet} />
       )}
     </div>
   );

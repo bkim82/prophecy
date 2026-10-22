@@ -11,10 +11,13 @@ import {
 import {
   IntentValidationError,
   assertSendCalls,
+  assertSwapOperationCalls,
   buildSendIntent,
+  buildSwapIntent,
   normalizeAddress,
   type NormalizedCall,
   type SendIntentInput,
+  type SwapIntentInput,
 } from "@/app/lib/embeddedWallet/intents";
 import { curatedToken, type SendToken } from "@/app/lib/embeddedWallet/tokens";
 import { getTokenMetadata } from "@/lib/alchemy";
@@ -62,31 +65,16 @@ export async function resolveSendToken(address: string): Promise<SendToken | nul
   };
 }
 
-export async function createSendIntent(
-  userId: string,
-  smartAccountAddress: string,
-  input: SendIntentInput,
-) {
-  const token = await resolveSendToken(input.tokenAddress);
-  if (!token) throw new IntentValidationError("unsupported-token", "This token can't be sent.");
-  const normalized = buildSendIntent(input, smartAccountAddress, token);
-  const hash = callHash(normalized.calls);
+type NewIntent = Omit<typeof transactionIntents.$inferInsert, "id" | "userId">;
+
+/** The server-resolved token the review screen shows, so it never trusts client labels. */
+const tokenView = (token: SendToken) => ({ address: token.address, symbol: token.symbol, decimals: token.decimals });
+
+/** Inserts once per (user, idempotency key); a replay must carry identical details. */
+async function persistIntent(userId: string, values: NewIntent) {
   const inserted = await getDb()
     .insert(transactionIntents)
-    .values({
-      id: randomUUID(),
-      schemaVersion: normalized.schemaVersion,
-      userId,
-      idempotencyKey: input.idempotencyKey,
-      kind: normalized.kind,
-      chainId: normalized.chainId,
-      smartAccountAddress: normalized.smartAccountAddress,
-      tokenIn: normalized.token.address,
-      recipient: normalized.recipient,
-      inputAmount: normalized.rawAmount.toString(),
-      calls: normalized.calls,
-      normalizedCallHash: hash,
-    })
+    .values({ id: randomUUID(), userId, ...values })
     .onConflictDoNothing({
       target: [transactionIntents.userId, transactionIntents.idempotencyKey],
     })
@@ -97,17 +85,18 @@ export async function createSendIntent(
     .from(transactionIntents)
     .where(and(
       eq(transactionIntents.userId, userId),
-      eq(transactionIntents.idempotencyKey, input.idempotencyKey),
+      eq(transactionIntents.idempotencyKey, values.idempotencyKey),
     )))[0];
   if (!row) throw new Error("Could not persist transaction intent");
 
   if (
-    row.kind !== "send"
-    || row.smartAccountAddress !== normalized.smartAccountAddress
-    || row.tokenIn !== normalized.token.address
-    || row.recipient !== normalized.recipient
-    || row.inputAmount !== normalized.rawAmount.toString()
-    || row.normalizedCallHash !== hash
+    row.kind !== values.kind
+    || row.smartAccountAddress !== values.smartAccountAddress
+    || row.tokenIn !== values.tokenIn
+    || row.tokenOut !== (values.tokenOut ?? null)
+    || row.recipient !== values.recipient
+    || row.inputAmount !== values.inputAmount
+    || row.normalizedCallHash !== values.normalizedCallHash
   ) {
     throw new Error("idempotency-conflict");
   }
@@ -118,6 +107,60 @@ export async function createSendIntent(
     });
   }
   return row;
+}
+
+export async function createSendIntent(
+  userId: string,
+  smartAccountAddress: string,
+  input: SendIntentInput,
+) {
+  const token = await resolveSendToken(input.tokenAddress);
+  if (!token) throw new IntentValidationError("unsupported-token", "This token can't be sent.");
+  const normalized = buildSendIntent(input, smartAccountAddress, token);
+  const intent = await persistIntent(userId, {
+    schemaVersion: normalized.schemaVersion,
+    idempotencyKey: input.idempotencyKey,
+    kind: normalized.kind,
+    chainId: normalized.chainId,
+    smartAccountAddress: normalized.smartAccountAddress,
+    tokenIn: normalized.token.address,
+    recipient: normalized.recipient,
+    inputAmount: normalized.rawAmount.toString(),
+    calls: normalized.calls,
+    normalizedCallHash: callHash(normalized.calls),
+  });
+  return { intent, token: tokenView(token) };
+}
+
+/** Returns the row plus both tokens' server-resolved views. */
+export async function createSwapIntent(
+  userId: string,
+  smartAccountAddress: string,
+  input: SwapIntentInput,
+) {
+  const [fromToken, toToken] = await Promise.all([
+    resolveSendToken(input.fromToken),
+    resolveSendToken(input.toToken),
+  ]);
+  if (!fromToken || !toToken) {
+    throw new IntentValidationError("unsupported-token", "This token can't be swapped.");
+  }
+  const normalized = buildSwapIntent(input, smartAccountAddress, fromToken, toToken);
+  const intent = await persistIntent(userId, {
+    schemaVersion: normalized.schemaVersion,
+    idempotencyKey: input.idempotencyKey,
+    kind: normalized.kind,
+    chainId: normalized.chainId,
+    smartAccountAddress: normalized.smartAccountAddress,
+    tokenIn: fromToken.address,
+    tokenOut: toToken.address,
+    recipient: normalized.recipient,
+    inputAmount: normalized.rawAmount.toString(),
+    quoteProvider: "cdp",
+    calls: normalized.calls,
+    normalizedCallHash: callHash(normalized.calls),
+  });
+  return { intent, fromToken: tokenView(fromToken), toToken: tokenView(toToken) };
 }
 
 export async function listTransactionIntents(userId: string, limit = 50) {
@@ -137,25 +180,52 @@ export async function getTransactionIntent(userId: string, id: string) {
   return row ?? null;
 }
 
+/**
+ * A swap must carry the raw minimum output shown on its review (the signer
+ * refuses a live quote below it); a send must not.
+ */
 export async function confirmTransactionIntent(
   userId: string,
   id: string,
   smartAccountAddress: string,
+  minimumOutputAmount: string | null,
   now = new Date(),
 ) {
   const [row] = await getDb()
     .update(transactionIntents)
-    .set({ status: "confirmed_by_user", updatedAt: now })
+    .set({ status: "confirmed_by_user", minimumOutputAmount, updatedAt: now })
     .where(and(
       eq(transactionIntents.id, id),
       eq(transactionIntents.userId, userId),
       eq(transactionIntents.smartAccountAddress, smartAccountAddress.toLowerCase()),
       eq(transactionIntents.status, "created"),
+      eq(transactionIntents.kind, minimumOutputAmount === null ? "send" : "swap"),
     ))
     .returning();
   if (row) await auditWalletEvent("intent.confirmed", userId, id);
   return row ?? null;
 }
+
+/**
+ * Drops an intent the user backed out of before it was claimed, so an
+ * abandoned confirmation doesn't sit in Activity until the 15-minute sweep.
+ */
+export async function cancelTransactionIntent(userId: string, id: string, now = new Date()) {
+  const [row] = await getDb()
+    .update(transactionIntents)
+    .set({ status: "canceled", failureCode: "user-canceled", updatedAt: now })
+    .where(and(
+      eq(transactionIntents.id, id),
+      eq(transactionIntents.userId, userId),
+      sql`${transactionIntents.status} IN ('created', 'confirmed_by_user')`,
+    ))
+    .returning();
+  if (row) await auditWalletEvent("intent.canceled", userId, id, { failureCode: "user-canceled" });
+  return row ?? null;
+}
+
+/** Why a claim was refused; nothing was signed in any of these cases. */
+export type ClaimRefusal = "not-submittable" | "call-mismatch" | "call-hash-mismatch" | "daily-limit";
 
 /**
  * Atomically claims one confirmed intent. A crash after this point is safe:
@@ -167,7 +237,7 @@ export async function claimTransactionIntent(
   id: string,
   smartAccountAddress: string,
   now = new Date(),
-) {
+): Promise<{ intent: TransactionIntentRow } | { refused: ClaimRefusal }> {
   const [row] = await getDb()
     .update(transactionIntents)
     .set({ status: "submitted", submissionClaimedAt: now, updatedAt: now })
@@ -178,35 +248,41 @@ export async function claimTransactionIntent(
       eq(transactionIntents.status, "confirmed_by_user"),
     ))
     .returning();
-  if (!row) return null;
+  if (!row) return { refused: "not-submittable" };
 
   if (row.kind === "send") {
-    assertSendCalls({
-      tokenAddress: row.tokenIn,
-      recipient: row.recipient,
-      rawAmount: BigInt(row.inputAmount),
-      calls: row.calls,
-    });
-    if (callHash(row.calls) !== row.normalizedCallHash) {
-      await markTransactionTerminal(userId, id, "dropped", "call-hash-mismatch", now);
-      return null;
-    }
-    // Only curated tokens carry a daily cap; others are bounded by balance.
-    const token = curatedToken(row.tokenIn);
-    const allowed = !token?.maxDailyRaw || await reserveDailySpend(
-      userId,
-      token.address,
-      BigInt(row.inputAmount),
-      token.maxDailyRaw,
-      now,
-    );
-    if (!allowed) {
-      await markTransactionTerminal(userId, id, "dropped", "daily-limit", now);
-      return null;
+    try {
+      assertSendCalls({
+        tokenAddress: row.tokenIn,
+        recipient: row.recipient,
+        rawAmount: BigInt(row.inputAmount),
+        calls: row.calls,
+      });
+    } catch (error) {
+      if (!(error instanceof IntentValidationError)) throw error;
+      await markTransactionTerminal(userId, id, "dropped", "call-mismatch", now);
+      return { refused: "call-mismatch" };
     }
   }
+  if (callHash(row.calls) !== row.normalizedCallHash) {
+    await markTransactionTerminal(userId, id, "dropped", "call-hash-mismatch", now);
+    return { refused: "call-hash-mismatch" };
+  }
+  // Only curated tokens carry a daily cap (shared by sends and swaps); others are bounded by balance.
+  const token = curatedToken(row.tokenIn);
+  const allowed = !token?.maxDailyRaw || await reserveDailySpend(
+    userId,
+    token.address,
+    BigInt(row.inputAmount),
+    token.maxDailyRaw,
+    now,
+  );
+  if (!allowed) {
+    await markTransactionTerminal(userId, id, "dropped", "daily-limit", now);
+    return { refused: "daily-limit" };
+  }
   await auditWalletEvent("intent.submission_claimed", userId, id);
-  return row;
+  return { intent: row };
 }
 
 export async function reserveDailySpend(
@@ -242,6 +318,11 @@ export async function reserveDailySpend(
   return Boolean(result.rows[0]);
 }
 
+/**
+ * Records the hash CDP returned. A late report (the browser retried after
+ * reconciliation gave up on a hashless claim) revives that row to submitted,
+ * so reconciliation checks the real operation instead of showing a false drop.
+ */
 export async function recordUserOperationHash(
   userId: string,
   id: string,
@@ -252,11 +333,11 @@ export async function recordUserOperationHash(
   if (!/^0x[0-9a-f]{64}$/.test(normalized)) return null;
   const [row] = await getDb()
     .update(transactionIntents)
-    .set({ userOperationHash: normalized, updatedAt: now })
+    .set({ status: "submitted", failureCode: null, userOperationHash: normalized, updatedAt: now })
     .where(and(
       eq(transactionIntents.id, id),
       eq(transactionIntents.userId, userId),
-      eq(transactionIntents.status, "submitted"),
+      sql`(${transactionIntents.status} = 'submitted' OR (${transactionIntents.status} = 'dropped' AND ${transactionIntents.failureCode} = 'submission-interrupted'))`,
       sql`${transactionIntents.userOperationHash} IS NULL`,
     ))
     .returning();
@@ -290,12 +371,37 @@ export async function markTransactionTerminal(
   return row ?? null;
 }
 
+function swapOperationMatches(row: TransactionIntentRow, calls: NormalizedCall[]) {
+  try {
+    assertSwapOperationCalls({ tokenIn: row.tokenIn, rawAmount: BigInt(row.inputAmount), calls });
+    return true;
+  } catch (error) {
+    if (error instanceof IntentValidationError) return false;
+    throw error;
+  }
+}
+
 /** Bounded on-request reconciliation; a deployment cron may call the same API. */
 export async function reconcileTransactionIntents(
   userId: string,
   now = new Date(),
   limit = 10,
 ) {
+  // A confirmed intent is claimed seconds later unless its pre-sign checks
+  // (route, balance, approval) failed and the user left; it was never signed.
+  const abandoned = await getDb()
+    .update(transactionIntents)
+    .set({ status: "canceled", failureCode: "confirmation-abandoned", updatedAt: now })
+    .where(and(
+      eq(transactionIntents.userId, userId),
+      eq(transactionIntents.status, "confirmed_by_user"),
+      sql`${transactionIntents.updatedAt} < ${new Date(now.getTime() - 15 * 60_000).toISOString()}::timestamptz`,
+    ))
+    .returning();
+  for (const row of abandoned) {
+    await auditWalletEvent("intent.canceled", userId, row.id, { failureCode: "confirmation-abandoned" });
+  }
+
   const rows = await getDb()
     .select()
     .from(transactionIntents)
@@ -306,7 +412,7 @@ export async function reconcileTransactionIntents(
     .orderBy(transactionIntents.updatedAt)
     .limit(Math.min(Math.max(limit, 1), 25));
 
-  const reconciled: TransactionIntentRow[] = [];
+  const reconciled: TransactionIntentRow[] = [...abandoned];
   for (const row of rows) {
     if (!row.userOperationHash) {
       const staleBefore = new Date(now.getTime() - 2 * 60_000);
@@ -327,7 +433,12 @@ export async function reconcileTransactionIntents(
         row.smartAccountAddress,
         row.userOperationHash,
       );
-      if (callHash(operation.calls) !== row.normalizedCallHash) {
+      // A send must match its stored batch exactly; CDP builds swap calls, so a
+      // swap is only bounded (value, sold-token approvals/transfers).
+      const mismatched = row.kind === "send"
+        ? callHash(operation.calls) !== row.normalizedCallHash
+        : !swapOperationMatches(row, operation.calls);
+      if (mismatched) {
         const dropped = await markTransactionTerminal(
           userId,
           row.id,

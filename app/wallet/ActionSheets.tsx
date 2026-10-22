@@ -1,17 +1,27 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAppAuth } from "@/app/auth/AuthProvider";
-import { createSendIntent, confirmIntent, searchRecipients, type WalletRecipient } from "@/app/lib/embeddedWallet/client";
+import {
+  cancelIntent,
+  confirmIntent,
+  createSendIntent,
+  createSwapIntent,
+  searchRecipients,
+  type ClientIntent,
+  type SwapToken,
+  type WalletRecipient,
+} from "@/app/lib/embeddedWallet/client";
 import { walletTransactionsEnabled } from "@/app/lib/embeddedWallet/config";
 import { formatUnits, normalizeAmount } from "@/app/lib/embeddedWallet/intents";
-import { useSubmitTypedIntent } from "@/app/lib/embeddedWallet/sign";
-import { GAS_ALLOWANCE_RAW, NATIVE_ETH, USDC_BASE } from "@/app/lib/embeddedWallet/tokens";
+import { ClaimedIntentError, useSubmitSwapIntent, useSubmitTypedIntent, useSwapQuote } from "@/app/lib/embeddedWallet/sign";
+import { curatedToken, GAS_ALLOWANCE_RAW, NATIVE_ETH, SWAP_SLIPPAGE_BPS, USDC_BASE } from "@/app/lib/embeddedWallet/tokens";
 import { ActionSheet } from "./ActionSheet";
 import { ETH_SENTINEL, type Coin } from "./types";
 
 // See docs/wallet.md: Deposit shows the canonical address with copy-to-clipboard;
-// Send (any held token, gas in USDC) signs through app/lib/embeddedWallet/sign.ts; Swap is still a UI preview.
+// Send (any held token, gas in USDC) and Swap (CDP swap, gas in ETH) sign through app/lib/embeddedWallet/sign.ts.
+// Review screens render the server's intent, and the intent is confirmed only by the review's own button.
 
 export function DepositSheet({ address, onClose }: { address: string; onClose: () => void }) {
   const [copied, setCopied] = useState(false);
@@ -21,7 +31,7 @@ export function DepositSheet({ address, onClose }: { address: string; onClose: (
   };
   return (
     <ActionSheet title="Deposit" onClose={onClose}>
-      <p className="wd-sheet-copy">Send ETH or any Base token to this address. Other Prophecy users can send to your @username. Keep some USDC here to pay gas when you send.</p>
+      <p className="wd-sheet-copy">Send ETH or any Base token to this address. Other Prophecy users can send to your @username. Keep some USDC here to pay gas when you send, and a little ETH for gas when you swap.</p>
       <div className="wd-sheet-address">
         <code>{address}</code>
         <button type="button" onClick={copy} className="wd-sheet-primary-button">{copied ? "Copied" : "Copy address"}</button>
@@ -31,35 +41,66 @@ export function DepositSheet({ address, onClose }: { address: string; onClose: (
   );
 }
 
+/** Everything here except `handle` comes from the server's intent, not the form. */
 type PreparedSend = {
   id: string;
-  symbol: string;
-  amount: string;
+  token: SwapToken;
+  rawAmount: string;
   recipient: string;
   handle: string | null;
 };
 
-/** `handle` is set only when picked from the @handle search (the server re-verifies it). */
-type Recipient = { address: string; handle: string | null };
+/** A picked @handle is resolved to its wallet by the server; the search never returns addresses. */
+type Recipient = { kind: "handle"; handle: string } | { kind: "address"; address: string };
+
+/**
+ * Confirms the intent once, on the review button, then hands the server's
+ * confirmed row to the signer. A retry after a pre-claim failure (route,
+ * approval, moved price) skips the confirm the server already recorded.
+ * A swap confirms with the raw minimum output its review showed.
+ */
+function useConfirmThenSubmit<Args extends unknown[]>(submit: (intent: ClientIntent, ...args: Args) => Promise<string>) {
+  const confirmed = useRef<ClientIntent | null>(null);
+  return async (id: string, minimumOutputAmount: string | undefined, ...args: Args) => {
+    if (confirmed.current?.id !== id) {
+      confirmed.current = (await confirmIntent(id, minimumOutputAmount)).intent;
+    }
+    return submit(confirmed.current, ...args);
+  };
+}
+
+/** Contract address under the symbol for anything but ETH/USDC: metadata symbols can impersonate them. */
+function TokenContract({ address }: { address: string }) {
+  return curatedToken(address) ? null : <code className="wd-sheet-token-contract">{address}</code>;
+}
 
 // Shows the provider's own message: paymaster/policy/balance failures all read
 // alike, so a friendly rewrite would hide which one happened.
-function submitErrorMessage(cause: unknown) {
-  console.error("sendUserOperation failed", cause);
+// A ClaimedIntentError means this intent is spent: the sheet goes back to the
+// form with the message instead of offering a retry that would 409. Only a
+// failure after the signing call warns that the attempt may still land.
+function submitErrorMessage(error: unknown, action: "send" | "swap" = "send") {
+  const cause = error instanceof ClaimedIntentError ? error.cause : error;
+  console.error(`${action} failed`, cause);
   const message = cause instanceof Error ? cause.message : String(cause ?? "");
   const code = (cause as { errorType?: unknown; code?: unknown } | null)?.errorType
     ?? (cause as { code?: unknown } | null)?.code;
-  return `Could not send${code ? ` (${String(code)})` : ""}: ${message || "unknown error"}`;
+  const spent = error instanceof ClaimedIntentError && error.mayHaveSubmitted
+    ? " — check Activity before trying again: this attempt may still go through."
+    : "";
+  return `Could not ${action}${code ? ` (${String(code)})` : ""}: ${message || "unknown error"}${spent}`;
 }
 
 function CdpSendSubmit({
   prepared,
   onSubmitted,
+  onRestart,
 }: {
   prepared: PreparedSend;
   onSubmitted: (hash: string) => void;
+  onRestart: (message: string) => void;
 }) {
-  const submit = useSubmitTypedIntent();
+  const submit = useConfirmThenSubmit(useSubmitTypedIntent());
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   return (
@@ -71,9 +112,13 @@ function CdpSendSubmit({
         onClick={() => {
           setPending(true);
           setError(null);
-          void submit(prepared.id)
+          void submit(prepared.id, undefined)
             .then(onSubmitted)
-            .catch((cause: unknown) => setError(submitErrorMessage(cause)))
+            .catch((cause: unknown) => {
+              const message = submitErrorMessage(cause);
+              if (cause instanceof ClaimedIntentError) onRestart(message);
+              else setError(message);
+            })
             .finally(() => setPending(false));
         }}
       >
@@ -115,7 +160,7 @@ function RecipientField({
       <div className="wd-sheet-field">
         <span>To</span>
         <div className="wd-sheet-recipient">
-          {value.handle ? <strong>@{value.handle}</strong> : <code>{value.address}</code>}
+          {value.kind === "handle" ? <strong>@{value.handle}</strong> : <code>{value.address}</code>}
           <button type="button" className="wd-sheet-recipient-clear" onClick={() => { onChange(null); setQuery(""); }}>Change</button>
         </div>
       </div>
@@ -130,7 +175,7 @@ function RecipientField({
         onChange={(event) => {
           const next = event.target.value;
           setQuery(next);
-          if (ADDRESS_RE.test(next.trim())) onChange({ address: next.trim().toLowerCase(), handle: null });
+          if (ADDRESS_RE.test(next.trim())) onChange({ kind: "address", address: next.trim().toLowerCase() });
         }}
         placeholder="@username or 0x address"
         spellCheck={false}
@@ -139,8 +184,8 @@ function RecipientField({
       {searching && results.length > 0 && (
         <ul className="wd-sheet-recipient-list">
           {results.map((recipient) => (
-            <li key={recipient.address}>
-              <button type="button" onClick={() => onChange({ address: recipient.address.toLowerCase(), handle: recipient.handle })}>
+            <li key={recipient.handle}>
+              <button type="button" onClick={() => onChange({ kind: "handle", handle: recipient.handle })}>
                 <strong>@{recipient.handle}</strong>
                 {recipient.displayName && <span>{recipient.displayName}</span>}
               </button>
@@ -185,9 +230,14 @@ export function SendSheet({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const enabled = walletTransactionsEnabled() && provider === "cdp";
+  // Backing out of a review cancels its unclaimed intent so it doesn't linger in Activity.
+  const leaveReview = () => {
+    if (prepared && !hash) void cancelIntent(prepared.id);
+    setPrepared(null);
+  };
 
   return (
-    <ActionSheet title="Send" onClose={onClose}>
+    <ActionSheet title="Send" onClose={() => { leaveReview(); onClose(); }}>
       {hash ? (
         <div className="wd-sheet-form">
           <p className="wd-sheet-sent-title">Sent — waiting for Base to confirm</p>
@@ -198,7 +248,8 @@ export function SendSheet({
       ) : prepared ? (
         <div className="wd-sheet-form">
           <div className="wd-sheet-review-amount">
-            <strong>{prepared.amount} {prepared.symbol}</strong>
+            <strong>{formatUnits(BigInt(prepared.rawAmount), prepared.token.decimals)} {prepared.token.symbol}</strong>
+            <TokenContract address={prepared.token.address} />
             <span>to {prepared.handle ? `@${prepared.handle}` : "an external address"}</span>
           </div>
           <dl className="wd-sheet-review">
@@ -208,8 +259,12 @@ export function SendSheet({
             <div><dt>Gas</dt><dd>Paid in USDC · usually a cent, at most {formatUnits(GAS_ALLOWANCE_RAW, 6)}</dd></div>
           </dl>
           <p className="wd-sheet-note">Check the address. Blockchain transfers can&apos;t be reversed.</p>
-          <CdpSendSubmit prepared={prepared} onSubmitted={setHash} />
-          <button type="button" className="wd-sheet-secondary-button" onClick={() => setPrepared(null)}>Back</button>
+          <CdpSendSubmit
+            prepared={prepared}
+            onSubmitted={setHash}
+            onRestart={(message) => { setPrepared(null); setError(message); }}
+          />
+          <button type="button" className="wd-sheet-secondary-button" onClick={leaveReview}>Back</button>
         </div>
       ) : (
         <form
@@ -224,17 +279,15 @@ export function SendSheet({
             void createSendIntent({
               idempotencyKey,
               tokenAddress: asset,
-              recipient: recipient.address,
-              ...(recipient.handle ? { recipientHandle: recipient.handle } : {}),
+              ...(recipient.kind === "handle" ? { recipientHandle: recipient.handle } : { recipient: recipient.address }),
               amount: value,
             })
-              .then(({ intent }) => confirmIntent(intent.id))
-              .then(({ intent }) => setPrepared({
+              .then(({ intent, token }) => setPrepared({
                 id: intent.id,
-                symbol,
-                amount: value,
-                recipient: recipient.address,
-                handle: recipient.handle,
+                token,
+                rawAmount: intent.inputAmount,
+                recipient: intent.recipient,
+                handle: recipient.kind === "handle" ? recipient.handle : null,
               }))
               .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : "Could not prepare send."))
               .finally(() => setPending(false));
@@ -265,63 +318,261 @@ export function SendSheet({
   );
 }
 
+type SwapOption = { address: string; symbol: string; priceUsd: number | null; qty: number };
+
+type PreparedSwap = {
+  id: string;
+  fromToken: SwapToken;
+  toToken: SwapToken;
+  rawAmount: string;
+};
+
+/** Short display for raw token amounts: 4 decimals at or above 1, 4 significant digits below. */
+function displayUnits(raw: string, decimals: number) {
+  const value = Number(formatUnits(BigInt(raw), decimals));
+  return value >= 1
+    ? value.toLocaleString(undefined, { maximumFractionDigits: 4 })
+    : value.toLocaleString(undefined, { maximumSignificantDigits: 4 });
+}
+
+function SwapReview({
+  prepared,
+  accountAddress,
+  ethBalance,
+  onSubmitted,
+  onBack,
+  onRestart,
+}: {
+  prepared: PreparedSwap;
+  accountAddress: string;
+  /** Display-only ETH balance, to flag a swap that can't pay its own gas. */
+  ethBalance: number;
+  onSubmitted: (hash: string) => void;
+  onBack: () => void;
+  onRestart: (message: string) => void;
+}) {
+  const { fromToken, toToken, rawAmount } = prepared;
+  const quote = useSwapQuote({ fromToken: fromToken.address, toToken: toToken.address, fromAmount: rawAmount, account: accountAddress });
+  const submit = useConfirmThenSubmit(useSubmitSwapIntent());
+  const [step, setStep] = useState<"idle" | "approving" | "swapping">("idle");
+  const [error, setError] = useState<string | null>(null);
+  const price = quote.data?.liquidityAvailable ? quote.data : null;
+  const noRoute = quote.data?.liquidityAvailable === false;
+  const short = price?.issues?.balance != null;
+  const busy = step !== "idle";
+  const fee = price?.totalNetworkFee ?? null;
+  const feeEth = fee ? Number(formatUnits(BigInt(fee), 18)) : 0;
+  const ethSpent = (fromToken.address === NATIVE_ETH ? Number(formatUnits(BigInt(rawAmount), 18)) : 0) + feeEth;
+  const noGas = !short && (ethBalance <= 0 || ethSpent >= ethBalance);
+
+  return (
+    <div className="wd-sheet-form">
+      <div className="wd-sheet-review-amount">
+        <strong>{price ? `≈ ${displayUnits(price.toAmount, toToken.decimals)} ${toToken.symbol}` : toToken.symbol}</strong>
+        <TokenContract address={toToken.address} />
+        <span>for {displayUnits(rawAmount, fromToken.decimals)} {fromToken.symbol}</span>
+        <TokenContract address={fromToken.address} />
+      </div>
+      <dl className="wd-sheet-review">
+        <div>
+          <dt>At least</dt>
+          <dd>{price ? `${displayUnits(price.minToAmount, toToken.decimals)} ${toToken.symbol}` : quote.status === "error" ? "Quote unavailable" : "Getting quote…"}</dd>
+        </div>
+        <div>
+          <dt>Slippage</dt>
+          <dd>Up to {SWAP_SLIPPAGE_BPS / 100}%. The price is re-checked right before signing and the swap is sent with a minimum no lower than the one above; if the price has fallen below it, nothing is signed</dd>
+        </div>
+        <div><dt>Account</dt><dd><code>{accountAddress}</code></dd></div>
+        <div><dt>Network</dt><dd>Base · routed by Coinbase (CDP Swap)</dd></div>
+        <div><dt>Gas</dt><dd>Paid in ETH from this account{fee ? ` · ≈ ${displayUnits(fee, 18)} ETH` : ""}</dd></div>
+      </dl>
+      {fromToken.address !== NATIVE_ETH && (
+        <p className="wd-sheet-note">The first time you sell {fromToken.symbol}, an exact {fromToken.symbol} approval goes through before the swap, with its own small ETH gas fee.</p>
+      )}
+      {noRoute && <p className="wd-sheet-error" role="alert">No swap route for this pair right now. Try a different amount or token.</p>}
+      {short && <p className="wd-sheet-error" role="alert">Not enough {fromToken.symbol} for this swap.</p>}
+      {noGas && (
+        <p className="wd-sheet-error" role="alert">
+          {fromToken.address === NATIVE_ETH ? "Leave some ETH for gas: swap a smaller amount." : "Swaps pay gas in ETH. Deposit a little ETH on Base first."}
+        </p>
+      )}
+      <button
+        type="button"
+        className="wd-sheet-primary-button"
+        disabled={busy || !price || short || noGas}
+        onClick={() => {
+          if (!price) return;
+          setError(null);
+          setStep("swapping");
+          void submit(prepared.id, price.minToAmount, setStep)
+            .then(onSubmitted)
+            .catch((cause: unknown) => {
+              const message = submitErrorMessage(cause, "swap");
+              if (cause instanceof ClaimedIntentError) onRestart(message);
+              else setError(message);
+            })
+            .finally(() => setStep("idle"));
+        }}
+      >
+        {step === "approving" ? `Approving ${fromToken.symbol}…` : step === "swapping" ? "Swapping…" : "Confirm swap"}
+      </button>
+      <button type="button" className="wd-sheet-secondary-button" disabled={busy} onClick={onBack}>Back</button>
+      {error && <p className="wd-sheet-error" role="alert">{error}</p>}
+    </div>
+  );
+}
+
+const swapKey = (address?: string) => (address === ETH_SENTINEL ? NATIVE_ETH : address?.toLowerCase());
+
 /**
- * `extraToken` covers the Advanced tab's case: buying/selling a token that
- * isn't (yet) in `coins` (the wallet's owned holdings), so it still shows up
- * as a pickable option. `initialFrom`/`initialTo` preselect a side (e.g. the
- * token a Buy/Sell button was pressed on) without locking the picker.
+ * Exact-input swap through CDP (docs/wallet.md). `extraToken` covers the
+ * Advanced tab's case: buying a market token the wallet doesn't hold yet, so
+ * it still shows up as a target. `initialFrom`/`initialTo` (coin addresses,
+ * "eth" for native) preselect a side without locking the picker.
  */
 export function SwapSheet({
+  accountAddress,
   coins,
   extraToken,
   initialFrom,
   initialTo,
   onClose,
 }: {
+  accountAddress: string;
   coins: Coin[];
-  extraToken?: { symbol: string };
+  extraToken?: { address: string; symbol: string; priceUsd: number | null };
   initialFrom?: string;
   initialTo?: string;
   onClose: () => void;
 }) {
-  const options = Array.from(new Set([...coins.map((coin) => coin.symbol), ...(extraToken ? [extraToken.symbol] : [])]));
-  const [from, setFrom] = useState(initialFrom ?? options[0] ?? "ETH");
-  const [to, setTo] = useState(initialTo ?? options[1] ?? options[0] ?? "ETH");
+  const { provider } = useAppAuth();
+  const enabled = walletTransactionsEnabled() && provider === "cdp";
+  const held: SwapOption[] = coins
+    .filter((coin) => coin.qty > 0)
+    .map((coin) => ({ address: tokenAddressOf(coin), symbol: coin.symbol, priceUsd: coin.priceUsd, qty: coin.qty }));
+  // Anything held, the market token being bought, and USDC/ETH as "sell into" targets.
+  const targets: SwapOption[] = [...held];
+  const addTarget = (option: SwapOption) => {
+    if (!targets.some((target) => target.address === option.address)) targets.push(option);
+  };
+  const extraKey = swapKey(extraToken?.address);
+  if (extraToken && extraKey) addTarget({ address: extraKey, symbol: extraToken.symbol, priceUsd: extraToken.priceUsd, qty: 0 });
+  addTarget({ address: USDC_BASE, symbol: "USDC", priceUsd: 1, qty: 0 });
+  addTarget({ address: NATIVE_ETH, symbol: "ETH", priceUsd: null, qty: 0 });
+
+  const wantedFrom = swapKey(initialFrom);
+  const startTo = swapKey(initialTo) ?? (wantedFrom === USDC_BASE ? NATIVE_ETH : USDC_BASE);
+  const [to, setTo] = useState(startTo);
+  // null until the user picks: the default is derived each render, so it fills
+  // in once holdings load instead of sticking at "" from an empty first render.
+  const [fromChoice, setFrom] = useState<string | null>(null);
+  const defaultFrom = (wantedFrom && held.some((option) => option.address === wantedFrom) ? wantedFrom : null)
+    ?? held.find((option) => option.address === USDC_BASE && option.address !== startTo)?.address
+    ?? held.find((option) => option.address !== startTo)?.address
+    ?? held[0]?.address
+    ?? "";
+  const from = fromChoice !== null && held.some((option) => option.address === fromChoice) ? fromChoice : defaultFrom;
   const [amount, setAmount] = useState("");
-  const [swapped, setSwapped] = useState(false);
+  const [prepared, setPrepared] = useState<PreparedSwap | null>(null);
+  const [hash, setHash] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fromOption = held.find((option) => option.address === from) ?? null;
+  const toOption = targets.find((option) => option.address === to) ?? null;
+  const ethBalance = held.find((option) => option.address === NATIVE_ETH)?.qty ?? 0;
+  const sellingUnheld = wantedFrom !== undefined && !held.some((option) => option.address === wantedFrom);
+  const typed = Number(normalizeAmount(amount));
+  // Rough USD-price estimate while typing; the review screen shows CDP's real quote.
+  const estimate = fromOption?.priceUsd && toOption?.priceUsd && typed > 0
+    ? (typed * fromOption.priceUsd) / toOption.priceUsd
+    : null;
+  const canFlip = held.some((option) => option.address === to);
+  // Backing out of a review cancels its unclaimed intent so it doesn't linger in Activity.
+  const leaveReview = () => {
+    if (prepared && !hash) void cancelIntent(prepared.id);
+    setPrepared(null);
+  };
 
   return (
-    <ActionSheet title="Swap" onClose={onClose}>
-      {swapped ? (
-        <p className="wd-sheet-note">Swapping isn&apos;t wired up yet — this is a preview of the flow, no funds moved.</p>
+    <ActionSheet title="Swap" onClose={() => { leaveReview(); onClose(); }}>
+      {hash ? (
+        <div className="wd-sheet-form">
+          <p className="wd-sheet-sent-title">Swap submitted — waiting for Base to confirm</p>
+          <p className="wd-sheet-note">Track it in the Activity tab. Your new balance shows up once the network includes it.</p>
+          <code className="wd-sheet-hash">{hash}</code>
+          <button type="button" className="wd-sheet-primary-button" onClick={onClose}>Done</button>
+        </div>
+      ) : prepared ? (
+        <SwapReview
+          prepared={prepared}
+          accountAddress={accountAddress}
+          ethBalance={ethBalance}
+          onSubmitted={setHash}
+          onBack={leaveReview}
+          onRestart={(message) => { setPrepared(null); setError(message); }}
+        />
       ) : (
         <form
           className="wd-sheet-form"
-          onSubmit={(event) => { event.preventDefault(); setSwapped(true); }}
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!enabled || !fromOption || !toOption) return;
+            setPending(true);
+            setError(null);
+            void createSwapIntent({
+              idempotencyKey: crypto.randomUUID(),
+              fromToken: fromOption.address,
+              toToken: toOption.address,
+              amount: normalizeAmount(amount),
+            })
+              .then(({ intent, fromToken, toToken }) => {
+                setPrepared({ id: intent.id, fromToken, toToken, rawAmount: intent.inputAmount });
+              })
+              .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : "Could not prepare swap."))
+              .finally(() => setPending(false));
+          }}
         >
           <label className="wd-sheet-field">
-            <span>From</span>
+            <span>Pay with{fromOption ? ` · balance ${fromOption.qty.toLocaleString(undefined, { maximumFractionDigits: 6 })}` : ""}</span>
             <select value={from} onChange={(event) => setFrom(event.target.value)}>
-              {options.map((symbol) => <option key={symbol} value={symbol}>{symbol}</option>)}
+              {held.length === 0 && <option value="">Nothing to swap yet</option>}
+              {held.map((option) => <option key={option.address} value={option.address}>{option.symbol}</option>)}
             </select>
           </label>
-          <button type="button" className="wd-sheet-swap-flip" onClick={() => { setFrom(to); setTo(from); }} aria-label="Reverse swap direction">
+          <button
+            type="button"
+            className="wd-sheet-swap-flip"
+            disabled={!canFlip}
+            onClick={() => { setFrom(to); setTo(from); }}
+            aria-label="Reverse swap direction"
+          >
             <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M5 6h7L9.5 3.5M11 10H4l2.5 2.5" />
             </svg>
           </button>
           <label className="wd-sheet-field">
-            <span>To</span>
+            <span>Receive</span>
             <select value={to} onChange={(event) => setTo(event.target.value)}>
-              {options.map((symbol) => <option key={symbol} value={symbol}>{symbol}</option>)}
+              {targets.map((option) => <option key={option.address} value={option.address}>{option.symbol}</option>)}
             </select>
           </label>
           <label className="wd-sheet-field">
-            <span>Amount</span>
-            <input value={amount} onChange={(event) => setAmount(event.target.value)} inputMode="decimal" placeholder="0.0" />
+            <span>
+              Amount ({fromOption?.symbol ?? "—"})
+              {estimate != null && ` · ≈ ${estimate.toLocaleString(undefined, { maximumSignificantDigits: 4 })} ${toOption?.symbol}`}
+            </span>
+            <input value={amount} onChange={(event) => setAmount(event.target.value)} inputMode="decimal" placeholder="0.00" />
           </label>
-          <button type="submit" className="wd-sheet-primary-button" disabled>Review swap</button>
-          <p className="wd-sheet-note">Swaps remain disabled until the credentialed quote, calldata-decoder, simulation, and Paymaster gates pass.</p>
+          <button type="submit" className="wd-sheet-primary-button" disabled={!enabled || pending || !fromOption || !amount || from === to || ethBalance === 0}>
+            {pending ? "Preparing…" : "Review swap"}
+          </button>
+          {from !== "" && from === to && <p className="wd-sheet-note">Pick two different tokens.</p>}
+          {sellingUnheld && <p className="wd-sheet-note">You don&apos;t hold that token, so there&apos;s nothing of it to sell.</p>}
+          {held.length === 0 && <p className="wd-sheet-note">Deposit USDC or ETH on Base to start buying.</p>}
+          {held.length > 0 && ethBalance === 0 && <p className="wd-sheet-note">Swaps pay gas in ETH. Deposit a little ETH on Base before swapping.</p>}
+          {!enabled && <p className="wd-sheet-note">Swapping is currently disabled.</p>}
+          {error && <p className="wd-sheet-error" role="alert">{error}</p>}
         </form>
       )}
     </ActionSheet>

@@ -15,6 +15,10 @@ function likeLiteral(value: string) {
  * Other Prophecy users with a handle and an active Base smart account, matched
  * by handle prefix or display-name substring. Only handled users are listed:
  * handles are unique, display names are not, so the picker labels by @handle.
+ * Addresses are never returned here, so browsing the directory doesn't map
+ * users to wallets. That mapping is not secret: a send intent to a handle
+ * returns the resolved address (the sender's browser has to sign the transfer
+ * to it), so learning one costs a rate-limited, audited intent per handle.
  */
 export async function GET(request: Request) {
   const viewer = await getViewer();
@@ -23,14 +27,13 @@ export async function GET(request: Request) {
     return walletJson({ error: "Too many requests" }, { status: 429 });
   }
   const q = (new URL(request.url).searchParams.get("q") ?? "").trim().replace(/^@/, "").slice(0, 50);
-  if (!q) return walletJson({ recipients: [] });
+  if (q.length < 2) return walletJson({ recipients: [] });
 
   const literal = likeLiteral(q);
   const rows = await getDb()
     .select({
       handle: profiles.handle,
       displayName: profiles.displayName,
-      address: users.smartAccountAddress,
     })
     .from(profiles)
     .innerJoin(users, eq(users.id, profiles.userId))

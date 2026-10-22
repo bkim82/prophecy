@@ -27,21 +27,28 @@ export async function GET(request: Request) {
     // An unconfirmed intent never left the confirmation sheet; it is not a transaction.
     .filter((intent) => intent.status !== "created")
     .filter((intent) => !intent.transactionHash || !confirmedHashes.has(intent.transactionHash));
+  const symbolOf = async (address: string) => {
+    const meta = curatedToken(address) ?? await getTokenMetadata(address);
+    return meta?.symbol && meta.decimals != null ? { symbol: meta.symbol, decimals: meta.decimals } : null;
+  };
   const local = await Promise.all(pending.map(async (intent) => {
-      const meta = curatedToken(intent.tokenIn) ?? await getTokenMetadata(intent.tokenIn);
-      const token = meta?.symbol && meta.decimals != null ? { symbol: meta.symbol, decimals: meta.decimals } : null;
+      const [token, toToken] = await Promise.all([
+        symbolOf(intent.tokenIn),
+        intent.tokenOut ? symbolOf(intent.tokenOut) : null,
+      ]);
       return {
         hash: intent.transactionHash ?? intent.userOperationHash ?? intent.id,
         kind: intent.kind === "swap" ? "swapped" : "sent",
         asset: token?.symbol ?? intent.tokenIn,
         // Display-only; the exact amount stays in rawAmount.
         value: token ? Number(formatUnits(BigInt(intent.inputAmount), token.decimals)) : null,
-        toAsset: intent.tokenOut,
+        toAsset: intent.tokenOut ? toToken?.symbol ?? intent.tokenOut : null,
         toValue: null,
         timestamp: intent.createdAt.getTime(),
         status: intent.status,
         rawAmount: intent.inputAmount,
-        recipient: intent.recipient,
+        // A swap's recipient is the account itself; only sends show "To …".
+        recipient: intent.kind === "swap" ? null : intent.recipient,
         transactionHash: intent.transactionHash,
         failureCode: intent.failureCode,
         local: true,

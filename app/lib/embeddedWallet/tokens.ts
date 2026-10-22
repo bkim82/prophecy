@@ -43,3 +43,9 @@ export function curatedToken(address: string): SendToken | null {
   const normalized = address.toLowerCase();
   return CURATED_BASE_TOKENS.find((token) => token.address === normalized) ?? null;
 }
+
+/** Uniswap's Permit2 (same address on every chain); CDP swaps pull the sold ERC-20 through it. */
+export const PERMIT2 = "0x000000000022d473030f116ddee9f6b43ac78ba3" as const;
+
+/** Max slippage passed to CDP's swap quote/execute, in basis points (100 = 1%). */
+export const SWAP_SLIPPAGE_BPS = 100;

@@ -2,17 +2,21 @@ import { describe, expect, it } from "vitest";
 import {
   IntentValidationError,
   assertSendCalls,
+  assertSwapOperationCalls,
+  buildPermit2Approval,
   buildSendIntent,
+  buildSwapIntent,
   decodeErc20Approve,
   decodeErc20Transfer,
   encodeErc20Approve,
   encodeErc20Transfer,
+  executionSlippageBps,
   formatUnits,
   normalizeAddress,
   normalizeAmount,
   parseUnits,
 } from "./intents";
-import { CDP_ERC20_PAYMASTER, GAS_ALLOWANCE_RAW, NATIVE_ETH, curatedToken } from "./tokens";
+import { CDP_ERC20_PAYMASTER, GAS_ALLOWANCE_RAW, NATIVE_ETH, PERMIT2, curatedToken } from "./tokens";
 
 const ACCOUNT = "0x1111111111111111111111111111111111111111";
 const RECIPIENT = "0x2222222222222222222222222222222222222222";
@@ -115,5 +119,73 @@ describe("send intent", () => {
   it("requires exact 20-byte addresses", () => {
     expect(normalizeAddress(RECIPIENT.toUpperCase().replace("0X", "0x"))).toBe(RECIPIENT);
     expect(() => normalizeAddress("0x1234")).toThrow(IntentValidationError);
+  });
+});
+
+describe("swap intents", () => {
+  const usdc = curatedToken(USDC)!;
+  const MEME = "0x5555555555555555555555555555555555555555";
+  const meme = { address: MEME, symbol: "MEME", decimals: 18, maxSendRaw: null, maxDailyRaw: null };
+  const swap = (fromToken: string, toToken: string, amount: string) => ({
+    idempotencyKey: "swap-intent-0001",
+    fromToken,
+    toToken,
+    amount,
+  });
+
+  it("builds an exact-input swap to the account itself with no stored calls", () => {
+    const intent = buildSwapIntent(swap(USDC, MEME, "25.5"), ACCOUNT, usdc, meme);
+    expect(intent.kind).toBe("swap");
+    expect(intent.rawAmount).toBe(25_500_000n);
+    expect(intent.recipient).toBe(ACCOUNT);
+    expect(intent.calls).toEqual([]);
+  });
+
+  it("rejects same-token, mismatched-token, and over-limit swaps", () => {
+    expect(() => buildSwapIntent(swap(USDC, USDC, "1"), ACCOUNT, usdc, usdc)).toThrowError(/different/);
+    expect(() => buildSwapIntent(swap(MEME, USDC, "1"), ACCOUNT, usdc, meme)).toThrowError(/not enabled/);
+    expect(() => buildSwapIntent(swap(USDC, MEME, "100.000001"), ACCOUNT, usdc, meme)).toThrowError(/maximum/);
+  });
+
+  it("bounds a reported swap operation's value and sold-token calls", () => {
+    const ROUTER = "0x6666666666666666666666666666666666666666";
+    const routerCall = (value = "0") => ({ to: ROUTER, value, data: "0x1fff991f" });
+    const check = (tokenIn: string, calls: { to: string; value: string; data: string }[]) =>
+      () => assertSwapOperationCalls({ tokenIn, rawAmount: 25_500_000n, calls });
+
+    expect(check(USDC, [routerCall()])).not.toThrow();
+    expect(check(USDC, [buildPermit2Approval(USDC, 25_500_000n), routerCall()])).not.toThrow();
+    expect(check(NATIVE_ETH, [routerCall("25500000")])).not.toThrow();
+    expect(check(USDC, [])).toThrowError(/no calls/);
+    expect(check(USDC, [routerCall("1")])).toThrowError(/more ETH/);
+    expect(check(NATIVE_ETH, [routerCall("25500001")])).toThrowError(/more ETH/);
+    expect(check(USDC, [{ to: USDC, value: "0", data: encodeErc20Transfer(RECIPIENT, 1n) }])).toThrowError(/transfers/);
+    expect(check(USDC, [{ to: USDC, value: "0", data: encodeErc20Approve(RECIPIENT, 1n) }])).toThrowError(/spender/);
+    expect(check(USDC, [buildPermit2Approval(USDC, 25_500_001n), routerCall()])).toThrowError(/spender/);
+  });
+
+  it("approves exactly the swapped amount to Permit2 and never native ETH", () => {
+    const approval = buildPermit2Approval(USDC, 25_500_000n);
+    expect(approval.to).toBe(USDC);
+    expect(decodeErc20Approve(approval.data)).toEqual({ spender: PERMIT2, amount: 25_500_000n });
+    expect(() => buildPermit2Approval(NATIVE_ETH, 1n)).toThrowError(/no approval/);
+  });
+});
+
+describe("executionSlippageBps", () => {
+  it("keeps the fresh quote's minimum at or above the confirmed one", () => {
+    // Reviewed at 1000 with 1% slippage → confirmed minimum 990; the quote then ticks down to 998.
+    const bps = executionSlippageBps(998n, 990n, 100);
+    expect(bps).toBe(80);
+    expect((998n * BigInt(10_000 - bps)) / 10_000n >= 990n).toBe(true);
+  });
+
+  it("caps at the configured maximum when the price rose", () => {
+    expect(executionSlippageBps(2_000n, 990n, 100)).toBe(100);
+  });
+
+  it("returns -1 once the quote is at or below the minimum", () => {
+    expect(executionSlippageBps(990n, 990n, 100)).toBe(-1);
+    expect(executionSlippageBps(900n, 990n, 100)).toBe(-1);
   });
 });
