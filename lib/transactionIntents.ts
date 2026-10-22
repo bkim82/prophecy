@@ -19,6 +19,7 @@ import {
   type SendIntentInput,
   type SwapIntentInput,
 } from "@/app/lib/embeddedWallet/intents";
+import { walletFreeGasEnabled } from "@/app/lib/embeddedWallet/config";
 import { curatedToken, type SendToken } from "@/app/lib/embeddedWallet/tokens";
 import { getTokenMetadata } from "@/lib/alchemy";
 import { getCdpUserOperation } from "@/lib/cdp";
@@ -116,7 +117,7 @@ export async function createSendIntent(
 ) {
   const token = await resolveSendToken(input.tokenAddress);
   if (!token) throw new IntentValidationError("unsupported-token", "This token can't be sent.");
-  const normalized = buildSendIntent(input, smartAccountAddress, token);
+  const normalized = buildSendIntent(input, smartAccountAddress, token, walletFreeGasEnabled());
   const intent = await persistIntent(userId, {
     schemaVersion: normalized.schemaVersion,
     idempotencyKey: input.idempotencyKey,

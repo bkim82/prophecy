@@ -4,7 +4,8 @@ import { executeSwap, getSwapPrice, getUserOperation } from "@coinbase/cdp-core"
 import { useCurrentUser, useGetSwapPrice, useSendUserOperation } from "@coinbase/cdp-hooks";
 import { useCallback } from "react";
 import { useAppAuth } from "@/app/auth/AuthProvider";
-import { assertSendCalls, buildPermit2Approval, executionSlippageBps } from "./intents";
+import { walletFreeGasEnabled } from "./config";
+import { assertSendCalls, buildPermit2Approval, executionSlippageBps, isSponsoredSend } from "./intents";
 import { NATIVE_ETH, PERMIT2, SWAP_SLIPPAGE_BPS, USDC_BASE } from "./tokens";
 import { claimIntent, rememberPendingBroadcast, reportBroadcast, type ClientIntent } from "./client";
 
@@ -125,9 +126,10 @@ export function useSubmitTypedIntent() {
           value: BigInt(call.value),
           data: call.data as Hex,
         })),
-        // Gas is paid in USDC through CDP's ERC-20 paymaster (approved in the first call).
+        // Free gas: CDP's Paymaster sponsors it. Otherwise gas is paid in USDC
+        // through CDP's ERC-20 paymaster (approved in the first call).
         useCdpPaymaster: true,
-        paymasterContext: { erc20: USDC_BASE },
+        ...(isSponsoredSend(intent.calls) ? {} : { paymasterContext: { erc20: USDC_BASE } }),
         idempotencyKey: intent.id,
       }));
     } catch (cause) {
@@ -155,8 +157,8 @@ async function waitForInclusion(account: Address, userOperationHash: Hex) {
 /**
  * Submits a confirmed swap intent through CDP's swap API, which quotes,
  * signs Permit2, simulates, and submits on Coinbase's side. Gas for the swap
- * and for the approval it may need is paid in ETH from the account itself (no
- * Paymaster). Everything that can fail before signing (route, balance,
+ * and for the approval it may need is paid in ETH from the account itself, or
+ * sponsored by CDP's Paymaster when free gas is on. Everything that can fail before signing (route, balance,
  * approval, the confirmed minimum output) runs before the intent is claimed,
  * so those failures leave it retryable and don't reserve the daily cap.
  * executeSwap takes a slippage, not a floor, so the slippage is sized from a
@@ -182,6 +184,7 @@ export function useSubmitSwapIntent() {
       throw new Error("The prepared operation did not match this wallet.");
     }
     const minimumOutput = BigInt(confirmed.minimumOutputAmount);
+    const freeGas = walletFreeGasEnabled();
     const swapParams = {
       network: "base" as const,
       fromToken: confirmed.tokenIn as Address,
@@ -206,11 +209,12 @@ export function useSubmitSwapIntent() {
     if (quote.needsApproval) {
       onStep?.("approving");
       const approval = buildPermit2Approval(confirmed.tokenIn, BigInt(confirmed.inputAmount));
-      // Self-paid in ETH. No idempotency key: repeating an exact approval leaves the same allowance.
+      // Self-paid in ETH unless free gas. No idempotency key: repeating an exact approval leaves the same allowance.
       const { userOperationHash } = await sendUserOperation({
         evmSmartAccount: providerAccount,
         network: "base",
         calls: [{ to: approval.to as Address, value: 0n, data: approval.data as Hex }],
+        useCdpPaymaster: freeGas,
       });
       await waitForInclusion(providerAccount, userOperationHash);
       const deadline = Date.now() + ALLOWANCE_SYNC_MS;
@@ -241,7 +245,7 @@ export function useSubmitSwapIntent() {
     });
     let userOperationHash: string;
     try {
-      const result = await executeSwap({ ...swapParams, slippageBps, idempotencyKey: intent.id });
+      const result = await executeSwap({ ...swapParams, slippageBps, useCdpPaymaster: freeGas, idempotencyKey: intent.id });
       if (result.type !== "evm-smart") throw new Error("The swap ran from an unexpected account type.");
       userOperationHash = result.userOpHash;
     } catch (cause) {
