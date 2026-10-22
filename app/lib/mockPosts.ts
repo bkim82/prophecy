@@ -146,7 +146,7 @@ export type Post = {
   poll?: Poll;
   // Stored in `posts` (lib/posts.ts) rather than mock data.
   saved?: boolean;
-  // Written by the viewer (FeedComposer posts): deletable from the ⋯ menu,
+  // Written by the viewer (composer posts): deletable from the ⋯ menu,
   // and it can be reposted but not vouched for or defied.
   mine?: boolean;
   // The viewer's saved engagement (lib/engagement.ts withEngagement): they

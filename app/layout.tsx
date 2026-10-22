@@ -14,6 +14,8 @@ import { TabNav } from "./TabNav";
 import { DEFAULT_THEME, THEME_INIT_SCRIPT } from "./theme";
 import { ThemeToggle } from "./ThemeToggle";
 import { embeddedWalletAuthEnabled } from "@/lib/embeddedWalletFeature";
+import { handleFor } from "@/lib/profile";
+import { getViewer } from "@/lib/viewer";
 import "./globals.css";
 
 // Cinzel carries the ancient-inscription weight for headings/brand; Inter
@@ -41,6 +43,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     if (!projectId) throw new Error("NEXT_PUBLIC_CDP_PROJECT_ID is required when embedded wallet auth is enabled");
     authConfig = { provider: "cdp", projectId };
   }
+  // The account menu heads with your @handle, not the provider's name/email.
+  // Profile saves call refresh(), which re-renders this layout with the new one.
+  const viewer = await getViewer();
+  const handle = viewer ? await handleFor(viewer.userId) : null;
 
   return (
     <html
@@ -63,7 +69,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   <ThemeToggle />
                   <SignedIn><BalancePill /></SignedIn>
                   <SignedIn><NotificationsMenu /></SignedIn>
-                  <AccountMenu />
+                  <AccountMenu handle={handle} />
                 </div>
               </div>
               <div className="mobile-header-content">
@@ -73,7 +79,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   <SignedIn><BalancePill /></SignedIn>
                   <SignedIn><NotificationsMenu /></SignedIn>
                   <div className="mobile-account-control">
-                    <AccountMenu compact />
+                    <AccountMenu compact handle={handle} />
                   </div>
                 </div>
               </div>

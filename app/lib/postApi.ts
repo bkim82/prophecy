@@ -1,5 +1,5 @@
-// Client side of POST /api/posts, shared by both composers
-// (app/compose/Composer.tsx, app/FeedComposer.tsx). Sends only what the
+// Client side of POST /api/posts, used by the composer
+// (app/compose/Composer.tsx). Sends only what the
 // author chose — the server derives the author and resolves the trade.
 
 export type PostPayload = {

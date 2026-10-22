@@ -123,11 +123,15 @@ export async function searchProfiles(query: string, limit: number): Promise<Prof
   return rows.flatMap(({ handle, ...row }) => (handle ? [{ ...row, handle }] : []));
 }
 
+/** The account's stored handle (lowercase, no "@"), or null until they pick one. */
+export async function handleFor(userId: string): Promise<string | null> {
+  const [row] = await getDb().select({ handle: profiles.handle }).from(profiles).where(eq(profiles.userId, userId));
+  return row?.handle ?? null;
+}
+
 /** A real account's rank, from its handle (app/lib/rank.ts rankForHandle); signed out → VIEWER_RANK. */
 export async function rankForUser(userId: string | undefined): Promise<string> {
-  if (!userId) return rankForHandle(null);
-  const [row] = await getDb().select({ handle: profiles.handle }).from(profiles).where(eq(profiles.userId, userId));
-  return rankForHandle(row?.handle);
+  return rankForHandle(userId ? await handleFor(userId) : null);
 }
 
 /** Clerk user id holding `handle` (stored form: lowercase, no "@"), or null. */
