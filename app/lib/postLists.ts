@@ -1,14 +1,19 @@
 "use client";
 
-import { useMemo, useSyncExternalStore } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
+import type { AccountTopics } from "@/app/lib/topicInterest";
 import { DEFAULT_INTERESTS, isTopicId, type TopicId } from "@/app/lib/topics";
+import { saveTopics } from "@/app/topicActions";
 
 // Per-browser Bookmarked / Interests / Not interested lists for the Omens
 // feed (app/FeedSwitcher.tsx). Viewer conveniences over mock posts, so they live in
 // localStorage like the Portfolio watchlist (app/duel/portfolio/watchlist.ts);
 // empty/blocked storage just means empty (or default) lists. Stored as ids only.
+// Signed in, interests and Not interested belong to the account instead
+// (useTopicPrefs, bottom).
 
 const EMPTY: string[] = [];
+const EMPTY_TOPICS: TopicId[] = [];
 
 // `fallback` is the list before this browser has ever saved one.
 function createIdStore(key: string, fallback: string[] = EMPTY) {
@@ -91,14 +96,6 @@ export function useInterests() {
   return { ids, has: (id: TopicId) => ids.includes(id), toggle };
 }
 
-// Swaps the whole interest list at once — the topics picked during /welcome
-// (app/welcome/OnboardingFlow.tsx) become this browser's feed. Following
-// takes back "Not interested", same as toggle.
-export function replaceInterests(ids: TopicId[]) {
-  interests.write(ids);
-  mutedTopics.write(mutedTopics.snapshot().filter((id) => !ids.includes(id as TopicId)));
-}
-
 // "Not interested" topics: kept out of the For You suggestions (covers, the
 // feed under them, Mix it up). Muting also unfollows; `mute` returns where the
 // topic sat in your interests (-1 if it wasn't followed) so an Undo can put it
@@ -121,6 +118,51 @@ export function useMutedTopics() {
     interests.write([...followed.slice(0, followAt), id, ...followed.slice(followAt)]);
   };
   return { ids, has: (id: TopicId) => ids.includes(id), mute, unmute };
+}
+
+type TopicLists = { followed: TopicId[]; muted: TopicId[] };
+
+// The feed's topics. Signed in (`account`, loaded by the page from
+// lib/topicPrefs.ts): the account's followed / Not interested lists, each
+// change saved with saveTopics, plus what its activity infers (fixed for
+// this page view, so covers don't shift while you scroll). Signed out, or
+// if the account's topics couldn't load: this browser's lists above, nothing
+// inferred. Same shapes as useInterests / useMutedTopics either way.
+export function useTopicPrefs(account: AccountTopics | null) {
+  const localInterests = useInterests();
+  const localMuted = useMutedTopics();
+  const [lists, setLists] = useState<TopicLists | null>(account && { followed: account.followed, muted: account.muted });
+  const [inferred] = useState<TopicId[]>(account?.inferred ?? EMPTY_TOPICS);
+  if (!lists) return { interests: localInterests, muted: localMuted, inferred };
+
+  const save = (next: TopicLists) => {
+    setLists(next);
+    saveTopics(next).catch(() => {});
+  };
+  const { followed, muted } = lists;
+  return {
+    interests: {
+      ids: followed,
+      has: (id: TopicId) => followed.includes(id),
+      toggle: (id: TopicId) =>
+        followed.includes(id)
+          ? save({ followed: followed.filter((other) => other !== id), muted })
+          : save({ followed: [...followed, id], muted: muted.filter((other) => other !== id) }),
+    },
+    muted: {
+      ids: muted,
+      has: (id: TopicId) => muted.includes(id),
+      mute: (id: TopicId) => {
+        save({ followed: followed.filter((other) => other !== id), muted: muted.includes(id) ? muted : [...muted, id] });
+        return followed.indexOf(id);
+      },
+      unmute: (id: TopicId, followAt = -1) => {
+        const rest = followed.filter((other) => other !== id);
+        save({ followed: followAt < 0 ? followed : [...rest.slice(0, followAt), id, ...rest.slice(followAt)], muted: muted.filter((other) => other !== id) });
+      },
+    },
+    inferred,
+  };
 }
 
 // Notification ids this browser has opened the header bell on

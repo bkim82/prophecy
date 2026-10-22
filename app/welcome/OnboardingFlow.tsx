@@ -18,7 +18,6 @@ import {
   type PaceId,
   type ReferralId,
 } from "@/app/lib/onboardingQuestions";
-import { replaceInterests } from "@/app/lib/postLists";
 import { useAppAuth } from "@/app/auth/AuthProvider";
 import { IMAGE_ACCEPT, PROFILE_LIMITS, SOURCE_IMAGE_MAX_BYTES, handleProblem, normalizeHandle } from "@/app/lib/profileEdit";
 import { TOPIC_KINDS, TOPICS, type TopicId } from "@/app/lib/topics";
@@ -32,8 +31,9 @@ import { finishOnboarding } from "./actions";
 // (saveProfileBasics; under Clerk the photo uploads after, under CDP it is
 // set later from Edit profile), so leaving midway still
 // leaves a usable profile. The survey answers are held here and saved once,
-// by finishOnboarding, before the tutorial; picked topics also become this
-// browser's Omens interests.
+// by finishOnboarding, before the tutorial; picked topics (or none) are
+// also the account's Omens interests until it saves its own
+// (lib/topicPrefs.ts accountTopics).
 
 export type WelcomeProfile = {
   displayName: string;
@@ -220,8 +220,6 @@ export function OnboardingFlow({ profile }: { profile: WelcomeProfile }) {
       } catch {
         return setError({ message: "Couldn't finish setting up — try again." });
       }
-      // No picks keeps the feed's defaults rather than an empty For You.
-      if (interests.length > 0) replaceInterests(interests);
       setTouring(!hasFinishedTutorial());
       setDone(true);
     });

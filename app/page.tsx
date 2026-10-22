@@ -3,6 +3,7 @@ import { FeedSwitcher } from "@/app/FeedSwitcher";
 import { GLOBAL_POSTS } from "@/app/lib/mockPosts";
 import { followedTraders } from "@/lib/follows";
 import { feedPosts } from "@/lib/posts";
+import { accountTopics } from "@/lib/topicPrefs";
 import { getViewer } from "@/lib/viewer";
 
 export default async function Page() {
@@ -15,9 +16,17 @@ export default async function Page() {
     console.error("Saved posts unavailable", error);
     return [];
   });
+  // Followed / Not interested / inferred topics. Before db/topics.sql is
+  // applied the feed falls back to this browser's lists.
+  const topics = userId
+    ? await accountTopics(userId).catch((error: unknown) => {
+        console.error("Account topics unavailable", error);
+        return null;
+      })
+    : null;
   return (
     <main className="feed-shell feed-shell--nav">
-      <FeedSwitcher posts={GLOBAL_POSTS} savedPosts={savedPosts} followed={followed} />
+      <FeedSwitcher posts={GLOBAL_POSTS} savedPosts={savedPosts} followed={followed} account={topics} />
       <aside className="feed-sidebar">
         <FeedSidebar />
       </aside>

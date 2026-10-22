@@ -1,10 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useRef, useState, type RefObject } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import { useAppAuth } from "@/app/auth/AuthProvider";
 import { BackIcon } from "@/app/icons";
 import type { Post, Reply } from "@/app/lib/mockPosts";
+import { useTopicSignal } from "@/app/lib/topicSignals";
 import { PostCard, ReplyItem } from "@/app/PostCard";
 
 // Local-only, like the feed composer: a reply is prepended to this page's
@@ -59,6 +60,10 @@ export function PostThread({ post, replies }: { post: Post; replies: Reply[] }) 
   const inputRef = useRef<HTMLInputElement>(null);
   const [mine, setMine] = useState<Reply[]>([]);
   const all = [...mine, ...replies];
+  // Opening a post and replying to it count toward inferred interests
+  // (once per post; the server skips your own).
+  const signal = useTopicSignal();
+  useEffect(() => signal("open_post", { postId: post.id }), [signal, post.id]);
 
   // Back to wherever the post was opened from; a fresh tab has nowhere to go
   // back to, so it lands on the feed.
@@ -77,7 +82,14 @@ export function PostThread({ post, replies }: { post: Post; replies: Reply[] }) 
       </div>
       <div className="feed-panel">
         <PostCard post={post} detail onReply={() => inputRef.current?.focus()} />
-        <ReplyComposer inputRef={inputRef} replyingTo={post.handle || post.author} onReply={(reply) => setMine((current) => [reply, ...current])} />
+        <ReplyComposer
+          inputRef={inputRef}
+          replyingTo={post.handle || post.author}
+          onReply={(reply) => {
+            signal("reply", { postId: post.id });
+            setMine((current) => [reply, ...current]);
+          }}
+        />
         <div className="post-replies">
           {all.map((reply) => (
             <ReplyItem key={reply.id} reply={reply} />
