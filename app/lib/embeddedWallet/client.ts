@@ -15,14 +15,22 @@ export type ClientIntent = {
   normalizedCallHash: string;
 };
 
-async function errorMessage(response: Response) {
-  const body = await response.json().catch(() => null) as { error?: unknown } | null;
-  return typeof body?.error === "string" ? body.error : "Wallet request failed";
-}
+/**
+ * Dispatched on `window` when a wallet route reports the app session is gone,
+ * so the auth bridge signs the browser out instead of leaving it looking signed in.
+ */
+export const WALLET_SIGNED_OUT_EVENT = "prophecy:wallet-signed-out";
 
 async function jsonRequest<T>(url: string, init: RequestInit): Promise<T> {
   const response = await fetch(url, init);
-  if (!response.ok) throw new Error(await errorMessage(response));
+  if (!response.ok) {
+    const body = await response.json().catch(() => null) as { error?: unknown; code?: unknown } | null;
+    // Must match WALLET_SIGNED_OUT_CODE in app/api/wallet/responses.ts.
+    if (response.status === 401 && body?.code === "signed-out") {
+      window.dispatchEvent(new Event(WALLET_SIGNED_OUT_EVENT));
+    }
+    throw new Error(typeof body?.error === "string" ? body.error : "Wallet request failed");
+  }
   return response.json() as Promise<T>;
 }
 

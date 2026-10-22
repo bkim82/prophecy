@@ -3,9 +3,11 @@ import { IntentValidationError } from "@/app/lib/embeddedWallet/intents";
 import {
   WalletRequestError,
   readWalletJson,
+  walletAccountRequired,
   walletJson,
   walletMutationHeaderFailure,
   walletRateLimit,
+  walletSignedOut,
 } from "@/app/api/wallet/responses";
 import { createSendIntent, createSwapIntent, listTransactionIntents } from "@/lib/transactionIntents";
 import { normalizeHandle } from "@/app/lib/profileEdit";
@@ -16,7 +18,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   const viewer = await getViewer();
-  if (!viewer) return walletJson({ error: "Not signed in" }, { status: 401 });
+  if (!viewer) return walletSignedOut();
   const intents = await listTransactionIntents(viewer.userId);
   return walletJson({ intents });
 }
@@ -28,9 +30,8 @@ export async function POST(request: Request) {
     return walletJson({ error: "Wallet transactions are disabled" }, { status: 503 });
   }
   const viewer = await getViewer();
-  if (!viewer?.smartAccountAddress) {
-    return walletJson({ error: "A canonical smart account is required" }, { status: 401 });
-  }
+  if (!viewer) return walletSignedOut();
+  if (!viewer.smartAccountAddress) return walletAccountRequired();
   if (!await walletRateLimit(request, viewer, "wallet-intent-create", 12)) {
     return walletJson({ error: "Too many requests" }, { status: 429 });
   }

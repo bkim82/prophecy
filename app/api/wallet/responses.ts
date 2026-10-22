@@ -11,6 +11,25 @@ export function walletJson(body: object, init?: ResponseInit) {
   });
 }
 
+/** The `code` the browser keys on to sign the user out instead of showing a dead-end error. */
+export const WALLET_SIGNED_OUT_CODE = "signed-out";
+
+/**
+ * No live app session behind the cookie (revoked by a sign-in elsewhere, idle
+ * or absolute expiry, or overwritten), while the page may still look signed in.
+ */
+export function walletSignedOut() {
+  return walletJson(
+    { error: "Your session ended. Sign in again.", code: WALLET_SIGNED_OUT_CODE },
+    { status: 401 },
+  );
+}
+
+/** Signed in, but not through the embedded wallet (e.g. Clerk mode). */
+export function walletAccountRequired() {
+  return walletJson({ error: "A canonical smart account is required" }, { status: 403 });
+}
+
 export function walletMutationHeaderFailure(request: Request) {
   const failure = mutationRequestFailure(request);
   if (!failure) return null;

@@ -1,5 +1,5 @@
 import { and, eq, ilike, isNotNull, ne, or } from "drizzle-orm";
-import { walletJson, walletRateLimit } from "@/app/api/wallet/responses";
+import { walletAccountRequired, walletJson, walletRateLimit, walletSignedOut } from "@/app/api/wallet/responses";
 import { getDb } from "@/db";
 import { profiles, users } from "@/db/schema";
 import { getViewer } from "@/lib/viewer";
@@ -22,7 +22,8 @@ function likeLiteral(value: string) {
  */
 export async function GET(request: Request) {
   const viewer = await getViewer();
-  if (!viewer?.smartAccountAddress) return walletJson({ error: "Not signed in" }, { status: 401 });
+  if (!viewer) return walletSignedOut();
+  if (!viewer.smartAccountAddress) return walletAccountRequired();
   if (!await walletRateLimit(request, viewer, "wallet-recipients", 60)) {
     return walletJson({ error: "Too many requests" }, { status: 429 });
   }

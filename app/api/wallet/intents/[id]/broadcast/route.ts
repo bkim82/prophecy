@@ -5,6 +5,7 @@ import {
   walletJson,
   walletMutationHeaderFailure,
   walletRateLimit,
+  walletSignedOut,
 } from "@/app/api/wallet/responses";
 import { recordUserOperationHash } from "@/lib/transactionIntents";
 import { getViewer } from "@/lib/viewer";
@@ -16,7 +17,7 @@ export async function POST(request: Request, context: RouteContext<"/api/wallet/
     return walletJson({ error: "Wallet transactions are disabled" }, { status: 503 });
   }
   const viewer = await getViewer();
-  if (!viewer) return walletJson({ error: "Not signed in" }, { status: 401 });
+  if (!viewer) return walletSignedOut();
   if (!await walletRateLimit(request, viewer, "wallet-intent-broadcast", 20)) {
     return walletJson({ error: "Too many requests" }, { status: 429 });
   }

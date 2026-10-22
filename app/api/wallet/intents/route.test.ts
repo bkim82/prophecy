@@ -65,4 +65,19 @@ describe("POST /api/wallet/intents (send recipients)", () => {
     expect(walletAddressForHandleMock).not.toHaveBeenCalled();
     expect(createSendIntentMock).toHaveBeenCalledWith("user-1", ACCOUNT, expect.objectContaining({ recipient: RECIPIENT }));
   });
+
+  it("tells the browser to sign out when the app session is gone", async () => {
+    getViewerMock.mockResolvedValue(null);
+    const response = await POST(request({ recipient: RECIPIENT }));
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toMatchObject({ code: "signed-out" });
+    expect(createSendIntentMock).not.toHaveBeenCalled();
+  });
+
+  it("refuses a signed-in viewer with no smart account without signing them out", async () => {
+    getViewerMock.mockResolvedValue({ userId: "user-1", smartAccountAddress: null });
+    const response = await POST(request({ recipient: RECIPIENT }));
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({ error: "A canonical smart account is required" });
+  });
 });
