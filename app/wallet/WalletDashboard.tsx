@@ -83,7 +83,8 @@ export function WalletDashboard({
       change24h: eth?.change24h ?? null,
     },
     ...tokenHoldings.map((holding): Coin => ({
-      address: holding.address,
+      // Lowercased to match market/search addresses, so a held token is found as owned (and sellable) everywhere.
+      address: holding.address.toLowerCase(),
       symbol: holding.symbol,
       name: holding.name,
       imageUrl: holding.imageUrl,

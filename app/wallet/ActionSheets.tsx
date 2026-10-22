@@ -16,6 +16,7 @@ import { walletTransactionsEnabled } from "@/app/lib/embeddedWallet/config";
 import { formatUnits, normalizeAmount } from "@/app/lib/embeddedWallet/intents";
 import { ClaimedIntentError, useSubmitSwapIntent, useSubmitTypedIntent, useSwapQuote } from "@/app/lib/embeddedWallet/sign";
 import { curatedToken, GAS_ALLOWANCE_RAW, NATIVE_ETH, SWAP_SLIPPAGE_BPS, USDC_BASE } from "@/app/lib/embeddedWallet/tokens";
+import { shortenAddress } from "@/app/lib/wallet";
 import { ActionSheet } from "./ActionSheet";
 import { ETH_SENTINEL, type Coin } from "./types";
 
@@ -424,11 +425,80 @@ function SwapReview({
 
 const swapKey = (address?: string) => (address === ETH_SENTINEL ? NATIVE_ETH : address?.toLowerCase());
 
+type TokenHit = { address: string; symbol: string; name: string; priceUsd: number | null };
+
 /**
- * Exact-input swap through CDP (docs/wallet.md). `extraToken` covers the
- * Advanced tab's case: buying a market token the wallet doesn't hold yet, so
- * it still shows up as a target. `initialFrom`/`initialTo` (coin addresses,
- * "eth" for native) preselect a side without locking the picker.
+ * Finds any Base token to receive by name, ticker, or contract (the same
+ * search as the Advanced tab). A pasted contract with no listed pool can still
+ * be picked: the server resolves it on review and CDP decides if it routes.
+ */
+function TokenSearchField({ onPick }: { onPick: (option: SwapOption) => void }) {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<TokenHit[]>([]);
+  const search = query.trim();
+  const pasted = ADDRESS_RE.test(search) ? search.toLowerCase() : null;
+
+  useEffect(() => {
+    if (search.length < 2) return;
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      void fetch(`/api/wallet/search?q=${encodeURIComponent(search)}`, { cache: "no-store", signal: controller.signal })
+        .then((res) => (res.ok ? res.json() : { results: [] }))
+        .then((data: { results?: TokenHit[] }) => setResults((data.results ?? []).slice(0, 8)))
+        .catch(() => { /* aborted or rate limited: keep last results */ });
+    }, 250);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [search]);
+
+  const shown = search.length >= 2 ? results : [];
+  const unlisted = pasted !== null && !shown.some((hit) => hit.address === pasted) ? pasted : null;
+  const pick = (option: SwapOption) => {
+    onPick(option);
+    setQuery("");
+    setResults([]);
+  };
+
+  return (
+    <div className="wd-sheet-field">
+      <span>Or find any Base token</span>
+      <input
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+        placeholder="Name, ticker, or 0x contract"
+        aria-label="Search any Base token to receive"
+        spellCheck={false}
+        autoComplete="off"
+      />
+      {(shown.length > 0 || unlisted) && (
+        <ul className="wd-sheet-recipient-list">
+          {shown.map((hit) => (
+            <li key={hit.address}>
+              <button type="button" onClick={() => pick({ address: hit.address, symbol: hit.symbol, priceUsd: hit.priceUsd, qty: 0 })}>
+                <strong>{hit.symbol}</strong>
+                <span>{hit.name} · {shortenAddress(hit.address)}</span>
+              </button>
+            </li>
+          ))}
+          {unlisted && (
+            <li>
+              <button type="button" onClick={() => pick({ address: unlisted, symbol: shortenAddress(unlisted), priceUsd: null, qty: 0 })}>
+                <strong>{shortenAddress(unlisted)}</strong>
+                <span>Unlisted contract · checked on review</span>
+              </button>
+            </li>
+          )}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Exact-input swap through CDP (docs/wallet.md). Pay with any held coin;
+ * receive any Base token (quick picks plus `TokenSearchField`). `extraToken`
+ * covers the Advanced tab's case: buying a market token the wallet doesn't
+ * hold yet, so it starts out as a target. `initialFrom`/`initialTo` (coin
+ * addresses, "eth" for native) preselect a side without locking the picker.
  */
 export function SwapSheet({
   accountAddress,
@@ -450,13 +520,15 @@ export function SwapSheet({
   const held: SwapOption[] = coins
     .filter((coin) => coin.qty > 0)
     .map((coin) => ({ address: tokenAddressOf(coin), symbol: coin.symbol, priceUsd: coin.priceUsd, qty: coin.qty }));
-  // Anything held, the market token being bought, and USDC/ETH as "sell into" targets.
+  const [found, setFound] = useState<SwapOption | null>(null);
+  // Anything held, the market token being bought, a searched token, and USDC/ETH as "sell into" targets.
   const targets: SwapOption[] = [...held];
   const addTarget = (option: SwapOption) => {
     if (!targets.some((target) => target.address === option.address)) targets.push(option);
   };
   const extraKey = swapKey(extraToken?.address);
   if (extraToken && extraKey) addTarget({ address: extraKey, symbol: extraToken.symbol, priceUsd: extraToken.priceUsd, qty: 0 });
+  if (found) addTarget(found);
   addTarget({ address: USDC_BASE, symbol: "USDC", priceUsd: 1, qty: 0 });
   addTarget({ address: NATIVE_ETH, symbol: "ETH", priceUsd: null, qty: 0 });
 
@@ -557,6 +629,7 @@ export function SwapSheet({
               {targets.map((option) => <option key={option.address} value={option.address}>{option.symbol}</option>)}
             </select>
           </label>
+          <TokenSearchField onPick={(option) => { setFound(option); setTo(option.address); }} />
           <label className="wd-sheet-field">
             <span>
               Amount ({fromOption?.symbol ?? "—"})
