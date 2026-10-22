@@ -9,7 +9,7 @@ import { ProfileIcon } from "./icons";
  * Provider-neutral header account control. Provider-specific sign-in and
  * account management stay behind app/auth/AuthProvider.tsx.
  */
-export function AccountMenu({ compact = false }: { compact?: boolean }) {
+export function AccountMenu({ compact = false, handle = null }: { compact?: boolean; handle?: string | null }) {
   const { error, isLoaded, isSignedIn, openAccountSettings, provider, signOut, user } = useAppAuth();
   const [avatarVersion, setAvatarVersion] = useState(0);
 
@@ -57,7 +57,7 @@ export function AccountMenu({ compact = false }: { compact?: boolean }) {
         )}
       </summary>
       <div className="account-menu-popover">
-        <span className="account-menu-name">{label}</span>
+        <span className="account-menu-name">{handle ? `@${handle}` : label}</span>
         <Link href="/profile"><ProfileIcon className="account-menu-icon" /> Profile</Link>
         {provider === "cdp" && <Link href="/account/security">Security</Link>}
         {openAccountSettings && (

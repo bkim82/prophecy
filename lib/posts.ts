@@ -4,6 +4,7 @@ import { pollVotes, postMedia, posts, profiles } from "@/db/schema";
 import { gifById, type GifId } from "@/app/lib/gifs";
 import type { Post, PostImage } from "@/app/lib/mockPosts";
 import { playedLabel } from "@/app/lib/playedLabel";
+import { rankForHandle } from "@/app/lib/rank";
 import { isCustomTopicId, isTopicId, type CustomTopicId } from "@/app/lib/topics";
 import type { PostInput } from "@/lib/postInput";
 import { tradeKey, tradeReceiptsFor } from "@/lib/trades";
@@ -163,6 +164,8 @@ async function toFeedPosts(rows: PostRow[], viewerId: string | null): Promise<Po
       likes: 0,
       replies: 0,
       kind: "text",
+      // Same stub rank the author's profile shows (lib/profile.ts rankForUser).
+      rank: rankForHandle(handle),
       saved: true,
       mine: viewerId !== null && row.authorId === viewerId,
       topics: row.topics.filter(isTopicId),

@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { FeedComposer } from "@/app/FeedComposer";
 import { CoverEyebrow, InterestPicker, MixBanner, MutedNotice, SeeMore, TopicChips, TopicHeader, type TopicView } from "@/app/FeedTopics";
 import { ComposeIcon } from "@/app/icons";
 import { PostCard } from "@/app/PostCard";
@@ -229,7 +228,6 @@ export function FeedSwitcher({
       </Link>
       <div className="feed-main">
         <div className="feed-panel" ref={panelRef}>
-          <FeedComposer />
           {home && forYouTopics.length > 1 && (
             <MixBanner mixed={mixed} topicCount={forYouTopics.length} onToggle={() => setMixed((value) => !value)} />
           )}

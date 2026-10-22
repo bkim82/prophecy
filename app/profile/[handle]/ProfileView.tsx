@@ -41,10 +41,10 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "portfolio", label: "Portfolio" },
 ];
 
-// Own profile only, ahead of the shared tabs.
 // How often a friend's profile re-checks whether they're online (GET /api/presence).
 const PRESENCE_POLL_MS = 5_000;
-const SELF_TABS: { id: TabId; label: string }[] = [{ id: "matches", label: "Matches" }, ...TABS];
+// Own profile only: Matches slots in right after Omens.
+const SELF_TABS: { id: TabId; label: string }[] = [TABS[0], { id: "matches", label: "Matches" }, ...TABS.slice(1)];
 
 const compactCount = new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 });
 const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
@@ -111,7 +111,7 @@ type ProfileViewProps = {
 };
 
 export function ProfileView({ profile, activity, portfolio, portfolioLocked, viewerRank, initiallyFollowing, signedIn = false, followsYou = false, online = false, traits, challenge, self, showcase }: ProfileViewProps) {
-  const [tab, setTab] = useState<TabId>(self ? "matches" : "omens");
+  const [tab, setTab] = useState<TabId>("omens");
   const [editing, setEditing] = useState(false);
   // Own profiles may have no handle yet; the page supplies a stable seed instead.
   const seed = self?.edit.avatarSeed ?? profile.handle;
