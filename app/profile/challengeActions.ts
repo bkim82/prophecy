@@ -2,10 +2,11 @@
 
 import { refresh } from "next/cache";
 import { PULSE_MARKETS, PULSE_ROUNDS, isChallengeMode, isChallengeStake, type ChallengeMode } from "@/app/lib/challengeRules";
-import { VIEWER_RANK, canChallenge, challengeTierNeeded } from "@/app/lib/rank";
+import { canChallenge, challengeTierNeeded } from "@/app/lib/rank";
 import { ensureUser } from "@/lib/balance";
 import { cancelPendingChallenge, createChallenge, declinePendingChallenge, dismissDeclinedChallenge } from "@/lib/challenges";
 import { followTarget, isFollowing } from "@/lib/follows";
+import { rankForUser } from "@/lib/profile";
 import { getViewer } from "@/lib/viewer";
 
 export type ChallengeInput = {
@@ -33,13 +34,14 @@ export async function sendChallenge(input: ChallengeInput): Promise<ChallengeRes
   const target = await followTarget(input.handle);
   if (!target) return { ok: false, error: "That trader doesn't exist." };
   if (target.userId === userId) return { ok: false, error: "You can't challenge yourself." };
-  const [youFollow, theyFollow] = await Promise.all([
+  const [youFollow, theyFollow, viewerRank] = await Promise.all([
     isFollowing(userId, target.key),
     target.userId ? isFollowing(target.userId, userId) : false,
+    rankForUser(userId),
   ]);
   if (!youFollow) return { ok: false, error: `Challenges are friends-only — follow ${target.name} first.` };
   if (!theyFollow) return { ok: false, error: `Challenges are friends-only — ${target.name} doesn't follow you back.` };
-  if (!canChallenge(target.rank, VIEWER_RANK)) {
+  if (!canChallenge(target.rank, viewerRank)) {
     return { ok: false, error: `Reach ${challengeTierNeeded(target.rank)} to challenge ${target.name}.` };
   }
   if (!isChallengeMode(input.mode)) return { ok: false, error: "Pick Pulse or 24h Portfolio." };
@@ -56,7 +58,7 @@ export async function sendChallenge(input: ChallengeInput): Promise<ChallengeRes
 
   const created = await createChallenge({
     challengerId: userId,
-    challengerRank: VIEWER_RANK,
+    challengerRank: viewerRank,
     targetHandle: target.handle,
     targetUserId: target.userId,
     targetRank: target.rank,

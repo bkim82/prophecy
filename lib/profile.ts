@@ -1,6 +1,7 @@
 import { and, desc, eq, ilike, isNotNull, or, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { profiles, users } from "@/db/schema";
+import { rankForHandle } from "@/app/lib/rank";
 import { embeddedWalletAuthEnabled } from "@/lib/embeddedWalletFeature";
 
 // Reads/writes for the `profiles` table (db/schema.ts). Validation lives in
@@ -120,6 +121,13 @@ export async function searchProfiles(query: string, limit: number): Promise<Prof
     .orderBy(desc(ilike(profiles.handle, `${escaped}%`)), profiles.handle)
     .limit(limit);
   return rows.flatMap(({ handle, ...row }) => (handle ? [{ ...row, handle }] : []));
+}
+
+/** A real account's rank, from its handle (app/lib/rank.ts rankForHandle); signed out → VIEWER_RANK. */
+export async function rankForUser(userId: string | undefined): Promise<string> {
+  if (!userId) return rankForHandle(null);
+  const [row] = await getDb().select({ handle: profiles.handle }).from(profiles).where(eq(profiles.userId, userId));
+  return rankForHandle(row?.handle);
 }
 
 /** Clerk user id holding `handle` (stored form: lowercase, no "@"), or null. */

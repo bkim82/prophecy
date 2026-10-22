@@ -62,10 +62,21 @@ export function rankScore(rank: string): number {
 }
 
 // Every real account's rank — the signed-in viewer's and anyone else's — until
-// ranking exists: everyone starts at the bottom, Bronze I. Gates profile
-// portfolios and challenges. (app/lib/roomsMocks.ts ROOM.subrank separately
-// assumes "Oracle II" for Sanctum.)
+// ranking exists: everyone starts at the bottom, Bronze I, except the handles
+// in RANK_OVERRIDES. Gates profile portfolios and challenges.
+// (app/lib/roomsMocks.ts ROOM.subrank separately assumes "Oracle II" for Sanctum.)
 export const VIEWER_RANK = "Bronze I";
+
+// Hand-granted ranks by real-account handle (stored form: lowercase, no "@").
+const RANK_OVERRIDES = new Map<string, string>([
+  ["bkim", "Oracle III"],
+  ["danielson", "Oracle III"],
+]);
+
+// A real account's rank by handle ("@bkim" or "bkim"); no handle → VIEWER_RANK.
+export function rankForHandle(handle?: string | null): string {
+  return (handle && RANK_OVERRIDES.get(handle.replace(/^@/, "").toLowerCase())) || VIEWER_RANK;
+}
 
 // A profile's portfolio is visible to viewers at or above that profile's rank.
 export function canViewPortfolio(profileRank: string, viewerRank: string = VIEWER_RANK): boolean {

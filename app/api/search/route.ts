@@ -1,6 +1,6 @@
 import { GLOBAL_POSTS } from "@/app/lib/mockPosts";
 import { PROFILES } from "@/app/lib/mockProfiles";
-import { VIEWER_RANK } from "@/app/lib/rank";
+import { rankForHandle } from "@/app/lib/rank";
 import type { SearchResults } from "@/app/SidebarSearch";
 import { searchProfiles } from "@/lib/profile";
 import { providerImagesFor } from "@/lib/viewer";
@@ -28,7 +28,7 @@ export async function GET(request: Request) {
     ...real.map((account) => ({
       handle: `@${account.handle}`,
       name: account.displayName ?? account.handle,
-      rank: VIEWER_RANK,
+      rank: rankForHandle(account.handle),
       imageUrl: account.hasAvatarImage
         ? `/api/profile/avatar?handle=${encodeURIComponent(account.handle)}&v=${account.updatedAt.getTime()}`
         : photos.get(account.userId),
