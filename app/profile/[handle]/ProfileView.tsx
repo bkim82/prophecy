@@ -4,8 +4,9 @@ import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 import { SignInAction } from "@/app/auth/AuthProvider";
 import { AuthorLink } from "@/app/AuthorLink";
-import { ArenaIcon, ContrarianIcon, DaredevilIcon, FlameIcon, LinkIcon, LockIcon, PatientIcon, PinIcon, SwiftIcon, TrendIcon } from "@/app/icons";
+import { ArenaIcon, ContrarianIcon, DaredevilIcon, FlameIcon, LinkIcon, LockIcon, MessagesIcon, PatientIcon, PinIcon, SwiftIcon, TrendIcon } from "@/app/icons";
 import { avatarGradient } from "@/app/lib/avatar";
+import { showMessages } from "@/app/lib/messages";
 import { callTrack } from "@/app/lib/calls";
 import type { ProfilePortfolio } from "@/app/lib/mockPortfolios";
 import type { Profile, ProfileActivity, ProfileTrade } from "@/app/lib/mockProfiles";
@@ -24,8 +25,10 @@ import {
 } from "@/app/lib/profileTraits";
 import { followProfile, togglePinnedMatch } from "@/app/profile/actions";
 import { EditProfileDialog, type EditableProfile } from "@/app/profile/EditProfileDialog";
+import type { BlockState } from "@/lib/blocks";
 import type { MatchHistoryEntry, MatchRecord } from "@/lib/match";
 import { rankTier } from "@/app/lib/rank";
+import { BlockMenu, UnblockButton } from "@/app/profile/[handle]/BlockMenu";
 import { ChallengeControl, type ChallengeState } from "@/app/profile/[handle]/ChallengeDialog";
 import { ProfileShowcase, type ShowcasePanels } from "@/app/profile/[handle]/ProfileShowcase";
 import { cancelChallenge, dismissChallenge } from "@/app/profile/challengeActions";
@@ -99,6 +102,11 @@ type ProfileViewProps = {
   followsYou?: boolean;
   // Friends only: they have the app open right now (challenges need you both online).
   online?: boolean;
+  // A real account (mock traders can't be messaged): show Message beside Follow.
+  messageable?: boolean;
+  // Signed in on a real account's profile: blocks either way (lib/blocks.ts).
+  // Either one swaps Follow/Message/Challenge for a note (and Unblock, if it's yours).
+  block?: BlockState;
   traits: ProfileTraits;
   // Someone else's profile only: which Challenge button to show.
   challenge?: ChallengeState;
@@ -110,7 +118,7 @@ type ProfileViewProps = {
   showcase?: ShowcasePanels;
 };
 
-export function ProfileView({ profile, activity, portfolio, portfolioLocked, viewerRank, initiallyFollowing, signedIn = false, followsYou = false, online = false, traits, challenge, self, showcase }: ProfileViewProps) {
+export function ProfileView({ profile, activity, portfolio, portfolioLocked, viewerRank, initiallyFollowing, signedIn = false, followsYou = false, online = false, messageable = false, block, traits, challenge, self, showcase }: ProfileViewProps) {
   const [tab, setTab] = useState<TabId>("omens");
   const [editing, setEditing] = useState(false);
   // Own profiles may have no handle yet; the page supplies a stable seed instead.
@@ -237,6 +245,18 @@ export function ProfileView({ profile, activity, portfolio, portfolioLocked, vie
           <button type="button" className="profile-follow is-following" onClick={() => setEditing(true)}>
             Edit profile
           </button>
+        ) : block && (block.youBlocked || block.blockedYou) ? (
+          <>
+            <div className="profile-actions">
+              <BlockMenu handle={profile.handle} blocked={block.youBlocked} />
+              {block.youBlocked && <UnblockButton handle={profile.handle} />}
+            </div>
+            <p className="profile-challenge-note muted">
+              {block.youBlocked
+                ? `You blocked ${profile.handle} — you can't follow or message each other, and their posts are hidden from your feed.`
+                : `${profile.handle} blocked you — you can't follow or message them.`}
+            </p>
+          </>
         ) : (
           <ChallengeControl
             state={challenge ?? { kind: "ready" }}
@@ -246,6 +266,8 @@ export function ProfileView({ profile, activity, portfolio, portfolioLocked, vie
             followsYou={followsYou}
             online={friends && friendOnline}
           >
+            {/* Blocking unfollows you both; drop the optimistic Follow until the refresh lands. */}
+            {block && <BlockMenu handle={profile.handle} blocked={false} onSaved={(blocked) => blocked && setFollowing(false)} />}
             {signedIn ? (
               <button
                 type="button"
@@ -262,6 +284,25 @@ export function ProfileView({ profile, activity, portfolio, portfolioLocked, vie
                 </button>
               </SignInAction>
             )}
+            {/* Opens the Messages dock on this conversation (app/MessagesDock.tsx). */}
+            {messageable &&
+              (signedIn ? (
+                <button
+                  type="button"
+                  className="profile-message-button"
+                  aria-label={`Message ${profile.name}`}
+                  title="Message"
+                  onClick={() => showMessages({ kind: "thread", peer: { handle: profile.handle, name: profile.name, imageUrl: profile.imageUrl } })}
+                >
+                  <MessagesIcon />
+                </button>
+              ) : (
+                <SignInAction>
+                  <button type="button" className="profile-message-button" aria-label={`Message ${profile.name}`} title="Message">
+                    <MessagesIcon />
+                  </button>
+                </SignInAction>
+              ))}
           </ChallengeControl>
         )}
         {followError && (

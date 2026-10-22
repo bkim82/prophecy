@@ -547,3 +547,67 @@ export const topicSignals = pgTable("topic_signals", {
   index("topic_signals_user_created_idx").on(table.userId, table.createdAt),
   uniqueIndex("topic_signals_post_once").on(table.userId, table.signal, table.postId, table.topic).where(sql`${table.postId} <> ''`),
 ]);
+
+// Direct messages between two real accounts (lib/messages.ts), sent from the
+// header's Messages dock (app/MessagesDock.tsx) or a post's Send button
+// (app/SharePostDialog.tsx). A message has text, photos
+// (`direct_message_media`), a shared post (`postId`: a saved post's id or a
+// mock post's, resolved live like a bookmark) or any mix — the route insists
+// on at least one. Created by db/messages.sql.
+export const directMessages = pgTable("direct_messages", {
+  id: text("id").primaryKey(),
+  senderId: text("sender_id").notNull(),
+  recipientId: text("recipient_id").notNull(),
+  body: text("body").notNull().default(""), // app/lib/messageRules.ts MESSAGE_MAX_LENGTH
+  postId: text("post_id"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("direct_messages_recipient_created_idx").on(table.recipientId, table.createdAt),
+  index("direct_messages_sender_created_idx").on(table.senderId, table.createdAt),
+  check("direct_messages_body_length", sql`char_length(${table.body}) <= 1000`),
+  check("direct_messages_not_self", sql`${table.senderId} <> ${table.recipientId}`),
+]);
+
+// A message's photos, ≤ 4 in `position` order — base64 like `post_media`,
+// checked the same way (lib/postInput.ts parsePhotos), served only to the two
+// people in the conversation by GET /api/messages/media/[id]/[n].
+export const directMessageMedia = pgTable("direct_message_media", {
+  messageId: text("message_id").notNull(),
+  position: integer("position").notNull(),
+  mime: text("mime").notNull(),
+  image: text("image").notNull(),
+  width: integer("width").notNull(),
+  height: integer("height").notNull(),
+}, (table) => [
+  primaryKey({ columns: [table.messageId, table.position] }),
+  check("direct_message_media_position_range", sql`${table.position} BETWEEN 0 AND 3`),
+]);
+
+// Your side of a conversation with `peerId`; no row = nothing read, accepted
+// or deleted yet. Messages up to `lastReadAt` are read. Friends' messages land
+// in your inbox, anyone else's in Requests until `acceptedAt` (Accept, or
+// sending them a message). Deleting sets `clearedAt`: older messages are gone
+// for you, and a newer one from them is a fresh request. Created by db/messages.sql.
+export const directThreads = pgTable("direct_threads", {
+  userId: text("user_id").notNull(),
+  peerId: text("peer_id").notNull(),
+  lastReadAt: timestamp("last_read_at", { withTimezone: true }),
+  acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+  clearedAt: timestamp("cleared_at", { withTimezone: true }),
+}, (table) => [
+  primaryKey({ columns: [table.userId, table.peerId] }),
+]);
+
+// One row per block, set from the blocked account's profile (⋯ → Block,
+// lib/blocks.ts). Real accounts only, by user id. Either direction stops
+// direct messages and follows between the two (blocking deletes both
+// follows), hides their conversation, and drops their saved posts from your
+// feed. Created by db/blocks.sql.
+export const blocks = pgTable("blocks", {
+  blockerId: text("blocker_id").notNull(),
+  blockedId: text("blocked_id").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  primaryKey({ columns: [table.blockerId, table.blockedId] }),
+  index("blocks_blocked_idx").on(table.blockedId),
+]);

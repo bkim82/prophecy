@@ -1,10 +1,12 @@
-import { and, count, desc, eq, gte, inArray, isNull } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, isNull, notInArray, type SQL } from "drizzle-orm";
+import type { PgColumn } from "drizzle-orm/pg-core";
 import { getDb } from "@/db";
 import { clashVotes, follows, postLikes, postReplies, postReshares, posts, profiles, replyLikes } from "@/db/schema";
 import { EXCLUSIVE_POSTS, GLOBAL_POSTS, POST_REPLIES, type Clash, type Post, type Reply, type Share } from "@/app/lib/mockPosts";
 import type { ProfileActivity, ProfileComment } from "@/app/lib/mockProfiles";
 import { playedLabel } from "@/app/lib/playedLabel";
 import type { Reshare, ReshareKind } from "@/app/PostShare";
+import { blockedAccountsFor, blockedIdsFor } from "@/lib/blocks";
 import { isSavedPostId, postsBy, savedPostsByIds } from "@/lib/posts";
 
 // Likes, reposts (repost / vouch / defy), replies and clash votes on omens
@@ -16,6 +18,10 @@ import { isSavedPostId, postsBy, savedPostsByIds } from "@/lib/posts";
 type ReplyRow = typeof postReplies.$inferSelect;
 
 const MOCK_POSTS = new Map([...GLOBAL_POSTS, ...EXCLUSIVE_POSTS].map((post) => [post.id, post]));
+
+// Leaves out rows by anyone with a block either way with the viewer (lib/blocks.ts) — nothing to leave out for most viewers.
+const notBy = (column: PgColumn, blocked: Set<string>): SQL | undefined => (blocked.size > 0 ? notInArray(column, [...blocked]) : undefined);
+const NO_BLOCKS = { ids: new Set<string>(), handles: new Set<string>() };
 
 // Streak, promo and clash cards have no like / comment / repost row.
 const engageable = (post: Post) => post.kind !== "streak" && post.kind !== "promo" && post.kind !== "clash";
@@ -77,8 +83,10 @@ export async function voteClash(postId: string, userId: string, side: 0 | 1 | nu
 /**
  * Adds saved likes, reposts, replies and clash votes to each post's counts,
  * plus the viewer's own: `liked`, `yourReshare` and a clash's `yourVote`.
- * Before db/engagement.sql is applied, or during a DB outage, posts keep
- * their own counts.
+ * Replies and reposts by anyone with a block either way with the viewer
+ * aren't counted (repliesFor doesn't show them either), and saved posts by
+ * them get `blocked` — no replying or reposting. Before db/engagement.sql is
+ * applied, or during a DB outage, posts keep their own counts.
  */
 export async function withEngagement(list: Post[], viewerId: string | null): Promise<Post[]> {
   const ids = [...new Set(list.filter(engageable).map((post) => post.id))];
@@ -89,6 +97,8 @@ export async function withEngagement(list: Post[], viewerId: string | null): Pro
   const whenAny = <T,>(some: unknown[], query: () => Promise<T[]>) => (some.length ? query() : Promise.resolve([] as T[]));
   const viewer = viewerId ?? "";
   try {
+    // Before db/blocks.sql is applied there's nothing to leave out.
+    const blocked = viewerId ? await blockedAccountsFor(viewerId).catch(() => NO_BLOCKS) : NO_BLOCKS;
     const [likes, liked, reshares, yours, replies, sides, votes] = await Promise.all([
       whenAny(ids, () => db.select({ postId: postLikes.postId, n: count() }).from(postLikes).where(inArray(postLikes.postId, ids)).groupBy(postLikes.postId)),
       whenAny(viewerId ? ids : [], () =>
@@ -98,7 +108,7 @@ export async function withEngagement(list: Post[], viewerId: string | null): Pro
         db
           .select({ postId: postReshares.postId, kind: postReshares.kind, n: count() })
           .from(postReshares)
-          .where(inArray(postReshares.postId, ids))
+          .where(and(inArray(postReshares.postId, ids), notBy(postReshares.userId, blocked.ids)))
           .groupBy(postReshares.postId, postReshares.kind),
       ),
       whenAny(viewerId ? ids : [], () =>
@@ -111,7 +121,7 @@ export async function withEngagement(list: Post[], viewerId: string | null): Pro
         db
           .select({ postId: postReplies.postId, n: count() })
           .from(postReplies)
-          .where(and(inArray(postReplies.postId, ids), isNull(postReplies.deletedAt)))
+          .where(and(inArray(postReplies.postId, ids), isNull(postReplies.deletedAt), notBy(postReplies.authorId, blocked.ids)))
           .groupBy(postReplies.postId),
       ),
       whenAny(clashIds, () =>
@@ -154,6 +164,7 @@ export async function withEngagement(list: Post[], viewerId: string | null): Pro
         vouches: (post.vouches ?? 0) + reshareCount(post.id, "vouch"),
         defies: (post.defies ?? 0) + reshareCount(post.id, "defy"),
         yourReshare: own && isReshareKind(own.kind) ? { kind: own.kind, text: own.text, timestamp: playedLabel(own.createdAt.getTime(), now) } : undefined,
+        blocked: post.saved === true && blocked.handles.has(post.handle),
       };
     });
   } catch (error) {
@@ -304,12 +315,13 @@ async function toReplies(rows: ReplyRow[], mock: Reply[], viewerId: string | nul
 const REPLY_LIMIT = 100;
 const PROFILE_COMMENT_LIMIT = 30;
 
-/** A post's replies as `viewerId` sees them: saved ones newest first, then the mock thread. */
+/** A post's replies as `viewerId` sees them: saved ones newest first (none by anyone with a block either way), then the mock thread. */
 export async function repliesFor(postId: string, viewerId: string | null): Promise<Reply[]> {
+  const blocked = viewerId ? await blockedIdsFor(viewerId).catch(() => new Set<string>()) : new Set<string>();
   const rows = await getDb()
     .select()
     .from(postReplies)
-    .where(and(eq(postReplies.postId, postId), isNull(postReplies.deletedAt)))
+    .where(and(eq(postReplies.postId, postId), isNull(postReplies.deletedAt), notBy(postReplies.authorId, blocked)))
     .orderBy(desc(postReplies.createdAt))
     .limit(REPLY_LIMIT);
   return toReplies(rows, POST_REPLIES[postId] ?? [], viewerId);

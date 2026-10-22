@@ -7,6 +7,8 @@ import { ActiveMatchBar } from "./ActiveMatchBar";
 import { AuthProvider, SignedIn, type AuthConfiguration } from "./auth/AuthProvider";
 import { BalancePill } from "./BalancePill";
 import { LiveChallenges } from "./LiveChallenges";
+import { MessagesButton } from "./MessagesButton";
+import { MessagesDock } from "./MessagesDock";
 import { MobileBottomNav } from "./MobileBottomNav";
 import { MobileChromeAutoHide } from "./MobileChromeAutoHide";
 import { NotificationsMenu } from "./NotificationsMenu";
@@ -68,6 +70,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 <div className="header-actions">
                   <ThemeToggle />
                   <SignedIn><BalancePill /></SignedIn>
+                  <SignedIn><MessagesButton /></SignedIn>
                   <SignedIn><NotificationsMenu /></SignedIn>
                   <AccountMenu handle={handle} />
                 </div>
@@ -77,6 +80,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 <div className="mobile-header-actions">
                   <ThemeToggle />
                   <SignedIn><BalancePill /></SignedIn>
+                  <SignedIn><MessagesButton /></SignedIn>
                   <SignedIn><NotificationsMenu /></SignedIn>
                   <div className="mobile-account-control">
                     <AccountMenu compact handle={handle} />
@@ -85,8 +89,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               </div>
             </div>
           </header>
-          {/* One heartbeat for both header layouts' bells: presence + incoming challenges. */}
+          {/* One heartbeat for both header layouts' bells: presence + incoming challenges + unread messages. */}
           <SignedIn><LiveChallenges /></SignedIn>
+          {/* One dock for both header layouts' Messages buttons, bottom-right. */}
+          <SignedIn><MessagesDock /></SignedIn>
           {children}
           <MobileBottomNav />
           <MobileChromeAutoHide />

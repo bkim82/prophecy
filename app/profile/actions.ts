@@ -15,6 +15,7 @@ import {
 } from "@/app/lib/profileEdit";
 import { inspectProfileImage } from "@/app/lib/profileImage";
 import { MAX_PINS, isPinnableMatch } from "@/app/lib/profileTraits";
+import { isBlockedEitherWay, saveBlock } from "@/lib/blocks";
 import { followTarget, saveFollow } from "@/lib/follows";
 import { historyEntryFor, settledMatchesByIds } from "@/lib/match";
 import {
@@ -220,7 +221,8 @@ export async function togglePinnedMatch(matchId: string): Promise<{ ok: true } |
 /**
  * Follows or unfollows a mock trader or real account from its profile;
  * Challenge re-checks follows both ways (app/profile/challengeActions.ts).
- * No refresh: the toggle already shows it.
+ * No follows across a block either way (lib/blocks.ts). No refresh: the
+ * toggle already shows it.
  */
 export async function followProfile(handle: string, following: boolean): Promise<{ ok: true } | { ok: false; error: string }> {
   const userId = (await getViewer())?.userId;
@@ -228,6 +230,25 @@ export async function followProfile(handle: string, following: boolean): Promise
   const target = await followTarget(handle);
   if (!target) return { ok: false, error: "That trader doesn't exist." };
   if (target.userId === userId) return { ok: false, error: "You can't follow yourself." };
+  if (following && target.userId && (await isBlockedEitherWay(userId, target.userId))) {
+    return { ok: false, error: `You can't follow ${target.name}.` };
+  }
   await saveFollow(userId, target.key, following === true);
+  return { ok: true };
+}
+
+/**
+ * Blocks or unblocks a real account from its profile's ⋯ menu. Blocking
+ * unfollows you both and stops messages either way (lib/blocks.ts);
+ * refresh() re-renders the profile so Follow, Message and Challenge go at once.
+ */
+export async function blockProfile(handle: string, blocked: boolean): Promise<{ ok: true } | { ok: false; error: string }> {
+  const userId = (await getViewer())?.userId;
+  if (!userId) return { ok: false, error: "Sign in to block accounts." };
+  const target = await followTarget(handle);
+  if (!target?.userId) return { ok: false, error: "Only real accounts can be blocked." };
+  if (target.userId === userId) return { ok: false, error: "You can't block yourself." };
+  await saveBlock(userId, target.userId, blocked === true);
+  refresh();
   return { ok: true };
 }

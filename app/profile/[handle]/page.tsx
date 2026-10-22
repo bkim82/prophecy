@@ -10,6 +10,7 @@ import { HighlightReel } from "@/app/profile/[handle]/HighlightReel";
 import { AchievementsPanel, ProfileAchievements } from "@/app/profile/[handle]/ProfileAchievements";
 import { ProfileView, type ProfileTraits } from "@/app/profile/[handle]/ProfileView";
 import { activityFor } from "@/lib/activity";
+import { blockStateBetween } from "@/lib/blocks";
 import { pendingChallengeTo } from "@/lib/challenges";
 import { accountActivity, withEngagement } from "@/lib/engagement";
 import { followTarget, followerCount, followingCount, isFollowing } from "@/lib/follows";
@@ -40,7 +41,11 @@ export default async function ProfilePage({ params }: { params: Promise<{ handle
     rankForUser(userId),
   ]);
   // Only friends see whether someone's online — it gates challenges (lib/presence.ts).
-  const online = following && followsYou && target.userId ? await isOnline(target.userId) : false;
+  // Blocks are between real accounts; a block either way replaces Follow/Message/Challenge.
+  const [online, block] = await Promise.all([
+    following && followsYou && target.userId ? isOnline(target.userId) : false,
+    userId && target.userId ? blockStateBetween(userId, target.userId) : undefined,
+  ]);
 
   const mock = getProfile(target.handle);
   const account = target.account;
@@ -131,6 +136,8 @@ export default async function ProfilePage({ params }: { params: Promise<{ handle
         signedIn={Boolean(userId)}
         followsYou={followsYou}
         online={online}
+        messageable={Boolean(target.userId)}
+        block={block}
         traits={traits}
         challenge={challenge}
         showcase={{

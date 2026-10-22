@@ -22,6 +22,7 @@ import { PostPoll } from "@/app/PostPoll";
 import { ReplyThread } from "@/app/PostReplies";
 import { ReshareHead, type Reshare } from "@/app/PostShare";
 import { RepostMenu } from "@/app/RepostMenu";
+import { SendPostButton } from "@/app/SharePostDialog";
 import { TradeCard, TradeUnavailable } from "@/app/TradeCard";
 
 // Short tag at the right of the meta row; the full sentence is its tooltip.
@@ -489,6 +490,8 @@ export function PostCard({
         >
           <BookmarkIcon filled={bookmarked} />
         </button>
+        {/* Send it to people in a direct message; posts without a page (unsaved composer drafts) can't be shared. */}
+        {postHref(post) && <SendPostButton post={post} />}
       </div>
       {repliesOpen && <ReplyThread post={post} onCountChange={(delta) => setNewReplies((n) => n + delta)} />}
       {!embedded && footer}

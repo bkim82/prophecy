@@ -1,4 +1,4 @@
-import { and, desc, eq, ilike, isNotNull, or, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, isNotNull, or, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { profiles, users } from "@/db/schema";
 import { rankForHandle } from "@/app/lib/rank";
@@ -103,23 +103,36 @@ export async function publicProfileFor(handle: string): Promise<PublicProfile | 
 
 export type ProfileMatch = { userId: string; handle: string; displayName: string | null; hasAvatarImage: boolean; updatedAt: Date };
 
+// ProfileMatch's columns (handle still nullable), for any query listing accounts.
+export const profileMatchFields = () => ({
+  userId: profiles.userId,
+  handle: profiles.handle,
+  displayName: profiles.displayName,
+  hasAvatarImage: embeddedWalletAuthEnabled()
+    ? sql<boolean>`${profiles.avatarImage} IS NOT NULL`
+    : sql<boolean>`false`,
+  updatedAt: profiles.updatedAt,
+});
+
 /** Accounts with a handle whose handle or name contains `query` (any case); handle-prefix matches first. */
 export async function searchProfiles(query: string, limit: number): Promise<ProfileMatch[]> {
   const escaped = query.replace(/[\\%_]/g, (char) => `\\${char}`);
   const rows = await getDb()
-    .select({
-      userId: profiles.userId,
-      handle: profiles.handle,
-      displayName: profiles.displayName,
-      hasAvatarImage: embeddedWalletAuthEnabled()
-        ? sql<boolean>`${profiles.avatarImage} IS NOT NULL`
-        : sql<boolean>`false`,
-      updatedAt: profiles.updatedAt,
-    })
+    .select(profileMatchFields())
     .from(profiles)
     .where(and(isNotNull(profiles.handle), or(ilike(profiles.handle, `%${escaped}%`), ilike(profiles.displayName, `%${escaped}%`))))
     .orderBy(desc(ilike(profiles.handle, `${escaped}%`)), profiles.handle)
     .limit(limit);
+  return rows.flatMap(({ handle, ...row }) => (handle ? [{ ...row, handle }] : []));
+}
+
+/** The accounts among `userIds` that have a handle. */
+export async function accountsFor(userIds: string[]): Promise<ProfileMatch[]> {
+  if (userIds.length === 0) return [];
+  const rows = await getDb()
+    .select(profileMatchFields())
+    .from(profiles)
+    .where(and(inArray(profiles.userId, userIds), isNotNull(profiles.handle)));
   return rows.flatMap(({ handle, ...row }) => (handle ? [{ ...row, handle }] : []));
 }
 

@@ -46,6 +46,7 @@ export function PostThread({ post, replies }: { post: Post; replies: Reply[] }) 
       <div className="feed-panel">
         <PostCard post={{ ...post, replies: post.replies + mine.length - removed.length }} detail onReply={() => inputRef.current?.focus()} />
         <ReplyComposer
+          blocked={post.blocked}
           postId={post.id}
           replyingTo={post.handle || post.author}
           inputRef={inputRef}

@@ -2,6 +2,8 @@
 
 import { useSyncExternalStore } from "react";
 import type { AcceptedChallenge, IncomingChallenge } from "@/app/lib/challengeRules";
+import type { MessageSummary } from "@/app/lib/messageRules";
+import { setMessageSummary } from "@/app/lib/messages";
 import { getPlayerId } from "@/app/lib/playerId";
 import { acceptChallenge, declineChallenge } from "@/app/profile/challengeActions";
 
@@ -10,6 +12,7 @@ import { acceptChallenge, declineChallenge } from "@/app/profile/challengeAction
 // renders one per layout, desktop and mobile). Each heartbeat marks you
 // online and replaces both lists: `challenges` sent to you and still pending,
 // `accepted` = ones you sent whose private round is waiting for you to join.
+// It also carries the Messages badge's unread counts (app/lib/messages.ts).
 
 export type Answer = "accepted" | "declined";
 
@@ -41,12 +44,13 @@ export function useLiveChallenges() {
 const post = (body: object, keepalive = false) =>
   fetch("/api/presence", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), cache: "no-store", keepalive });
 
-/** Marks you online (POST /api/presence) and refreshes both lists. Failures keep the last lists. */
+/** Marks you online (POST /api/presence) and refreshes both lists and the message counts. Failures keep the last ones. */
 export async function heartbeat(): Promise<void> {
   try {
     const response = await post({});
     if (!response.ok) return;
-    const data: { challenges: IncomingChallenge[]; accepted: AcceptedChallenge[] } = await response.json();
+    const data: { challenges: IncomingChallenge[]; accepted: AcceptedChallenge[]; messages: MessageSummary | null } = await response.json();
+    if (data.messages) setMessageSummary(data.messages);
     const receivedAt = Date.now();
     update({
       challenges: data.challenges.map((challenge) => ({ ...challenge, expiresAt: receivedAt + challenge.expiresInMs })),
