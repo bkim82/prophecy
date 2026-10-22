@@ -7,12 +7,13 @@ import { DefyIcon, RepostIcon, VouchIcon } from "@/app/icons";
 // The three ways to repost an omen, all picked from the one Repost button
 // (app/RepostMenu.tsx). Each sends the post to your followers' feeds with your
 // name on it: a plain repost just shares it, a vouch says you back it, a defy
-// says you're against it. Any of them can carry your own words. Mock only:
-// nothing is actually sent to followers.
+// says you're against it. Any of them can carry your own words. Reposts are
+// saved (lib/engagement.ts) and show above the post in your followers' feeds.
 export type ReshareKind = "repost" | "vouch" | "defy";
 
-// Your own repost of a post: the kind plus your words ("" for none).
-export type Reshare = { kind: ReshareKind; text: string };
+// Your own repost of a post: the kind plus your words ("" for none), and when
+// you made it as a feed label (unset = just now).
+export type Reshare = { kind: ReshareKind; text: string; timestamp?: string };
 
 export const RESHARE_KINDS: ReshareKind[] = ["repost", "vouch", "defy"];
 
@@ -28,17 +29,20 @@ export const RESHARE: Record<
 // The sharer's own row above a reshared post (the post itself sits in a
 // bordered card under it, see PostCard): avatar with a kind badge, then
 // "Nova vouched for this omen · 8m ago", then their words if they added any.
-// `handle` is omitted for the viewer's own repost ("You").
+// `handle` is omitted for the viewer's own repost ("You"); `account` = a real
+// account's repost, so the name links to their profile.
 export function ReshareHead({
   kind,
   name,
   handle,
+  account = false,
   timestamp,
   text,
 }: {
   kind: ReshareKind;
   name: string;
   handle?: string;
+  account?: boolean;
   timestamp: string;
   text?: string;
 }) {
@@ -59,7 +63,7 @@ export function ReshareHead({
       )}
       <div className="post-reshare-text">
         <p className="post-reshare-who">
-          {handle ? <AuthorLink handle={handle} name={name} /> : <strong>{name}</strong>}{" "}
+          {handle ? <AuthorLink handle={handle} name={name} account={account} /> : <strong>{name}</strong>}{" "}
           <span className="post-reshare-verb">{verb}</span>
           <span className="muted"> · {timestamp}</span>
         </p>

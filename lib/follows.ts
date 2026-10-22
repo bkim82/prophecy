@@ -1,6 +1,6 @@
-import { and, eq, like, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { getDb } from "@/db";
-import { follows } from "@/db/schema";
+import { follows, profiles } from "@/db/schema";
 import { getProfile } from "@/app/lib/mockProfiles";
 import { VIEWER_RANK } from "@/app/lib/rank";
 import { publicProfileFor, type PublicProfile } from "@/lib/profile";
@@ -31,13 +31,14 @@ export async function isFollowing(followerId: string, target: string): Promise<b
   return Boolean(row);
 }
 
-/** The mock traders you follow ("@handle"s) — the feed's Following filter. */
-export async function followedTraders(followerId: string): Promise<string[]> {
+/** Everyone you follow as "@handle"s — mock traders and real accounts — for the feed's Following filter. */
+export async function followedHandles(followerId: string): Promise<string[]> {
   const rows = await getDb()
-    .select({ target: follows.target })
+    .select({ target: follows.target, handle: profiles.handle })
     .from(follows)
-    .where(and(eq(follows.followerId, followerId), like(follows.target, "@%")));
-  return rows.map((row) => row.target);
+    .leftJoin(profiles, eq(profiles.userId, follows.target))
+    .where(eq(follows.followerId, followerId));
+  return rows.flatMap((row) => (row.target.startsWith("@") ? [row.target] : row.handle ? [`@${row.handle}`] : []));
 }
 
 export async function followerCount(target: string): Promise<number> {

@@ -203,10 +203,34 @@ export async function feedPosts(viewerId: string | null, limit = 30): Promise<Po
   return toFeedPosts(rows, viewerId);
 }
 
+/** Uuid-shaped, like the ids createPost (and createReply) make. */
+export const isSavedPostId = (id: string) => /^[0-9a-f-]{36}$/.test(id);
+
+/** Saved posts by id, newest first, of any age — skipping unknown, malformed or deleted ids. */
+export async function savedPostsByIds(ids: string[], viewerId: string | null): Promise<Post[]> {
+  const valid = ids.filter(isSavedPostId);
+  if (valid.length === 0) return [];
+  const rows = await getDb()
+    .select()
+    .from(posts)
+    .where(and(inArray(posts.id, valid), isNull(posts.deletedAt)))
+    .orderBy(desc(posts.createdAt));
+  return toFeedPosts(rows, viewerId);
+}
+
 /** One saved post for /post/[id]; null for unknown, malformed or deleted ids. */
 export async function savedPost(id: string, viewerId: string | null): Promise<Post | null> {
-  if (!/^[0-9a-f-]{36}$/.test(id)) return null;
-  const rows = await getDb().select().from(posts).where(and(eq(posts.id, id), isNull(posts.deletedAt)));
-  const [post] = await toFeedPosts(rows, viewerId);
+  const [post] = await savedPostsByIds([id], viewerId);
   return post ?? null;
+}
+
+/** The author's newest saved posts — their profile's Omens tab. */
+export async function postsBy(authorId: string, viewerId: string | null, limit = 30): Promise<Post[]> {
+  const rows = await getDb()
+    .select()
+    .from(posts)
+    .where(and(eq(posts.authorId, authorId), isNull(posts.deletedAt)))
+    .orderBy(desc(posts.createdAt))
+    .limit(limit);
+  return toFeedPosts(rows, viewerId);
 }

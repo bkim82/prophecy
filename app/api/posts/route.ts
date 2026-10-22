@@ -1,10 +1,10 @@
+import { authorFor } from "@/app/api/posts/author";
 import { postsJson, postsMutationFailure, readPostsJson } from "@/app/api/posts/responses";
 import { MAX_POST_PHOTOS, POST_IMAGE_MAX_BYTES } from "@/app/lib/postImage";
 import { parsePostInput, type PostInput } from "@/lib/postInput";
 import { createPost, postCountSince } from "@/lib/posts";
-import { storedProfileFor } from "@/lib/profile";
 import { tradeKey, tradeReceiptsFor } from "@/lib/trades";
-import { getViewer, getViewerProfile, type Viewer } from "@/lib/viewer";
+import { getViewer, type Viewer } from "@/lib/viewer";
 
 export const dynamic = "force-dynamic";
 
@@ -58,16 +58,6 @@ async function save(viewer: Viewer, input: PostInput) {
     if (trade.open) tradeRoiAtPost = trade.roiPct;
   }
 
-  const [stored, provider] = await Promise.all([storedProfileFor(viewer.userId), getViewerProfile(viewer)]);
-  // getViewerProfile falls back to "You" for the viewer's own screens, which
-  // would read wrong to everyone else.
-  const providerName = provider?.displayName && provider.displayName !== "You" ? provider.displayName : null;
-  const id = await createPost({
-    ...input,
-    authorId: viewer.userId,
-    authorName: stored?.displayName ?? providerName ?? "Prophecy trader",
-    authorHandle: stored?.handle ?? null,
-    tradeRoiAtPost,
-  });
+  const id = await createPost({ ...input, ...(await authorFor(viewer)), authorId: viewer.userId, tradeRoiAtPost });
   return postsJson({ id }, { status: 201 });
 }

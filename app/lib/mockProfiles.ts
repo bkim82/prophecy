@@ -41,10 +41,13 @@ export function getProfile(handle: string): Profile | undefined {
   return PROFILES.find((profile) => profile.handle === handle);
 }
 
-// "@ren.eth" -> "/profile/ren.eth". Undefined for handles with no profile
-// (bots, unknown reply authors) so callers render plain text instead.
-export function profileHref(handle: string): string | undefined {
-  return getProfile(handle) ? `/profile/${handle.slice(1)}` : undefined;
+// "@ren.eth" -> "/profile/ren.eth" for a mock trader with a profile, or for
+// any handle when `account` says it's a real account's (saved posts, replies
+// and reposts: their handles come from `profiles`, so the page exists).
+// Undefined otherwise (bots, profile-less mock authors, accounts without a
+// handle) so callers render plain text instead.
+export function profileHref(handle: string, account = false): string | undefined {
+  return getProfile(handle) || (account && handle) ? `/profile/${encodeURIComponent(handle.slice(1))}` : undefined;
 }
 
 export type ProfileComment = { reply: Reply; post: Post };

@@ -603,7 +603,7 @@ a.feed-notif:hover { background: var(--surface-hover); }
 .post-time { color: inherit; text-decoration: none; }
 .post-time:hover { color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
 .reply-thread { display: grid; gap: 12px; margin: 8px 0 2px; padding-left: 14px; border-left: 2px solid var(--line); }
-.reply-thread-empty { margin: 4px 0 0 14px; font-size: 12px; }
+.reply-thread-empty { margin: 0; font-size: 12px; }
 .reply-item { display: flex; gap: 8px; }
 .reply-avatar { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 999px; color: #fff; font-size: 11px; font-weight: 700; text-shadow: 0 1px 2px rgba(0, 0, 0, .35); }
 .reply-body { min-width: 0; display: grid; gap: 4px; }
@@ -614,6 +614,17 @@ a.feed-notif:hover { background: var(--surface-hover); }
 .reply-actions .action-like.is-active { color: var(--like); }
 .reply-actions .action-like, .reply-actions .action-reply { display: inline-flex; align-items: center; gap: 5px; min-height: 30px; border: 0; border-radius: 999px; background: transparent; padding: 0 8px; color: var(--muted); font: inherit; font-size: 11px; font-weight: 600; }
 .reply-actions .action-like:hover, .reply-actions .action-reply:hover { color: var(--brand-strong); background: var(--surface-hover); }
+/* Your own replies (app/PostReplies.tsx): Edit / Delete in the actions row,
+   delete asks once more there; editing swaps the text for a field. */
+.reply-actions .reply-delete:hover, .reply-actions .reply-delete.is-confirming { color: var(--negative); }
+.reply-confirm { padding: 0 4px 0 8px; color: var(--text); font-size: 11px; font-weight: 600; }
+.reply-actions .action-reply:disabled { opacity: .5; cursor: default; }
+.reply-actions .reply-save { color: var(--violet-strong); }
+.reply-edit { display: grid; gap: 4px; }
+.reply-edit-input { width: 100%; min-width: 0; padding: 7px 10px; border: 1px solid var(--line-strong); border-radius: 8px; outline: 0; background: transparent; color: var(--text); font: inherit; font-size: 13px; }
+.reply-edit-input:focus { border-color: var(--violet-strong); }
+.post-replies .reply-edit-input { font-size: 15px; }
+.reply-error { margin: 0; color: var(--negative); font-size: 12px; }
 .reply-thread-more { justify-self: start; min-height: 30px; border: 0; background: transparent; padding: 0 4px; color: var(--brand); font-size: 12px; font-weight: 600; }
 .reply-thread-more:hover { color: var(--brand-strong); }
 /* Post page (app/post/[id]): back header, the post in detail layout (name
@@ -636,6 +647,13 @@ a.feed-notif:hover { background: var(--surface-hover); }
 .reply-composer { align-items: center; }
 .reply-composer-field { flex: 1; min-width: 0; display: grid; gap: 2px; cursor: text; }
 .reply-composer-field .muted { font-size: 12px; }
+/* The feed's inline reply box, first in a post's thread (app/PostReplies.tsx).
+   Two classes so the phone .feed-composer padding doesn't win. */
+.feed-composer.reply-composer--inline { gap: 8px; padding: 0 0 10px; }
+.reply-composer--inline .feed-composer-avatar { width: 26px; height: 26px; font-size: 11px; }
+.reply-composer--inline .feed-composer-input { font-size: 13px; }
+.reply-composer--inline .feed-composer-post { min-height: 28px; padding: 0 12px; }
+.reply-thread .feed-composer-error { padding: 0 0 0 34px; }
 .post-replies .reply-item { gap: 12px; padding: 14px 18px; }
 .post-replies .reply-item + .reply-item { border-top: 1px solid var(--line); }
 .post-replies .reply-avatar { width: 38px; height: 38px; font-size: 15px; }

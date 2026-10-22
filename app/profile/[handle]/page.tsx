@@ -11,6 +11,7 @@ import { AchievementsPanel, ProfileAchievements } from "@/app/profile/[handle]/P
 import { ProfileView, type ProfileTraits } from "@/app/profile/[handle]/ProfileView";
 import { activityFor } from "@/lib/activity";
 import { pendingChallengeTo } from "@/lib/challenges";
+import { accountActivity, withEngagement } from "@/lib/engagement";
 import { followTarget, followerCount, followingCount, isFollowing } from "@/lib/follows";
 import { marketAccuracyFor } from "@/lib/match";
 import { getViewer, providerImagesFor } from "@/lib/viewer";
@@ -104,12 +105,20 @@ export default async function ProfilePage({ params }: { params: Promise<{ handle
   }
 
   const highlights = mock ? (PINNED_OMENS[mock.handle] ?? []) : [];
+  // Omens/Comments tabs: a mock trader's are hand-written (plus saved
+  // engagement); a real account's are what they've posted and replied.
+  const mockActivity = mock ? profileActivity(mock) : null;
+  const tabs = mockActivity
+    ? { ...mockActivity, omens: await withEngagement(mockActivity.omens, userId ?? null) }
+    : account
+      ? await accountActivity(account.userId, userId ?? null)
+      : { omens: [], comments: [], trades: [] };
 
   return (
     <main className="feed-shell">
       <ProfileView
         profile={profile}
-        activity={mock ? profileActivity(mock) : { omens: [], comments: [], trades: [] }}
+        activity={tabs}
         portfolio={portfolio}
         portfolioLocked={portfolioLocked}
         viewerRank={VIEWER_RANK}

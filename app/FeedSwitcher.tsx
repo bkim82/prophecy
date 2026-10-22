@@ -21,12 +21,15 @@ const FILTERS: { id: FilterId; label: string }[] = [
   { id: "bookmarked", label: "Bookmarked" },
 ];
 
-// The latest vouch/defy per post by someone you follow. It's the line shown
-// above that post wherever it appears, and it pulls the post into Following.
-function followedShares(followed: string[]): Map<string, Share> {
+// The latest repost per post by someone you follow: real accounts' saved
+// ones (`saved`, already limited to who you follow) and the mock `SHARES`.
+// It's the line shown above that post wherever it appears, and it pulls the
+// post into Following.
+function followedShares(followed: string[], saved: Share[]): Map<string, Share> {
   const shares = new Map<string, Share>();
-  for (const share of SHARES) {
-    if (followed.includes(share.handle) && !shares.has(share.postId)) shares.set(share.postId, share);
+  for (const share of [...saved, ...SHARES.filter((mock) => followed.includes(mock.handle))]) {
+    const current = shares.get(share.postId);
+    if (!current || ageMinutes(share.timestamp) < ageMinutes(current.timestamp)) shares.set(share.postId, share);
   }
   return shares;
 }
@@ -49,9 +52,21 @@ type Row =
 
 // `savedPosts` = omens from the `posts` table (lib/posts.ts feedPosts,
 // rendered by app/page.tsx), newest first, pinned above everything else.
-// `followed`: the mock traders you follow (lib/follows.ts followedTraders).
-export function FeedSwitcher({ posts, savedPosts, followed }: { posts: Post[]; savedPosts: Post[]; followed: string[] }) {
-  const shares = useMemo(() => followedShares(followed), [followed]);
+// `followed`: everyone you follow as "@handle"s (lib/follows.ts
+// followedHandles); `shares`: what the real accounts among them reposted
+// (lib/engagement.ts followedReshares).
+export function FeedSwitcher({
+  posts,
+  savedPosts,
+  followed,
+  shares: savedShares,
+}: {
+  posts: Post[];
+  savedPosts: Post[];
+  followed: string[];
+  shares: Share[];
+}) {
+  const shares = useMemo(() => followedShares(followed, savedShares), [followed, savedShares]);
   const [filter, setFilter] = useState<FilterId>("forYou");
   // Topic chip: "forYou" = every topic, else one followed (or opened) topic.
   const [view, setView] = useState<TopicView>("forYou");
