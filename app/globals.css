@@ -2534,6 +2534,9 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
 .wd-detail-head p { margin: 2px 0 0; color: var(--muted); font-size: 12px; }
 .wd-detail-price { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
 .wd-detail-price > span:first-child { font-size: 28px; font-weight: 700; color: var(--text); }
+/* No [data-market] here, so without this the line falls back to the rust --chart-accent. */
+.wd-detail-chart { --chart-line: #7cc4ff; --chart-point: #a8d8ff; --market-accent-contrast: #06213a; }
+[data-theme="light"] .wd-detail-chart { --chart-line: #2b8fd6; --chart-point: #1f74b3; --market-accent-contrast: #ffffff; }
 .wd-detail-periods { display: flex; justify-content: flex-end; gap: 4px; margin-bottom: 8px; }
 .wd-detail-periods button { border: 0; border-radius: 6px; background: none; color: var(--muted); padding: 5px 10px; font-size: 11px; font-weight: 600; text-transform: uppercase; }
 .wd-detail-periods button.is-selected { background: var(--surface-hover); color: var(--text); }
@@ -2580,7 +2583,7 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
 .wd-sheet-review > div + div { border-top: 1px solid var(--line); }
 .wd-sheet-review dt { color: var(--muted); font-size: 11px; padding-top: 1px; }
 .wd-sheet-review dd { display: grid; gap: 2px; margin: 0; color: var(--text); font-size: 12px; min-width: 0; }
-.wd-sheet-review code, .wd-sheet-hash { font-size: 11px; color: var(--muted); overflow-wrap: anywhere; }
+.wd-sheet-review code, .wd-sheet-hash, .wd-sheet-token-contract { font-size: 11px; color: var(--muted); overflow-wrap: anywhere; }
 .wd-sheet-review dd > code:only-child { color: var(--text); }
 .wd-sheet-sent-title { margin: 0; font-size: 14px; font-weight: 700; color: var(--text); }
 .wd-sheet-swap-flip { justify-self: center; display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-raised); color: var(--muted); }

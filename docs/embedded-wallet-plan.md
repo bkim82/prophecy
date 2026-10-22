@@ -170,17 +170,17 @@ Transaction status vocabulary: `created | confirmed_by_user | submitted | includ
 - Confirmation shows full recipient, account, network, token contract/symbol, raw-derived amount, sponsorship/fee, and irreversible-action warning.
 - Re-read raw balance, validate destination code/risk rules, simulate, and re-check session/account coherence immediately before signing.
 - `Max` is computed from raw balance and the actual sponsorship decision; no optimistic success on broadcast.
-- Implemented: ETH/any-ERC-20 typed intents (USDC-paid gas, `@handle` recipient picker), mandatory full-field confirmation, sole CDP hook import, browser/application identity coherence check, durable pending hash, and no optimistic success. `Max` is intentionally absent until the exact raw token-balance/sponsorship read is available (`app/wallet/ActionSheets.tsx`, `app/lib/embeddedWallet/sign.ts:14`).
+- Implemented: ETH/any-ERC-20 typed intents (USDC-paid gas, `@handle` recipient picker), mandatory full-field confirmation, sole CDP hook import, browser/application identity coherence check, durable pending hash, and no optimistic success. `Max` is intentionally absent until the exact raw token-balance/sponsorship read is available (`app/wallet/ActionSheets.tsx`, `app/lib/embeddedWallet/sign.ts:97`).
 
-### Phase 6 — exact-input Swap (blocked by credentialed quote/decoder decision)
+### Phase 6 — exact-input Swap (built on CDP Swap; Base mainnet verification open)
 
-- Launch with a curated Base token list and exact-input swaps. “Any Base token,” exact-output, fee-on-transfer tokens, Permit2, and infinite approvals are deferred.
+- Original plan: a curated Base token list and exact-input swaps, with “any Base token” and Permit2 deferred. Superseded by the CDP Swap implementation below (any Base token, exact Permit2 approval); exact-output, fee-on-transfer tokens, and infinite approvals remain deferred.
 - `POST /api/wallet/quote` accepts token pair, raw input amount, and bounded slippage only. Server supplies chain, canonical smart account/recipient, aggregator host, and allowed fee configuration.
 - Validate and persist the normalized quote/intent; enforce short expiry/deadline, max slippage, max price impact, supported router/version, exact recipient, exact input, minimum output, native value, and no unexpected fee/affiliate/transfer calls.
 - Decode and compare every final call and simulate immediately before signing. Never cache executable calldata across users.
 - Batch exact approval plus swap only after Phase -1 proves atomic execution. Otherwise wait for approval inclusion and present it as a separate confirmed transaction.
 - Wire existing Buy/Sell preset plumbing in `app/wallet/WalletDashboard.tsx` only after the common transaction core is complete.
-- The preset plumbing remains, but submission is visibly disabled. No executable quote/calldata is accepted or cached until an aggregator/provider path passes the Phase -1 checks.
+- Implemented with CDP Swap instead of a self-decoded aggregator: CDP quotes, signs Permit2, simulates, and submits server-side (`executeSwap`), so the app never holds swap calldata; any Base token is buyable; exact Permit2 approval is a separate user op awaited (inclusion + allowance) before the swap; swap and approval gas are paid in ETH by the account, no Paymaster; the reviewed minimum output is stored at confirm and becomes the swap's floor via a slippage sized from a fresh quote (`app/lib/embeddedWallet/sign.ts:166`, docs/wallet.md). Not yet run against a funded mainnet account.
 
 ### Phase 7 — Deposit (copy-address complete; hosted Onramp blocked)
 
@@ -211,7 +211,7 @@ Transaction status vocabulary: `created | confirmed_by_user | submitted | includ
 - External-wallet login/linking.
 - Multiple smart accounts per user or account selection.
 - ENS and cross-chain sends/swaps.
-- Arbitrary/unverified Base tokens, exact-output swaps, Permit2, infinite approvals, and generic contract calls.
+- Arbitrary/unverified Base tokens for Send/Swap are built (see Phases 5–6); exact-output swaps, infinite approvals, and generic contract calls remain out.
 - Key export unless recovery, recent step-up, user warning, and deletion behavior pass security/product review.
 - Custom-auth migration unless identity mapping and wallet continuity are proven in a separate plan.
 

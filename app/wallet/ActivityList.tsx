@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { reconcileIntents } from "@/app/lib/embeddedWallet/client";
+import { hasPendingBroadcasts, reconcileIntents } from "@/app/lib/embeddedWallet/client";
 import { shortenAddress } from "@/app/lib/wallet";
 
 // Alchemy activity is metered and rate-limited per IP, so idle polling stays slow;
@@ -74,8 +74,9 @@ export function ActivityList({ address, onIncluded }: { address: string; onInclu
 
     const load = async () => {
       clearTimeout(timer);
-      if (hasSubmitted) {
+      if (hasSubmitted || hasPendingBroadcasts()) {
         // Transient provider failures leave rows submitted; the next tick retries.
+        // Reconcile first re-reports any hash the signer couldn't record.
         const result = await reconcileIntents().catch(() => null);
         if (result?.intents.some((intent) => intent.status === "included")) onIncludedRef.current();
       }

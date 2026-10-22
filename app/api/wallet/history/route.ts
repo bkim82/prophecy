@@ -5,6 +5,7 @@ export const dynamic = "force-dynamic";
 
 const BASE_WETH_ADDRESS = "0x4200000000000000000000000000000000000006";
 const ETH_SENTINEL = "eth";
+const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 
 /**
  * POST { addresses, period? } -> closes per address (oldest first), same
@@ -18,7 +19,8 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}) as Record<string, unknown>);
   const rawAddresses: unknown[] = Array.isArray(body.addresses) ? body.addresses : [];
   const requested = rawAddresses.filter((address): address is string => typeof address === "string");
-  if (requested.length === 0 || requested.length > 30) {
+  const valid = requested.every((address) => address.toLowerCase() === ETH_SENTINEL || ADDRESS_RE.test(address));
+  if (requested.length === 0 || requested.length > 30 || !valid) {
     return Response.json({ error: "Invalid addresses" }, { status: 400 });
   }
   if (body.period !== undefined && !isHistoryPeriod(body.period)) {

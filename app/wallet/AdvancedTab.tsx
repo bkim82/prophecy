@@ -27,8 +27,8 @@ export function AdvancedTab({
   onSell,
 }: {
   coins: Coin[];
-  onBuy: (token: { address: string; symbol: string }) => void;
-  onSell: (token: { address: string; symbol: string }) => void;
+  onBuy: (token: { address: string; symbol: string; priceUsd: number | null }) => void;
+  onSell: (token: { address: string; symbol: string; priceUsd: number | null }) => void;
 }) {
   const [selected, setSelected] = useState<TokenSearchResult | null>(null);
   const [mobileView, setMobileView] = useState<MobileView>("explore");
