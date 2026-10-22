@@ -5,6 +5,7 @@ import { useAppAuth } from "@/app/auth/AuthProvider";
 import {
   cancelIntent,
   confirmIntent,
+  createOnrampSession,
   createSendIntent,
   createSwapIntent,
   searchRecipients,
@@ -12,7 +13,7 @@ import {
   type SwapToken,
   type WalletRecipient,
 } from "@/app/lib/embeddedWallet/client";
-import { walletFreeGasEnabled, walletTransactionsEnabled } from "@/app/lib/embeddedWallet/config";
+import { walletFreeGasEnabled, walletOnrampEnabled, walletTransactionsEnabled } from "@/app/lib/embeddedWallet/config";
 import { formatUnits, normalizeAmount } from "@/app/lib/embeddedWallet/intents";
 import { ClaimedIntentError, useSubmitSwapIntent, useSubmitTypedIntent, useSwapQuote } from "@/app/lib/embeddedWallet/sign";
 import { curatedToken, GAS_ALLOWANCE_RAW, NATIVE_ETH, SWAP_SLIPPAGE_BPS, USDC_BASE } from "@/app/lib/embeddedWallet/tokens";
@@ -33,6 +34,7 @@ export function DepositSheet({ address, onClose }: { address: string; onClose: (
   };
   return (
     <ActionSheet title="Deposit" onClose={onClose}>
+      {walletOnrampEnabled() && <BuyWithCard />}
       <p className="wd-sheet-copy">Send ETH or any Base token to this address. Other Prophecy users can send to your @username.{walletFreeGasEnabled() ? " Gas is free: Prophecy covers it." : " Keep some USDC here to pay gas when you send, and a little ETH for gas when you swap."}</p>
       <div className="wd-sheet-address">
         <code>{address}</code>
@@ -40,6 +42,52 @@ export function DepositSheet({ address, onClose }: { address: string; onClose: (
       </div>
       <p className="wd-sheet-note">Base network only — sending from another chain may not arrive.</p>
     </ActionSheet>
+  );
+}
+
+/**
+ * Card → USDC through Coinbase's hosted checkout, which shows the live quote,
+ * fees, limits, and eligibility (none are promised here). The tab opens on the
+ * click so popup blockers allow it, then navigates once the server returns the URL.
+ */
+function BuyWithCard() {
+  const [amount, setAmount] = useState("");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <form
+      className="wd-sheet-form wd-sheet-buy"
+      onSubmit={async (event) => {
+        event.preventDefault();
+        const tab = window.open("", "_blank");
+        setPending(true);
+        setError(null);
+        try {
+          const { url } = await createOnrampSession(amount.trim() || undefined);
+          if (tab) {
+            tab.opener = null;
+            tab.location.href = url;
+          } else {
+            window.location.href = url;
+          }
+        } catch (caught) {
+          tab?.close();
+          setError(caught instanceof Error ? caught.message : "Couldn't start checkout");
+        } finally {
+          setPending(false);
+        }
+      }}
+    >
+      <label className="wd-sheet-field">
+        <span>Buy USDC with card · amount (USD, optional)</span>
+        <input value={amount} onChange={(event) => setAmount(event.target.value)} inputMode="decimal" placeholder="25.00" />
+      </label>
+      <button type="submit" className="wd-sheet-primary-button" disabled={pending}>
+        {pending ? "Opening Coinbase…" : "Buy USDC with card"}
+      </button>
+      <p className="wd-sheet-note">Checkout opens on Coinbase, which shows fees and limits before you pay. USDC arrives in this wallet on Base.</p>
+      {error && <p className="wd-sheet-error" role="alert">{error}</p>}
+    </form>
   );
 }
 

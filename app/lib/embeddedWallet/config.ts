@@ -6,8 +6,18 @@ export function walletServerTransactionsEnabled() {
   return process.env.WALLET_TRANSACTIONS_ENABLED === "true";
 }
 
+/** Shows "Buy USDC with card" in the Deposit sheet; the server gate below still decides. */
 export function walletOnrampEnabled() {
+  return process.env.NEXT_PUBLIC_WALLET_ONRAMP_ENABLED === "true";
+}
+
+export function walletServerOnrampEnabled() {
   return process.env.WALLET_ONRAMP_ENABLED === "true";
+}
+
+/** Prefixes the Onramp partnerUserRef with `sandbox-` so Coinbase runs test purchases with no real funds. */
+export function walletOnrampSandbox() {
+  return process.env.WALLET_ONRAMP_SANDBOX === "true";
 }
 
 /**
