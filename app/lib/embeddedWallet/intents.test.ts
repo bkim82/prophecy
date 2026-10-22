@@ -12,6 +12,7 @@ import {
   encodeErc20Transfer,
   executionSlippageBps,
   formatUnits,
+  isSponsoredSend,
   normalizeAddress,
   normalizeAmount,
   parseUnits,
@@ -75,6 +76,29 @@ describe("send intent", () => {
     ]);
   });
 
+  it("drops the gas approval when free gas is sponsored, and still validates the lone transfer", () => {
+    const transfer = { to: USDC, value: "0", data: encodeErc20Transfer(RECIPIENT, 1_500_000n) };
+    const intent = buildSendIntent(send(USDC, "1.5"), ACCOUNT, usdc, true);
+    expect(intent.calls).toEqual([transfer]);
+    expect(isSponsoredSend(intent.calls)).toBe(true);
+    expect(isSponsoredSend(buildSendIntent(send(USDC, "1.5"), ACCOUNT, usdc).calls)).toBe(false);
+    expect(buildSendIntent(send(NATIVE_ETH, "0.01"), ACCOUNT, eth, true).calls).toEqual([
+      { to: RECIPIENT, value: "10000000000000000", data: "0x" },
+    ]);
+    expect(() => assertSendCalls({
+      tokenAddress: USDC,
+      recipient: RECIPIENT,
+      rawAmount: 1n,
+      calls: [transfer],
+    })).toThrowError(/does not match/);
+    expect(() => assertSendCalls({
+      tokenAddress: USDC,
+      recipient: RECIPIENT,
+      rawAmount: 1_500_000n,
+      calls: [gasApproval],
+    })).toThrowError(/calldata is invalid/);
+  });
+
   it("round-trips and independently validates calldata", () => {
     const data = encodeErc20Transfer(RECIPIENT, 12_345_678n);
     expect(decodeErc20Transfer(data)).toEqual({ recipient: RECIPIENT, amount: 12_345_678n });
@@ -109,8 +133,10 @@ describe("send intent", () => {
       tokenAddress: USDC,
       recipient: RECIPIENT,
       rawAmount: 1n,
-      calls: [{ to: USDC, value: "0", data: encodeErc20Transfer(RECIPIENT, 1n) }],
-    })).toThrowError(/exactly a gas approval/);
+      calls: [gasApproval, gasApproval, { to: USDC, value: "0", data: encodeErc20Transfer(RECIPIENT, 1n) }],
+    })).toThrowError(/optionally after one gas approval/);
+    expect(() => assertSendCalls({ tokenAddress: USDC, recipient: RECIPIENT, rawAmount: 1n, calls: [] }))
+      .toThrowError(/optionally after one gas approval/);
     expect(() => buildSendIntent(send(OTHER, "1"), ACCOUNT, usdc)).toThrowError(/not enabled/);
     expect(() => buildSendIntent(send(USDC, "1", ACCOUNT), ACCOUNT, usdc)).toThrowError(/different/);
     expect(() => buildSendIntent(send(USDC, "100.000001"), ACCOUNT, usdc)).toThrowError(/maximum/);

@@ -164,6 +164,15 @@ export async function reconcileIntents() {
   });
 }
 
+/** Single-use Coinbase checkout URL; the server fixes destination (this account), Base, and USDC. */
+export async function createOnrampSession(amount?: string) {
+  return jsonRequest<{ url: string }>("/api/wallet/onramp", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(amount ? { amount } : {}),
+  });
+}
+
 export type WalletRecipient = { handle: string; displayName: string | null };
 
 export async function searchRecipients(q: string, signal?: AbortSignal) {

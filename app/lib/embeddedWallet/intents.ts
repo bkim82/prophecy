@@ -112,11 +112,21 @@ export function gasAllowanceCall(): NormalizedCall {
   return { to: USDC_BASE, value: "0", data: encodeErc20Approve(CDP_ERC20_PAYMASTER, GAS_ALLOWANCE_RAW) };
 }
 
+/**
+ * A send batch is either the USDC gas approval plus the transfer, or (free gas,
+ * sponsored by CDP's Paymaster) the transfer alone. `assertSendCalls` allows
+ * only those two shapes, so the signer reads the gas mode off the batch.
+ */
+export function isSponsoredSend(calls: NormalizedCall[]) {
+  return calls.length === 1;
+}
+
 /** `token` is resolved server-side (curated or Alchemy metadata), never taken from the client. */
 export function buildSendIntent(
   input: SendIntentInput,
   smartAccountAddress: string,
   token: SendToken,
+  freeGas = false,
 ) {
   if (!IDEMPOTENCY_RE.test(input.idempotencyKey)) {
     throw new IntentValidationError("invalid-idempotency-key", "The operation id is invalid.");
@@ -133,12 +143,10 @@ export function buildSendIntent(
   if (token.maxSendRaw !== null && rawAmount > token.maxSendRaw) {
     throw new IntentValidationError("transaction-limit", `The maximum send is ${formatUnits(token.maxSendRaw, token.decimals)} ${token.symbol}.`);
   }
-  const calls: NormalizedCall[] = [
-    gasAllowanceCall(),
-    token.address === NATIVE_ETH
-      ? { to: recipient, value: rawAmount.toString(), data: "0x" }
-      : { to: token.address, value: "0", data: encodeErc20Transfer(recipient, rawAmount) },
-  ];
+  const transfer: NormalizedCall = token.address === NATIVE_ETH
+    ? { to: recipient, value: rawAmount.toString(), data: "0x" }
+    : { to: token.address, value: "0", data: encodeErc20Transfer(recipient, rawAmount) };
+  const calls = freeGas ? [transfer] : [gasAllowanceCall(), transfer];
   assertSendCalls({ tokenAddress: token.address, recipient, rawAmount, calls });
   return {
     schemaVersion: INTENT_SCHEMA_VERSION,
@@ -267,18 +275,21 @@ export function assertSendCalls(input: {
   rawAmount: bigint;
   calls: NormalizedCall[];
 }) {
-  if (input.calls.length !== 2) {
-    throw new IntentValidationError("unexpected-batch", "Send requires exactly a gas approval and a transfer.");
+  if (input.calls.length !== 1 && input.calls.length !== 2) {
+    throw new IntentValidationError("unexpected-batch", "Send requires a transfer, optionally after one gas approval.");
   }
-  const [approveCall, transferCall] = input.calls;
-  const approval = decodeErc20Approve(approveCall.data);
-  if (
-    normalizeAddress(approveCall.to) !== USDC_BASE
-    || BigInt(approveCall.value) !== 0n
-    || approval.spender !== CDP_ERC20_PAYMASTER
-    || approval.amount !== GAS_ALLOWANCE_RAW
-  ) {
-    throw new IntentValidationError("call-mismatch", "The gas approval does not match policy.");
+  const transferCall = input.calls[input.calls.length - 1];
+  if (!isSponsoredSend(input.calls)) {
+    const approveCall = input.calls[0];
+    const approval = decodeErc20Approve(approveCall.data);
+    if (
+      normalizeAddress(approveCall.to) !== USDC_BASE
+      || BigInt(approveCall.value) !== 0n
+      || approval.spender !== CDP_ERC20_PAYMASTER
+      || approval.amount !== GAS_ALLOWANCE_RAW
+    ) {
+      throw new IntentValidationError("call-mismatch", "The gas approval does not match policy.");
+    }
   }
   if (input.tokenAddress === NATIVE_ETH) {
     if (

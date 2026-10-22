@@ -170,7 +170,7 @@ Transaction status vocabulary: `created | confirmed_by_user | submitted | includ
 - Confirmation shows full recipient, account, network, token contract/symbol, raw-derived amount, sponsorship/fee, and irreversible-action warning.
 - Re-read raw balance, validate destination code/risk rules, simulate, and re-check session/account coherence immediately before signing.
 - `Max` is computed from raw balance and the actual sponsorship decision; no optimistic success on broadcast.
-- Implemented: ETH/any-ERC-20 typed intents (USDC-paid gas, `@handle` recipient picker), mandatory full-field confirmation, sole CDP hook import, browser/application identity coherence check, durable pending hash, and no optimistic success. `Max` is intentionally absent until the exact raw token-balance/sponsorship read is available (`app/wallet/ActionSheets.tsx`, `app/lib/embeddedWallet/sign.ts:97`).
+- Implemented: ETH/any-ERC-20 typed intents (USDC-paid gas, `@handle` recipient picker), mandatory full-field confirmation, sole CDP hook import, browser/application identity coherence check, durable pending hash, and no optimistic success. `Max` is intentionally absent until the exact raw token-balance/sponsorship read is available (`app/wallet/ActionSheets.tsx`, `app/lib/embeddedWallet/sign.ts:98`).
 
 ### Phase 6 — exact-input Swap (built on CDP Swap; Base mainnet verification open)
 
@@ -180,14 +180,14 @@ Transaction status vocabulary: `created | confirmed_by_user | submitted | includ
 - Decode and compare every final call and simulate immediately before signing. Never cache executable calldata across users.
 - Batch exact approval plus swap only after Phase -1 proves atomic execution. Otherwise wait for approval inclusion and present it as a separate confirmed transaction.
 - Wire existing Buy/Sell preset plumbing in `app/wallet/WalletDashboard.tsx` only after the common transaction core is complete.
-- Implemented with CDP Swap instead of a self-decoded aggregator: CDP quotes, signs Permit2, simulates, and submits server-side (`executeSwap`), so the app never holds swap calldata; any Base token is buyable; exact Permit2 approval is a separate user op awaited (inclusion + allowance) before the swap; swap and approval gas are paid in ETH by the account, no Paymaster; the reviewed minimum output is stored at confirm and becomes the swap's floor via a slippage sized from a fresh quote (`app/lib/embeddedWallet/sign.ts:166`, docs/wallet.md). Not yet run against a funded mainnet account.
+- Implemented with CDP Swap instead of a self-decoded aggregator: CDP quotes, signs Permit2, simulates, and submits server-side (`executeSwap`), so the app never holds swap calldata; any Base token is buyable; exact Permit2 approval is a separate user op awaited (inclusion + allowance) before the swap; swap and approval gas are paid in ETH by the account, no Paymaster; the reviewed minimum output is stored at confirm and becomes the swap's floor via a slippage sized from a fresh quote (`app/lib/embeddedWallet/sign.ts:168`, docs/wallet.md). Not yet run against a funded mainnet account.
 
-### Phase 7 — Deposit (copy-address complete; hosted Onramp blocked)
+### Phase 7 — Deposit (copy-address + card→USDC session built; order reconciliation open)
 
 - Server creates each Onramp session/order from `getViewer()` with the canonical smart-account address, Base, selected supported asset, and exact allowed return URL. Ignore/reject client destination and network fields.
 - Show provider-supplied quote, fees, limits, payment methods, geographic/state eligibility, identity requirements, and expiry. Do not hard-code promotional pricing.
 - Track order id/status, handle abandonment/failure/refund, reconcile the resulting onchain deposit, and retain “copy address” for crypto deposits with Base warning.
-- `onramp_orders` schema and canonical Base copy-address UI exist; hosted session creation remains unexposed until Onramp credentials/access, allowed origins, runtime quote schema, and webhook/order reconciliation are verified.
+- Built: card → USDC hosted session creation from `getViewer()` (`app/api/wallet/onramp/route.ts`, `lib/onramp.ts`) behind `WALLET_ONRAMP_ENABLED`; each session records an `onramp_orders` row. Remaining: Portal allowed-origin + credential verification in sandbox, and webhook/order status reconciliation (rows stay `created`).
 
 ### Phase 8 — Activity and reconciliation (repository complete)
 
