@@ -263,7 +263,8 @@ export default function Page({ params }: { params: Promise<{ market: string; mat
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [positions, phase]);
 
-  // The opponent's entries/closes, as dashed markers plus a one-line call-out.
+  // The opponent's entries/closes, recorded as dashed markers but kept off
+  // the chart (and unannounced) until settle so the round stays blind.
   useEffect(() => {
     if (phase !== "countdown" || price === null) return;
     const prev = prevOpponentRef.current;
@@ -281,10 +282,6 @@ export default function Page({ params }: { params: Promise<{ market: string; mat
         p: item.entryPrice, side: item.side, action: "entry" as const, owner: "room" as const,
       })),
     ]);
-    const newest = opened.at(-1);
-    const shut = closed.at(-1);
-    if (newest) say(`Opponent went ${newest.side} @ ${usd(newest.entryPrice)}.`);
-    else if (shut) say(`Opponent closed a ${shut.side} (${signedUsd(pulsePositionPnl(shut, price))}).`);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [opponentPositions, phase]);
 
@@ -303,9 +300,12 @@ export default function Page({ params }: { params: Promise<{ market: string; mat
   }, [phase, view?.finalPrice]);
 
   const roundStart = toLocal(view?.roundStartAt ?? null);
-  const markerData = useMemo<TradeMarker[]>(() => trades.map((trade) => ({
-    t: trade.t, p: trade.p, side: trade.side, action: trade.action, owner: trade.owner, pnl: trade.pnl,
-  })), [trades]);
+  const revealRoom = phase === "settled";
+  const markerData = useMemo<TradeMarker[]>(() => trades
+    .filter((trade) => revealRoom || trade.owner !== "room")
+    .map((trade) => ({
+      t: trade.t, p: trade.p, side: trade.side, action: trade.action, owner: trade.owner, pnl: trade.pnl,
+    })), [trades, revealRoom]);
 
   const postAction = async (body: Record<string, unknown>) => {
     const res = await fetch(`/api/match/${encodeURIComponent(matchId)}/action`, {
@@ -463,7 +463,7 @@ export default function Page({ params }: { params: Promise<{ market: string; mat
     <section className="mt-4">
       <PriceChart points={frozenPoints ?? points} trades={markerData} roundStart={roundStart} frozen={frozenPoints !== null} openEntry={openEntry} now={now} />
       <div className="mt-2 flex items-center justify-between px-1 text-xs text-[var(--muted-dim)]">
-        <span>Entries ○ · exits □ · reversals ◇ · dashed = Opponent</span>
+        <span>Entries ○ · exits □ · reversals ◇{revealRoom ? " · dashed = Opponent" : ""}</span>
         <SoundToggle muted={muted} onToggle={toggleMuted} />
       </div>
     </section>
