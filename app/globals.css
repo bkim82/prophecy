@@ -2463,12 +2463,17 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
 .wd-list-search { flex: 1; min-width: 160px; border: 1px solid var(--line); border-radius: 8px; background: var(--field-bg); padding: 8px 12px; font-size: 13px; color: var(--text); }
 .wd-list-sort { border: 1px solid var(--line); border-radius: 8px; background: var(--field-bg); padding: 8px 10px; font-size: 12px; font-weight: 600; color: var(--text); }
 .wd-table-head, .wd-coin-row-grid { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr) minmax(0, 0.4fr) minmax(0, 1fr); align-items: center; gap: 10px; }
-.wd-table-head { margin: 18px 2px 6px; padding: 0 14px; color: var(--muted-dim); font-size: 11px; text-transform: uppercase; letter-spacing: .07em; }
+.wd-table-head { margin: 18px 2px 6px; padding: 0 42px 0 14px; color: var(--muted-dim); font-size: 11px; text-transform: uppercase; letter-spacing: .07em; }
 .wd-table-head span:not(:first-child), .wd-coin-row-balance, .wd-coin-row-share, .wd-coin-row-price { text-align: right; justify-self: end; }
 .wd-coin-list { display: grid; gap: 6px; }
-.wd-coin-row { position: relative; border-radius: 10px; background: var(--surface); transition: background-color .15s; }
+.wd-coin-row { position: relative; display: flex; align-items: center; border-radius: 10px; background: var(--surface); transition: background-color .15s; }
 .wd-coin-row:hover { background: var(--surface-hover); }
-.wd-coin-row-grid { width: 100%; padding: 10px 14px; text-align: left; }
+.wd-coin-row:has([aria-expanded="true"]) { z-index: 11; }
+.wd-coin-row.is-hidden .wd-coin-row-grid { opacity: .55; }
+.wd-coin-row-grid { flex: 1; min-width: 0; padding: 10px 6px 10px 14px; text-align: left; }
+.wd-coin-row-menu { flex: none; margin-right: 8px; }
+.wd-list-hidden-toggle { justify-self: center; display: block; margin: 10px auto 0; border: 0; background: none; color: var(--muted); font-size: 12px; font-weight: 600; }
+.wd-list-hidden-toggle:hover { color: var(--text); }
 .wd-coin-row-asset { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .wd-coin-row-identity { display: grid; gap: 1px; min-width: 0; }
 .wd-coin-row-identity strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: var(--text); }

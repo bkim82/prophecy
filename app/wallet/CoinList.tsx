@@ -22,15 +22,30 @@ function sortKey(coin: Coin, sort: Sort): number | string {
  * sparklines) — same "filter the list, order freezes while you're reading
  * it" idiom as app/duel/portfolio/TokenExplorer.tsx, just simpler since the
  * source data is already local (no pagination, no trending/new fetch).
+ * Hidden coins (see ./hiddenCoins.ts) are left out unless "Show hidden" is on.
  */
-export function CoinList({ coins, totalUsd, onSelect }: { coins: Coin[]; totalUsd: number; onSelect: (address: string) => void }) {
+export function CoinList({
+  coins,
+  totalUsd,
+  isHidden,
+  onToggleHidden,
+  onSelect,
+}: {
+  coins: Coin[];
+  totalUsd: number;
+  isHidden: (address: string) => boolean;
+  onToggleHidden: (address: string) => void;
+  onSelect: (address: string) => void;
+}) {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<Sort>("value");
+  const [showHidden, setShowHidden] = useState(false);
   const trimmed = query.trim().toLowerCase();
 
-  const filtered = trimmed
-    ? coins.filter((coin) => coin.symbol.toLowerCase().includes(trimmed) || coin.name.toLowerCase().includes(trimmed))
-    : coins;
+  const hiddenCount = coins.filter((coin) => isHidden(coin.address)).length;
+  const filtered = coins.filter((coin) =>
+    (showHidden || !isHidden(coin.address))
+    && (!trimmed || coin.symbol.toLowerCase().includes(trimmed) || coin.name.toLowerCase().includes(trimmed)));
 
   const sortedIds = useMemo(() => {
     const factor = sort === "name" ? 1 : -1; // name: A→Z; value/change: high→low
@@ -45,7 +60,7 @@ export function CoinList({ coins, totalUsd, onSelect }: { coins: Coin[]; totalUs
 
   // Frozen ordering: re-rank only when the view (sort/search) or the coin set
   // changes, never on a plain price tick — same principle as TokenExplorer's.
-  const viewKey = `${sort}|${trimmed}`;
+  const viewKey = `${sort}|${trimmed}|${showHidden}`;
   const [frozen, setFrozen] = useState<{ key: string; order: string[] }>({ key: "", order: [] });
   const displayed = useMemo(() => {
     if (frozen.key !== viewKey) return sortedIds;
@@ -81,7 +96,13 @@ export function CoinList({ coins, totalUsd, onSelect }: { coins: Coin[]; totalUs
       </div>
 
       {displayed.length === 0 ? (
-        <p className="wd-empty">{coins.length === 0 ? "No holdings on Base yet — deposit ETH or a Base token to see it here." : `No coins match "${query}".`}</p>
+        <p className="wd-empty">
+          {coins.length === 0
+            ? "No holdings on Base yet — deposit ETH or a Base token to see it here."
+            : trimmed
+              ? `No coins match "${query}".`
+              : "All your coins are hidden."}
+        </p>
       ) : (
         <>
           <div className="wd-table-head" aria-hidden="true">
@@ -94,11 +115,27 @@ export function CoinList({ coins, totalUsd, onSelect }: { coins: Coin[]; totalUs
             {displayed.map((address) => {
               const coin = byAddress.get(address);
               if (!coin) return null;
-              const sharePct = totalUsd > 0 ? ((coin.valueUsd ?? 0) / totalUsd) * 100 : 0;
-              return <CoinRow key={address} coin={coin} sharePct={sharePct} onSelect={() => onSelect(address)} />;
+              const hidden = isHidden(address);
+              const sharePct = hidden ? null : totalUsd > 0 ? ((coin.valueUsd ?? 0) / totalUsd) * 100 : 0;
+              return (
+                <CoinRow
+                  key={address}
+                  coin={coin}
+                  sharePct={sharePct}
+                  hidden={hidden}
+                  onSelect={() => onSelect(address)}
+                  onToggleHidden={() => onToggleHidden(address)}
+                />
+              );
             })}
           </ul>
         </>
+      )}
+
+      {hiddenCount > 0 && (
+        <button type="button" className="wd-list-hidden-toggle" aria-pressed={showHidden} onClick={() => setShowHidden((v) => !v)}>
+          {showHidden ? "Hide hidden coins" : `Show hidden (${hiddenCount})`}
+        </button>
       )}
     </div>
   );
