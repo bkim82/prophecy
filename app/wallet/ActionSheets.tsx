@@ -12,7 +12,7 @@ import {
   type SwapToken,
   type WalletRecipient,
 } from "@/app/lib/embeddedWallet/client";
-import { walletTransactionsEnabled } from "@/app/lib/embeddedWallet/config";
+import { walletFreeGasEnabled, walletTransactionsEnabled } from "@/app/lib/embeddedWallet/config";
 import { formatUnits, normalizeAmount } from "@/app/lib/embeddedWallet/intents";
 import { ClaimedIntentError, useSubmitSwapIntent, useSubmitTypedIntent, useSwapQuote } from "@/app/lib/embeddedWallet/sign";
 import { curatedToken, GAS_ALLOWANCE_RAW, NATIVE_ETH, SWAP_SLIPPAGE_BPS, USDC_BASE } from "@/app/lib/embeddedWallet/tokens";
@@ -21,7 +21,8 @@ import { ActionSheet } from "./ActionSheet";
 import { ETH_SENTINEL, type Coin } from "./types";
 
 // See docs/wallet.md: Deposit shows the canonical address with copy-to-clipboard;
-// Send (any held token, gas in USDC) and Swap (CDP swap, gas in ETH) sign through app/lib/embeddedWallet/sign.ts.
+// Send (any held token, gas in USDC) and Swap (CDP swap, gas in ETH) sign through app/lib/embeddedWallet/sign.ts;
+// with free gas (walletFreeGasEnabled) the Paymaster sponsors both and no gas balance is needed.
 // Review screens render the server's intent, and the intent is confirmed only by the review's own button.
 
 export function DepositSheet({ address, onClose }: { address: string; onClose: () => void }) {
@@ -32,7 +33,7 @@ export function DepositSheet({ address, onClose }: { address: string; onClose: (
   };
   return (
     <ActionSheet title="Deposit" onClose={onClose}>
-      <p className="wd-sheet-copy">Send ETH or any Base token to this address. Other Prophecy users can send to your @username. Keep some USDC here to pay gas when you send, and a little ETH for gas when you swap.</p>
+      <p className="wd-sheet-copy">Send ETH or any Base token to this address. Other Prophecy users can send to your @username.{walletFreeGasEnabled() ? " Gas is free: Prophecy covers it." : " Keep some USDC here to pay gas when you send, and a little ETH for gas when you swap."}</p>
       <div className="wd-sheet-address">
         <code>{address}</code>
         <button type="button" onClick={copy} className="wd-sheet-primary-button">{copied ? "Copied" : "Copy address"}</button>
@@ -257,7 +258,7 @@ export function SendSheet({
             <div><dt>To</dt><dd>{prepared.handle && <strong>@{prepared.handle}</strong>}<code>{prepared.recipient}</code></dd></div>
             <div><dt>From</dt><dd><code>{accountAddress}</code></dd></div>
             <div><dt>Network</dt><dd>Base</dd></div>
-            <div><dt>Gas</dt><dd>Paid in USDC · usually a cent, at most {formatUnits(GAS_ALLOWANCE_RAW, 6)}</dd></div>
+            <div><dt>Gas</dt><dd>{walletFreeGasEnabled() ? "Free · covered by Prophecy" : `Paid in USDC · usually a cent, at most ${formatUnits(GAS_ALLOWANCE_RAW, 6)}`}</dd></div>
           </dl>
           <p className="wd-sheet-note">Check the address. Blockchain transfers can&apos;t be reversed.</p>
           <CdpSendSubmit
@@ -310,7 +311,7 @@ export function SendSheet({
           <button type="submit" className="wd-sheet-primary-button" disabled={!enabled || pending || !recipient || !amount}>
             {pending ? "Preparing…" : "Review send"}
           </button>
-          {usdcBalance === 0 && <p className="wd-sheet-note">Gas is paid in USDC. Deposit a little USDC on Base before sending.</p>}
+          {usdcBalance === 0 && !walletFreeGasEnabled() && <p className="wd-sheet-note">Gas is paid in USDC. Deposit a little USDC on Base before sending.</p>}
           {!enabled && <p className="wd-sheet-note">Sending is currently disabled.</p>}
           {error && <p className="wd-sheet-error" role="alert">{error}</p>}
         </form>
@@ -364,7 +365,8 @@ function SwapReview({
   const fee = price?.totalNetworkFee ?? null;
   const feeEth = fee ? Number(formatUnits(BigInt(fee), 18)) : 0;
   const ethSpent = (fromToken.address === NATIVE_ETH ? Number(formatUnits(BigInt(rawAmount), 18)) : 0) + feeEth;
-  const noGas = !short && (ethBalance <= 0 || ethSpent >= ethBalance);
+  const freeGas = walletFreeGasEnabled();
+  const noGas = !freeGas && !short && (ethBalance <= 0 || ethSpent >= ethBalance);
 
   return (
     <div className="wd-sheet-form">
@@ -385,10 +387,10 @@ function SwapReview({
         </div>
         <div><dt>Account</dt><dd><code>{accountAddress}</code></dd></div>
         <div><dt>Network</dt><dd>Base · routed by Coinbase (CDP Swap)</dd></div>
-        <div><dt>Gas</dt><dd>Paid in ETH from this account{fee ? ` · ≈ ${displayUnits(fee, 18)} ETH` : ""}</dd></div>
+        <div><dt>Gas</dt><dd>{freeGas ? "Free · covered by Prophecy" : `Paid in ETH from this account${fee ? ` · ≈ ${displayUnits(fee, 18)} ETH` : ""}`}</dd></div>
       </dl>
       {fromToken.address !== NATIVE_ETH && (
-        <p className="wd-sheet-note">The first time you sell {fromToken.symbol}, an exact {fromToken.symbol} approval goes through before the swap, with its own small ETH gas fee.</p>
+        <p className="wd-sheet-note">The first time you sell {fromToken.symbol}, an exact {fromToken.symbol} approval goes through before the swap{freeGas ? "." : ", with its own small ETH gas fee."}</p>
       )}
       {noRoute && <p className="wd-sheet-error" role="alert">No swap route for this pair right now. Try a different amount or token.</p>}
       {short && <p className="wd-sheet-error" role="alert">Not enough {fromToken.symbol} for this swap.</p>}
@@ -638,13 +640,13 @@ export function SwapSheet({
             </span>
             <input value={amount} onChange={(event) => setAmount(event.target.value)} inputMode="decimal" placeholder="0.00" />
           </label>
-          <button type="submit" className="wd-sheet-primary-button" disabled={!enabled || pending || !fromOption || !amount || from === to || ethBalance === 0}>
+          <button type="submit" className="wd-sheet-primary-button" disabled={!enabled || pending || !fromOption || !amount || from === to || (ethBalance === 0 && !walletFreeGasEnabled())}>
             {pending ? "Preparing…" : "Review swap"}
           </button>
           {from !== "" && from === to && <p className="wd-sheet-note">Pick two different tokens.</p>}
           {sellingUnheld && <p className="wd-sheet-note">You don&apos;t hold that token, so there&apos;s nothing of it to sell.</p>}
           {held.length === 0 && <p className="wd-sheet-note">Deposit USDC or ETH on Base to start buying.</p>}
-          {held.length > 0 && ethBalance === 0 && <p className="wd-sheet-note">Swaps pay gas in ETH. Deposit a little ETH on Base before swapping.</p>}
+          {held.length > 0 && ethBalance === 0 && !walletFreeGasEnabled() && <p className="wd-sheet-note">Swaps pay gas in ETH. Deposit a little ETH on Base before swapping.</p>}
           {!enabled && <p className="wd-sheet-note">Swapping is currently disabled.</p>}
           {error && <p className="wd-sheet-error" role="alert">{error}</p>}
         </form>
