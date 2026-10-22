@@ -497,7 +497,8 @@ function TokenSearchField({ onPick }: { onPick: (option: SwapOption) => void }) 
  * Exact-input swap through CDP (docs/wallet.md). Pay with any held coin;
  * receive any Base token (quick picks plus `TokenSearchField`). `extraToken`
  * covers the Advanced tab's case: buying a market token the wallet doesn't
- * hold yet, so it starts out as a target. `initialFrom`/`initialTo` (coin
+ * hold yet, so it starts out as a target (and the search is hidden, since the
+ * token was already picked there). `initialFrom`/`initialTo` (coin
  * addresses, "eth" for native) preselect a side without locking the picker.
  */
 export function SwapSheet({
@@ -629,7 +630,7 @@ export function SwapSheet({
               {targets.map((option) => <option key={option.address} value={option.address}>{option.symbol}</option>)}
             </select>
           </label>
-          <TokenSearchField onPick={(option) => { setFound(option); setTo(option.address); }} />
+          {!extraToken && <TokenSearchField onPick={(option) => { setFound(option); setTo(option.address); }} />}
           <label className="wd-sheet-field">
             <span>
               Amount ({fromOption?.symbol ?? "—"})
