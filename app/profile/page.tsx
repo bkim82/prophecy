@@ -1,15 +1,15 @@
 import { redirect } from "next/navigation";
-import { FOLLOWED_HANDLES } from "@/app/lib/mockPosts";
 import { challengeTerms } from "@/app/lib/challengeRules";
 import { getProfile, profileHref, type Profile } from "@/app/lib/mockProfiles";
 import type { ProfileBanner } from "@/app/lib/profileEdit";
 import { archetypeFor, isPinnableMatch, type Highlight } from "@/app/lib/profileTraits";
-import { VIEWER_COPY_EARNINGS, VIEWER_FOLLOWERS, VIEWER_RECORDS, VIEWER_STYLE } from "@/app/lib/mockViewer";
 import { VIEWER_RANK } from "@/app/lib/rank";
 import { HighlightReel } from "@/app/profile/[handle]/HighlightReel";
 import { AchievementsPanel, ProfileAchievements } from "@/app/profile/[handle]/ProfileAchievements";
 import { ProfileView, type ProfileMatch, type SentChallenge } from "@/app/profile/[handle]/ProfileView";
-import { pendingChallengesFrom } from "@/lib/challenges";
+import { NO_COPY_EARNINGS, activityFor } from "@/lib/activity";
+import { sentChallengesFrom } from "@/lib/challenges";
+import { followerCount, followingCount } from "@/lib/follows";
 import { historyEntryFor, marketAccuracyFor, matchRecordFor, settledMatchesByIds, settledMatchesFor } from "@/lib/match";
 import { opponentNames } from "@/lib/opponentNames";
 import { isOnboarded } from "@/lib/onboarding";
@@ -21,8 +21,10 @@ import { getViewer, getViewerProfile } from "@/lib/viewer";
 // (app/AccountMenu.tsx). Same layout as /profile/[handle]. Real: join date
 // through the viewer adapter, everything the Edit profile dialog saves (`profiles`
 // table, lib/profile.ts), match history, per-asset accuracy (Arena round
-// P&L) and the highlight reel (pinned won matches). The rest is
-// app/lib/mockViewer.ts.
+// P&L), the highlight reel (pinned won matches), follower/following counts
+// (lib/follows.ts), and achievements + trading style from what you played
+// (lib/activity.ts). Rank is the VIEWER_RANK stub; copy earnings are zero
+// until copy trading exists.
 
 const MATCH_LIMIT = 20;
 const joinedFormat = new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
@@ -37,13 +39,16 @@ export default async function OwnProfilePage() {
   if (!user) redirect("/sign-in");
   const { userId } = viewer;
 
-  const [rows, record, stored, marketAccuracy, sent, onboarded] = await Promise.all([
+  const [rows, record, stored, marketAccuracy, sent, onboarded, followers, following, activity] = await Promise.all([
     settledMatchesFor(userId, MATCH_LIMIT),
     matchRecordFor(userId),
     storedProfileFor(userId),
     marketAccuracyFor(userId),
-    pendingChallengesFrom(userId),
+    sentChallengesFrom(userId),
     isOnboarded(userId),
+    followerCount(userId),
+    followingCount(userId),
+    activityFor(userId, VIEWER_RANK),
   ]);
   // Pins can be older than the listed page, so they're fetched by id — and
   // re-checked, so a pin that stopped qualifying just drops out of the reel.
@@ -73,7 +78,7 @@ export default async function OwnProfilePage() {
     net: entry.net,
     date: playedLabel(entry.playedAt, now),
   }));
-  // Targets are mock traders today; fall back to the stored handle/rank if one disappears.
+  // Mock traders by their mock profile; real accounts by the handle they had when challenged.
   const challenges: SentChallenge[] = sent.map((row) => {
     const target = getProfile(row.targetHandle);
     return {
@@ -81,8 +86,9 @@ export default async function OwnProfilePage() {
       handle: row.targetHandle,
       name: target?.name ?? row.targetHandle,
       rank: target?.rank ?? row.targetRank,
-      href: profileHref(row.targetHandle),
+      href: target ? profileHref(row.targetHandle) : `/profile/${row.targetHandle.slice(1)}`,
       terms: challengeTerms(row),
+      declined: row.status === "declined",
       sentLabel: playedLabel(row.createdAt.getTime(), now),
     };
   });
@@ -112,15 +118,15 @@ export default async function OwnProfilePage() {
     rank: VIEWER_RANK,
     bio: stored?.bio ?? "",
     joined: joinedFormat.format(user.createdAt),
-    followers: VIEWER_FOLLOWERS,
-    following: FOLLOWED_HANDLES.length,
+    followers,
+    following,
     imageUrl,
     location: stored?.location ?? undefined,
     website: stored?.website ?? undefined,
     banner,
   };
   const seed = handle || userId;
-  const records = { ...VIEWER_RECORDS, duelsWon: record.won };
+  const { records } = activity;
 
   return (
     <main className="feed-shell">
@@ -134,7 +140,7 @@ export default async function OwnProfilePage() {
         initiallyFollowing={false}
         traits={{
           accuracy,
-          archetype: archetypeFor(VIEWER_STYLE),
+          archetype: archetypeFor(activity.style ?? undefined),
           accuracySource: "Share of your Arena rounds per market that finished in profit",
         }}
         self={{
@@ -143,7 +149,7 @@ export default async function OwnProfilePage() {
           onboarded,
           matches,
           record,
-          copyEarnings: VIEWER_COPY_EARNINGS,
+          copyEarnings: NO_COPY_EARNINGS,
           edit: {
             displayName: stored?.displayName ?? "",
             namePlaceholder: accountName,

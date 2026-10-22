@@ -1018,6 +1018,28 @@ a.feed-notif:hover { background: var(--surface-hover); }
   .oracles-more { font-size: 10px; letter-spacing: .2em; }
 }
 @media (max-width: 960px) { .sidebar-panel.oracles-panel { grid-column: 1 / -1; } .oracles-panel > * { max-width: 400px; margin-inline: auto; } }
+/* Rail search (app/SidebarSearch.tsx), above the leaderboard. Results open inline, pushing the rail down — the rail scrolls itself, so an overlay would be clipped. */
+.sidebar-search { display: grid; gap: 8px; min-width: 0; }
+.sidebar-search-field { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 14px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--field-bg); color: var(--muted); transition: border-color .15s ease; }
+.sidebar-search-field:focus-within { border-color: var(--brand); color: var(--text); }
+.sidebar-search-field svg { flex: none; width: 16px; height: 16px; }
+.sidebar-search-field input { flex: 1; min-width: 0; border: 0; background: none; color: var(--text); font-size: 14px; outline: none; }
+.sidebar-search-field input::placeholder { color: var(--muted); }
+.sidebar-search-results { display: grid; padding: 8px 0; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-raised); }
+.sidebar-search-results h3 { margin: 4px 0 2px; padding: 0 14px; color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.sidebar-search-results ul { margin: 0; padding: 0; list-style: none; }
+.sidebar-search-item { display: flex; align-items: center; gap: 10px; padding: 8px 14px; color: var(--text); text-decoration: none; }
+.sidebar-search-item:hover, .sidebar-search-item:focus-visible { background: var(--surface-hover); }
+.sidebar-search-avatar { display: grid; flex: none; place-items: center; width: 32px; height: 32px; border-radius: 999px; color: #fff; font-size: 13px; font-weight: 700; overflow: hidden; }
+.sidebar-search-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.sidebar-search-text { display: grid; gap: 2px; min-width: 0; font-size: 13px; }
+.sidebar-search-text strong { display: flex; align-items: center; gap: 6px; min-width: 0; font-weight: 600; }
+.sidebar-search-name, .sidebar-search-text > .muted { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sidebar-search-text .muted { font-size: 12px; }
+.sidebar-search-text .muted strong { display: inline; color: var(--text); }
+.sidebar-search-snippet { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-height: 1.4; }
+.sidebar-search-empty { margin: 0; padding: 4px 14px; font-size: 13px; }
+@media (max-width: 960px) { .sidebar-search { grid-column: 1 / -1; } }
 @media (prefers-reduced-motion: reduce) { .oracles-panel *, .oracles-panel *::before, .oracles-panel *::after { animation: none !important; } }
 /* `/` sidebar above 960px: panels (Oracles included) drop their boxes and split on hairlines, like the open rail + feed column. After the Oracles rules so it beats their light-theme background. */
 @media (min-width: 961px) {
@@ -1259,6 +1281,8 @@ a.post-avatar { text-decoration: none; }
 .profile-rank { position: relative; z-index: 1; display: inline-flex; margin-top: -20px; border-radius: 999px; background: var(--surface-raised); }
 .profile-identity h1 { margin: 2px 0 0; font-size: 21px; line-height: 1.2; }
 .profile-identity .muted { font-size: 13px; }
+/* X-style "Follows you" chip after the handle; with your Follow it unlocks Challenge. */
+.profile-follows-you { margin-left: 6px; padding: 1px 6px; border-radius: 4px; background: color-mix(in srgb, var(--text) 8%, transparent); color: var(--muted); font-size: 11px; font-weight: 600; vertical-align: 1px; }
 .profile-bio { margin: 0; max-width: 46ch; color: var(--text); font-size: 14px; line-height: 1.5; }
 .profile-stats { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 18px; margin: 0; color: var(--muted); font-size: 13px; }
 .profile-stats strong { color: var(--text); font-weight: 700; font-variant-numeric: tabular-nums; }
@@ -1426,6 +1450,7 @@ a.post-avatar { text-decoration: none; }
 .profile-sent-row .profile-match-main strong a { color: inherit; text-decoration: none; }
 .profile-sent-row .profile-match-main strong a:hover { text-decoration: underline; }
 .profile-sent-status { padding: 3px 9px; border: 1px solid color-mix(in srgb, var(--gold) 45%, transparent); border-radius: 999px; color: var(--gold); font-family: var(--font-mono), ui-monospace, monospace; font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+.profile-sent-status[data-declined] { border-color: color-mix(in srgb, var(--negative) 45%, transparent); color: var(--negative); }
 @media (max-width: 620px) {
   .challenge-modes, .challenge-row { grid-template-columns: minmax(0, 1fr); }
   .profile-sent-status { display: none; }
@@ -1494,6 +1519,7 @@ a.post-avatar { text-decoration: none; }
 .profile-copy-head { display: flex; align-items: center; gap: 8px; color: var(--violet-strong); }
 .profile-copy-head svg { flex: none; width: 14px; height: 14px; }
 .profile-copy-head .eyebrow { color: inherit; font-weight: 700; }
+.profile-copy-empty { margin: 0; font-size: 12px; }
 .profile-copy-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; }
 .profile-copy-stats div { display: flex; flex-direction: column-reverse; justify-content: flex-end; gap: 4px; min-width: 0; }
 .profile-copy-stats dt { color: var(--muted); font-size: 12px; }

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { auth, currentUser } from "@clerk/nextjs/server";
+import { auth, clerkClient, currentUser } from "@clerk/nextjs/server";
 import { eq } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { getDb } from "@/db";
@@ -63,4 +63,36 @@ export async function getViewerProfile(viewer: Viewer): Promise<ViewerProfile | 
     hasImage: user.hasImage,
     imageUrl: user.imageUrl,
   };
+}
+
+// Per-instance cache for providerImagesFor, so search-as-you-type doesn't hit
+// the provider on every keystroke. null = looked up, no photo.
+const PROVIDER_IMAGE_TTL_MS = 5 * 60_000;
+const providerImageCache = new Map<string, { url: string | null; at: number }>();
+
+/**
+ * Temporary bridge for other accounts' provider-owned photos (Clerk), for
+ * public profiles and search: user id → photo URL, one request for up to 100
+ * uncached ids. Leaves out anyone without a photo; empty with embedded auth
+ * (photos are app-owned then) or when the provider can't be reached.
+ */
+export async function providerImagesFor(userIds: string[]): Promise<Map<string, string>> {
+  if (embeddedWalletAuthEnabled() || userIds.length === 0) return new Map();
+  const now = Date.now();
+  const fresh = (id: string) => (providerImageCache.get(id)?.at ?? -Infinity) > now - PROVIDER_IMAGE_TTL_MS;
+  const missing = userIds.filter((id) => !fresh(id)).slice(0, 100);
+  if (missing.length > 0) {
+    try {
+      const { data } = await (await clerkClient()).users.getUserList({ userId: missing, limit: 100 });
+      const urls = new Map(data.map((user) => [user.id, user.hasImage ? user.imageUrl : null]));
+      if (providerImageCache.size > 5000) providerImageCache.clear();
+      for (const id of missing) providerImageCache.set(id, { url: urls.get(id) ?? null, at: now });
+    } catch {
+      // Unreachable provider: show initials now, retry on the next lookup.
+    }
+  }
+  return new Map(userIds.flatMap((id) => {
+    const url = providerImageCache.get(id)?.url;
+    return url ? [[id, url] as const] : [];
+  }));
 }

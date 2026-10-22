@@ -15,6 +15,7 @@ import {
 } from "@/app/lib/profileEdit";
 import { inspectProfileImage } from "@/app/lib/profileImage";
 import { MAX_PINS, isPinnableMatch } from "@/app/lib/profileTraits";
+import { followTarget, saveFollow } from "@/lib/follows";
 import { historyEntryFor, settledMatchesByIds } from "@/lib/match";
 import {
   handleOwner,
@@ -213,5 +214,20 @@ export async function togglePinnedMatch(matchId: string): Promise<{ ok: true } |
 
   await savePinnedMatches(userId, next);
   refresh();
+  return { ok: true };
+}
+
+/**
+ * Follows or unfollows a mock trader or real account from its profile;
+ * Challenge re-checks follows both ways (app/profile/challengeActions.ts).
+ * No refresh: the toggle already shows it.
+ */
+export async function followProfile(handle: string, following: boolean): Promise<{ ok: true } | { ok: false; error: string }> {
+  const userId = (await getViewer())?.userId;
+  if (!userId) return { ok: false, error: "Sign in to follow traders." };
+  const target = await followTarget(handle);
+  if (!target) return { ok: false, error: "That trader doesn't exist." };
+  if (target.userId === userId) return { ok: false, error: "You can't follow yourself." };
+  await saveFollow(userId, target.key, following === true);
   return { ok: true };
 }
