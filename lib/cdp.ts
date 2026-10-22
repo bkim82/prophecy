@@ -1,6 +1,7 @@
 import "server-only";
 
 import { CdpClient } from "@coinbase/cdp-sdk";
+import { generateJwt } from "@coinbase/cdp-sdk/auth";
 
 export type CdpEndUserIdentity = {
   userId: string;
@@ -25,15 +26,63 @@ export class CdpConfigurationError extends Error {
 
 let client: CdpClient | null = null;
 
-function getCdpClient() {
-  if (client) return client;
-
+function cdpCredentials() {
   const apiKeyId = process.env.CDP_API_KEY_ID;
   const apiKeySecret = process.env.CDP_API_KEY_SECRET;
   if (!apiKeyId || !apiKeySecret) throw new CdpConfigurationError();
+  return { apiKeyId, apiKeySecret };
+}
 
-  client = new CdpClient({ apiKeyId, apiKeySecret });
+function getCdpClient() {
+  if (client) return client;
+  client = new CdpClient(cdpCredentials());
   return client;
+}
+
+export class CdpOnrampError extends Error {
+  constructor(readonly status: number) {
+    super(`CDP Onramp session request failed (${status})`);
+    this.name = "CdpOnrampError";
+  }
+}
+
+const CDP_HOST = "api.cdp.coinbase.com";
+const ONRAMP_SESSION_PATH = "/platform/v2/onramp/sessions";
+const ONRAMP_URL_PREFIX = "https://pay.coinbase.com/";
+
+/**
+ * Creates a single-use Coinbase-hosted Onramp URL. CdpClient doesn't expose
+ * Onramp, so this calls the REST endpoint with an SDK-signed JWT. The caller
+ * supplies the destination; never pass a client-chosen address or network.
+ */
+export async function createCdpOnrampSession(input: {
+  destinationAddress: string;
+  purchaseCurrency: string;
+  destinationNetwork: string;
+  paymentCurrency: string;
+  paymentAmount?: string;
+  redirectUrl: string;
+  clientIp?: string;
+  partnerUserRef: string;
+}): Promise<string> {
+  const jwt = await generateJwt({
+    ...cdpCredentials(),
+    requestMethod: "POST",
+    requestHost: CDP_HOST,
+    requestPath: ONRAMP_SESSION_PATH,
+  });
+  const response = await fetch(`https://${CDP_HOST}${ONRAMP_SESSION_PATH}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+    cache: "no-store",
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!response.ok) throw new CdpOnrampError(response.status);
+  const body = await response.json() as { session?: { onrampUrl?: unknown } };
+  const url = body.session?.onrampUrl;
+  if (typeof url !== "string" || !url.startsWith(ONRAMP_URL_PREFIX)) throw new CdpOnrampError(502);
+  return url;
 }
 
 /** Validates a browser access token without retaining it or provider actions. */

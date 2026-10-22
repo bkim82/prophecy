@@ -182,12 +182,12 @@ Transaction status vocabulary: `created | confirmed_by_user | submitted | includ
 - Wire existing Buy/Sell preset plumbing in `app/wallet/WalletDashboard.tsx` only after the common transaction core is complete.
 - Implemented with CDP Swap instead of a self-decoded aggregator: CDP quotes, signs Permit2, simulates, and submits server-side (`executeSwap`), so the app never holds swap calldata; any Base token is buyable; exact Permit2 approval is a separate user op awaited (inclusion + allowance) before the swap; swap and approval gas are paid in ETH by the account, no Paymaster; the reviewed minimum output is stored at confirm and becomes the swap's floor via a slippage sized from a fresh quote (`app/lib/embeddedWallet/sign.ts:168`, docs/wallet.md). Not yet run against a funded mainnet account.
 
-### Phase 7 — Deposit (copy-address complete; hosted Onramp blocked)
+### Phase 7 — Deposit (copy-address + card→USDC session built; order reconciliation open)
 
 - Server creates each Onramp session/order from `getViewer()` with the canonical smart-account address, Base, selected supported asset, and exact allowed return URL. Ignore/reject client destination and network fields.
 - Show provider-supplied quote, fees, limits, payment methods, geographic/state eligibility, identity requirements, and expiry. Do not hard-code promotional pricing.
 - Track order id/status, handle abandonment/failure/refund, reconcile the resulting onchain deposit, and retain “copy address” for crypto deposits with Base warning.
-- `onramp_orders` schema and canonical Base copy-address UI exist; hosted session creation remains unexposed until Onramp credentials/access, allowed origins, runtime quote schema, and webhook/order reconciliation are verified.
+- Built: card → USDC hosted session creation from `getViewer()` (`app/api/wallet/onramp/route.ts`, `lib/onramp.ts`) behind `WALLET_ONRAMP_ENABLED`; each session records an `onramp_orders` row. Remaining: Portal allowed-origin + credential verification in sandbox, and webhook/order status reconciliation (rows stay `created`).
 
 ### Phase 8 — Activity and reconciliation (repository complete)
 
