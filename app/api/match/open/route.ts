@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, isNotNull, or } from "drizzle-orm";
+import { and, desc, eq, gt, isNotNull, isNull, or } from "drizzle-orm";
 import { getDb } from "@/db";
 import { matches } from "@/db/schema";
 import { presenceCutoff } from "@/lib/match";
@@ -30,6 +30,8 @@ export async function GET(request: Request) {
         isNotNull(matches.player1UserId),
         // Bot hosts never heartbeat; they are always "here".
         or(gt(matches.player1LastSeen, presenceCutoff()), isNotNull(matches.botState)),
+        // Challenge rounds are private to the challenger.
+        isNull(matches.invitedUserId),
         ...(market ? [eq(matches.market, market)] : []),
         ...(mode ? [eq(matches.mode, mode)] : []),
       ),

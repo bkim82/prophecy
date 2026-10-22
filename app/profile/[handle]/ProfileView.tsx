@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { SignInAction } from "@/app/auth/AuthProvider";
 import { AuthorLink } from "@/app/AuthorLink";
 import { ArenaIcon, ContrarianIcon, DaredevilIcon, FlameIcon, LinkIcon, LockIcon, PatientIcon, PinIcon, SwiftIcon, TrendIcon } from "@/app/icons";
@@ -42,6 +42,8 @@ const TABS: { id: TabId; label: string }[] = [
 ];
 
 // Own profile only, ahead of the shared tabs.
+// How often a friend's profile re-checks whether they're online (GET /api/presence).
+const PRESENCE_POLL_MS = 5_000;
 const SELF_TABS: { id: TabId; label: string }[] = [{ id: "matches", label: "Matches" }, ...TABS];
 
 const compactCount = new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 });
@@ -70,7 +72,7 @@ export type OwnProfile = {
 
 // A pending challenge you sent, resolved for display (target name/rank from
 // their profile, `terms` from challengeTerms, relative `sentLabel`).
-export type SentChallenge = { id: string; handle: string; name: string; rank: string; href?: string; terms: string; sentLabel: string; declined: boolean };
+export type SentChallenge = { id: string; handle: string; name: string; rank: string; href?: string; terms: string; sentLabel: string; status: "pending" | "declined" | "expired" };
 
 // The hero's "how they trade" line. `accuracySource` explains where the
 // numbers come from when it isn't obvious (your own: Arena round P&L).
@@ -95,6 +97,8 @@ type ProfileViewProps = {
   signedIn?: boolean;
   // Someone else's profile: they follow you back, which (with your Follow) unlocks Challenge.
   followsYou?: boolean;
+  // Friends only: they have the app open right now (challenges need you both online).
+  online?: boolean;
   traits: ProfileTraits;
   // Someone else's profile only: which Challenge button to show.
   challenge?: ChallengeState;
@@ -106,7 +110,7 @@ type ProfileViewProps = {
   showcase?: ShowcasePanels;
 };
 
-export function ProfileView({ profile, activity, portfolio, portfolioLocked, viewerRank, initiallyFollowing, signedIn = false, followsYou = false, traits, challenge, self, showcase }: ProfileViewProps) {
+export function ProfileView({ profile, activity, portfolio, portfolioLocked, viewerRank, initiallyFollowing, signedIn = false, followsYou = false, online = false, traits, challenge, self, showcase }: ProfileViewProps) {
   const [tab, setTab] = useState<TabId>(self ? "matches" : "omens");
   const [editing, setEditing] = useState(false);
   // Own profiles may have no handle yet; the page supplies a stable seed instead.
@@ -114,6 +118,23 @@ export function ProfileView({ profile, activity, portfolio, portfolioLocked, vie
   const [following, setFollowing] = useState(initiallyFollowing);
   const [followError, setFollowError] = useState<string | null>(null);
   const [, startFollow] = useTransition();
+  const friends = signedIn && following && followsYou;
+  const [friendOnline, setFriendOnline] = useState(online);
+
+  // Keep a friend's online status (and with it the Challenge button) current while you're on their page.
+  useEffect(() => {
+    if (!friends) return;
+    const check = () =>
+      fetch(`/api/presence?handle=${encodeURIComponent(profile.handle)}`, { cache: "no-store" })
+        .then((response) => (response.ok ? response.json() : null))
+        .then((data: { online: boolean } | null) => {
+          if (data) setFriendOnline(data.online);
+        })
+        .catch(() => {});
+    void check();
+    const timer = setInterval(check, PRESENCE_POLL_MS);
+    return () => clearInterval(timer);
+  }, [friends, profile.handle]);
   const followers = profile.followers + Number(following) - Number(initiallyFollowing);
   const [pinPendingId, setPinPendingId] = useState<string | null>(null);
   const [pinError, setPinError] = useState<string | null>(null);
@@ -167,6 +188,7 @@ export function ProfileView({ profile, activity, portfolio, portfolioLocked, vie
             <span className="muted">
               {profile.handle}
               {followsYou && <span className="profile-follows-you">Follows you</span>}
+              {friends && friendOnline && <span className="profile-online">Online</span>}
             </span>
           ) : (
             self && (
@@ -222,6 +244,7 @@ export function ProfileView({ profile, activity, portfolio, portfolioLocked, vie
             viewerRank={viewerRank}
             following={following}
             followsYou={followsYou}
+            online={friends && friendOnline}
           >
             {signedIn ? (
               <button
@@ -374,22 +397,22 @@ function CopyEarningsCard({ earnings }: { earnings: CopyEarnings }) {
   );
 }
 
-// Challenges you've sent that are still waiting, plus declined ones until you
-// clear them, above your match history.
+// Challenges you've sent that are still waiting, plus declined and expired
+// ones until you clear them, above your match history.
 function SentChallenges({ challenges }: { challenges: SentChallenge[] }) {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [, startUpdate] = useTransition();
   if (challenges.length === 0) return null;
-  const pendingCount = challenges.filter((challenge) => !challenge.declined).length;
-  const declinedCount = challenges.length - pendingCount;
+  const count = (status: SentChallenge["status"]) => challenges.filter((challenge) => challenge.status === status).length;
+  const [pendingCount, declinedCount, expiredCount] = [count("pending"), count("declined"), count("expired")];
 
-  // Cancel a pending one, or clear a declined one.
-  const close = ({ id, declined }: SentChallenge) => {
+  // Cancel a pending one, or clear a declined/expired one.
+  const close = ({ id, status }: SentChallenge) => {
     setBusyId(id);
     setError(null);
     startUpdate(async () => {
-      const action = declined ? dismissChallenge : cancelChallenge;
+      const action = status === "pending" ? cancelChallenge : dismissChallenge;
       const result = await action(id).catch(() => ({ ok: false as const, error: "Couldn't update — try again." }));
       if (!result.ok) setError(result.error);
       setBusyId(null);
@@ -402,6 +425,7 @@ function SentChallenges({ challenges }: { challenges: SentChallenge[] }) {
         {[
           pendingCount > 0 && `${pendingCount} pending ${pendingCount === 1 ? "challenge" : "challenges"}`,
           declinedCount > 0 && `${declinedCount} declined`,
+          expiredCount > 0 && `${expiredCount} expired`,
         ]
           .filter(Boolean)
           .join(" · ")}
@@ -421,12 +445,12 @@ function SentChallenges({ challenges }: { challenges: SentChallenge[] }) {
                 {challenge.terms} · sent {challenge.sentLabel}
               </span>
             </div>
-            <span className="profile-sent-status" data-declined={challenge.declined || undefined}>
-              {challenge.declined ? "Declined" : "Pending"}
+            <span className="profile-sent-status" data-status={challenge.status}>
+              {challenge.status === "pending" ? "Pending" : challenge.status === "declined" ? "Declined" : "Expired"}
             </span>
             <div className="profile-match-pin">
               <button type="button" className="profile-pin" disabled={busyId === challenge.id} onClick={() => close(challenge)}>
-                {busyId === challenge.id ? "…" : challenge.declined ? "Clear" : "Cancel"}
+                {busyId === challenge.id ? "…" : challenge.status === "pending" ? "Cancel" : "Clear"}
               </button>
             </div>
           </li>

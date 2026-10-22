@@ -13,6 +13,7 @@ import { activityFor } from "@/lib/activity";
 import { pendingChallengeTo } from "@/lib/challenges";
 import { followTarget, followerCount, followingCount, isFollowing } from "@/lib/follows";
 import { marketAccuracyFor } from "@/lib/match";
+import { isOnline } from "@/lib/presence";
 import { getViewer, providerImagesFor } from "@/lib/viewer";
 
 const joinedFormat = new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
@@ -35,6 +36,8 @@ export default async function ProfilePage({ params }: { params: Promise<{ handle
     userId && target.userId ? isFollowing(target.userId, userId) : false,
     followerCount(target.key),
   ]);
+  // Only friends see whether someone's online — it gates challenges (lib/presence.ts).
+  const online = following && followsYou && target.userId ? await isOnline(target.userId) : false;
 
   const mock = getProfile(target.handle);
   const account = target.account;
@@ -100,7 +103,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ handle
     challenge = { kind: "signed-out" };
   } else {
     const pending = await pendingChallengeTo(userId, profile.handle);
-    challenge = pending ? { kind: "pending", id: pending.id, terms: challengeTerms(pending) } : { kind: "ready" };
+    challenge = pending ? { kind: "pending", id: pending.id, terms: challengeTerms(pending), expiresInMs: pending.expiresInMs } : { kind: "ready" };
   }
 
   const highlights = mock ? (PINNED_OMENS[mock.handle] ?? []) : [];
@@ -116,6 +119,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ handle
         initiallyFollowing={following}
         signedIn={Boolean(userId)}
         followsYou={followsYou}
+        online={online}
         traits={traits}
         challenge={challenge}
         showcase={{

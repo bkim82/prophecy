@@ -58,7 +58,8 @@ multi-statement transactions or row locks. Every transition is a single guarded
 - Personas: `bots` table (`db/schema.ts`), Clerk-shaped `user_…` id, random name (`randomBotName`, `lib/bots.ts:74`) in the same `@handle`/first-name shapes as real opponents, hidden `skill` 0..1. Pool minted up to `POOL_TARGET`=80, then reused (`pickPersonas`). Names resolve via `lib/opponentNames.ts` → `botNames` before Clerk.
 - Per-round brain: `matches.bot_state` jsonb (`BotState`, role + skill + next tick). Non-null = a bot holds that seat; never in `viewFor`. A bot opponent always reads `opponentPresent: true`.
 - Always online: `ensureBotSlots` (`lib/bots.ts:149`, called from `GET /api/match/open`, throttled 4s/instance) keeps one bot-hosted `open` row per BTC × 60/120/300s × 50/100/200 wager (`BOT_WAGERS` = `PULSE_WAGER_OPTIONS`; `BOT_MARKETS`; ETH stays human-only so invites aren't sniped); unique partial index `matches_one_open_bot_per_slot` dedupes. A slot gets a new persona only after its bot is joined; the listed age cycles every 90s (`listedCreatedAt`, display only). Bot hosts skip presence (`or(... isNotNull(botState))` in open list + join).
-- Play (`find-or-create`) pairs humans only (`isNull(botState)`); a queued human on a `BOT_MARKETS` market gets a bot after a deterministic 3–9s per match (`seatBotIfWaiting`, `lib/bots.ts:209`, run off the poll), same guarded seat UPDATE so a real joiner still wins.
+- Play (`find-or-create`) pairs humans only (`isNull(botState)`); a queued human on a `BOT_MARKETS` market gets a bot after a deterministic 3–9s per match (`seatBotIfWaiting`, `lib/bots.ts:212`, run off the poll), same guarded seat UPDATE so a real joiner still wins.
+- Challenge rounds (`matches.invited_user_id` set by `acceptChallenge`, see [profiles.md](profiles.md)) are private: `find-or-create` and `GET /api/match/open` skip them, `seatBotIfWaiting` never seats a bot, and `join` 409s anyone but the invited account (also in its guarded UPDATE).
 - Trading: `driveBot` (`lib/bots.ts:241`) runs off `GET /api/match/[id]` between pre-round expiry and settlement (`app/api/match/[id]/route.ts:47-48`); CAS on `bot_state`. Skill shapes habits only (stake fraction, leverage, momentum-follow, TP/SL, tick rate) — no lookahead. Only trades while someone polls.
 - Economy: bots have no `users` row and reserve nothing; a human beating a bot is paid the full 2× pot (half minted), a bot win just keeps the human's stake.
 
@@ -68,10 +69,10 @@ multi-statement transactions or row locks. Every transition is a single guarded
 | --- | --- |
 | `POST /api/match/find-or-create` | join oldest live `open` match with identical criteria, else create one. Returns `status`, which is how the lobby decides between entering the room and queueing (`app/api/match/find-or-create/route.ts:74`,`:97`,`:117`) |
 | `GET /api/match/[id]?playerId=` | role-scoped view + heartbeat + pre-round expiry + lazy settlement (`app/api/match/[id]/route.ts:38`). Polled by the room, and by the lobby while queued |
-| `POST /api/match/[id]/join` | take a specific fresh open match (lobby list or invite link path) |
+| `POST /api/match/[id]/join` | take a specific fresh open match (lobby list or invite link path); a challenge round only seats `invited_user_id` |
 | `POST /api/match/[id]/action` | Pulse server-priced `enter` actions up to available bankroll and per-position `close` actions; rejects unless the application viewer owns the browser player's stored match slot (`app/api/match/[id]/action/route.ts:33-51`) |
 | `POST /api/match/[id]/leave` | delete while `open`/`predict`; 409 once counting down |
-| `GET /api/match/open?market=&mode=&playerId=` | joinable matches with a fresh host heartbeat |
+| `GET /api/match/open?market=&mode=&playerId=` | joinable matches with a fresh host heartbeat (not challenge rounds) |
 | `GET /api/match/recent` | signed-in user's newest 5 settled matches, all markets — `settledMatchesFor` + `historyEntryFor` + profile-backed `opponentNames` (`lib/opponentNames.ts`), same naming as the profile Matches tab. Rendered by the lobby's Recent results: coin, `vs <opponent>`, Won/Lost/Tie, your round P&L, relative time (`app/lib/playedLabel.ts`); fetched once per mount, so returning from a room refreshes it |
 
 Validation on entry: market must price (`lib/spotPrice.ts:12`), mode must be

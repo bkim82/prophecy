@@ -6,6 +6,7 @@ import { AccountMenu } from "./AccountMenu";
 import { ActiveMatchBar } from "./ActiveMatchBar";
 import { AuthProvider, SignedIn, type AuthConfiguration } from "./auth/AuthProvider";
 import { BalancePill } from "./BalancePill";
+import { LiveChallenges } from "./LiveChallenges";
 import { MobileBottomNav } from "./MobileBottomNav";
 import { MobileChromeAutoHide } from "./MobileChromeAutoHide";
 import { NotificationsMenu } from "./NotificationsMenu";
@@ -78,6 +79,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               </div>
             </div>
           </header>
+          {/* One heartbeat for both header layouts' bells: presence + incoming challenges. */}
+          <SignedIn><LiveChallenges /></SignedIn>
           {children}
           <MobileBottomNav />
           <MobileChromeAutoHide />
