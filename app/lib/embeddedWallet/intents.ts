@@ -1,4 +1,4 @@
-import { CDP_ERC20_PAYMASTER, GAS_ALLOWANCE_RAW, NATIVE_ETH, USDC_BASE, type SendToken } from "./tokens";
+import { CDP_ERC20_PAYMASTER, GAS_ALLOWANCE_RAW, NATIVE_ETH, PERMIT2, USDC_BASE, type SendToken } from "./tokens";
 
 export const BASE_CHAIN_ID = 8453 as const;
 export const INTENT_SCHEMA_VERSION = 1 as const;
@@ -107,6 +107,11 @@ export function decodeErc20Approve(data: string) {
   return { spender: address, amount };
 }
 
+/** Lets CDP's ERC-20 paymaster take the gas fee in USDC; batched first in every USDC-gas user operation. */
+export function gasAllowanceCall(): NormalizedCall {
+  return { to: USDC_BASE, value: "0", data: encodeErc20Approve(CDP_ERC20_PAYMASTER, GAS_ALLOWANCE_RAW) };
+}
+
 /** `token` is resolved server-side (curated or Alchemy metadata), never taken from the client. */
 export function buildSendIntent(
   input: SendIntentInput,
@@ -128,9 +133,8 @@ export function buildSendIntent(
   if (token.maxSendRaw !== null && rawAmount > token.maxSendRaw) {
     throw new IntentValidationError("transaction-limit", `The maximum send is ${formatUnits(token.maxSendRaw, token.decimals)} ${token.symbol}.`);
   }
-  // The approve lets CDP's ERC-20 paymaster take the gas fee in USDC, whatever is sent.
   const calls: NormalizedCall[] = [
-    { to: USDC_BASE, value: "0", data: encodeErc20Approve(CDP_ERC20_PAYMASTER, GAS_ALLOWANCE_RAW) },
+    gasAllowanceCall(),
     token.address === NATIVE_ETH
       ? { to: recipient, value: rawAmount.toString(), data: "0x" }
       : { to: token.address, value: "0", data: encodeErc20Transfer(recipient, rawAmount) },
@@ -146,6 +150,115 @@ export function buildSendIntent(
     rawAmount,
     calls,
   };
+}
+
+export type SwapIntentInput = {
+  idempotencyKey: string;
+  fromToken: string;
+  toToken: string;
+  amount: string;
+};
+
+/** Raw minimum output the user accepted on review: a positive integer string. */
+export function parseMinimumOutput(value: unknown) {
+  if (typeof value !== "string" || !/^[1-9]\d{0,77}$/.test(value)) {
+    throw new IntentValidationError("invalid-minimum-output", "The confirmed swap quote is invalid.");
+  }
+  return value;
+}
+
+/**
+ * Largest slippage (capped at `maxBps`) that keeps `toAmount × (1 − bps)` at
+ * or above the confirmed minimum; -1 when the quote is already at or below it.
+ */
+export function executionSlippageBps(toAmount: bigint, minimumOutput: bigint, maxBps: number) {
+  if (toAmount <= minimumOutput) return -1;
+  const room = Number(((toAmount - minimumOutput) * 10_000n) / toAmount);
+  return Math.min(room, maxBps);
+}
+
+/**
+ * Exact-input swap of a held token into any Base token. CDP builds, simulates,
+ * and submits the swap calls itself, so the stored batch is empty and the
+ * recipient is always the account.
+ */
+export function buildSwapIntent(
+  input: SwapIntentInput,
+  smartAccountAddress: string,
+  fromToken: SendToken,
+  toToken: SendToken,
+) {
+  if (!IDEMPOTENCY_RE.test(input.idempotencyKey)) {
+    throw new IntentValidationError("invalid-idempotency-key", "The operation id is invalid.");
+  }
+  const account = normalizeAddress(smartAccountAddress);
+  if (normalizeAddress(input.fromToken) !== fromToken.address || normalizeAddress(input.toToken) !== toToken.address) {
+    throw new IntentValidationError("unsupported-token", "This token is not enabled for swaps.");
+  }
+  if (fromToken.address === toToken.address) {
+    throw new IntentValidationError("same-token", "Pick two different tokens.");
+  }
+  const rawAmount = parseUnits(input.amount, fromToken.decimals);
+  if (fromToken.maxSendRaw !== null && rawAmount > fromToken.maxSendRaw) {
+    throw new IntentValidationError("transaction-limit", `The maximum swap is ${formatUnits(fromToken.maxSendRaw, fromToken.decimals)} ${fromToken.symbol}.`);
+  }
+  return {
+    schemaVersion: INTENT_SCHEMA_VERSION,
+    kind: "swap" as const,
+    chainId: BASE_CHAIN_ID,
+    smartAccountAddress: account,
+    fromToken,
+    toToken,
+    recipient: account,
+    rawAmount,
+    calls: [] as NormalizedCall[],
+  };
+}
+
+/**
+ * The one approval allowed before a swap: an exact allowance from the sold
+ * token to Permit2, sent as its own self-paid (ETH gas) user operation.
+ */
+export function buildPermit2Approval(tokenAddress: string, rawAmount: bigint): NormalizedCall {
+  const token = normalizeAddress(tokenAddress);
+  if (token === NATIVE_ETH) {
+    throw new IntentValidationError("unexpected-approval", "Native ETH needs no approval.");
+  }
+  return { to: token, value: "0", data: encodeErc20Approve(PERMIT2, rawAmount) };
+}
+
+/**
+ * Bounds what a reported swap user operation may do, since CDP builds its
+ * calls: native value at most the ETH sold (zero for an ERC-20 sell), and any
+ * top-level approve or transfer of the sold token only to Permit2, at most the
+ * sold amount. The swap router itself is CDP's choice and is not pinned.
+ */
+export function assertSwapOperationCalls(input: {
+  tokenIn: string;
+  rawAmount: bigint;
+  calls: NormalizedCall[];
+}) {
+  const tokenIn = normalizeAddress(input.tokenIn);
+  if (input.calls.length === 0) {
+    throw new IntentValidationError("unexpected-calls", "The swap operation has no calls.");
+  }
+  const nativeValue = input.calls.reduce((sum, call) => sum + BigInt(call.value), 0n);
+  if (nativeValue > (tokenIn === NATIVE_ETH ? input.rawAmount : 0n)) {
+    throw new IntentValidationError("unexpected-value", "The swap operation moves more ETH than was sold.");
+  }
+  for (const call of input.calls) {
+    if (call.to.toLowerCase() !== tokenIn) continue;
+    const selector = call.data.slice(2, 10).toLowerCase();
+    if (selector === ERC20_TRANSFER_SELECTOR) {
+      throw new IntentValidationError("unexpected-transfer", "The swap operation transfers the sold token directly.");
+    }
+    if (selector === ERC20_APPROVE_SELECTOR) {
+      const { spender, amount } = decodeErc20Approve(call.data);
+      if (spender !== PERMIT2 || amount > input.rawAmount) {
+        throw new IntentValidationError("unexpected-approval", "The swap operation approves an unexpected spender.");
+      }
+    }
+  }
 }
 
 export function assertSendCalls(input: {

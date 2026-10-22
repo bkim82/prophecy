@@ -2,37 +2,30 @@ import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 
-const signingImports = [
-  {
-    name: "@coinbase/cdp-hooks",
-    importNames: [
-      "useSendEvmTransaction",
-      "useSignEvmHash",
-      "useSignEvmMessage",
-      "useSignEvmTypedData",
-    ],
-    message: "Submit typed intents through app/lib/embeddedWallet/sign.ts.",
-  },
-  {
-    name: "@coinbase/cdp-core",
-    importNames: [
-      "sendEvmTransaction",
-      "signEvmHash",
-      "signEvmMessage",
-      "signEvmTypedData",
-    ],
-    message: "Submit typed intents through app/lib/embeddedWallet/sign.ts.",
-  },
-  {
-    name: "@coinbase/cdp-react",
-    importNames: ["SendEvmTransactionButton"],
-    message: "Submit typed intents through app/lib/embeddedWallet/sign.ts.",
-  },
-  {
-    name: "@coinbase/cdp-react/components/SendEvmTransactionButton",
-    message: "Submit typed intents through app/lib/embeddedWallet/sign.ts.",
-  },
-];
+// Outside sign.ts, CDP browser packages are allowlisted to read-only/auth
+// names: a denylist misses new signing, spend-permission, delegation, and
+// borrow APIs as the SDK grows. Add a name here only after checking it can't
+// sign or grant control of funds.
+const CDP_BOUNDARY = "Only read-only/auth CDP imports are allowed outside app/lib/embeddedWallet/sign.ts; submit typed intents through it, or allowlist a reviewed name in eslint.config.mjs.";
+
+const signingRestrictions = {
+  paths: [
+    {
+      name: "@coinbase/cdp-hooks",
+      allowImportNames: ["useCurrentUser", "useGetAccessToken", "useIsInitialized", "useIsSignedIn", "useSignOut"],
+      message: CDP_BOUNDARY,
+    },
+    { name: "@coinbase/cdp-core", message: CDP_BOUNDARY },
+    {
+      name: "@coinbase/cdp-react",
+      allowImportNames: ["CDPReactProvider", "SignInModal", "SignInModalContent", "EnrollMfaModal", "LinkAuthModal"],
+      message: CDP_BOUNDARY,
+    },
+  ],
+  patterns: [
+    { group: ["@coinbase/cdp-hooks/*", "@coinbase/cdp-core/*", "@coinbase/cdp-react/*"], message: CDP_BOUNDARY },
+  ],
+};
 
 export default defineConfig([
   ...nextVitals,
@@ -54,12 +47,13 @@ export default defineConfig([
         "error",
         {
           paths: [
-            ...signingImports,
+            ...signingRestrictions.paths,
             {
               name: "@clerk/nextjs/server",
               message: "Read server identity through lib/viewer.ts.",
             },
           ],
+          patterns: signingRestrictions.patterns,
         },
       ],
     },
@@ -71,7 +65,7 @@ export default defineConfig([
   {
     files: ["lib/viewer.ts"],
     rules: {
-      "no-restricted-imports": ["error", { paths: signingImports }],
+      "no-restricted-imports": ["error", signingRestrictions],
     },
   },
   globalIgnores([".next/**", "out/**", "build/**", "coverage/**", "next-env.d.ts"]),

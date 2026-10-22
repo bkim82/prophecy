@@ -51,7 +51,7 @@ function describe(token: TokenSearchResult, now: number) {
  * Advanced tab's selected token: identity, live price, a chart with period
  * switching, factual context, a watchlist toggle, and Buy/Sell actions —
  * modeled on app/duel/portfolio/TokenDetail.tsx, minus the Embers-based
- * OrderForm (Buy/Sell here open the wallet's non-functional swap sheet).
+ * OrderForm (Buy/Sell here open the wallet's CDP swap sheet).
  */
 export function AdvancedTokenDetail({
   token,

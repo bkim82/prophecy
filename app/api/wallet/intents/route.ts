@@ -7,7 +7,7 @@ import {
   walletMutationHeaderFailure,
   walletRateLimit,
 } from "@/app/api/wallet/responses";
-import { createSendIntent, listTransactionIntents } from "@/lib/transactionIntents";
+import { createSendIntent, createSwapIntent, listTransactionIntents } from "@/lib/transactionIntents";
 import { normalizeHandle } from "@/app/lib/profileEdit";
 import { walletAddressForHandle } from "@/lib/profile";
 import { getViewer } from "@/lib/viewer";
@@ -37,35 +37,51 @@ export async function POST(request: Request) {
 
   try {
     const body = await readWalletJson(request);
-    if (body.kind !== "send") {
-      return walletJson({ error: "Only curated send intents are enabled" }, { status: 400 });
+    if (body.kind === "swap") {
+      if (
+        typeof body.idempotencyKey !== "string"
+        || typeof body.fromToken !== "string"
+        || typeof body.toToken !== "string"
+        || typeof body.amount !== "string"
+      ) {
+        return walletJson({ error: "Invalid swap intent" }, { status: 400 });
+      }
+      const swap = await createSwapIntent(viewer.userId, viewer.smartAccountAddress, {
+        idempotencyKey: body.idempotencyKey,
+        fromToken: body.fromToken,
+        toToken: body.toToken,
+        amount: body.amount,
+      });
+      return walletJson(swap, { status: swap.intent.status === "created" ? 201 : 200 });
     }
+    if (body.kind !== "send") {
+      return walletJson({ error: "Only send and swap intents are enabled" }, { status: 400 });
+    }
+    // Exactly one of a pasted address or a picked @handle. A handle is resolved
+    // only here; the returned intent carries the address (the review shows it and
+    // the browser signs to it), so each lookup costs a rate-limited, audited intent.
+    const byHandle = typeof body.recipientHandle === "string";
     if (
       typeof body.idempotencyKey !== "string"
       || typeof body.tokenAddress !== "string"
-      || typeof body.recipient !== "string"
       || typeof body.amount !== "string"
+      || byHandle === (typeof body.recipient === "string")
     ) {
       return walletJson({ error: "Invalid send intent" }, { status: 400 });
     }
-    // A picked @handle is re-resolved here so a stale or tampered picker can't
-    // pair one person's handle with another wallet.
-    if (body.recipientHandle !== undefined) {
-      if (typeof body.recipientHandle !== "string") {
-        return walletJson({ error: "Invalid send intent" }, { status: 400 });
-      }
-      const handleAddress = await walletAddressForHandle(normalizeHandle(body.recipientHandle));
-      if (!handleAddress || handleAddress !== body.recipient.toLowerCase()) {
-        return walletJson({ error: "That @handle doesn't match this wallet anymore. Pick the recipient again." }, { status: 409 });
-      }
+    const recipient = byHandle
+      ? await walletAddressForHandle(normalizeHandle(body.recipientHandle as string))
+      : body.recipient as string;
+    if (!recipient) {
+      return walletJson({ error: "That @handle doesn't have a Prophecy wallet. Pick the recipient again." }, { status: 409 });
     }
-    const intent = await createSendIntent(viewer.userId, viewer.smartAccountAddress, {
+    const send = await createSendIntent(viewer.userId, viewer.smartAccountAddress, {
       idempotencyKey: body.idempotencyKey,
       tokenAddress: body.tokenAddress,
-      recipient: body.recipient,
+      recipient,
       amount: body.amount,
     });
-    return walletJson({ intent }, { status: intent.status === "created" ? 201 : 200 });
+    return walletJson(send, { status: send.intent.status === "created" ? 201 : 200 });
   } catch (error) {
     if (error instanceof IntentValidationError) {
       return walletJson({ error: error.message, code: error.code }, { status: 400 });
