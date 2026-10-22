@@ -1,5 +1,6 @@
 import { Composer } from "@/app/compose/Composer";
 import { recentCustomTopicsBy } from "@/lib/posts";
+import { accountTopics } from "@/lib/topicPrefs";
 import { getViewer } from "@/lib/viewer";
 
 // Full-page composer, opened from the feed's "Create Omen" button (desktop
@@ -10,10 +11,12 @@ export default async function ComposePage({ searchParams }: { searchParams: Prom
   const params = await searchParams;
   const text = typeof params.text === "string" ? params.text : "";
   const viewer = await getViewer();
-  const ownTopics = viewer ? await recentCustomTopicsBy(viewer.userId).catch(() => []) : [];
+  const [ownTopics, account] = viewer
+    ? await Promise.all([recentCustomTopicsBy(viewer.userId).catch(() => []), accountTopics(viewer.userId).catch(() => null)])
+    : [[], null];
   return (
     <main className="compose-shell">
-      <Composer initialText={text} openTrades={params.attach === "trade"} ownTopics={ownTopics} />
+      <Composer initialText={text} openTrades={params.attach === "trade"} ownTopics={ownTopics} account={account} />
     </main>
   );
 }

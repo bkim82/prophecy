@@ -9,6 +9,7 @@ import { callRoi, callTrack, formatCallPrice, signedPct, type CallTrack } from "
 import { saveClashVote, saveLike, saveReshare, useSaved } from "@/app/lib/engagementApi";
 import { profileHref } from "@/app/lib/mockProfiles";
 import { useBookmarks } from "@/app/lib/postLists";
+import { useTopicSignal } from "@/app/lib/topicSignals";
 import { rankTier } from "@/app/lib/rank";
 import { RankBadge } from "@/app/RankBadge";
 import type { Clash, Market, MarketCall, Post, PostFlair, Share } from "@/app/lib/mockPosts";
@@ -317,6 +318,8 @@ export function PostCard({
   const [reshared, setReshared] = useSaved<Reshare | null>(post.yourReshare ?? null, (next) => saveReshare(post.id, next));
   const [expanded, setExpanded] = useState(false);
   const bookmarks = useBookmarks();
+  // Likes, bookmarks and reposts also count toward inferred interests.
+  const signal = useTopicSignal();
 
   if (post.kind === "streak") return <StreakCard post={post} />;
   if (post.kind === "promo") return <PromoCard post={post} />;
@@ -447,7 +450,10 @@ export function PostCard({
           className={`action-like${liked ? " is-active" : ""}`}
           aria-pressed={liked}
           aria-label={`Like (${likes})`}
-          onClick={() => setLiked(!liked)}
+          onClick={() => {
+            signal("like", { postId: post.id }, !liked);
+            setLiked(!liked);
+          }}
         >
           <HeartIcon filled={liked} />
           {compact(likes)}
@@ -462,13 +468,24 @@ export function PostCard({
           <CommentIcon />
           {compact(replies)}
         </button>
-        <RepostMenu post={post} mine={mine} reshare={reshared} onChange={setReshared} />
+        <RepostMenu
+          post={post}
+          mine={mine}
+          reshare={reshared}
+          onChange={(next) => {
+            if ((next === null) !== (reshared === null)) signal("repost", { postId: post.id }, next !== null);
+            setReshared(next);
+          }}
+        />
         <button
           type="button"
           className={`action-bookmark${bookmarked ? " is-active" : ""}`}
           aria-pressed={bookmarked}
           aria-label={bookmarked ? "Remove bookmark" : "Bookmark post"}
-          onClick={() => bookmarks.toggle(post.id)}
+          onClick={() => {
+            signal("bookmark", { postId: post.id }, !bookmarked);
+            bookmarks.toggle(post.id);
+          }}
         >
           <BookmarkIcon filled={bookmarked} />
         </button>

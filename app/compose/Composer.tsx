@@ -12,7 +12,8 @@ import { gifById, type GifId } from "@/app/lib/gifs";
 import { markFreshPost } from "@/app/lib/freshPost";
 import { publishPost } from "@/app/lib/postApi";
 import { MAX_POST_PHOTOS, POST_IMAGE_MAX_BYTES, POST_IMAGE_MAX_SIDE } from "@/app/lib/postImage";
-import { useInterests } from "@/app/lib/postLists";
+import { useTopicPrefs } from "@/app/lib/postLists";
+import type { AccountTopics } from "@/app/lib/topicInterest";
 import { MAX_POST_TOPICS, isCustomTopicId, mentionedTopics, type TopicId } from "@/app/lib/topics";
 import { tradePrompt, tradeTopic, type TradeReceipt } from "@/app/lib/trades";
 import { GifShot } from "@/app/PostMedia";
@@ -196,9 +197,20 @@ function useDismiss(open: Panel | null, containerRef: RefObject<HTMLElement | nu
  * POST /api/posts (sign-in required) — only the trade's id goes up, never its
  * numbers — then goes back to the feed, where the new omen is pinned on top
  * and flashes (app/lib/freshPost.ts). `ownTopics` = custom topics from your
- * recent saved posts (app/compose/page.tsx), offered for reuse.
+ * recent saved posts (app/compose/page.tsx), offered for reuse; `account` =
+ * the signed-in account's feed topics (null: this browser's).
  */
-export function Composer({ initialText, openTrades, ownTopics }: { initialText: string; openTrades: boolean; ownTopics: TopicId[] }) {
+export function Composer({
+  initialText,
+  openTrades,
+  ownTopics,
+  account,
+}: {
+  initialText: string;
+  openTrades: boolean;
+  ownTopics: TopicId[];
+  account: AccountTopics | null;
+}) {
   const router = useRouter();
   const { user, isSignedIn, openSignIn } = useAppAuth();
   const [draft] = useState(() => savedDraft);
@@ -209,7 +221,7 @@ export function Composer({ initialText, openTrades, ownTopics }: { initialText: 
   const [poll, setPoll] = useState<PollDraft | null>(draft?.poll ?? null);
   const [topics, setTopics] = useState<TopicId[]>(draft?.topics ?? []);
   const [autoTopic, setAutoTopic] = useState<TopicId | null>(draft?.autoTopic ?? null);
-  const interests = useInterests();
+  const { interests, inferred } = useTopicPrefs(account);
   const [posting, setPosting] = useState(false);
   const [panel, setPanel] = useState<Panel | null>(openTrades ? "trade" : null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -265,8 +277,8 @@ export function Composer({ initialText, openTrades, ownTopics }: { initialText: 
   // Topics you've made yourself: picked now, followed, or on your recent posts.
   const knownTopics = [...new Set([...topics, ...interests.ids, ...ownTopics])].filter(isCustomTopicId);
   // Chip order: the trade's coin, what the text mentions, your feed
-  // interests, then your own topics.
-  const suggestedTopics = [...new Set([...(tradeTopicId ? [tradeTopicId] : []), ...mentionedTopics(text), ...interests.ids, ...knownTopics])];
+  // interests (followed, then inferred), then your own topics.
+  const suggestedTopics = [...new Set([...(tradeTopicId ? [tradeTopicId] : []), ...mentionedTopics(text), ...interests.ids, ...inferred, ...knownTopics])];
 
   function toggle(next: Panel) {
     setPanel((current) => (current === next ? null : next));

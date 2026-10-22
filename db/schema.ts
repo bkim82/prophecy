@@ -522,3 +522,28 @@ export const follows = pgTable("follows", {
   pk: primaryKey({ columns: [table.followerId, table.target] }),
   byTarget: index("follows_target").on(table.target),
 }));
+
+// An account's feed topics (lib/topicPrefs.ts): followed and Not interested
+// TopicIds, in order. No row yet = the onboarding picks (or the feed defaults
+// for accounts that predate onboarding). Created by db/topics.sql.
+export const topicPrefs = pgTable("topic_prefs", {
+  userId: text("user_id").primaryKey(),
+  followed: jsonb("followed").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+  muted: jsonb("muted").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Engagement that feeds inferred interests (app/lib/topicInterest.ts): one
+// row per topic of the post acted on — once per post and signal, removed on
+// unlike/unbookmark/undo — or per topic visit (`post_id` ''). Created by
+// db/topics.sql.
+export const topicSignals = pgTable("topic_signals", {
+  userId: text("user_id").notNull(),
+  topic: text("topic").notNull(), // TopicId incl. custom "#name"
+  signal: text("signal").notNull(), // ClientTopicSignal
+  postId: text("post_id").notNull().default(""),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("topic_signals_user_created_idx").on(table.userId, table.createdAt),
+  uniqueIndex("topic_signals_post_once").on(table.userId, table.signal, table.postId, table.topic).where(sql`${table.postId} <> ''`),
+]);

@@ -1,9 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BackIcon } from "@/app/icons";
 import type { Post, Reply } from "@/app/lib/mockPosts";
+import { useTopicSignal } from "@/app/lib/topicSignals";
 import { PostCard } from "@/app/PostCard";
 import { ReplyComposer, ReplyItem, withMention } from "@/app/PostReplies";
 
@@ -17,6 +18,10 @@ export function PostThread({ post, replies }: { post: Post; replies: Reply[] }) 
   const [mine, setMine] = useState<Reply[]>([]);
   const [removed, setRemoved] = useState<string[]>([]);
   const all = [...mine, ...replies].filter((reply) => !removed.includes(reply.id));
+  // Opening a post and replying to it count toward inferred interests
+  // (once per post; the server skips your own).
+  const signal = useTopicSignal();
+  useEffect(() => signal("open_post", { postId: post.id }), [signal, post.id]);
 
   // Back to wherever the post was opened from; a fresh tab has nowhere to go
   // back to, so it lands on the feed.
@@ -46,7 +51,10 @@ export function PostThread({ post, replies }: { post: Post; replies: Reply[] }) 
           inputRef={inputRef}
           draft={draft}
           onDraft={setDraft}
-          onPosted={(reply) => setMine((current) => [reply, ...current])}
+          onPosted={(reply) => {
+            signal("reply", { postId: post.id });
+            setMine((current) => [reply, ...current]);
+          }}
         />
         <div className="post-replies">
           {all.map((reply) => (

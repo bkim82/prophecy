@@ -8,7 +8,9 @@ import { ComposeIcon } from "@/app/icons";
 import { PostCard } from "@/app/PostCard";
 import { clearFreshPost, useFreshPostId } from "@/app/lib/freshPost";
 import { LIVE_CALL_COUNT, SHARES, type Post, type Share } from "@/app/lib/mockPosts";
-import { useBookmarks, useInterests, useMutedTopics } from "@/app/lib/postLists";
+import { useBookmarks, useTopicPrefs } from "@/app/lib/postLists";
+import type { AccountTopics } from "@/app/lib/topicInterest";
+import { useTopicSignal } from "@/app/lib/topicSignals";
 import { ageMinutes, blendTopics, personalize, pickCovers, postTopics, topicById, type Cover, type Topic, type TopicId } from "@/app/lib/topics";
 
 type FilterId = "forYou" | "following" | "live" | "clashes" | "bookmarked";
@@ -51,20 +53,25 @@ type Row =
   | { kind: "notice"; key: string; notice: Notice };
 
 // `savedPosts` = omens from the `posts` table (lib/posts.ts feedPosts,
-// rendered by app/page.tsx), newest first, pinned above everything else.
+// rendered by app/page.tsx), newest first, pinned above everything else
+// (on the For You home, only your own).
 // `followed`: everyone you follow as "@handle"s (lib/follows.ts
 // followedHandles); `shares`: what the real accounts among them reposted
 // (lib/engagement.ts followedReshares).
+// `account`: the signed-in account's topics (lib/topicPrefs.ts accountTopics);
+// null = signed out (or unavailable), so this browser's lists are used.
 export function FeedSwitcher({
   posts,
   savedPosts,
   followed,
   shares: savedShares,
+  account,
 }: {
   posts: Post[];
   savedPosts: Post[];
   followed: string[];
   shares: Share[];
+  account: AccountTopics | null;
 }) {
   const shares = useMemo(() => followedShares(followed, savedShares), [followed, savedShares]);
   const [filter, setFilter] = useState<FilterId>("forYou");
@@ -80,8 +87,14 @@ export function FeedSwitcher({
   // Just published from a composer: flashed once on its way in.
   const freshId = useFreshPostId();
   const { ids: bookmarkIds } = useBookmarks();
-  const interests = useInterests();
-  const muted = useMutedTopics();
+  const { interests, muted, inferred } = useTopicPrefs(account);
+  // For You runs on what you follow plus what your activity points to
+  // (app/lib/topicInterest.ts), minus anything marked Not interested since.
+  const forYouTopics = useMemo(
+    () => [...interests.ids, ...inferred.filter((id) => !interests.ids.includes(id) && !muted.ids.includes(id))],
+    [interests.ids, inferred, muted.ids],
+  );
+  const signal = useTopicSignal();
   const [notices, setNotices] = useState<Notice[]>([]);
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -97,21 +110,25 @@ export function FeedSwitcher({
       if (filter === "bookmarked" && !bookmarkIds.includes(post.id)) return false;
       return view === "forYou" || postTopics(post).includes(view);
     };
-    // Saved omens stay on top, above the covers.
-    const pinned = shownSaved.filter(keep);
+    // Saved omens stay on top.
+    const saved = shownSaved.filter(keep);
     const feed = posts.filter(keep);
     // Following runs on when things hit it, so a fresh vouch/defy of an old
     // post lands near the top. (Stable sort keeps ties in feed order.)
     if (filter === "following") feed.sort((a, b) => followingAge(a, shares) - followingAge(b, shares));
     const none: Cover[] = [];
-    if (!home) return { pinned, covers: none, rest: feed };
+    if (!home) return { pinned: saved, covers: none, rest: feed };
+    // On the For You home only your own omens stay pinned; everyone else's
+    // join the suggestions (newest first, ahead of the mock feed) so your
+    // interests' covers lead the feed.
+    const pinned = saved.filter((post) => post.mine);
     // Suggestions skip anything tagged with a "Not interested" topic.
-    const suggestions = feed.filter((post) => !postTopics(post).some((id) => muted.ids.includes(id)));
-    if (mixed) return { pinned, covers: none, rest: blendTopics(suggestions, interests.ids) };
-    const covers = pickCovers(suggestions, interests.ids);
+    const suggestions = [...saved.filter((post) => !post.mine), ...feed].filter((post) => !postTopics(post).some((id) => muted.ids.includes(id)));
+    if (mixed) return { pinned, covers: none, rest: blendTopics(suggestions, forYouTopics) };
+    const covers = pickCovers(suggestions, forYouTopics);
     const coverIds = new Set(covers.map((cover) => cover.post.id));
-    return { pinned, covers, rest: personalize(suggestions.filter((post) => !coverIds.has(post.id)), interests.ids) };
-  }, [filter, view, home, mixed, posts, followed, shares, shownSaved, bookmarkIds, interests.ids, muted.ids]);
+    return { pinned, covers, rest: personalize(suggestions.filter((post) => !coverIds.has(post.id)), forYouTopics) };
+  }, [filter, view, home, mixed, posts, followed, shares, shownSaved, bookmarkIds, forYouTopics, muted.ids]);
 
   const visible = useMemo(() => [...pinned, ...covers.map((cover) => cover.post), ...rest], [pinned, covers, rest]);
 
@@ -145,10 +162,16 @@ export function FeedSwitcher({
     setNotices((current) => current.filter((notice) => notice.topic !== topic));
   }
 
+  // Opening a topic's feed counts as a visit toward inferring it.
+  function showView(next: TopicView) {
+    if (next !== "forYou" && next !== view) signal("view_topic", { topic: next });
+    setView(next);
+  }
+
   // "See more on …": open the topic and bring the top of the feed back into
   // view, since the cover that was clicked may be far down.
   function openTopic(next: TopicView) {
-    setView(next);
+    showView(next);
     const panel = panelRef.current;
     if (panel && panel.getBoundingClientRect().top < 0) {
       const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -207,15 +230,15 @@ export function FeedSwitcher({
       <div className="feed-main">
         <div className="feed-panel" ref={panelRef}>
           <FeedComposer />
-          {home && interests.ids.length > 1 && (
-            <MixBanner mixed={mixed} topicCount={interests.ids.length} onToggle={() => setMixed((value) => !value)} />
+          {home && forYouTopics.length > 1 && (
+            <MixBanner mixed={mixed} topicCount={forYouTopics.length} onToggle={() => setMixed((value) => !value)} />
           )}
           <TopicChips
             interests={interests.ids}
             view={view}
             homeLabel={filter === "forYou" ? "For You" : "All"}
             pickerOpen={pickerOpen}
-            onSelect={setView}
+            onSelect={showView}
             onTogglePicker={() => setPickerOpen((open) => !open)}
           />
           {pickerOpen && (
@@ -237,7 +260,7 @@ export function FeedSwitcher({
             />
           )}
           <div className="feed-list">
-            {home && !mixed && interests.ids.length === 0 && (
+            {home && !mixed && forYouTopics.length === 0 && (
               <p className="feed-covers-empty">
                 Follow a few coins, companies or people and For You will open with a top post from each.
                 <button type="button" onClick={() => setPickerOpen(true)}>
