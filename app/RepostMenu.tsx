@@ -35,6 +35,8 @@ const lockedFor = (mine: boolean, kind: ReshareKind) => mine && kind !== "repost
 // survives closing the popover. The button shows the total of all three and
 // takes the chosen kind's icon + color once you've reposted. `onChange` saves
 // it (PostCard); signed out, the button opens sign-in instead of the menu.
+// Across a block with the author (`post.blocked`) it's disabled, unless you
+// still have a repost to undo.
 export function RepostMenu({
   post,
   mine,
@@ -46,6 +48,7 @@ export function RepostMenu({
   reshare: Reshare | null;
   onChange: (next: Reshare | null) => void;
 }) {
+  const locked = post.blocked === true && !reshare;
   const { isSignedIn, openSignIn } = useAppAuth();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(reshare?.text ?? "");
@@ -97,8 +100,9 @@ export function RepostMenu({
         data-kind={reshare?.kind}
         aria-haspopup="dialog"
         aria-expanded={open}
-        aria-label={active ? `${active.done} (${total}): change or undo` : `Repost (${total}): repost, vouch or defy`}
-        title="Repost, vouch or defy"
+        aria-label={active ? `${active.done} (${total}): change or undo` : locked ? `Repost (${total}): unavailable` : `Repost (${total}): repost, vouch or defy`}
+        title={locked ? "You can't repost this post" : "Repost, vouch or defy"}
+        disabled={locked}
         onClick={() => (open ? close() : isSignedIn ? setOpen(true) : openSignIn())}
       >
         <TriggerIcon />

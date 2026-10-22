@@ -11,7 +11,8 @@ import { BackIcon, CloseIcon, EmojiIcon, GifIcon, ImageIcon, PollIcon, TrendIcon
 import { gifById, type GifId } from "@/app/lib/gifs";
 import { markFreshPost } from "@/app/lib/freshPost";
 import { publishPost } from "@/app/lib/postApi";
-import { MAX_POST_PHOTOS, POST_IMAGE_MAX_BYTES, POST_IMAGE_MAX_SIDE } from "@/app/lib/postImage";
+import { MAX_POST_PHOTOS } from "@/app/lib/postImage";
+import { PICKED_PHOTO_MAX_BYTES, encodePhoto, loadPhoto, type PickedPhoto } from "@/app/lib/pickedPhoto";
 import { useTopicPrefs } from "@/app/lib/postLists";
 import type { AccountTopics } from "@/app/lib/topicInterest";
 import { MAX_POST_TOPICS, isCustomTopicId, mentionedTopics, type TopicId } from "@/app/lib/topics";
@@ -22,7 +23,7 @@ import { TradeCard } from "@/app/TradeCard";
 const MAX_CHARS = 280;
 const MAX_PHOTOS = MAX_POST_PHOTOS;
 // What you can pick; each is shrunk to POST_IMAGE_MAX_BYTES before upload.
-const MAX_PHOTO_BYTES = 20 * 1024 * 1024;
+const MAX_PHOTO_BYTES = PICKED_PHOTO_MAX_BYTES;
 const MAX_CHOICE_CHARS = 25;
 const POLL_DURATIONS = [
   { value: "1h", label: "1 hour" },
@@ -32,7 +33,7 @@ const POLL_DURATIONS = [
   { value: "7d", label: "7 days" },
 ];
 
-type Photo = { src: string; width: number; height: number; file: File };
+type Photo = PickedPhoto;
 type PollDraft = { choices: string[]; duration: string };
 type Panel = "trade" | "gif" | "emoji" | "topics";
 // `autoTopic` = the topic attaching the trade added for you; it goes again
@@ -42,54 +43,6 @@ type Draft = { text: string; trade: TradeReceipt | null; photos: Photo[]; gif: G
 // The draft survives leaving /compose without posting (back to the feed and
 // in again), for this tab only. Blob URLs in it stay alive with it.
 let savedDraft: Draft | null = null;
-
-function loadPhoto(file: File): Promise<Photo | null> {
-  return new Promise((resolve) => {
-    const src = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => resolve({ src, width: img.naturalWidth || 1, height: img.naturalHeight || 1, file });
-    img.onerror = () => {
-      URL.revokeObjectURL(src);
-      resolve(null);
-    };
-    img.src = src;
-  });
-}
-
-const toBase64 = async (blob: Blob) => {
-  const bytes = new Uint8Array(await blob.arrayBuffer());
-  let binary = "";
-  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  return btoa(binary);
-};
-
-// A photo as POST /api/posts takes it: a GIF that already fits goes as-is
-// (keeps its animation); anything else is redrawn no larger than
-// POST_IMAGE_MAX_SIDE and saved as JPEG, stepping quality down until it fits
-// POST_IMAGE_MAX_BYTES. Null if it still won't fit.
-async function encodePhoto(photo: Photo): Promise<{ mime: string; data: string } | null> {
-  if (photo.file.type === "image/gif" && photo.file.size <= POST_IMAGE_MAX_BYTES) {
-    return { mime: "image/gif", data: await toBase64(photo.file) };
-  }
-  const img = new Image();
-  img.src = photo.src;
-  await img.decode();
-  const scale = Math.min(1, POST_IMAGE_MAX_SIDE / Math.max(img.naturalWidth, img.naturalHeight));
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
-  canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
-  const context = canvas.getContext("2d");
-  if (!context) return null;
-  // JPEG has no transparency; paint it white rather than black.
-  context.fillStyle = "#fff";
-  context.fillRect(0, 0, canvas.width, canvas.height);
-  context.drawImage(img, 0, 0, canvas.width, canvas.height);
-  for (const quality of [0.86, 0.74, 0.6]) {
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
-    if (blob && blob.size <= POST_IMAGE_MAX_BYTES) return { mime: "image/jpeg", data: await toBase64(blob) };
-  }
-  return null;
-}
 
 // X-style progress ring: fills toward the limit, shows what's left from 20
 // out, turns red past it.

@@ -33,6 +33,24 @@ export type PostInput = {
 const GIF_IDS = new Set<string>(GIFS.map((gif) => gif.id));
 const BASE64 = /^[A-Za-z0-9+/]+={0,2}$/;
 
+/** `[{ mime, data }]` (base64) → checked photos, ≤ MAX_POST_PHOTOS — posts and direct messages alike. Missing = none. */
+export function parsePhotos(raw: unknown): PostPhotoInput[] | { error: string } {
+  const rawPhotos = raw ?? [];
+  if (!Array.isArray(rawPhotos) || rawPhotos.length > MAX_POST_PHOTOS) return { error: `Up to ${MAX_POST_PHOTOS} photos` };
+  const photos: PostPhotoInput[] = [];
+  for (const item of rawPhotos as { mime?: unknown; data?: unknown }[]) {
+    if (typeof item?.mime !== "string" || typeof item.data !== "string" || !BASE64.test(item.data)) return { error: "Invalid photo" };
+    const bytes = Buffer.from(item.data, "base64");
+    try {
+      const info = inspectPostImage(bytes, item.mime);
+      photos.push({ mime: info.mime, base64: bytes.toString("base64"), width: info.width, height: info.height });
+    } catch {
+      return { error: "Photos must be JPEG, PNG, WebP or GIF, up to 1 MB" };
+    }
+  }
+  return photos;
+}
+
 export function parsePostInput(body: Record<string, unknown>): PostInput | { error: string } {
   const content = typeof body.content === "string" ? body.content.trim() : body.content === undefined ? "" : null;
   if (content === null || content.length > MAX_POST_CHARS) return { error: `Posts are up to ${MAX_POST_CHARS} characters` };
@@ -65,19 +83,8 @@ export function parsePostInput(body: Record<string, unknown>): PostInput | { err
     poll = { choices, durationMs };
   }
 
-  const rawPhotos = body.photos ?? [];
-  if (!Array.isArray(rawPhotos) || rawPhotos.length > MAX_POST_PHOTOS) return { error: `Up to ${MAX_POST_PHOTOS} photos` };
-  const photos: PostPhotoInput[] = [];
-  for (const raw of rawPhotos as { mime?: unknown; data?: unknown }[]) {
-    if (typeof raw?.mime !== "string" || typeof raw.data !== "string" || !BASE64.test(raw.data)) return { error: "Invalid photo" };
-    const bytes = Buffer.from(raw.data, "base64");
-    try {
-      const info = inspectPostImage(bytes, raw.mime);
-      photos.push({ mime: info.mime, base64: bytes.toString("base64"), width: info.width, height: info.height });
-    } catch {
-      return { error: "Photos must be JPEG, PNG, WebP or GIF, up to 1 MB" };
-    }
-  }
+  const photos = parsePhotos(body.photos);
+  if ("error" in photos) return photos;
 
   if ([photos.length > 0, gif !== null, poll !== null].filter(Boolean).length > 1) {
     return { error: "A post can have photos, a GIF or a poll — one of them" };

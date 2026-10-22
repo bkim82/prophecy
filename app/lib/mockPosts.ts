@@ -154,6 +154,9 @@ export type Post = {
   // `reposts`/`vouches`/`defies`).
   liked?: boolean;
   yourReshare?: Reshare;
+  // A saved post whose author has a block either way with the viewer
+  // (lib/blocks.ts, set by withEngagement): no replying or reposting.
+  blocked?: boolean;
 };
 
 // Platform-wide count beside "Live Calls" in the feed rail — a hardcoded

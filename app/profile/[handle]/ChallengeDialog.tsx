@@ -43,7 +43,7 @@ type ChallengeControlProps = {
   followsYou: boolean;
   // They're online right now (ProfileView polls it); you are, being here.
   online: boolean;
-  // The Follow button, kept on the same row.
+  // The ⋯ menu, Follow and Message buttons, kept on the same row.
   children: React.ReactNode;
 };
 
@@ -152,7 +152,7 @@ export function ChallengeControl({ state, target, viewerRank, following, follows
 
   return (
     <>
-      {/* Follow (primary) first, then Challenge. */}
+      {/* ⋯, Follow (primary) and Message first, then Challenge. */}
       <div className="profile-actions">
         {children}
         {button}

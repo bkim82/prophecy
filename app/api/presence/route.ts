@@ -1,5 +1,6 @@
 import { acceptedChallengeViews, closeAbandonedRounds, incomingChallengeViews } from "@/lib/challenges";
 import { followTarget, isFollowing } from "@/lib/follows";
+import { messageSummaryFor } from "@/lib/messages";
 import { clearPresence, isOnline, touchPresence } from "@/lib/presence";
 import { mutationRequestFailure } from "@/lib/requestSecurity";
 import { getViewer } from "@/lib/viewer";
@@ -11,9 +12,12 @@ const NO_STORE = { "Cache-Control": "private, no-store" };
 /**
  * The header heartbeat (app/LiveChallenges.tsx), every 2s in a visible tab.
  * POST {} → marks you online, closes abandoned challenge rounds you're in
- * (refunding the accepter), and returns { challenges, accepted }: your
- * unexpired incoming challenges, and your sent ones whose round is waiting
- * for you to join, for the bell and its popup (app/lib/liveChallenges.ts).
+ * (refunding the accepter), and returns { challenges, accepted, messages }:
+ * your unexpired incoming challenges, and your sent ones whose round is
+ * waiting for you to join, for the bell and its popup
+ * (app/lib/liveChallenges.ts); and your unread message counts for the
+ * Messages badge (lib/messages.ts messageSummaryFor) — null if they couldn't
+ * be read, so a messaging outage never stalls challenges.
  * POST { away: true } → offline now (the tab is closing).
  */
 export async function POST(request: Request) {
@@ -27,8 +31,12 @@ export async function POST(request: Request) {
     return new Response(null, { status: 204 });
   }
   await Promise.all([touchPresence(userId), closeAbandonedRounds(userId)]);
-  const [challenges, accepted] = await Promise.all([incomingChallengeViews(userId), acceptedChallengeViews(userId)]);
-  return Response.json({ challenges, accepted }, { headers: NO_STORE });
+  const [challenges, accepted, messages] = await Promise.all([
+    incomingChallengeViews(userId),
+    acceptedChallengeViews(userId),
+    messageSummaryFor(userId).catch(() => null),
+  ]);
+  return Response.json({ challenges, accepted, messages }, { headers: NO_STORE });
 }
 
 /**

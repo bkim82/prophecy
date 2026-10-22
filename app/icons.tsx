@@ -69,6 +69,26 @@ export function BellIcon({ className }: { className?: string }) {
   );
 }
 
+// Envelope: the header's Messages button (app/MessagesButton.tsx) and a profile's Message button.
+export function MessagesIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" className={className} fill="none" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="2.75" y="4.5" width="14.5" height="11" rx="2" />
+      <path d="m3.5 6 6.5 5 6.5-5" />
+    </svg>
+  );
+}
+
+// Pencil on a page: start a new conversation (app/MessagesDock.tsx).
+export function NewMessageIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" className={className} fill="none" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M9 4H5.5a2 2 0 0 0-2 2v8.5a2 2 0 0 0 2 2H14a2 2 0 0 0 2-2V11" />
+      <path d="M14.3 3.2a1.5 1.5 0 0 1 2.1 2.1l-5.9 5.9-2.8.7.7-2.8 5.9-5.9Z" />
+    </svg>
+  );
+}
+
 export function SearchIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 20 20" className={className} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">

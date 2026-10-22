@@ -15,10 +15,12 @@ const mocks = vi.hoisted(() => ({
   editReply: vi.fn(),
   deleteReply: vi.fn(),
   voteClash: vi.fn(),
+  isBlockedEitherWay: vi.fn(),
 }));
 
 vi.mock("@/lib/viewer", () => ({ getViewer: mocks.getViewer, getViewerProfile: mocks.getViewerProfile }));
 vi.mock("@/lib/profile", () => ({ storedProfileFor: mocks.storedProfileFor }));
+vi.mock("@/lib/blocks", () => ({ isBlockedEitherWay: mocks.isBlockedEitherWay }));
 vi.mock("@/lib/engagement", () => ({
   isReshareKind: (value: unknown) => value === "repost" || value === "vouch" || value === "defy",
   engagementTarget: mocks.engagementTarget,
@@ -55,6 +57,7 @@ describe("engagement routes", () => {
     mocks.storedProfileFor.mockResolvedValue(null);
     mocks.engagementTarget.mockResolvedValue({ authorId: null });
     mocks.replyCountSince.mockResolvedValue(0);
+    mocks.isBlockedEitherWay.mockResolvedValue(false);
   });
 
   it("requires sign-in and a same-origin request to like, repost or reply", async () => {
@@ -91,6 +94,23 @@ describe("engagement routes", () => {
     expect((await reshare(request("reshare", { kind: "defy" }), ctx("p1"))).status).toBe(403);
     expect((await reshare(request("reshare", { kind: "repost", text: "mine" }), ctx("p1"))).status).toBe(200);
     expect(mocks.setReshare).toHaveBeenCalledWith("p1", "user_1", { kind: "repost", text: "mine" });
+  });
+
+  it("refuses replies and reposts across a block with the author, but still lets you undo a repost", async () => {
+    mocks.engagementTarget.mockResolvedValue({ authorId: "user_2" });
+    mocks.isBlockedEitherWay.mockResolvedValue(true);
+    const replied = await reply(request("replies", { content: "hi" }), ctx("p1"));
+    expect(replied.status).toBe(403);
+    expect(await replied.json()).toEqual({ error: "You can't reply to this post." });
+    const reposted = await reshare(request("reshare", { kind: "repost" }), ctx("p1"));
+    expect(reposted.status).toBe(403);
+    expect(await reposted.json()).toEqual({ error: "You can't repost this post." });
+    expect(mocks.isBlockedEitherWay).toHaveBeenCalledWith("user_1", "user_2");
+    expect(mocks.createReply).not.toHaveBeenCalled();
+    expect(mocks.setReshare).not.toHaveBeenCalled();
+
+    expect((await reshare(request("reshare", { kind: null }), ctx("p1"))).status).toBe(200);
+    expect(mocks.setReshare).toHaveBeenCalledWith("p1", "user_1", null);
   });
 
   it("saves a reply with a server-derived author", async () => {

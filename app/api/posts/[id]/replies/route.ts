@@ -1,5 +1,6 @@
 import { authorFor } from "@/app/api/posts/author";
 import { postsJson, postsMutationFailure, readPostsJson } from "@/app/api/posts/responses";
+import { isBlockedEitherWay } from "@/lib/blocks";
 import { createReply, engagementTarget, replyCountSince, repliesFor } from "@/lib/engagement";
 import { MAX_POST_CHARS } from "@/lib/postInput";
 import { getViewer } from "@/lib/viewer";
@@ -20,7 +21,8 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
 /**
  * POST { content } → 201 { reply }: saves the viewer's reply (1–280 chars).
  * The author is derived like a post's (app/api/posts/author.ts); rate
- * limited per author via the post_replies table.
+ * limited per author via the post_replies table. Not across a block either
+ * way with the post's author (403, lib/blocks.ts).
  */
 export async function POST(request: Request, ctx: { params: Promise<{ id: string }> }) {
   const failure = postsMutationFailure(request);
@@ -34,7 +36,11 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
 
   const { id } = await ctx.params;
   try {
-    if (!(await engagementTarget(id))) return postsJson({ error: "Post not found" }, { status: 404 });
+    const target = await engagementTarget(id);
+    if (!target) return postsJson({ error: "Post not found" }, { status: 404 });
+    if (target.authorId && target.authorId !== viewer.userId && (await isBlockedEitherWay(viewer.userId, target.authorId))) {
+      return postsJson({ error: "You can't reply to this post." }, { status: 403 });
+    }
     const now = Date.now();
     const [lastMinute, lastDay] = await Promise.all([
       replyCountSince(viewer.userId, new Date(now - 60_000)),

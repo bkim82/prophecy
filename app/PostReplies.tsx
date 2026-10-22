@@ -209,7 +209,8 @@ export function ReplyItem({
 // `draft` so a reply's Reply button can @mention into it. Saves through
 // POST /api/posts/[id]/replies; signed out, Reply opens sign-in and keeps the
 // draft. Authorship is server-derived; the avatar initial here is the
-// signed-in user's.
+// signed-in user's. `blocked` (a block either way with the post's author,
+// `post.blocked`) swaps the box for a note — the server refuses anyway.
 export function ReplyComposer({
   postId,
   replyingTo,
@@ -218,6 +219,7 @@ export function ReplyComposer({
   onDraft,
   onPosted,
   inline = false,
+  blocked = false,
 }: {
   postId: string;
   replyingTo: string;
@@ -226,6 +228,7 @@ export function ReplyComposer({
   onDraft: (draft: string) => void;
   onPosted: (reply: Reply) => void;
   inline?: boolean;
+  blocked?: boolean;
 }) {
   const { user, isSignedIn, openSignIn } = useAppAuth();
   const [posting, setPosting] = useState(false);
@@ -254,6 +257,8 @@ export function ReplyComposer({
     onDraft("");
     onPosted(result.reply);
   }
+
+  if (blocked) return <p className="muted reply-blocked">You can&rsquo;t reply to this post.</p>;
 
   return (
     <>
@@ -335,6 +340,7 @@ export function ReplyThread({ post, onCountChange }: { post: Post; onCountChange
     <div className="reply-thread">
       <ReplyComposer
         inline
+        blocked={post.blocked}
         postId={post.id}
         replyingTo={post.handle || post.author}
         inputRef={inputRef}
