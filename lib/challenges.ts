@@ -1,10 +1,24 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import { getDb } from "@/db";
-import { challenges, profiles } from "@/db/schema";
-import type { ChallengeMode } from "@/app/lib/challengeRules";
+import { challenges, matches, profiles } from "@/db/schema";
+import { CHALLENGE_TTL_SECONDS, ROUND_JOIN_SECONDS, type AcceptedChallenge, type IncomingChallenge } from "@/app/lib/challengeRules";
+import { playedLabel } from "@/app/lib/playedLabel";
+import { refundBalance } from "@/lib/balance";
+import { presenceCutoff } from "@/lib/match";
 
 // Reads/writes for the `challenges` table (db/schema.ts). Validation and the
 // rank gate live in app/profile/challengeActions.ts.
+//
+// A pending challenge expires CHALLENGE_TTL_SECONDS after it's sent. Reads
+// treat older pending rows as gone right away; expireStaleChallenges() then
+// flips them to "expired" (before a send, so the one-pending slot frees up,
+// and before your sent list loads). Times use the database clock.
+
+const ttl = sql`make_interval(secs => ${CHALLENGE_TTL_SECONDS})`;
+const unexpired = gt(challenges.createdAt, sql`now() - ${ttl}`);
+const expiresInMs = sql<number>`greatest(0, extract(epoch from (${challenges.createdAt} + ${ttl} - now())) * 1000)::int`;
+// An accepted round's window for the challenger to take their seat.
+const joinWindow = sql`make_interval(secs => ${ROUND_JOIN_SECONDS})`;
 
 export type ChallengeRow = typeof challenges.$inferSelect;
 
@@ -14,7 +28,7 @@ export type NewChallenge = {
   targetHandle: string;
   targetUserId: string | null;
   targetRank: string;
-  mode: ChallengeMode;
+  mode: "pulse";
   market: string | null;
   timerSeconds: number | null;
   stake: number;
@@ -36,53 +50,182 @@ export async function createChallenge(challenge: NewChallenge): Promise<"ok" | "
   }
 }
 
-/** Your pending challenges plus declined ones you haven't cleared, newest first — the own-profile Matches tab. */
+/** Flips your timed-out pending challenges to "expired". */
+export async function expireStaleChallenges(challengerId: string): Promise<void> {
+  await getDb()
+    .update(challenges)
+    .set({ status: "expired" })
+    .where(and(eq(challenges.challengerId, challengerId), eq(challenges.status, "pending"), sql`not ${unexpired}`));
+}
+
+/** Your pending challenges plus declined/expired ones you haven't cleared, newest first — the own-profile Matches tab. Run expireStaleChallenges first. */
 export async function sentChallengesFrom(challengerId: string): Promise<ChallengeRow[]> {
   return getDb()
     .select()
     .from(challenges)
-    .where(and(eq(challenges.challengerId, challengerId), inArray(challenges.status, ["pending", "declined"])))
+    .where(and(eq(challenges.challengerId, challengerId), inArray(challenges.status, ["pending", "declined", "expired"])))
     .orderBy(desc(challenges.createdAt));
 }
 
-export type IncomingChallengeRow = ChallengeRow & { challengerHandle: string | null; challengerName: string | null };
+export type IncomingChallengeRow = ChallengeRow & { challengerHandle: string | null; challengerName: string | null; expiresInMs: number };
 
-/** Pending challenges sent to you, newest first — the header bell. */
-export async function incomingChallengesFor(userId: string, limit = 20): Promise<IncomingChallengeRow[]> {
+/** Unexpired pending challenges sent to you, newest first — the header bell. */
+async function incomingChallengesFor(userId: string, limit = 20): Promise<IncomingChallengeRow[]> {
   const rows = await getDb()
-    .select({ challenge: challenges, challengerHandle: profiles.handle, challengerName: profiles.displayName })
+    .select({ challenge: challenges, challengerHandle: profiles.handle, challengerName: profiles.displayName, expiresInMs })
     .from(challenges)
     .leftJoin(profiles, eq(profiles.userId, challenges.challengerId))
-    .where(and(eq(challenges.targetUserId, userId), eq(challenges.status, "pending")))
+    .where(and(eq(challenges.targetUserId, userId), eq(challenges.status, "pending"), unexpired))
     .orderBy(desc(challenges.createdAt))
     .limit(limit);
-  return rows.map(({ challenge, challengerHandle, challengerName }) => ({ ...challenge, challengerHandle, challengerName }));
+  return rows.map(({ challenge, ...rest }) => ({ ...challenge, ...rest }));
 }
 
-export async function pendingChallengeTo(challengerId: string, targetHandle: string): Promise<ChallengeRow | null> {
+/** Your unexpired pending challenge to that handle — the profile's "Challenge sent" state. */
+export async function pendingChallengeTo(challengerId: string, targetHandle: string): Promise<(ChallengeRow & { expiresInMs: number }) | null> {
   const [row] = await getDb()
-    .select()
+    .select({ challenge: challenges, expiresInMs })
     .from(challenges)
-    .where(and(eq(challenges.challengerId, challengerId), eq(challenges.targetHandle, targetHandle), eq(challenges.status, "pending")));
-  return row ?? null;
+    .where(and(eq(challenges.challengerId, challengerId), eq(challenges.targetHandle, targetHandle), eq(challenges.status, "pending"), unexpired));
+  return row ? { ...row.challenge, expiresInMs: row.expiresInMs } : null;
 }
 
-/** Guarded on target + still pending; false when there was nothing to decline. */
+/** incomingChallengesFor as the header bell shows them (POST /api/presence). */
+export async function incomingChallengeViews(userId: string): Promise<IncomingChallenge[]> {
+  const now = Date.now();
+  return (await incomingChallengesFor(userId)).map((row) => ({
+    id: row.id,
+    handle: row.challengerHandle ? `@${row.challengerHandle}` : null,
+    name: row.challengerName ?? row.challengerHandle ?? "A trader",
+    rank: row.challengerRank,
+    mode: row.mode,
+    market: row.market,
+    timerSeconds: row.timerSeconds,
+    stake: row.stake,
+    sentLabel: playedLabel(row.createdAt.getTime(), now),
+    expiresInMs: row.expiresInMs,
+  }));
+}
+
+/** A challenge sent to you that's still pending (`expired` once it timed out); null if it isn't (or isn't yours). */
+export async function pendingChallengeFor(targetUserId: string, id: string): Promise<(ChallengeRow & { expired: boolean }) | null> {
+  const [row] = await getDb()
+    .select({ challenge: challenges, expired: sql<boolean>`not ${unexpired}` })
+    .from(challenges)
+    .where(and(eq(challenges.id, id), eq(challenges.targetUserId, targetUserId), eq(challenges.status, "pending")));
+  return row ? { ...row.challenge, expired: row.expired } : null;
+}
+
+/**
+ * Accepting a Pulse challenge: opens its private round with the accepter in
+ * seat 1 (their stake already reserved by the caller), then marks the
+ * challenge accepted. Only the challenger may take seat 2 (`invited_user_id`).
+ * Null when the challenge stopped being pending first — the round is removed
+ * again and the caller refunds.
+ */
+export async function openChallengeRound(
+  challenge: ChallengeRow & { market: string; timerSeconds: number },
+  host: { userId: string; playerId: string },
+): Promise<string | null> {
+  const db = getDb();
+  const matchId = crypto.randomUUID();
+  await db.insert(matches).values({
+    id: matchId,
+    market: challenge.market,
+    mode: "pulse",
+    wager: challenge.stake,
+    timerSeconds: challenge.timerSeconds,
+    status: "open",
+    player1Id: host.playerId,
+    player1UserId: host.userId,
+    player1LastSeen: new Date(),
+    invitedUserId: challenge.challengerId,
+  });
+  const claimed = await db
+    .update(challenges)
+    .set({ status: "accepted", matchId })
+    .where(and(eq(challenges.id, challenge.id), eq(challenges.targetUserId, host.userId), eq(challenges.status, "pending"), unexpired))
+    .returning({ id: challenges.id });
+  if (claimed.length > 0) return matchId;
+  await db.delete(matches).where(eq(matches.id, matchId));
+  return null;
+}
+
+/**
+ * Your challenges that were accepted and whose private round is still waiting
+ * for you, with the accepter still in it and inside the join window — the
+ * bell's "Join round" popup.
+ */
+export async function acceptedChallengeViews(challengerId: string): Promise<AcceptedChallenge[]> {
+  const rows = await getDb()
+    .select({ challenge: challenges, handle: profiles.handle, name: profiles.displayName })
+    .from(challenges)
+    .innerJoin(matches, eq(matches.id, challenges.matchId))
+    .leftJoin(profiles, eq(profiles.userId, challenges.targetUserId))
+    .where(
+      and(
+        eq(challenges.challengerId, challengerId),
+        eq(challenges.status, "accepted"),
+        eq(matches.status, "open"),
+        isNull(matches.player2Id),
+        eq(matches.invitedUserId, challengerId),
+        gt(matches.player1LastSeen, presenceCutoff()),
+        gt(matches.createdAt, sql`now() - ${joinWindow}`),
+      ),
+    )
+    .orderBy(desc(matches.createdAt));
+  return rows.map(({ challenge, handle, name }) => ({
+    id: challenge.id,
+    handle: handle ? `@${handle}` : null,
+    name: name ?? handle ?? challenge.targetHandle,
+    mode: challenge.mode,
+    market: challenge.market,
+    timerSeconds: challenge.timerSeconds,
+    stake: challenge.stake,
+    href: `/duel/${challenge.market}/pulse/${challenge.matchId}?invite=1`,
+  }));
+}
+
+/**
+ * Closes challenge rounds you're in (as accepter or invited challenger) that
+ * nobody will play: the challenger didn't join within ROUND_JOIN_SECONDS, or
+ * the accepter stopped polling the room (left the page) for longer than the
+ * match presence window. Refunds the accepter's stake — the challenger's
+ * isn't reserved until they join. Run off every heartbeat, so whichever of
+ * the two is still around cleans up.
+ */
+export async function closeAbandonedRounds(userId: string): Promise<void> {
+  const closed = await getDb()
+    .delete(matches)
+    .where(
+      and(
+        eq(matches.status, "open"),
+        isNull(matches.player2Id),
+        isNotNull(matches.invitedUserId),
+        or(eq(matches.player1UserId, userId), eq(matches.invitedUserId, userId)),
+        or(lt(matches.player1LastSeen, presenceCutoff()), lt(matches.createdAt, sql`now() - ${joinWindow}`)),
+      ),
+    )
+    .returning({ hostUserId: matches.player1UserId, wager: matches.wager });
+  await Promise.all(closed.map(({ hostUserId, wager }) => (hostUserId ? refundBalance(hostUserId, wager) : null)));
+}
+
+/** Guarded on target + still pending and unexpired; false when there was nothing to decline. */
 export async function declinePendingChallenge(targetUserId: string, id: string): Promise<boolean> {
   const rows = await getDb()
     .update(challenges)
     .set({ status: "declined" })
-    .where(and(eq(challenges.id, id), eq(challenges.targetUserId, targetUserId), eq(challenges.status, "pending")))
+    .where(and(eq(challenges.id, id), eq(challenges.targetUserId, targetUserId), eq(challenges.status, "pending"), unexpired))
     .returning({ id: challenges.id });
   return rows.length > 0;
 }
 
-/** Clears a declined challenge from its sender's list; guarded on owner + declined. */
+/** Clears a declined or expired challenge from its sender's list; guarded on owner + status. */
 export async function dismissDeclinedChallenge(challengerId: string, id: string): Promise<boolean> {
   const rows = await getDb()
     .update(challenges)
     .set({ status: "dismissed" })
-    .where(and(eq(challenges.id, id), eq(challenges.challengerId, challengerId), eq(challenges.status, "declined")))
+    .where(and(eq(challenges.id, id), eq(challenges.challengerId, challengerId), inArray(challenges.status, ["declined", "expired"])))
     .returning({ id: challenges.id });
   return rows.length > 0;
 }

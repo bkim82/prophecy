@@ -210,7 +210,8 @@ function joinDelayFor(matchId: string) {
  * arrives first still wins the seat.
  */
 export async function seatBotIfWaiting(row: MatchRow): Promise<MatchRow> {
-  if (row.status !== "open" || row.player2Id !== null || row.botState !== null) return row;
+  // Challenge rounds wait for the challenger, never a bot.
+  if (row.status !== "open" || row.player2Id !== null || row.botState !== null || row.invitedUserId !== null) return row;
   if (!BOT_MARKETS.includes(row.market)) return row;
   if (Date.now() - row.createdAt.getTime() < joinDelayFor(row.id)) return row;
 

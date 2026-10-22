@@ -30,6 +30,10 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
   if (existingRole && (existingRole === 1 ? candidate.player1UserId : candidate.player2UserId) === userId) {
     return Response.json({ matchId: candidate.id });
   }
+  // A challenge round only seats the challenger (app/profile/challengeActions.ts acceptChallenge).
+  if (candidate.invitedUserId && candidate.invitedUserId !== userId) {
+    return Response.json({ error: "Match is already full" }, { status: 409 });
+  }
   const reserved = await reserveBalance(userId, candidate.wager);
   if (!reserved) return Response.json({ error: "Insufficient balance" }, { status: 402 });
 
@@ -51,6 +55,7 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
         isNull(matches.player2Id),
         // A direct invite should only claim a queue the host is still holding.
         or(gt(matches.player1LastSeen, presenceCutoff()), isNotNull(matches.botState)),
+        or(isNull(matches.invitedUserId), eq(matches.invitedUserId, userId)),
       ),
     )
     .returning();

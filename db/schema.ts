@@ -178,6 +178,10 @@ export const matches = pgTable("matches", {
   player2Id: text("player2_id"),
   player1UserId: text("player1_user_id"),
   player2UserId: text("player2_user_id"),
+  // A challenge's private round (app/profile/challengeActions.ts acceptChallenge):
+  // only this account may take seat 2, and the lobby list, matchmaking and
+  // house bots all skip it.
+  invitedUserId: text("invited_user_id"),
   // Every timestamp here is `timestamptz`, not the bare `timestamp` `users`
   // uses: these are compared against wall-clock `Date.now()` and written from
   // more than one code path. A naive column stores whatever local time the
@@ -356,8 +360,10 @@ export const challenges = pgTable("challenges", {
   market: text("market"), // pulse only: "btc" | "eth" | "hype"
   timerSeconds: integer("timer_seconds"), // pulse only
   stake: integer("stake").notNull(), // Embers, proposed — not reserved; 0 = no stakes
-  // "pending" → "canceled" (sender) | "declined" (target) → "dismissed" (sender clears it)
+  // "pending" → "canceled" (sender) | "declined" (target) → "dismissed" (sender
+  // clears it) | "accepted" (target; `match_id` is the private round it opened)
   status: text("status").notNull().default("pending"),
+  matchId: text("match_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
   // One open challenge per challenger → target, so a double-submit can't send two.
@@ -494,6 +500,15 @@ export const clashVotes = pgTable("clash_votes", {
   primaryKey({ columns: [table.postId, table.userId] }),
   check("clash_votes_side", sql`${table.side} IN (0, 1)`),
 ]);
+
+// When each signed-in account last had the app open: the header heartbeat
+// (app/LiveChallenges.tsx → POST /api/presence) bumps it every few seconds and
+// deletes the row when the tab closes. "Online" = seen within lib/presence.ts
+// ONLINE_WINDOW; challenges need both sides online. Created by db/presence.sql.
+export const presence = pgTable("presence", {
+  userId: text("user_id").primaryKey(),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+});
 
 // One row per follow. Everyone starts following no one, with no followers.
 // `target` is the followed account's user id, or a mock trader's "@handle"

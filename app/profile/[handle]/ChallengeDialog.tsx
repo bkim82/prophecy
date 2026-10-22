@@ -1,25 +1,26 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { SignInAction } from "@/app/auth/AuthProvider";
-import { ArenaIcon, LockIcon, PatientIcon, SwiftIcon } from "@/app/icons";
+import { ArenaIcon, LockIcon, SwiftIcon } from "@/app/icons";
 import {
-  CHALLENGE_MODES,
   CHALLENGE_STAKES,
+  CHALLENGE_TTL_SECONDS,
   NO_STAKE,
+  PULSE_BLURB,
   PULSE_MARKETS,
   PULSE_ROUNDS,
   challengeTerms,
   stakeLabel,
-  type ChallengeMode,
 } from "@/app/lib/challengeRules";
 import { cancelChallenge, sendChallenge } from "@/app/profile/challengeActions";
 import { RankBadge } from "@/app/RankBadge";
 
 // The Challenge button on someone else's profile, secondary to Follow in
-// the hero, and the dialog it opens. Challenges are friends-only: you follow
+// the hero, and the dialog it opens. Challenges are friends-only — you follow
 // each other, from the hero's Follow toggle plus their follow of you (mock
-// traders never follow back).
+// traders never follow back) — and live: you both have to be online.
 // The page works out the rest of the state (app/profile/[handle]/page.tsx);
 // the server action re-checks all of it.
 
@@ -28,7 +29,8 @@ export type ChallengeState =
   // The one-tier-up gate (app/lib/rank.ts canChallenge) says no.
   | { kind: "locked"; tierNeeded: string }
   | { kind: "ready" }
-  | { kind: "pending"; id: string; terms: string };
+  // `expiresInMs` as measured by the server when it rendered the page.
+  | { kind: "pending"; id: string; terms: string; expiresInMs: number };
 
 type ChallengeTarget = { handle: string; name: string; rank: string };
 
@@ -39,15 +41,26 @@ type ChallengeControlProps = {
   // You follow them (the Follow button's current state) / they follow you.
   following: boolean;
   followsYou: boolean;
+  // They're online right now (ProfileView polls it); you are, being here.
+  online: boolean;
   // The Follow button, kept on the same row.
   children: React.ReactNode;
 };
 
-export function ChallengeControl({ state, target, viewerRank, following, followsYou, children }: ChallengeControlProps) {
+export function ChallengeControl({ state, target, viewerRank, following, followsYou, online, children }: ChallengeControlProps) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const noteId = useId();
+  const router = useRouter();
+
+  // A challenge expires on the server; re-render the page then, so "Challenge sent" turns back into Challenge.
+  const expiresInMs = state.kind === "pending" ? state.expiresInMs : null;
+  useEffect(() => {
+    if (expiresInMs === null) return;
+    const timer = setTimeout(() => router.refresh(), expiresInMs + 500);
+    return () => clearTimeout(timer);
+  }, [expiresInMs, router]);
 
   const label = (
     <>
@@ -76,6 +89,14 @@ export function ChallengeControl({ state, target, viewerRank, following, follows
             : `follow each other to challenge ${target.name}.`}
       </>
     );
+  } else if (state.kind !== "pending" && state.kind !== "signed-out" && !online) {
+    button = (
+      <button type="button" className="profile-challenge-button is-locked" disabled aria-describedby={noteId}>
+        <LockIcon />
+        Challenge
+      </button>
+    );
+    note = <>{target.name} is offline — challenges need you both online. This unlocks as soon as they&rsquo;re back.</>;
   } else if (state.kind === "signed-out") {
     button = (
       <SignInAction>
@@ -105,7 +126,7 @@ export function ChallengeControl({ state, target, viewerRank, following, follows
     );
     note = (
       <>
-        {state.terms} · waiting on {target.name}.{" "}
+        {state.terms} · waiting on {target.name}, who has {CHALLENGE_TTL_SECONDS / 60} minutes to accept.{" "}
         <button
           type="button"
           className="profile-edit-text-button"
@@ -154,10 +175,9 @@ export function ChallengeControl({ state, target, viewerRank, following, follows
 function ChallengeDialog({ target, viewerRank, onClose }: { target: ChallengeTarget; viewerRank: string; onClose: () => void }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const id = useId();
-  const [mode, setMode] = useState<ChallengeMode>("pulse");
   const [market, setMarket] = useState<string>(PULSE_MARKETS[0].id);
   const [timerSeconds, setTimerSeconds] = useState(PULSE_ROUNDS[0]);
-  const [stake, setStake] = useState(CHALLENGE_STAKES.pulse[0]);
+  const [stake, setStake] = useState(CHALLENGE_STAKES[0]);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -165,19 +185,11 @@ function ChallengeDialog({ target, viewerRank, onClose }: { target: ChallengeTar
     dialogRef.current?.showModal();
   }, []);
 
-  const pickMode = (next: ChallengeMode) => {
-    setMode(next);
-    // Each mode has its own stake presets; keep the stake if it's offered in both.
-    if (stake !== NO_STAKE && !CHALLENGE_STAKES[next].includes(stake)) setStake(CHALLENGE_STAKES[next][0]);
-  };
-
   function send() {
     startTransition(async () => {
       setError(null);
       try {
-        const result = await sendChallenge(
-          mode === "pulse" ? { handle: target.handle, mode, market, timerSeconds, stake } : { handle: target.handle, mode, stake },
-        );
+        const result = await sendChallenge({ handle: target.handle, market, timerSeconds, stake });
         if (!result.ok) return setError(result.error);
       } catch {
         return setError("Couldn't send the challenge — try again.");
@@ -216,54 +228,42 @@ function ChallengeDialog({ target, viewerRank, onClose }: { target: ChallengeTar
             <span className="muted">{target.handle}</span>
           </p>
 
-          <fieldset className="challenge-group">
-            <legend>Match</legend>
-            <div className="challenge-modes">
-              {(Object.keys(CHALLENGE_MODES) as ChallengeMode[]).map((option) => {
-                const Icon = option === "pulse" ? SwiftIcon : PatientIcon;
-                return (
-                  <button key={option} type="button" className="challenge-mode" aria-pressed={mode === option} onClick={() => pickMode(option)}>
-                    <Icon />
-                    <strong>{CHALLENGE_MODES[option].label}</strong>
-                    <span className="muted">{CHALLENGE_MODES[option].blurb}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </fieldset>
+          <p className="challenge-pulse">
+            <SwiftIcon />
+            <strong>Pulse</strong>
+            <span className="muted">{PULSE_BLURB}</span>
+          </p>
 
-          {mode === "pulse" && (
-            <div className="challenge-row">
-              <fieldset className="challenge-group">
-                <legend>Market</legend>
-                <div className="challenge-options">
-                  {PULSE_MARKETS.map((option) => (
-                    <button key={option.id} type="button" aria-pressed={market === option.id} onClick={() => setMarket(option.id)}>
-                      <span className={`market-symbol ${option.symbolClass}`} aria-hidden="true">
-                        {option.symbol}
-                      </span>
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              </fieldset>
-              <fieldset className="challenge-group">
-                <legend>Round</legend>
-                <div className="challenge-options">
-                  {PULSE_ROUNDS.map((seconds) => (
-                    <button key={seconds} type="button" aria-pressed={timerSeconds === seconds} onClick={() => setTimerSeconds(seconds)}>
-                      {seconds}s
-                    </button>
-                  ))}
-                </div>
-              </fieldset>
-            </div>
-          )}
+          <div className="challenge-row">
+            <fieldset className="challenge-group">
+              <legend>Market</legend>
+              <div className="challenge-options">
+                {PULSE_MARKETS.map((option) => (
+                  <button key={option.id} type="button" aria-pressed={market === option.id} onClick={() => setMarket(option.id)}>
+                    <span className={`market-symbol ${option.symbolClass}`} aria-hidden="true">
+                      {option.symbol}
+                    </span>
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+            <fieldset className="challenge-group">
+              <legend>Round</legend>
+              <div className="challenge-options">
+                {PULSE_ROUNDS.map((seconds) => (
+                  <button key={seconds} type="button" aria-pressed={timerSeconds === seconds} onClick={() => setTimerSeconds(seconds)}>
+                    {seconds}s
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+          </div>
 
           <fieldset className="challenge-group">
             <legend>Stake</legend>
             <div className="challenge-options">
-              {[...CHALLENGE_STAKES[mode], NO_STAKE].map((amount) => (
+              {[...CHALLENGE_STAKES, NO_STAKE].map((amount) => (
                 <button key={amount} type="button" aria-pressed={stake === amount} onClick={() => setStake(amount)}>
                   {stakeLabel(amount)}
                 </button>
@@ -272,9 +272,9 @@ function ChallengeDialog({ target, viewerRank, onClose }: { target: ChallengeTar
           </fieldset>
 
           <p className="challenge-summary">
-            <strong>{challengeTerms({ mode, market: mode === "pulse" ? market : null, timerSeconds: mode === "pulse" ? timerSeconds : null, stake })}</strong>
+            <strong>{challengeTerms({ mode: "pulse", market, timerSeconds, stake })}</strong>
             <span className="muted">
-              {stake === NO_STAKE ? "Just for bragging rights — no Embers change hands." : <>Embers aren&rsquo;t reserved until {target.name} accepts.</>}
+              {stake === NO_STAKE ? "Just for bragging rights — no Embers change hands." : <>Embers are reserved when {target.name} accepts and you join the round.</>}
             </span>
           </p>
 

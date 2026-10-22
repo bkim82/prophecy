@@ -66,6 +66,8 @@ export async function POST(request: Request) {
     // Play pairs real players first; a lonely queue gets a bot after a few
     // seconds (lib/bots.ts seatBotIfWaiting). Bot hosts are joined from the list.
     isNull(matches.botState),
+    // Challenge rounds are private to the challenger.
+    isNull(matches.invitedUserId),
   );
 
   const candidates = await db

@@ -7,7 +7,7 @@ import { HighlightReel } from "@/app/profile/[handle]/HighlightReel";
 import { AchievementsPanel, ProfileAchievements } from "@/app/profile/[handle]/ProfileAchievements";
 import { ProfileView, type ProfileMatch, type SentChallenge } from "@/app/profile/[handle]/ProfileView";
 import { NO_COPY_EARNINGS, activityFor } from "@/lib/activity";
-import { sentChallengesFrom } from "@/lib/challenges";
+import { expireStaleChallenges, sentChallengesFrom } from "@/lib/challenges";
 import { accountActivity } from "@/lib/engagement";
 import { followerCount, followingCount } from "@/lib/follows";
 import { historyEntryFor, marketAccuracyFor, matchRecordFor, settledMatchesByIds, settledMatchesFor } from "@/lib/match";
@@ -38,6 +38,8 @@ export default async function OwnProfilePage() {
   const user = await getViewerProfile(viewer);
   if (!user) redirect("/sign-in");
   const { userId } = viewer;
+  // So timed-out challenges show as expired in the sent list.
+  await expireStaleChallenges(userId);
 
   const viewerRank = rankForUser(userId);
   const [rows, record, stored, marketAccuracy, sent, onboarded, followers, following, rank, activity, posted] = await Promise.all([
@@ -91,7 +93,7 @@ export default async function OwnProfilePage() {
       rank: target?.rank ?? row.targetRank,
       href: target ? profileHref(row.targetHandle) : `/profile/${row.targetHandle.slice(1)}`,
       terms: challengeTerms(row),
-      declined: row.status === "declined",
+      status: row.status === "declined" || row.status === "expired" ? row.status : "pending",
       sentLabel: playedLabel(row.createdAt.getTime(), now),
     };
   });
