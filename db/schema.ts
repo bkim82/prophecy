@@ -424,6 +424,77 @@ export const pollVotes = pgTable("poll_votes", {
   check("poll_votes_choice_range", sql`${table.choice} BETWEEN 0 AND 3`),
 ]);
 
+// Engagement on omens, written by the /api/posts/[id]/… routes
+// (lib/engagement.ts). `postId` is a saved post's id or a mock post's id
+// (app/lib/mockPosts.ts), so the mock feed's likes, reposts and replies save
+// too; mock counts stay the base the saved ones are added to. Created by
+// db/engagement.sql.
+
+// One like per user per post; unliking deletes it.
+export const postLikes = pgTable("post_likes", {
+  postId: text("post_id").notNull(),
+  userId: text("user_id").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  primaryKey({ columns: [table.postId, table.userId] }),
+]);
+
+// The user's one repost of a post: a plain repost, a vouch (backs it) or a
+// defy (against it), with optional words. Switching kind or words replaces
+// it; undoing deletes it.
+export const postReshares = pgTable("post_reshares", {
+  postId: text("post_id").notNull(),
+  userId: text("user_id").notNull(),
+  kind: text("kind").notNull(), // app/PostShare.tsx ReshareKind
+  text: text("text").notNull().default(""),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  primaryKey({ columns: [table.postId, table.userId] }),
+  check("post_reshares_kind", sql`${table.kind} IN ('repost', 'vouch', 'defy')`),
+  check("post_reshares_text_length", sql`char_length(${table.text}) <= 280`),
+]);
+
+// A reply under a post. Author fields work like `posts`: derived server-side,
+// with a write-time name/handle snapshot for authors without a profile. The
+// author can edit it (`editedAt` = last edit) or delete it (soft delete).
+export const postReplies = pgTable("post_replies", {
+  id: text("id").primaryKey(),
+  postId: text("post_id").notNull(),
+  authorId: text("author_id").notNull(),
+  authorName: text("author_name").notNull(),
+  authorHandle: text("author_handle"),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  editedAt: timestamp("edited_at", { withTimezone: true }),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+}, (table) => [
+  index("post_replies_post_created_at_idx").on(table.postId, table.createdAt),
+  index("post_replies_author_created_at_idx").on(table.authorId, table.createdAt),
+  check("post_replies_content_length", sql`char_length(${table.content}) BETWEEN 1 AND 280`),
+]);
+
+// One like per user per reply; `replyId` is a `post_replies` id or a mock
+// reply's id (app/lib/mockPosts.ts POST_REPLIES, unique across posts).
+export const replyLikes = pgTable("reply_likes", {
+  replyId: text("reply_id").notNull(),
+  userId: text("user_id").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  primaryKey({ columns: [table.replyId, table.userId] }),
+]);
+
+// One side per user per clash (a mock `kind: "clash"` post): 0 = first side,
+// 1 = second. Switching replaces it; taking it back deletes it.
+export const clashVotes = pgTable("clash_votes", {
+  postId: text("post_id").notNull(),
+  userId: text("user_id").notNull(),
+  side: integer("side").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  primaryKey({ columns: [table.postId, table.userId] }),
+  check("clash_votes_side", sql`${table.side} IN (0, 1)`),
+]);
+
 // One row per follow. Everyone starts following no one, with no followers.
 // `target` is the followed account's user id, or a mock trader's "@handle"
 // (app/lib/mockProfiles.ts) — those never follow anyone back. Challenges need

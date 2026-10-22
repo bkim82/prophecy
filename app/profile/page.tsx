@@ -8,6 +8,7 @@ import { AchievementsPanel, ProfileAchievements } from "@/app/profile/[handle]/P
 import { ProfileView, type ProfileMatch, type SentChallenge } from "@/app/profile/[handle]/ProfileView";
 import { NO_COPY_EARNINGS, activityFor } from "@/lib/activity";
 import { sentChallengesFrom } from "@/lib/challenges";
+import { accountActivity } from "@/lib/engagement";
 import { followerCount, followingCount } from "@/lib/follows";
 import { historyEntryFor, marketAccuracyFor, matchRecordFor, settledMatchesByIds, settledMatchesFor } from "@/lib/match";
 import { opponentNames } from "@/lib/opponentNames";
@@ -39,7 +40,7 @@ export default async function OwnProfilePage() {
   const { userId } = viewer;
 
   const viewerRank = rankForUser(userId);
-  const [rows, record, stored, marketAccuracy, sent, onboarded, followers, following, rank, activity] = await Promise.all([
+  const [rows, record, stored, marketAccuracy, sent, onboarded, followers, following, rank, activity, posted] = await Promise.all([
     settledMatchesFor(userId, MATCH_LIMIT),
     matchRecordFor(userId),
     storedProfileFor(userId),
@@ -50,6 +51,7 @@ export default async function OwnProfilePage() {
     followingCount(userId),
     viewerRank,
     viewerRank.then((rank) => activityFor(userId, rank)),
+    accountActivity(userId, userId),
   ]);
   // Pins can be older than the listed page, so they're fetched by id — and
   // re-checked, so a pin that stopped qualifying just drops out of the reel.
@@ -133,8 +135,8 @@ export default async function OwnProfilePage() {
     <main className="feed-shell">
       <ProfileView
         profile={profile}
-        // Posting isn't persisted (docs/roadmap.md), so the viewer has no omens, comments or trades.
-        activity={{ omens: [], comments: [], trades: [] }}
+        // Your saved omens and replies (lib/engagement.ts); trades aren't listed here yet.
+        activity={posted}
         portfolio={null}
         portfolioLocked={false}
         viewerRank={rank}

@@ -547,7 +547,7 @@ function CommentsTab({ activity }: { activity: ProfileActivity }) {
       {activity.comments.map(({ reply, post }) => (
         <article key={reply.id} className="profile-comment">
           <p className="profile-comment-context muted">
-            Replying to <AuthorLink handle={post.handle} name={post.author} />
+            Replying to <AuthorLink handle={post.handle} name={post.author} account={post.saved} />
             <span className="profile-comment-snippet">“{post.content}”</span>
           </p>
           <p className="profile-comment-body">{reply.content}</p>

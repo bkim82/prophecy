@@ -1,10 +1,21 @@
 import Link from "next/link";
 import { profileHref } from "@/app/lib/mockProfiles";
 
-// Author name that links to /profile/[handle] when that handle has a mock
-// profile; bots and unknown handles stay plain text.
-export function AuthorLink({ handle, name }: { handle: string; name: string }) {
-  const href = profileHref(handle);
+// Author name that links to their profile (`profileHref`: a mock trader's,
+// or a real account's when `account` is set), or to `href` when the caller
+// knows better ("/profile" for your own); bots, profile-less mock authors and
+// accounts without a handle stay plain text.
+export function AuthorLink({
+  handle,
+  name,
+  account = false,
+  href = profileHref(handle, account),
+}: {
+  handle: string;
+  name: string;
+  account?: boolean;
+  href?: string;
+}) {
   return href ? (
     <Link href={href} className="author-link">
       <strong>{name}</strong>

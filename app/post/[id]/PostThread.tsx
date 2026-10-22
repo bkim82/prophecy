@@ -1,70 +1,33 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useRef, useState, type RefObject } from "react";
-import { useAppAuth } from "@/app/auth/AuthProvider";
+import { useRef, useState } from "react";
 import { BackIcon } from "@/app/icons";
 import type { Post, Reply } from "@/app/lib/mockPosts";
-import { PostCard, ReplyItem } from "@/app/PostCard";
+import { PostCard } from "@/app/PostCard";
+import { ReplyComposer, ReplyItem, withMention } from "@/app/PostReplies";
 
-// Local-only, like the feed composer: a reply is prepended to this page's
-// list and gone on reload. Authorship uses the signed-in provider user's name.
-function ReplyComposer({
-  inputRef,
-  replyingTo,
-  onReply,
-}: {
-  inputRef: RefObject<HTMLInputElement | null>;
-  replyingTo: string;
-  onReply: (reply: Reply) => void;
-}) {
-  const { user } = useAppAuth();
-  const [text, setText] = useState("");
-  const name = user?.firstName ?? user?.username ?? "You";
-  const initial = name[0].toUpperCase();
-
-  function submit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const content = text.trim();
-    if (!content) return;
-    onReply({ id: `local-reply-${Date.now()}`, author: name, handle: `@${user?.username ?? "you"}`, avatarInitial: initial, content, timestamp: "now", likes: 0 });
-    setText("");
-  }
-
-  return (
-    <form className="feed-composer reply-composer" onSubmit={submit}>
-      <span className="feed-composer-avatar" aria-hidden="true">
-        {initial}
-      </span>
-      <label className="reply-composer-field">
-        <span className="muted">Replying to {replyingTo}</span>
-        <input
-          ref={inputRef}
-          className="feed-composer-input"
-          value={text}
-          onChange={(event) => setText(event.target.value)}
-          placeholder="Post your reply"
-          maxLength={280}
-        />
-      </label>
-      <button type="submit" className="feed-composer-post" disabled={!text.trim()}>
-        Reply
-      </button>
-    </form>
-  );
-}
-
+// `replies` = saved then mock (lib/engagement.ts repliesFor). Replies you post
+// here are saved and go on top, ones you delete drop out (both move the
+// comment count); a reply's Reply button @mentions its author in the box.
 export function PostThread({ post, replies }: { post: Post; replies: Reply[] }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
+  const [draft, setDraft] = useState("");
   const [mine, setMine] = useState<Reply[]>([]);
-  const all = [...mine, ...replies];
+  const [removed, setRemoved] = useState<string[]>([]);
+  const all = [...mine, ...replies].filter((reply) => !removed.includes(reply.id));
 
   // Back to wherever the post was opened from; a fresh tab has nowhere to go
   // back to, so it lands on the feed.
   function goBack() {
     if (window.history.length > 1) router.back();
     else router.push("/");
+  }
+
+  function mention(reply: Reply) {
+    setDraft((current) => withMention(current, reply.handle));
+    inputRef.current?.focus();
   }
 
   return (
@@ -76,11 +39,24 @@ export function PostThread({ post, replies }: { post: Post; replies: Reply[] }) 
         <h1>Post</h1>
       </div>
       <div className="feed-panel">
-        <PostCard post={post} detail onReply={() => inputRef.current?.focus()} />
-        <ReplyComposer inputRef={inputRef} replyingTo={post.handle || post.author} onReply={(reply) => setMine((current) => [reply, ...current])} />
+        <PostCard post={{ ...post, replies: post.replies + mine.length - removed.length }} detail onReply={() => inputRef.current?.focus()} />
+        <ReplyComposer
+          postId={post.id}
+          replyingTo={post.handle || post.author}
+          inputRef={inputRef}
+          draft={draft}
+          onDraft={setDraft}
+          onPosted={(reply) => setMine((current) => [reply, ...current])}
+        />
         <div className="post-replies">
           {all.map((reply) => (
-            <ReplyItem key={reply.id} reply={reply} />
+            <ReplyItem
+              key={reply.id}
+              reply={reply}
+              postId={post.id}
+              onReply={mention}
+              onDeleted={({ id }) => setRemoved((current) => [...current, id])}
+            />
           ))}
           {all.length === 0 && <p className="muted post-replies-empty">No replies yet. Be the first.</p>}
         </div>

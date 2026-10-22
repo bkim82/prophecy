@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useAppAuth } from "@/app/auth/AuthProvider";
 import type { Post } from "@/app/lib/mockPosts";
 import { RepostIcon } from "@/app/icons";
 import { RESHARE, RESHARE_KINDS, type Reshare, type ReshareKind } from "@/app/PostShare";
@@ -32,7 +33,8 @@ const lockedFor = (mine: boolean, kind: ReshareKind) => mine && kind !== "repost
 // repost). The active option reads "Undo …", or "Update …" once you've
 // changed your words; picking another switches and keeps them. The draft
 // survives closing the popover. The button shows the total of all three and
-// takes the chosen kind's icon + color once you've reposted.
+// takes the chosen kind's icon + color once you've reposted. `onChange` saves
+// it (PostCard); signed out, the button opens sign-in instead of the menu.
 export function RepostMenu({
   post,
   mine,
@@ -44,13 +46,18 @@ export function RepostMenu({
   reshare: Reshare | null;
   onChange: (next: Reshare | null) => void;
 }) {
+  const { isSignedIn, openSignIn } = useAppAuth();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(reshare?.text ?? "");
   const triggerRef = useRef<HTMLButtonElement>(null);
+  // The post's counts already include your saved repost (`post.yourReshare`);
+  // swap it for the one you have now.
+  const countFor = (kind: ReshareKind, base = 0) =>
+    base - (post.yourReshare?.kind === kind ? 1 : 0) + (reshare?.kind === kind ? 1 : 0);
   const counts: Record<ReshareKind, number> = {
-    repost: (post.reposts ?? 0) + (reshare?.kind === "repost" ? 1 : 0),
-    vouch: (post.vouches ?? 0) + (reshare?.kind === "vouch" ? 1 : 0),
-    defy: (post.defies ?? 0) + (reshare?.kind === "defy" ? 1 : 0),
+    repost: countFor("repost", post.reposts),
+    vouch: countFor("vouch", post.vouches),
+    defy: countFor("defy", post.defies),
   };
   const total = counts.repost + counts.vouch + counts.defy;
   const active = reshare && RESHARE[reshare.kind];
@@ -92,7 +99,7 @@ export function RepostMenu({
         aria-expanded={open}
         aria-label={active ? `${active.done} (${total}): change or undo` : `Repost (${total}): repost, vouch or defy`}
         title="Repost, vouch or defy"
-        onClick={() => (open ? close() : setOpen(true))}
+        onClick={() => (open ? close() : isSignedIn ? setOpen(true) : openSignIn())}
       >
         <TriggerIcon />
         <span className="action-label">{active ? active.done : "Repost"}</span>

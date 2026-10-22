@@ -6,17 +6,19 @@ import { useState, type MouseEvent, type ReactNode } from "react";
 import { AuthorLink } from "@/app/AuthorLink";
 import { avatarGradient } from "@/app/lib/avatar";
 import { callRoi, callTrack, formatCallPrice, signedPct, type CallTrack } from "@/app/lib/calls";
+import { saveClashVote, saveLike, saveReshare, useSaved } from "@/app/lib/engagementApi";
 import { profileHref } from "@/app/lib/mockProfiles";
 import { useBookmarks } from "@/app/lib/postLists";
 import { rankTier } from "@/app/lib/rank";
 import { RankBadge } from "@/app/RankBadge";
-import { POST_REPLIES, type Clash, type Market, type MarketCall, type Post, type PostFlair, type Reply, type Share } from "@/app/lib/mockPosts";
+import type { Clash, Market, MarketCall, Post, PostFlair, Share } from "@/app/lib/mockPosts";
 import { TopicIcon } from "@/app/FeedTopics";
 import { BookmarkIcon, ClashIcon, CommentIcon, FlameIcon, HeartIcon, TrendIcon } from "@/app/icons";
 import { postTopics, topicById, type TopicId } from "@/app/lib/topics";
 import { PostMedia } from "@/app/PostMedia";
 import { PostMenu } from "@/app/PostMenu";
 import { PostPoll } from "@/app/PostPoll";
+import { ReplyThread } from "@/app/PostReplies";
 import { ReshareHead, type Reshare } from "@/app/PostShare";
 import { RepostMenu } from "@/app/RepostMenu";
 import { TradeCard, TradeUnavailable } from "@/app/TradeCard";
@@ -176,68 +178,6 @@ export function MarketCallCard({ call }: { call: MarketCall }) {
   );
 }
 
-const REPLIES_SHOWN_INITIALLY = 2;
-
-export function ReplyItem({ reply }: { reply: Reply }) {
-  const [liked, setLiked] = useState(false);
-  return (
-    <div className="reply-item">
-      <div className="reply-avatar" aria-hidden="true" style={{ background: avatarGradient(reply.handle) }}>
-        {reply.avatarInitial}
-      </div>
-      <div className="reply-body">
-        <div className="reply-meta">
-          <AuthorLink handle={reply.handle} name={reply.author} />
-          <span className="muted">{reply.handle}</span>
-          <span className="muted">· {reply.timestamp}</span>
-        </div>
-        <p className="reply-content">{reply.content}</p>
-        <div className="reply-actions">
-          <button
-            type="button"
-            className={`action-like${liked ? " is-active" : ""}`}
-            aria-pressed={liked}
-            aria-label={`Like (${reply.likes + (liked ? 1 : 0)})`}
-            onClick={() => setLiked((v) => !v)}
-          >
-            <HeartIcon filled={liked} /> {compact(reply.likes + (liked ? 1 : 0))}
-          </button>
-          <button type="button" className="action-reply">Reply</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Inline expand-in-place thread (Reddit-style, not a TikTok overlay): shows
-// the first couple of already-loaded POST_REPLIES, "view N more" just
-// reveals the rest of that same local array — there's no backend to fetch
-// against.
-function ReplyThread({ postId }: { postId: string }) {
-  const [shown, setShown] = useState(REPLIES_SHOWN_INITIALLY);
-  const replies = POST_REPLIES[postId] ?? [];
-
-  if (replies.length === 0) {
-    return <p className="muted reply-thread-empty">No replies yet — be the first.</p>;
-  }
-
-  const visible = replies.slice(0, shown);
-  const remaining = replies.length - visible.length;
-
-  return (
-    <div className="reply-thread">
-      {visible.map((reply) => (
-        <ReplyItem key={reply.id} reply={reply} />
-      ))}
-      {remaining > 0 && (
-        <button type="button" className="reply-thread-more" onClick={() => setShown((n) => n + remaining)}>
-          View {remaining} more {remaining === 1 ? "reply" : "replies"}
-        </button>
-      )}
-    </div>
-  );
-}
-
 function StreakCard({ post }: { post: Post }) {
   return (
     <article className="post-card post-card--streak" id={`post-${post.id}`}>
@@ -263,14 +203,16 @@ function PromoCard({ post }: { post: Post }) {
   );
 }
 
-// Two opposing calls; the crowd votes for a side. Your vote is local-only:
+// Two opposing calls; the crowd votes for a side. Your vote is saved
+// (POST /api/posts/[id]/clash, optimistic via useSaved; signed out → sign-in):
 // it adds one to that side, recomputes the split, and can be switched or
 // taken back. Sides stay neutral (the arrows say which way each calls it);
 // your side of the bar turns violet once you vote (data-vote).
 function ClashCard({ post, clash }: { post: Post; clash: Clash }) {
-  const [vote, setVote] = useState<0 | 1 | null>(null);
+  const [vote, setVote] = useSaved<0 | 1 | null>(clash.yourVote ?? null, (next) => saveClashVote(post.id, next));
   const [a, b] = clash.sides;
-  const counts = clash.sides.map((side, i) => side.votes + (vote === i ? 1 : 0));
+  // Saved counts already include your saved vote (`clash.yourVote`).
+  const counts = clash.sides.map((side, i) => side.votes - (clash.yourVote === i ? 1 : 0) + (vote === i ? 1 : 0));
   const total = counts[0] + counts[1];
   const firstPct = Math.round((counts[0] / total) * 100);
   const pcts = [firstPct, 100 - firstPct];
@@ -307,7 +249,7 @@ function ClashCard({ post, clash }: { post: Post; clash: Clash }) {
             type="button"
             className="clash-pick"
             aria-pressed={vote === i}
-            onClick={() => setVote((current) => (current === i ? null : (i as 0 | 1)))}
+            onClick={() => setVote(vote === i ? null : (i as 0 | 1))}
           >
             {vote === i ? `✓ Sided with ${side.name}` : `Side with ${side.name}`} · {pcts[i]}%
           </button>
@@ -329,12 +271,16 @@ const INTERACTIVE = "a, button, input, textarea, label, form, [role='button'], [
 // interested in …"); `footer` sits under the actions. `detail` is the post
 // page layout (app/post/[id]/PostThread.tsx): full text, topic pills, no
 // inline thread — `onReply` then focuses that page's reply box instead.
+// Elsewhere the comment action opens the inline thread with its reply box
+// focused (app/PostReplies.tsx). Likes and your repost are saved
+// (lib/engagement.ts); `post.liked` / `post.yourReshare` are the viewer's own.
 // `onNotInterested` adds "Not interested in <topic>" to the ⋯ menu, and
 // `onDelete` adds Delete post there for your own (`post.mine`) posts. `share`
-// is a followed account's vouch/defy: like an X quote post, the sharer gets
-// their own header row and the original post drops into a bordered card
-// under it (your own repost/vouch/defy does the same, with your words if you
-// added any, replacing theirs). `fresh` flashes a post you just published
+// is a followed account's repost (with their words, if any): like an X quote
+// post, the sharer gets their own header row and the original post drops
+// into a bordered card under it (your own repost/vouch/defy does the same,
+// replacing theirs). The author's name and avatar link to their profile
+// (yours for your own posts). `fresh` flashes a post you just published
 // from /compose. Topics you picked in the composer show as tags under your
 // own posts; `onTopic` makes them open that topic in the feed. None of it
 // applies to streak/promo/clash cards.
@@ -363,10 +309,12 @@ export function PostCard({
 }) {
   const router = useRouter();
   const [repliesOpen, setRepliesOpen] = useState(false);
-  const [liked, setLiked] = useState(false);
+  // Replies posted (minus deleted) from the inline thread since the page loaded.
+  const [newReplies, setNewReplies] = useState(0);
+  const [liked, setLiked] = useSaved(post.liked === true, (next) => saveLike(post.id, next));
   // Your own repost of this post — one kind (repost, vouch or defy) plus
-  // optional words. Local only, like likes.
-  const [reshared, setReshared] = useState<Reshare | null>(null);
+  // optional words.
+  const [reshared, setReshared] = useSaved<Reshare | null>(post.yourReshare ?? null, (next) => saveReshare(post.id, next));
   const [expanded, setExpanded] = useState(false);
   const bookmarks = useBookmarks();
 
@@ -378,13 +326,16 @@ export function PostCard({
   const isLongPost = !detail && post.content.length > 220;
   const flair = post.flair && FLAIRS[post.flair];
   const bookmarked = bookmarks.has(post.id);
-  const href = profileHref(post.handle);
+  // Your own posts go to your profile; a real author's (`saved`) to theirs.
+  const href = post.mine ? "/profile" : profileHref(post.handle, post.saved);
   const url = detail ? undefined : postHref(post);
   const topics = postTopics(post).map(topicById);
   // The name link is the accessible one; the avatar link is a mouse-only
   // duplicate, so it stays out of the tab order and the a11y tree.
   const avatarProps = { className: "post-avatar", "aria-hidden": true, style: { background: avatarGradient(post.handle) } };
-  const likes = post.likes + (liked ? 1 : 0);
+  // `post.likes` already counts a saved like of yours.
+  const likes = post.likes - (post.liked ? 1 : 0) + (liked ? 1 : 0);
+  const replies = post.replies + newReplies;
   const mine = post.mine === true;
   // A deleted post shouldn't linger in Bookmarked as a dangling id.
   const deletePost =
@@ -395,9 +346,9 @@ export function PostCard({
         }
       : undefined;
   const reshare = reshared ? (
-    <ReshareHead kind={reshared.kind} name="You" timestamp="now" text={reshared.text} />
+    <ReshareHead kind={reshared.kind} name="You" timestamp={reshared.timestamp ?? "just now"} text={reshared.text} />
   ) : share ? (
-    <ReshareHead kind={share.kind} name={share.name} handle={share.handle} timestamp={share.timestamp} />
+    <ReshareHead kind={share.kind} name={share.name} handle={share.handle} account={share.saved} timestamp={share.timestamp} text={share.text} />
   ) : null;
   // The post page keeps its own layout; it just gets the header on top.
   const embedded = reshare !== null && !detail;
@@ -419,7 +370,7 @@ export function PostCard({
     )}
     <div className="post-body">
       <div className="post-meta">
-        <AuthorLink handle={post.handle} name={post.author} />
+        <AuthorLink handle={post.handle} name={post.author} href={href} />
         {post.rank && <RankBadge rank={post.rank} seed={post.handle} />}
         <span className="muted">
           {post.handle}
@@ -496,7 +447,7 @@ export function PostCard({
           className={`action-like${liked ? " is-active" : ""}`}
           aria-pressed={liked}
           aria-label={`Like (${likes})`}
-          onClick={() => setLiked((v) => !v)}
+          onClick={() => setLiked(!liked)}
         >
           <HeartIcon filled={liked} />
           {compact(likes)}
@@ -505,11 +456,11 @@ export function PostCard({
           type="button"
           className="action-reply"
           aria-expanded={onReply ? undefined : repliesOpen}
-          aria-label={`Comment (${post.replies})`}
+          aria-label={`Comment (${replies})`}
           onClick={() => (onReply ? onReply() : setRepliesOpen((v) => !v))}
         >
           <CommentIcon />
-          {compact(post.replies)}
+          {compact(replies)}
         </button>
         <RepostMenu post={post} mine={mine} reshare={reshared} onChange={setReshared} />
         <button
@@ -522,7 +473,7 @@ export function PostCard({
           <BookmarkIcon filled={bookmarked} />
         </button>
       </div>
-      {repliesOpen && <ReplyThread postId={post.id} />}
+      {repliesOpen && <ReplyThread post={post} onCountChange={(delta) => setNewReplies((n) => n + delta)} />}
       {!embedded && footer}
     </div>
     </>

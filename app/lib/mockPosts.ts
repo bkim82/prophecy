@@ -10,6 +10,7 @@
 import type { GifId } from "@/app/lib/gifs";
 import type { TopicId } from "@/app/lib/topics";
 import type { TradeReceipt } from "@/app/lib/trades";
+import type { Reshare, ReshareKind } from "@/app/PostShare";
 
 export type Market = "btc" | "eth" | "sol" | "doge";
 export type Side = "LONG" | "SHORT";
@@ -97,7 +98,8 @@ export type PostKind = "text" | "call" | "result" | "streak" | "promo" | "clash"
 // the crowd siding with each (hand-picked); voting in the UI adds one local
 // vote and settles nothing.
 export type ClashSide = { name: string; handle: string; direction: "up" | "down"; target: string; votes: number };
-export type Clash = { market: Market; deadline: string; sides: [ClashSide, ClashSide] };
+// `yourVote` = the viewer's saved side (lib/engagement.ts), already counted in its `votes`.
+export type Clash = { market: Market; deadline: string; sides: [ClashSide, ClashSide]; yourVote?: 0 | 1 };
 
 // Short tag at the right of a post's meta row (app/PostCard.tsx FLAIRS).
 // Hand-assigned in the mock — no engagement or recommendation signal
@@ -147,6 +149,11 @@ export type Post = {
   // Written by the viewer (FeedComposer posts): deletable from the ⋯ menu,
   // and it can be reposted but not vouched for or defied.
   mine?: boolean;
+  // The viewer's saved engagement (lib/engagement.ts withEngagement): they
+  // liked it (already counted in `likes`), and their own repost (counted in
+  // `reposts`/`vouches`/`defies`).
+  liked?: boolean;
+  yourReshare?: Reshare;
 };
 
 // Platform-wide count beside "Live Calls" in the feed rail — a hardcoded
@@ -154,17 +161,22 @@ export type Post = {
 export const LIVE_CALL_COUNT = 214;
 
 
-// A vouch or defy someone made, as it lands in their followers' feeds: the
-// original post under "Nova vouched for this omen" / "Zane defied this omen".
-// Both are plain reposts (a defy just says you're against it). Newest first;
-// hand-written.
+// A repost someone you follow made, as it lands in your feed: the original
+// post under "Nova vouched for this omen" / "Zane defied this omen". `SHARES`
+// are the hand-written mock ones (vouches/defies, no words), newest first;
+// real accounts' come from lib/engagement.ts followedReshares.
 export type Share = {
   id: string;
-  kind: "vouch" | "defy";
+  kind: ReshareKind;
   postId: string;
   name: string;
   handle: string;
   timestamp: string;
+  // The sharer's own words, if any.
+  text?: string;
+  // A real account's saved repost (lib/engagement.ts followedReshares), so its
+  // handle always has a profile page.
+  saved?: boolean;
 };
 
 export const SHARES: Share[] = [
@@ -184,10 +196,18 @@ export type Reply = {
   content: string;
   timestamp: string;
   likes: number;
+  // The viewer liked it (saved, already counted in `likes`).
+  liked?: boolean;
+  // A saved reply (lib/engagement.ts): its author is a real account; `mine`
+  // = the viewer wrote it (they can edit or delete it); `edited` once changed.
+  saved?: boolean;
+  mine?: boolean;
+  edited?: boolean;
 };
 
-// Replies shown when a post's thread is expanded (app/PostCard.tsx's
-// ReplyThread, toggled by the Reply action). Keyed by Post.id, a handful of
+// Replies shown when a post's thread is expanded (app/PostReplies.tsx's
+// ReplyThread, opened by the comment action), under any saved ones
+// (lib/engagement.ts repliesFor). Keyed by Post.id, a handful of
 // loaded replies per post — independent of Post.replies (the decorative
 // total count), same "not every reply is fetched" shorthand every real feed
 // uses. Posts with no entry here render an empty-state instead.
