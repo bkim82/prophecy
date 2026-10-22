@@ -350,12 +350,14 @@ export const challenges = pgTable("challenges", {
   challengerId: text("challenger_id").notNull(), // Clerk user id
   challengerRank: text("challenger_rank").notNull(),
   targetHandle: text("target_handle").notNull(),
+  targetUserId: text("target_user_id"), // real accounts; null for mock traders
   targetRank: text("target_rank").notNull(),
   mode: text("mode").notNull(), // "pulse" | "portfolio"
   market: text("market"), // pulse only: "btc" | "eth" | "hype"
   timerSeconds: integer("timer_seconds"), // pulse only
-  stake: integer("stake").notNull(), // Embers, proposed — not reserved
-  status: text("status").notNull().default("pending"), // "pending" | "canceled"
+  stake: integer("stake").notNull(), // Embers, proposed — not reserved; 0 = no stakes
+  // "pending" → "canceled" (sender) | "declined" (target) → "dismissed" (sender clears it)
+  status: text("status").notNull().default("pending"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
   // One open challenge per challenger → target, so a double-submit can't send two.
@@ -421,3 +423,16 @@ export const pollVotes = pgTable("poll_votes", {
   primaryKey({ columns: [table.postId, table.userId] }),
   check("poll_votes_choice_range", sql`${table.choice} BETWEEN 0 AND 3`),
 ]);
+
+// One row per follow. Everyone starts following no one, with no followers.
+// `target` is the followed account's user id, or a mock trader's "@handle"
+// (app/lib/mockProfiles.ts) — those never follow anyone back. Challenges need
+// a follow both ways (app/profile/challengeActions.ts). Created by db/follows.sql.
+export const follows = pgTable("follows", {
+  followerId: text("follower_id").notNull(), // user id
+  target: text("target").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.followerId, table.target] }),
+  byTarget: index("follows_target").on(table.target),
+}));

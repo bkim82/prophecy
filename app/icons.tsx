@@ -69,6 +69,15 @@ export function BellIcon({ className }: { className?: string }) {
   );
 }
 
+export function SearchIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" className={className} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+      <circle cx="8.8" cy="8.8" r="5.3" />
+      <path d="m12.8 12.8 3.9 3.9" />
+    </svg>
+  );
+}
+
 export function FlameIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

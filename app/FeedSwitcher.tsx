@@ -7,7 +7,7 @@ import { CoverEyebrow, InterestPicker, MixBanner, MutedNotice, SeeMore, TopicChi
 import { ComposeIcon } from "@/app/icons";
 import { PostCard } from "@/app/PostCard";
 import { clearFreshPost, useFreshPostId } from "@/app/lib/freshPost";
-import { FOLLOWED_HANDLES, LIVE_CALL_COUNT, SHARES, type Post, type Share } from "@/app/lib/mockPosts";
+import { LIVE_CALL_COUNT, SHARES, type Post, type Share } from "@/app/lib/mockPosts";
 import { useBookmarks, useInterests, useMutedTopics } from "@/app/lib/postLists";
 import { ageMinutes, blendTopics, personalize, pickCovers, postTopics, topicById, type Cover, type Topic, type TopicId } from "@/app/lib/topics";
 
@@ -23,14 +23,17 @@ const FILTERS: { id: FilterId; label: string }[] = [
 
 // The latest vouch/defy per post by someone you follow. It's the line shown
 // above that post wherever it appears, and it pulls the post into Following.
-const FOLLOWED_SHARES = new Map<string, Share>();
-for (const share of SHARES) {
-  if (FOLLOWED_HANDLES.includes(share.handle) && !FOLLOWED_SHARES.has(share.postId)) FOLLOWED_SHARES.set(share.postId, share);
+function followedShares(followed: string[]): Map<string, Share> {
+  const shares = new Map<string, Share>();
+  for (const share of SHARES) {
+    if (followed.includes(share.handle) && !shares.has(share.postId)) shares.set(share.postId, share);
+  }
+  return shares;
 }
 
 // When a post reached your Following feed: posted, or later reshared.
-function followingAge(post: Post): number {
-  const share = FOLLOWED_SHARES.get(post.id);
+function followingAge(post: Post, shares: Map<string, Share>): number {
+  const share = shares.get(post.id);
   return Math.min(ageMinutes(post.timestamp), share ? ageMinutes(share.timestamp) : Infinity);
 }
 
@@ -46,7 +49,9 @@ type Row =
 
 // `savedPosts` = omens from the `posts` table (lib/posts.ts feedPosts,
 // rendered by app/page.tsx), newest first, pinned above everything else.
-export function FeedSwitcher({ posts, savedPosts }: { posts: Post[]; savedPosts: Post[] }) {
+// `followed`: the mock traders you follow (lib/follows.ts followedTraders).
+export function FeedSwitcher({ posts, savedPosts, followed }: { posts: Post[]; savedPosts: Post[]; followed: string[] }) {
+  const shares = useMemo(() => followedShares(followed), [followed]);
   const [filter, setFilter] = useState<FilterId>("forYou");
   // Topic chip: "forYou" = every topic, else one followed (or opened) topic.
   const [view, setView] = useState<TopicView>("forYou");
@@ -71,7 +76,7 @@ export function FeedSwitcher({ posts, savedPosts }: { posts: Post[]; savedPosts:
 
   const { pinned, covers, rest } = useMemo(() => {
     const keep = (post: Post) => {
-      if (filter === "following" && !FOLLOWED_HANDLES.includes(post.handle) && !FOLLOWED_SHARES.has(post.id)) return false;
+      if (filter === "following" && !followed.includes(post.handle) && !shares.has(post.id)) return false;
       if (filter === "live" && post.kind !== "call") return false;
       if (filter === "clashes" && post.kind !== "clash") return false;
       if (filter === "bookmarked" && !bookmarkIds.includes(post.id)) return false;
@@ -82,7 +87,7 @@ export function FeedSwitcher({ posts, savedPosts }: { posts: Post[]; savedPosts:
     const feed = posts.filter(keep);
     // Following runs on when things hit it, so a fresh vouch/defy of an old
     // post lands near the top. (Stable sort keeps ties in feed order.)
-    if (filter === "following") feed.sort((a, b) => followingAge(a) - followingAge(b));
+    if (filter === "following") feed.sort((a, b) => followingAge(a, shares) - followingAge(b, shares));
     const none: Cover[] = [];
     if (!home) return { pinned, covers: none, rest: feed };
     // Suggestions skip anything tagged with a "Not interested" topic.
@@ -91,7 +96,7 @@ export function FeedSwitcher({ posts, savedPosts }: { posts: Post[]; savedPosts:
     const covers = pickCovers(suggestions, interests.ids);
     const coverIds = new Set(covers.map((cover) => cover.post.id));
     return { pinned, covers, rest: personalize(suggestions.filter((post) => !coverIds.has(post.id)), interests.ids) };
-  }, [filter, view, home, mixed, posts, shownSaved, bookmarkIds, interests.ids, muted.ids]);
+  }, [filter, view, home, mixed, posts, followed, shares, shownSaved, bookmarkIds, interests.ids, muted.ids]);
 
   const visible = useMemo(() => [...pinned, ...covers.map((cover) => cover.post), ...rest], [pinned, covers, rest]);
 
@@ -237,7 +242,7 @@ export function FeedSwitcher({ posts, savedPosts }: { posts: Post[]; savedPosts:
                 <PostCard
                   key={row.key}
                   post={post}
-                  share={FOLLOWED_SHARES.get(post.id)}
+                  share={shares.get(post.id)}
                   onNotInterested={onNotInterested}
                   onDelete={post.mine && post.saved ? () => void deleteSaved(post.id) : undefined}
                   fresh={post.id === freshId}

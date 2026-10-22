@@ -1,16 +1,18 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type MouseEvent } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type MouseEvent } from "react";
 import { FeedNotifications } from "@/app/FeedNotifications";
 import { BellIcon } from "@/app/icons";
+import type { IncomingChallenge } from "@/app/lib/challengeRules";
 import { NOTIFICATION_IDS } from "@/app/lib/mockNotifications";
 import { useSeenNotifications } from "@/app/lib/postLists";
 
 /**
  * Header bell beside the account avatar (signed-in only, app/layout.tsx).
  * The badge counts inbox items this browser hasn't opened the bell on yet;
- * opening it marks them all seen. The popover stays mounted while closed so
- * challenge answers survive closing it.
+ * opening it marks them all seen. Real incoming challenges are fetched on
+ * load and again on each open. The popover stays mounted while closed so
+ * a "Declined" row survives closing it.
  */
 export function NotificationsMenu() {
   const [open, setOpen] = useState(false);
@@ -18,7 +20,22 @@ export function NotificationsMenu() {
   const popoverId = useId();
   const seen = useSeenNotifications();
   const seenIds = seen.ids;
-  const unseen = seenIds === null ? 0 : NOTIFICATION_IDS.filter((id) => !seenIds.includes(id)).length;
+  const [challenges, setChallenges] = useState<IncomingChallenge[]>([]);
+  const ids = [...challenges.map((challenge) => challenge.id), ...NOTIFICATION_IDS];
+  const unseen = seenIds === null ? 0 : ids.filter((id) => !seenIds.includes(id)).length;
+
+  const loadChallenges = useCallback(() => {
+    fetch("/api/challenges/incoming", { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data: { challenges: IncomingChallenge[] } | null) => {
+        if (data) setChallenges(data.challenges);
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    loadChallenges();
+  }, [loadChallenges]);
 
   useEffect(() => {
     if (!open) return;
@@ -37,7 +54,10 @@ export function NotificationsMenu() {
   }, [open]);
 
   const toggle = () => {
-    if (!open && unseen > 0) seen.markSeen(NOTIFICATION_IDS);
+    if (!open) {
+      if (unseen > 0) seen.markSeen(ids);
+      loadChallenges();
+    }
     setOpen(!open);
   };
 
@@ -64,7 +84,7 @@ export function NotificationsMenu() {
         )}
       </button>
       <div id={popoverId} className="notif-popover" role="dialog" aria-label="Notifications" hidden={!open} onClick={closeOnLink}>
-        <FeedNotifications />
+        <FeedNotifications challenges={challenges} />
       </div>
     </div>
   );

@@ -6,17 +6,22 @@ import { ArenaIcon, LockIcon, PatientIcon, SwiftIcon } from "@/app/icons";
 import {
   CHALLENGE_MODES,
   CHALLENGE_STAKES,
+  NO_STAKE,
   PULSE_MARKETS,
   PULSE_ROUNDS,
   challengeTerms,
+  stakeLabel,
   type ChallengeMode,
 } from "@/app/lib/challengeRules";
 import { cancelChallenge, sendChallenge } from "@/app/profile/challengeActions";
 import { RankBadge } from "@/app/RankBadge";
 
 // The Challenge button on someone else's profile, secondary to Follow in
-// the hero, and the dialog it opens. The page works out which state applies
-// (app/profile/[handle]/page.tsx); the server action re-checks all of it.
+// the hero, and the dialog it opens. Challenges are friends-only: you follow
+// each other, from the hero's Follow toggle plus their follow of you (mock
+// traders never follow back).
+// The page works out the rest of the state (app/profile/[handle]/page.tsx);
+// the server action re-checks all of it.
 
 export type ChallengeState =
   | { kind: "signed-out" }
@@ -31,11 +36,14 @@ type ChallengeControlProps = {
   state: ChallengeState;
   target: ChallengeTarget;
   viewerRank: string;
+  // You follow them (the Follow button's current state) / they follow you.
+  following: boolean;
+  followsYou: boolean;
   // The Follow button, kept on the same row.
   children: React.ReactNode;
 };
 
-export function ChallengeControl({ state, target, viewerRank, children }: ChallengeControlProps) {
+export function ChallengeControl({ state, target, viewerRank, following, followsYou, children }: ChallengeControlProps) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -50,7 +58,25 @@ export function ChallengeControl({ state, target, viewerRank, children }: Challe
 
   let button: React.ReactNode;
   let note: React.ReactNode = null;
-  if (state.kind === "signed-out") {
+  // A pending challenge stays cancelable even if you've since unfollowed.
+  if (state.kind !== "pending" && !(following && followsYou)) {
+    button = (
+      <button type="button" className="profile-challenge-button is-locked" disabled aria-describedby={noteId}>
+        <LockIcon />
+        Challenge
+      </button>
+    );
+    note = (
+      <>
+        Challenges are friends-only —{" "}
+        {followsYou
+          ? `${target.name} follows you, so follow back to challenge them.`
+          : following
+            ? `you can challenge ${target.name} once they follow you back.`
+            : `follow each other to challenge ${target.name}.`}
+      </>
+    );
+  } else if (state.kind === "signed-out") {
     button = (
       <SignInAction>
         <button type="button" className="profile-challenge-button">
@@ -142,7 +168,7 @@ function ChallengeDialog({ target, viewerRank, onClose }: { target: ChallengeTar
   const pickMode = (next: ChallengeMode) => {
     setMode(next);
     // Each mode has its own stake presets; keep the stake if it's offered in both.
-    if (!CHALLENGE_STAKES[next].includes(stake)) setStake(CHALLENGE_STAKES[next][0]);
+    if (stake !== NO_STAKE && !CHALLENGE_STAKES[next].includes(stake)) setStake(CHALLENGE_STAKES[next][0]);
   };
 
   function send() {
@@ -237,9 +263,9 @@ function ChallengeDialog({ target, viewerRank, onClose }: { target: ChallengeTar
           <fieldset className="challenge-group">
             <legend>Stake</legend>
             <div className="challenge-options">
-              {CHALLENGE_STAKES[mode].map((amount) => (
+              {[...CHALLENGE_STAKES[mode], NO_STAKE].map((amount) => (
                 <button key={amount} type="button" aria-pressed={stake === amount} onClick={() => setStake(amount)}>
-                  {amount.toLocaleString("en-US")} Embers
+                  {stakeLabel(amount)}
                 </button>
               ))}
             </div>
@@ -247,7 +273,9 @@ function ChallengeDialog({ target, viewerRank, onClose }: { target: ChallengeTar
 
           <p className="challenge-summary">
             <strong>{challengeTerms({ mode, market: mode === "pulse" ? market : null, timerSeconds: mode === "pulse" ? timerSeconds : null, stake })}</strong>
-            <span className="muted">Embers aren&rsquo;t reserved until {target.name} accepts.</span>
+            <span className="muted">
+              {stake === NO_STAKE ? "Just for bragging rights — no Embers change hands." : <>Embers aren&rsquo;t reserved until {target.name} accepts.</>}
+            </span>
           </p>
 
           {error && (

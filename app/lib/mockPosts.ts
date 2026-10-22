@@ -153,9 +153,6 @@ export type Post = {
 // mock, not derived from the posts below.
 export const LIVE_CALL_COUNT = 214;
 
-// Drives the "Following" feed filter (app/FeedSwitcher.tsx) — not a real
-// social graph, just a hardcoded handle allowlist for the mock.
-export const FOLLOWED_HANDLES = ["@nova_trades", "@ren.eth", "@zane_lfg"];
 
 // A vouch or defy someone made, as it lands in their followers' feeds: the
 // original post under "Nova vouched for this omen" / "Zane defied this omen".

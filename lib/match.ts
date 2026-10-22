@@ -283,7 +283,7 @@ export function viewFor(row: MatchRow, you: 1 | 2): MatchView {
   };
 }
 
-const settledFor = (userId: string) =>
+export const settledFor = (userId: string) =>
   and(eq(matches.status, "settled"), or(eq(matches.player1UserId, userId), eq(matches.player2UserId, userId)));
 
 /** Newest-first settled matches a Clerk user played in — the profile Matches tab. */

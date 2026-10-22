@@ -1,24 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { useId, useState } from "react";
+import { useId, useState, useTransition } from "react";
 import { ArenaIcon } from "@/app/icons";
 import { avatarGradient } from "@/app/lib/avatar";
-import { challengeTerms } from "@/app/lib/challengeRules";
-import { CHALLENGE_REQUESTS, NOTIFICATIONS, type ChallengeRequest, type Notification } from "@/app/lib/mockNotifications";
-import { getProfile, profileHref, type Profile } from "@/app/lib/mockProfiles";
+import { challengeTerms, type IncomingChallenge } from "@/app/lib/challengeRules";
+import { NOTIFICATIONS, type Notification } from "@/app/lib/mockNotifications";
+import { getProfile, profileHref } from "@/app/lib/mockProfiles";
+import { declineChallenge } from "@/app/profile/challengeActions";
 
-// The header bell's Notifications list (app/NotificationsMenu.tsx): incoming
-// challenge requests on top, then mentions / copies / follows. All mock
-// (app/lib/mockNotifications.ts). Accept and Decline only mark the request
-// until reload — there's no match to start against a mock trader.
+// The header bell's Notifications list (app/NotificationsMenu.tsx): real
+// incoming challenges on top (fetched by the bell), then mock mentions /
+// copies (app/lib/mockNotifications.ts). Decline is saved; Accept stays
+// disabled until there's a head-to-head round to start.
 
-type Answer = "accepted" | "declined";
-
-function Avatar({ profile, href, challenge = false }: { profile: Profile; href?: string; challenge?: boolean }) {
+function Avatar({ initial, seed, href, challenge = false }: { initial: string; seed: string; href?: string; challenge?: boolean }) {
   const face = (
     <>
-      {profile.avatarInitial}
+      {initial}
       {challenge && (
         <span className="feed-notif-kind">
           <ArenaIcon />
@@ -26,7 +25,7 @@ function Avatar({ profile, href, challenge = false }: { profile: Profile; href?:
       )}
     </>
   );
-  const style = { background: avatarGradient(profile.handle) };
+  const style = { background: avatarGradient(seed) };
   // Mouse-only duplicate of the name link, like PostCard's avatar.
   return href ? (
     <Link href={href} className="feed-notif-avatar" style={style} tabIndex={-1} aria-hidden="true">
@@ -40,40 +39,55 @@ function Avatar({ profile, href, challenge = false }: { profile: Profile; href?:
 }
 
 // Collapsed to who + when so the list stays short; "Show more" reveals the terms.
-function ChallengeRow({ request, answer, onAnswer }: { request: ChallengeRequest; answer?: Answer; onAnswer: (answer: Answer) => void }) {
+function ChallengeRow({ request }: { request: IncomingChallenge }) {
   const [open, setOpen] = useState(false);
+  const [declined, setDeclined] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startDecline] = useTransition();
   const termsId = useId();
-  const profile = getProfile(request.handle);
-  if (!profile) return null;
-  const href = profileHref(profile.handle);
+  const href = request.handle ? `/profile/${request.handle.slice(1)}` : undefined;
+
+  const decline = () =>
+    startDecline(async () => {
+      setError(null);
+      const result = await declineChallenge(request.id).catch(() => ({ ok: false as const, error: "Couldn't decline — try again." }));
+      if (result.ok) setDeclined(true);
+      else setError(result.error);
+    });
+
   return (
     <li className="feed-notif feed-notif--challenge">
-      <Avatar profile={profile} href={href} challenge />
+      <Avatar initial={request.name.charAt(0).toUpperCase()} seed={request.handle ?? request.id} href={href} challenge />
       <div className="feed-notif-body">
         <p className="feed-notif-line">
-          <strong>{href ? <Link href={href}>{profile.name}</Link> : profile.name}</strong> challenged you
+          <strong>{href ? <Link href={href}>{request.name}</Link> : request.name}</strong> challenged you
         </p>
         <p className="feed-notif-detail" id={termsId} hidden={!open}>
           {challengeTerms(request)}
         </p>
+        {error && (
+          <p className="feed-notif-detail" role="alert">
+            {error}
+          </p>
+        )}
         <p className="feed-notif-detail feed-notif-meta">
-          <span>{request.timestamp}</span>
+          <span>{request.sentLabel}</span>
           <button type="button" className="feed-notif-more" aria-expanded={open} aria-controls={termsId} onClick={() => setOpen(!open)}>
             {open ? "Show less" : "Show more"}
           </button>
         </p>
       </div>
-      {answer ? (
-        <p className="feed-notif-status" data-answer={answer}>
-          {answer === "accepted" ? "✓ Accepted" : "Declined"}
+      {declined ? (
+        <p className="feed-notif-status" data-answer="declined">
+          Declined
         </p>
       ) : (
         <div className="feed-notif-actions">
-          <button type="button" className="feed-notif-accept" aria-label={`Accept ${profile.name}'s challenge`} onClick={() => onAnswer("accepted")}>
+          <button type="button" className="feed-notif-accept" disabled title="Coming soon — head-to-head rounds aren't live yet">
             Accept
           </button>
-          <button type="button" aria-label={`Decline ${profile.name}'s challenge`} onClick={() => onAnswer("declined")}>
-            Decline
+          <button type="button" aria-label={`Decline ${request.name}'s challenge`} disabled={pending} onClick={decline}>
+            {pending ? "Declining…" : "Decline"}
           </button>
         </div>
       )}
@@ -100,7 +114,7 @@ function NotificationRow({ notification }: { notification: Notification }) {
   return (
     <li>
       <Link href={href} className="feed-notif">
-        <Avatar profile={profile} />
+        <Avatar initial={profile.avatarInitial} seed={profile.handle} />
         <span className="feed-notif-body">
           <span className="feed-notif-line">
             <strong>{profile.name}</strong> {action}
@@ -112,8 +126,7 @@ function NotificationRow({ notification }: { notification: Notification }) {
   );
 }
 
-export function FeedNotifications() {
-  const [answers, setAnswers] = useState<Record<string, Answer>>({});
+export function FeedNotifications({ challenges }: { challenges: IncomingChallenge[] }) {
   const labelId = useId();
   return (
     <section className="feed-notifs" aria-labelledby={labelId}>
@@ -121,13 +134,8 @@ export function FeedNotifications() {
         Notifications
       </h2>
       <ul className="feed-notif-list">
-        {CHALLENGE_REQUESTS.map((request) => (
-          <ChallengeRow
-            key={request.id}
-            request={request}
-            answer={answers[request.id]}
-            onAnswer={(answer) => setAnswers((current) => ({ ...current, [request.id]: answer }))}
-          />
+        {challenges.map((request) => (
+          <ChallengeRow key={request.id} request={request} />
         ))}
         {NOTIFICATIONS.map((notification) => (
           <NotificationRow key={notification.id} notification={notification} />

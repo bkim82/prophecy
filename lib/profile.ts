@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, isNotNull, or, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { profiles, users } from "@/db/schema";
 import { embeddedWalletAuthEnabled } from "@/lib/embeddedWalletFeature";
@@ -61,6 +61,65 @@ export async function walletAddressForHandle(handle: string): Promise<string | n
     .innerJoin(users, eq(users.id, profiles.userId))
     .where(and(eq(profiles.handle, handle), eq(users.walletStatus, "active"), eq(users.walletChainId, 8453)));
   return row?.address?.toLowerCase() ?? null;
+}
+
+// A real account's public profile (/profile/[handle]). Uploaded images are
+// served by GET /api/profile/avatar|banner?handle=, versioned by `updatedAt`.
+export type PublicProfile = ProfileFields & {
+  userId: string;
+  handle: string;
+  bannerPreset: string | null;
+  hasAvatarImage: boolean;
+  hasBannerImage: boolean;
+  updatedAt: Date;
+  joined: Date;
+};
+
+/** The account holding `handle` (stored form: lowercase, no "@"), or null. */
+export async function publicProfileFor(handle: string): Promise<PublicProfile | null> {
+  const [row] = await getDb()
+    .select({
+      userId: profiles.userId,
+      displayName: profiles.displayName,
+      bio: profiles.bio,
+      location: profiles.location,
+      website: profiles.website,
+      bannerPreset: profiles.bannerPreset,
+      hasAvatarImage: embeddedWalletAuthEnabled()
+        ? sql<boolean>`${profiles.avatarImage} IS NOT NULL`
+        : sql<boolean>`false`,
+      hasBannerImage: sql<boolean>`${profiles.bannerImage} IS NOT NULL`,
+      createdAt: users.createdAt,
+      updatedAt: profiles.updatedAt,
+    })
+    .from(profiles)
+    .leftJoin(users, eq(users.id, profiles.userId))
+    .where(eq(profiles.handle, handle));
+  if (!row) return null;
+  const { createdAt, ...fields } = row;
+  return { ...fields, handle, joined: createdAt ?? fields.updatedAt };
+}
+
+export type ProfileMatch = { userId: string; handle: string; displayName: string | null; hasAvatarImage: boolean; updatedAt: Date };
+
+/** Accounts with a handle whose handle or name contains `query` (any case); handle-prefix matches first. */
+export async function searchProfiles(query: string, limit: number): Promise<ProfileMatch[]> {
+  const escaped = query.replace(/[\\%_]/g, (char) => `\\${char}`);
+  const rows = await getDb()
+    .select({
+      userId: profiles.userId,
+      handle: profiles.handle,
+      displayName: profiles.displayName,
+      hasAvatarImage: embeddedWalletAuthEnabled()
+        ? sql<boolean>`${profiles.avatarImage} IS NOT NULL`
+        : sql<boolean>`false`,
+      updatedAt: profiles.updatedAt,
+    })
+    .from(profiles)
+    .where(and(isNotNull(profiles.handle), or(ilike(profiles.handle, `%${escaped}%`), ilike(profiles.displayName, `%${escaped}%`))))
+    .orderBy(desc(ilike(profiles.handle, `${escaped}%`)), profiles.handle)
+    .limit(limit);
+  return rows.flatMap(({ handle, ...row }) => (handle ? [{ ...row, handle }] : []));
 }
 
 /** Clerk user id holding `handle` (stored form: lowercase, no "@"), or null. */

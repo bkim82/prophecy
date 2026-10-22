@@ -8,19 +8,25 @@
 import type { Market, Side } from "@/app/lib/mockPosts";
 import type { AssetAccuracy, Highlight, TradingStyle } from "@/app/lib/profileTraits";
 
-export type BestTrade = { market: Market; side: Side; leverage: number; roi: number; date: string };
+// `market` is a mock call's coin, a Pulse market ("btc") or a Portfolio token
+// symbol. No side/leverage = a whole Pulse round, which keeps only its P&L.
+export type BestTrade = { market: Market | string; side?: Side; leverage?: number; roi: number; date: string };
 
+// Mock traders' are hand-picked (below); real accounts' come from what they
+// played (lib/activity.ts), with null where there's nothing to show yet.
 export type ProfileRecords = {
-  peakElo: number;
+  // Null for real accounts: there's no Elo system, so the card shows rank alone.
+  peakElo: number | null;
   peakRank: string;
-  bestTrade: BestTrade;
-  // Most fulfilled calls in a row.
+  bestTrade: BestTrade | null;
+  // Most wins in a row: fulfilled calls, or Arena rounds when `unit` says so.
   longestStreak: number;
-  // Fraction of settled calls fulfilled.
-  winRate: number;
+  // Fraction of settled calls fulfilled / rounds won; null before any.
+  winRate: number | null;
   calls: number;
+  unit?: "rounds";
   // Best 24h Portfolio session, % P&L.
-  bestSession: number;
+  bestSession: number | null;
   duelsWon: number;
 };
 

@@ -1,26 +1,31 @@
 import { profileImageResponse } from "@/app/lib/profileImage";
-import { avatarImageFor } from "@/lib/profile";
+import { avatarImageFor, handleOwner } from "@/lib/profile";
 import { getViewer } from "@/lib/viewer";
 
 export const dynamic = "force-dynamic";
 
-/** Returns the caller's application-owned profile avatar. */
+/**
+ * Returns an application-owned profile avatar: the caller's own, or with
+ * `?handle=` (stored form) anyone's, for public profiles.
+ */
 export async function GET(request: Request) {
-  const userId = (await getViewer())?.userId;
-  if (!userId) return Response.json({ error: "Not signed in" }, { status: 401 });
+  const params = new URL(request.url).searchParams;
+  const handle = params.get("handle");
+  const scope = handle ? "public" : "private";
 
   try {
-    const avatar = await avatarImageFor(userId);
+    const userId = handle ? await handleOwner(handle.toLowerCase()) : (await getViewer())?.userId;
+    if (!userId && !handle) return Response.json({ error: "Not signed in" }, { status: 401 });
+    const avatar = userId ? await avatarImageFor(userId) : null;
     if (!avatar) {
       return Response.json(
         { error: "No avatar" },
         { status: 404, headers: { "Cache-Control": "private, no-store" } },
       );
     }
-    const versioned = new URL(request.url).searchParams.has("v");
     return profileImageResponse(
       avatar,
-      versioned ? "private, max-age=31536000, immutable" : "private, no-cache",
+      params.has("v") ? `${scope}, max-age=31536000, immutable` : `${scope}, no-cache`,
     );
   } catch {
     return Response.json(

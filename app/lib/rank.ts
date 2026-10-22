@@ -61,10 +61,11 @@ export function rankScore(rank: string): number {
   return tier * 10 + DIVISIONS.indexOf(division) + 1;
 }
 
-// The signed-in viewer's rank for profile gating — hardcoded like the rest of
-// this stub. (app/lib/roomsMocks.ts ROOM.subrank separately assumes
-// "Oracle II" for Sanctum.)
-export const VIEWER_RANK = "Gold II";
+// Every real account's rank — the signed-in viewer's and anyone else's — until
+// ranking exists: everyone starts at the bottom, Bronze I. Gates profile
+// portfolios and challenges. (app/lib/roomsMocks.ts ROOM.subrank separately
+// assumes "Oracle II" for Sanctum.)
+export const VIEWER_RANK = "Bronze I";
 
 // A profile's portfolio is visible to viewers at or above that profile's rank.
 export function canViewPortfolio(profileRank: string, viewerRank: string = VIEWER_RANK): boolean {

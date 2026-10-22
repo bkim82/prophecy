@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { useState, useTransition } from "react";
+import { SignInAction } from "@/app/auth/AuthProvider";
 import { AuthorLink } from "@/app/AuthorLink";
 import { ArenaIcon, ContrarianIcon, DaredevilIcon, FlameIcon, LinkIcon, LockIcon, PatientIcon, PinIcon, SwiftIcon, TrendIcon } from "@/app/icons";
 import { avatarGradient } from "@/app/lib/avatar";
 import { callTrack } from "@/app/lib/calls";
 import type { ProfilePortfolio } from "@/app/lib/mockPortfolios";
 import type { Profile, ProfileActivity, ProfileTrade } from "@/app/lib/mockProfiles";
-import type { CopyEarnings } from "@/app/lib/mockViewer";
 import { bannerBackground, websiteLabel } from "@/app/lib/profileEdit";
 import {
   ARCHETYPES,
@@ -20,14 +20,15 @@ import {
   signatureAsset,
   type ArchetypeId,
   type AssetAccuracy,
+  type CopyEarnings,
 } from "@/app/lib/profileTraits";
-import { togglePinnedMatch } from "@/app/profile/actions";
+import { followProfile, togglePinnedMatch } from "@/app/profile/actions";
 import { EditProfileDialog, type EditableProfile } from "@/app/profile/EditProfileDialog";
 import type { MatchHistoryEntry, MatchRecord } from "@/lib/match";
 import { rankTier } from "@/app/lib/rank";
 import { ChallengeControl, type ChallengeState } from "@/app/profile/[handle]/ChallengeDialog";
 import { ProfileShowcase, type ShowcasePanels } from "@/app/profile/[handle]/ProfileShowcase";
-import { cancelChallenge } from "@/app/profile/challengeActions";
+import { cancelChallenge, dismissChallenge } from "@/app/profile/challengeActions";
 import { MarketCallCard, PostCard } from "@/app/PostCard";
 import { RankBadge } from "@/app/RankBadge";
 
@@ -69,7 +70,7 @@ export type OwnProfile = {
 
 // A pending challenge you sent, resolved for display (target name/rank from
 // their profile, `terms` from challengeTerms, relative `sentLabel`).
-export type SentChallenge = { id: string; handle: string; name: string; rank: string; href?: string; terms: string; sentLabel: string };
+export type SentChallenge = { id: string; handle: string; name: string; rank: string; href?: string; terms: string; sentLabel: string; declined: boolean };
 
 // The hero's "how they trade" line. `accuracySource` explains where the
 // numbers come from when it isn't obvious (your own: Arena round P&L).
@@ -90,6 +91,10 @@ type ProfileViewProps = {
   portfolioLocked: boolean;
   viewerRank: string;
   initiallyFollowing: boolean;
+  // Follow saves via followProfile; signed out it opens sign-in instead.
+  signedIn?: boolean;
+  // Someone else's profile: they follow you back, which (with your Follow) unlocks Challenge.
+  followsYou?: boolean;
   traits: ProfileTraits;
   // Someone else's profile only: which Challenge button to show.
   challenge?: ChallengeState;
@@ -101,18 +106,33 @@ type ProfileViewProps = {
   showcase?: ShowcasePanels;
 };
 
-export function ProfileView({ profile, activity, portfolio, portfolioLocked, viewerRank, initiallyFollowing, traits, challenge, self, showcase }: ProfileViewProps) {
+export function ProfileView({ profile, activity, portfolio, portfolioLocked, viewerRank, initiallyFollowing, signedIn = false, followsYou = false, traits, challenge, self, showcase }: ProfileViewProps) {
   const [tab, setTab] = useState<TabId>(self ? "matches" : "omens");
   const [editing, setEditing] = useState(false);
   // Own profiles may have no handle yet; the page supplies a stable seed instead.
   const seed = self?.edit.avatarSeed ?? profile.handle;
   const [following, setFollowing] = useState(initiallyFollowing);
-  // Local-only follow toggle, like the feed's like button — nothing persists.
+  const [followError, setFollowError] = useState<string | null>(null);
+  const [, startFollow] = useTransition();
   const followers = profile.followers + Number(following) - Number(initiallyFollowing);
   const [pinPendingId, setPinPendingId] = useState<string | null>(null);
   const [pinError, setPinError] = useState<string | null>(null);
   const [, startPin] = useTransition();
   const Archetype = traits.archetype ? ARCHETYPE_ICONS[traits.archetype] : null;
+
+  // Optimistic; Challenge re-checks the saved follow on the server.
+  const toggleFollow = () => {
+    const next = !following;
+    setFollowing(next);
+    setFollowError(null);
+    startFollow(async () => {
+      const result = await followProfile(profile.handle, next).catch(() => ({ ok: false as const, error: "Couldn't save your follow — try again." }));
+      if (!result.ok) {
+        setFollowing(!next);
+        setFollowError(result.error);
+      }
+    });
+  };
 
   // Pin/unpin from the Matches tab; the action refreshes the page, so the rail's reel updates too.
   const togglePin = (id: string) => {
@@ -144,7 +164,10 @@ export function ProfileView({ profile, activity, portfolio, portfolioLocked, vie
         <div className="profile-identity">
           <h1>{profile.name}</h1>
           {profile.handle ? (
-            <span className="muted">{profile.handle}</span>
+            <span className="muted">
+              {profile.handle}
+              {followsYou && <span className="profile-follows-you">Follows you</span>}
+            </span>
           ) : (
             self && (
               <button type="button" className="profile-handle-prompt" onClick={() => setEditing(true)}>
@@ -193,16 +216,35 @@ export function ProfileView({ profile, activity, portfolio, portfolioLocked, vie
             Edit profile
           </button>
         ) : (
-          <ChallengeControl state={challenge ?? { kind: "ready" }} target={{ handle: profile.handle, name: profile.name, rank: profile.rank }} viewerRank={viewerRank}>
-            <button
-              type="button"
-              className={`profile-follow${following ? " is-following" : ""}`}
-              aria-pressed={following}
-              onClick={() => setFollowing((v) => !v)}
-            >
-              {following ? "Following" : "Follow"}
-            </button>
+          <ChallengeControl
+            state={challenge ?? { kind: "ready" }}
+            target={{ handle: profile.handle, name: profile.name, rank: profile.rank }}
+            viewerRank={viewerRank}
+            following={following}
+            followsYou={followsYou}
+          >
+            {signedIn ? (
+              <button
+                type="button"
+                className={`profile-follow${following ? " is-following" : ""}`}
+                aria-pressed={following}
+                onClick={toggleFollow}
+              >
+                {following ? "Following" : "Follow"}
+              </button>
+            ) : (
+              <SignInAction>
+                <button type="button" className="profile-follow">
+                  Follow
+                </button>
+              </SignInAction>
+            )}
           </ChallengeControl>
+        )}
+        {followError && (
+          <p className="profile-edit-error" role="alert">
+            {followError}
+          </p>
         )}
       </ProfileShowcase>
 
@@ -304,8 +346,8 @@ function TradeDossier({ accuracy, source }: { accuracy: AssetAccuracy[]; source?
   );
 }
 
-// How much the viewer made from other traders copying them — mock numbers
-// (app/lib/mockViewer.ts), nothing is actually copied yet.
+// How much the viewer made from other traders copying them. Always zero for
+// now (lib/activity.ts NO_COPY_EARNINGS): nothing can be copied yet.
 function CopyEarningsCard({ earnings }: { earnings: CopyEarnings }) {
   return (
     <section className="profile-copy" aria-label="Copy trading">
@@ -324,34 +366,45 @@ function CopyEarningsCard({ earnings }: { earnings: CopyEarnings }) {
         </div>
         <div>
           <dt>Earned from copies</dt>
-          <dd className="is-up">{usdCents.format(earnings.earned)}</dd>
+          <dd className={earnings.earned > 0 ? "is-up" : undefined}>{usdCents.format(earnings.earned)}</dd>
         </div>
       </dl>
+      {earnings.copies === 0 && <p className="profile-copy-empty muted">No one has copied your trades yet.</p>}
     </section>
   );
 }
 
-// Challenges you've sent that are still waiting, above your match history.
+// Challenges you've sent that are still waiting, plus declined ones until you
+// clear them, above your match history.
 function SentChallenges({ challenges }: { challenges: SentChallenge[] }) {
-  const [cancelingId, setCancelingId] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [, startCancel] = useTransition();
+  const [, startUpdate] = useTransition();
   if (challenges.length === 0) return null;
+  const pendingCount = challenges.filter((challenge) => !challenge.declined).length;
+  const declinedCount = challenges.length - pendingCount;
 
-  const cancel = (id: string) => {
-    setCancelingId(id);
+  // Cancel a pending one, or clear a declined one.
+  const close = ({ id, declined }: SentChallenge) => {
+    setBusyId(id);
     setError(null);
-    startCancel(async () => {
-      const result = await cancelChallenge(id).catch(() => ({ ok: false as const, error: "Couldn't cancel — try again." }));
+    startUpdate(async () => {
+      const action = declined ? dismissChallenge : cancelChallenge;
+      const result = await action(id).catch(() => ({ ok: false as const, error: "Couldn't update — try again." }));
       if (!result.ok) setError(result.error);
-      setCancelingId(null);
+      setBusyId(null);
     });
   };
 
   return (
     <section className="profile-sent" aria-label="Sent challenges">
       <p className="profile-trade-summary muted">
-        {challenges.length} pending {challenges.length === 1 ? "challenge" : "challenges"}
+        {[
+          pendingCount > 0 && `${pendingCount} pending ${pendingCount === 1 ? "challenge" : "challenges"}`,
+          declinedCount > 0 && `${declinedCount} declined`,
+        ]
+          .filter(Boolean)
+          .join(" · ")}
       </p>
       <ul className="profile-matches">
         {challenges.map((challenge) => (
@@ -368,10 +421,12 @@ function SentChallenges({ challenges }: { challenges: SentChallenge[] }) {
                 {challenge.terms} · sent {challenge.sentLabel}
               </span>
             </div>
-            <span className="profile-sent-status">Pending</span>
+            <span className="profile-sent-status" data-declined={challenge.declined || undefined}>
+              {challenge.declined ? "Declined" : "Pending"}
+            </span>
             <div className="profile-match-pin">
-              <button type="button" className="profile-pin" disabled={cancelingId === challenge.id} onClick={() => cancel(challenge.id)}>
-                {cancelingId === challenge.id ? "…" : "Cancel"}
+              <button type="button" className="profile-pin" disabled={busyId === challenge.id} onClick={() => close(challenge)}>
+                {busyId === challenge.id ? "…" : challenge.declined ? "Clear" : "Cancel"}
               </button>
             </div>
           </li>

@@ -32,6 +32,17 @@ export const accuracyTone = (accuracy: number) => (accuracy >= 0.6 ? "is-up" : a
 // rounds; `fadeShare` = shorts plus calls against the prevailing move.
 export type TradingStyle = { pulseShare: number; avgHoldHours: number; fadeShare: number; avgLeverage: number };
 
+// The own-profile copy-trading card. Nothing can be copied yet — the feed's
+// Copy button (app/PostCard.tsx) is unwired and there's no copy-trade ledger.
+export type CopyEarnings = {
+  // Distinct traders who copied at least one of your trades.
+  copiers: number;
+  // Copied positions across all of them.
+  copies: number;
+  // USD paid out to you from copiers' trades.
+  earned: number;
+};
+
 export type ArchetypeId = "daredevil" | "contrarian" | "patient" | "swift";
 
 export const ARCHETYPES: Record<ArchetypeId, { name: string; blurb: string }> = {
