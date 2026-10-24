@@ -553,13 +553,16 @@ export const topicSignals = pgTable("topic_signals", {
 // (app/SharePostDialog.tsx). A message has text, photos
 // (`direct_message_media`), a shared post (`postId`: a saved post's id or a
 // mock post's, resolved live like a bookmark) or any mix — the route insists
-// on at least one. Created by db/messages.sql.
+// on at least one. Sending a challenge also posts one with just its
+// `challengeId` (app/profile/challengeActions.ts), shown as a live card.
+// Created by db/messages.sql.
 export const directMessages = pgTable("direct_messages", {
   id: text("id").primaryKey(),
   senderId: text("sender_id").notNull(),
   recipientId: text("recipient_id").notNull(),
   body: text("body").notNull().default(""), // app/lib/messageRules.ts MESSAGE_MAX_LENGTH
   postId: text("post_id"),
+  challengeId: text("challenge_id"), // `challenges.id`
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   index("direct_messages_recipient_created_idx").on(table.recipientId, table.createdAt),

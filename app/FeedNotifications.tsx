@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
 import { ArenaIcon } from "@/app/icons";
 import { avatarGradient } from "@/app/lib/avatar";
-import { challengeTerms, type AcceptedChallenge } from "@/app/lib/challengeRules";
+import { challengeTerms, clockLabel, type AcceptedChallenge } from "@/app/lib/challengeRules";
 import { NOTIFICATIONS, type Notification } from "@/app/lib/mockNotifications";
 import { acceptIncoming, declineIncoming, useLiveChallenges, useNow, type Answer, type LiveIncoming } from "@/app/lib/liveChallenges";
 import { getProfile, profileHref } from "@/app/lib/mockProfiles";
@@ -42,9 +42,6 @@ function Avatar({ initial, seed, href, challenge = false }: { initial: string; s
 }
 
 const profileLink = (handle: string | null) => (handle ? `/profile/${handle.slice(1)}` : undefined);
-
-// 95 → "1:35"
-const clockLabel = (seconds: number) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 
 // Collapsed to who + when so the list stays short; "Show more" reveals the
 // terms. The popup passes `expanded` to lead with them. `onAccepted` runs

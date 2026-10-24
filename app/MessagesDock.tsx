@@ -1,14 +1,19 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, useTransition, type ClipboardEvent, type KeyboardEvent, type RefObject } from "react";
-import { BackIcon, CloseIcon, ImageIcon, NewMessageIcon, SearchIcon, SendIcon } from "@/app/icons";
+import { ArenaIcon, BackIcon, CloseIcon, ImageIcon, NewMessageIcon, SearchIcon, SendIcon } from "@/app/icons";
 import { avatarGradient } from "@/app/lib/avatar";
+import { clockLabel } from "@/app/lib/challengeRules";
+import { acceptIncoming, declineIncoming, useLiveChallenges, useNow } from "@/app/lib/liveChallenges";
 import {
   MESSAGE_MAX_LENGTH,
   MESSAGE_MAX_PHOTOS,
   messagePreview,
   normalizeMessage,
+  type ChallengeCard,
+  type ChallengeStatus,
   type ConversationView,
   type Folder,
   type MessageView,
@@ -21,6 +26,7 @@ import { PICKED_PHOTO_MAX_BYTES, encodePhoto, loadPhoto, type PickedPhoto } from
 import { playedLabel } from "@/app/lib/playedLabel";
 import { POST_IMAGE_TYPES } from "@/app/lib/postImage";
 import { acceptConversation, deleteConversation, markConversationRead } from "@/app/messages/actions";
+import { cancelChallenge } from "@/app/profile/challengeActions";
 
 // The Messages dock: a panel docked to the bottom-right corner (full screen
 // on phones), opened from the header's Messages button or a profile's
@@ -32,6 +38,9 @@ import { acceptConversation, deleteConversation, markConversationRead } from "@/
 
 // A gap this long between two messages from one side starts a new run (its own timestamp).
 const RUN_GAP_MS = 5 * 60_000;
+// How often an open conversation re-reads while one of its challenges is still pending
+// — an answer isn't a new message, so the heartbeat's `latest` doesn't move for it.
+const CHALLENGE_POLL_MS = 3_000;
 
 type Lists = { inbox: ConversationView[]; requests: ConversationView[] };
 
@@ -245,6 +254,122 @@ function MessagePhotos({ message, from }: { message: MessageView; from: string }
   );
 }
 
+const CHALLENGE_STATUS: Record<Exclude<ChallengeStatus, "pending">, string> = {
+  accepted: "✓ Accepted",
+  declined: "Declined",
+  expired: "Expired",
+  canceled: "Canceled",
+  closed: "No longer open",
+};
+
+// A challenge posted into the conversation as it was sent. Live like the
+// bell's row (app/FeedNotifications.tsx), sharing its answers
+// (app/lib/liveChallenges.ts): the one challenged accepts — into the private
+// round, closing the dock — or declines here; the sender sees the countdown
+// and can cancel, then "Join round" once it's accepted (from the heartbeat's
+// `accepted`). `loadedAt` is when the server measured `expiresInMs`.
+function ChallengeMessage({
+  card,
+  mine,
+  peerName,
+  loadedAt,
+  onCanceled,
+}: {
+  card: ChallengeCard | null;
+  mine: boolean;
+  peerName: string;
+  loadedAt: number;
+  onCanceled: () => void;
+}) {
+  const router = useRouter();
+  const { accepted, answers } = useLiveChallenges();
+  const now = useNow();
+  const [error, setError] = useState<string | null>(null);
+  const [answering, startAnswer] = useTransition();
+  if (!card) return <p className="messages-challenge is-gone">This challenge is no longer available.</p>;
+
+  // Unset until you answer it here or in the bell.
+  const answered = card.id in answers ? answers[card.id] : undefined;
+  const secondsLeft = now === 0 ? null : Math.max(0, Math.ceil((loadedAt + card.expiresInMs - now) / 1000));
+  const status: ChallengeStatus = answered ?? (card.status === "pending" && secondsLeft === 0 ? "expired" : card.status);
+  const join = mine && status === "accepted" ? accepted.find((round) => round.id === card.id) : undefined;
+  const respond = (run: () => Promise<string | null>) =>
+    startAnswer(async () => {
+      setError(null);
+      setError(await run().catch(() => "Something went wrong — try again."));
+    });
+
+  return (
+    <div className="messages-challenge" data-status={status}>
+      <p className="messages-challenge-head">
+        <ArenaIcon />
+        {mine ? `You challenged ${peerName}` : `${peerName} challenged you`}
+      </p>
+      <p className="messages-challenge-terms">{card.terms}</p>
+      {status === "pending" ? (
+        <>
+          <p className="messages-challenge-meta">
+            {mine ? `Waiting for ${peerName}` : "Answer before it expires"}
+            {secondsLeft !== null && ` · ${clockLabel(secondsLeft)} left`}
+          </p>
+          <div className="messages-challenge-actions">
+            {mine ? (
+              <button
+                type="button"
+                disabled={answering}
+                onClick={() =>
+                  respond(async () => {
+                    const result = await cancelChallenge(card.id);
+                    if (!result.ok) return result.error;
+                    onCanceled();
+                    return null;
+                  })
+                }
+              >
+                {answering ? "Canceling…" : "Cancel challenge"}
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="messages-accept"
+                  disabled={answering || card.mode !== "pulse"}
+                  title={card.mode === "pulse" ? undefined : "24h Portfolio challenges can't be accepted — Pulse only for now"}
+                  onClick={() =>
+                    respond(async () => {
+                      const result = await acceptIncoming(card.id);
+                      if ("error" in result) return result.error;
+                      closeMessages();
+                      router.push(result.href);
+                      return null;
+                    })
+                  }
+                >
+                  Accept
+                </button>
+                <button type="button" disabled={answering} onClick={() => respond(() => declineIncoming(card.id))}>
+                  Decline
+                </button>
+              </>
+            )}
+          </div>
+        </>
+      ) : join ? (
+        <Link href={join.href} className="messages-challenge-join" onClick={closeMessages}>
+          They&rsquo;re in the round — join
+        </Link>
+      ) : (
+        <p className="messages-challenge-status">{CHALLENGE_STATUS[status]}</p>
+      )}
+      {error && (
+        <p className="messages-challenge-error" role="alert">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function ThreadPane({ opened }: { opened: Peer }) {
   const { summary } = useMessages();
   const [loaded, setLoaded] = useState<{ thread: ThreadView; at: number } | null>(null);
@@ -259,6 +384,7 @@ function ThreadPane({ opened }: { opened: Peer }) {
   const tabVisible = useTabVisible();
   const thread = loaded?.thread ?? null;
   const peer = thread?.peer ?? opened;
+  const [poll, setPoll] = useState(0);
 
   useEffect(() => {
     let live = true;
@@ -270,7 +396,27 @@ function ThreadPane({ opened }: { opened: Peer }) {
     return () => {
       live = false;
     };
-  }, [opened.handle, summary.latest]);
+  }, [opened.handle, summary.latest, poll]);
+
+  const challengePending = thread?.messages.some((message) => message.challenge?.status === "pending") ?? false;
+  useEffect(() => {
+    if (!challengePending) return;
+    const timer = setInterval(() => setPoll((n) => n + 1), CHALLENGE_POLL_MS);
+    return () => clearInterval(timer);
+  }, [challengePending]);
+
+  const setChallengeStatus = (id: string, status: ChallengeStatus) =>
+    setLoaded((current) =>
+      current && {
+        ...current,
+        thread: {
+          ...current.thread,
+          messages: current.thread.messages.map((message) =>
+            message.challenge?.id === id ? { ...message, challenge: { ...message.challenge, status, expiresInMs: 0 } } : message,
+          ),
+        },
+      },
+    );
 
   // Picked photos' previews are blob: URLs; let them go with the pane.
   const photosRef = useRef(photos);
@@ -512,6 +658,15 @@ function ThreadPane({ opened }: { opened: Peer }) {
               const from = message.mine ? "you" : peer.name;
               return (
                 <li key={message.id} className="messages-bubble-row" data-mine={message.mine}>
+                  {message.challenge !== undefined && loaded && (
+                    <ChallengeMessage
+                      card={message.challenge}
+                      mine={message.mine}
+                      peerName={peer.name}
+                      loadedAt={loaded.at}
+                      onCanceled={() => message.challenge && setChallengeStatus(message.challenge.id, "canceled")}
+                    />
+                  )}
                   {message.post !== undefined && <SharedPostCard post={message.post} />}
                   {message.photos.length > 0 && <MessagePhotos message={message} from={from} />}
                   {message.body && (
