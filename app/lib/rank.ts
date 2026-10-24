@@ -18,31 +18,42 @@ export function isExclusiveUnlocked(rank: number = MOCK_CURRENT_RANK): boolean {
 // Gold II outranks Gold I. A bare tier sorts below every division of it.
 // Each tier keys a [data-room]/[data-rank] colour set in globals.css and a
 // door style in the Sanctum entry gate.
-export const RANK_TIERS = ["bronze", "silver", "gold", "platinum", "diamond", "prophet", "oracle"] as const;
+export const RANK_TIERS = ["bronze", "silver", "gold", "platinum", "diamond", "oracle"] as const;
 export type RankTier = (typeof RANK_TIERS)[number];
 export type RoomId = RankTier;
 export const isRoomId = (v: unknown): v is RoomId => RANK_TIERS.includes(v as RoomId);
 
-// Tiers are percentile bands of the player base: the share (%) in each tier,
-// read top-down — Oracle is the top 1%, Prophet the next 4%, and so on to the
-// bottom 15% in Bronze. Sums to 100.
-export const TIER_SHARE: Record<RankTier, number> = {
-  oracle: 1,
-  prophet: 4,
-  diamond: 10,
-  platinum: 20,
-  gold: 20,
-  silver: 30,
-  bronze: 15,
+// Tiers are earned with rating points; everyone starts in Bronze (under
+// 1,500). Silver → Platinum are points alone. Diamond and Oracle also need a
+// "top X%" standing, a career match count, and (Oracle) a win rate over the
+// last RECENT_MATCHES — miss any of those and you hold the tier below, e.g.
+// 9,000 points outside the top 10% stays Platinum.
+type TierRequirement = { minPoints: number; topPct?: number; minMatches?: number; minRecentWinRate?: number };
+
+export const RECENT_MATCHES = 50;
+
+export const TIER_REQUIREMENTS: Record<RankTier, TierRequirement> = {
+  bronze: { minPoints: 0 },
+  silver: { minPoints: 1500 },
+  gold: { minPoints: 2500 },
+  platinum: { minPoints: 4000 },
+  diamond: { minPoints: 7500, topPct: 10, minMatches: 100 },
+  oracle: { minPoints: 15000, topPct: 1, minMatches: 200, minRecentWinRate: 55 },
 };
 
-// "Top X%" standing (0 = best player, 100 = worst) -> tier. Bands include
-// their upper edge, so exactly top 1% is Oracle and top 5% is Prophet.
-export function tierForPercentile(topPct: number): RankTier {
-  let cutoff = 0;
+// topPct: 0 = best player, 100 = worst; recentWinRate: % won of the last
+// RECENT_MATCHES. Percent edges are inclusive (exactly top 1% is Oracle).
+export type TierStanding = { points: number; topPct: number; matches: number; recentWinRate: number };
+
+export function tierForStanding(s: TierStanding): RankTier {
   for (const tier of [...RANK_TIERS].reverse()) {
-    cutoff += TIER_SHARE[tier];
-    if (topPct <= cutoff) return tier;
+    const req = TIER_REQUIREMENTS[tier];
+    if (
+      s.points >= req.minPoints &&
+      s.topPct <= (req.topPct ?? 100) &&
+      s.matches >= (req.minMatches ?? 0) &&
+      s.recentWinRate >= (req.minRecentWinRate ?? 0)
+    ) return tier;
   }
   return "bronze";
 }
@@ -98,7 +109,7 @@ export function canChallenge(targetRank: string, viewerRank: string = VIEWER_RAN
   return target >= 0 && viewer >= 0 && target <= viewer + 1;
 }
 
-// The lowest tier that may challenge `targetRank` ("Oracle" -> "Prophet"),
+// The lowest tier that may challenge `targetRank` ("Oracle" -> "Diamond"),
 // for the locked button's explanation.
 export function challengeTierNeeded(targetRank: string): string {
   const tier = RANK_TIERS[Math.max(0, tierIndex(targetRank) - 1)];
