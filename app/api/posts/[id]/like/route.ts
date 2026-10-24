@@ -4,7 +4,7 @@ import { getViewer } from "@/lib/viewer";
 
 export const dynamic = "force-dynamic";
 
-/** POST { liked: boolean } → likes or unlikes a post (saved or mock) as the viewer. */
+/** POST { liked: boolean } → likes or unlikes a saved post as the viewer. */
 export async function POST(request: Request, ctx: { params: Promise<{ id: string }> }) {
   const failure = postsMutationFailure(request);
   if (failure) return failure;

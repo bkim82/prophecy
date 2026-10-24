@@ -6,33 +6,18 @@ import PriceChart, { type TradeMarker } from "@/app/PriceChart";
 import { useAppAuth } from "@/app/auth/AuthProvider";
 import { usePriceFeed } from "@/app/usePriceFeed";
 import { shortenAddress } from "@/app/lib/wallet";
-import {
-  ROOM,
-  ROOM_COINS,
-  ROOM_MEMBERS,
-  chatLineFor,
-  coinMeta,
-  isRoomId,
-  pick,
-  seedChat,
-  type RoomChatMessage,
-  type RoomCoin,
-  type RoomSide,
-} from "@/app/lib/roomsMocks";
+import { ROOM, ROOM_COINS, coinMeta, isRoomId, type RoomChatMessage, type RoomCoin, type RoomSide } from "@/app/lib/rooms";
 import { RoomChat } from "@/app/sanctum/RoomChat";
 import { SanctumGate } from "@/app/sanctum/SanctumGate";
 import { RoomFeed, formatPrice, type RoomEvent } from "@/app/sanctum/RoomFeed";
 
 // No USD rail yet: without a wallet the room trades against preview funds so
-// the loop is visible. Nothing here settles. See docs/rooms.md.
+// the loop is visible. Nothing here settles, and no other players are
+// connected — the feed and chat are yours alone. See docs/sanctum.md.
 const PREVIEW_BALANCE = 1000;
 const STAKE_OPTIONS = [25, 100, 300, 500];
 const LEVERAGE_OPTIONS = [100, 1000, 10000];
 const MAX_EVENTS = 80;
-const SIM_TICK_MS = 1700;
-// Rough share of room activity per coin — majors dominate, the daily coin
-// still shows up.
-const COIN_WEIGHTS: [RoomCoin, number][] = [["btc", 0.45], ["eth", 0.35], ["daily", 0.2]];
 
 type Position = { coin: RoomCoin; side: RoomSide; stake: number; leverage: number; entryPrice: number; openedAt: number };
 
@@ -47,14 +32,6 @@ const sideColor = (side: RoomSide) => (side === "long" ? "var(--chart-up)" : "va
 const positionPnl = (p: Pick<Position, "side" | "stake" | "leverage" | "entryPrice">, price: number) => {
   const move = p.side === "long" ? price - p.entryPrice : p.entryPrice - price;
   return Math.max(-p.stake, p.stake * (move / p.entryPrice) * p.leverage);
-};
-
-const weightedCoin = (): RoomCoin => {
-  let r = Math.random();
-  for (const [coin, w] of COIN_WEIGHTS) {
-    if ((r -= w) <= 0) return coin;
-  }
-  return "btc";
 };
 
 let eventSeq = 0;
@@ -95,7 +72,7 @@ export function SanctumView({ previewRank }: { previewRank?: string }) {
   const [stake, setStake] = useState(100);
   const [leverage, setLeverage] = useState(1000);
   const [events, setEvents] = useState<RoomEvent[]>([]);
-  const [chat, setChat] = useState<RoomChatMessage[]>(seedChat);
+  const [chat, setChat] = useState<RoomChatMessage[]>([]);
   const coinRef = useRef<HTMLDetailsElement>(null);
   const stakeRef = useRef<HTMLDetailsElement>(null);
   const leverageRef = useRef<HTMLDetailsElement>(null);
@@ -112,63 +89,6 @@ export function SanctumView({ previewRank }: { previewRank?: string }) {
     setEvents((current) => [event, ...current].slice(0, MAX_EVENTS));
   }, []);
 
-  // --- The rest of the room: simulated Oracles trading the same live prices. ---
-  const memberPositions = useRef(new Map<string, Position>());
-  useEffect(() => {
-    const priceOf = (c: RoomCoin) => feedsRef.current[c].getLivePrice();
-    let seeded = false;
-
-    const openFor = (name: string, at: number): RoomEvent | null => {
-      const member = ROOM_MEMBERS.find((m) => m.name === name)!;
-      const c = weightedCoin();
-      const price = priceOf(c);
-      if (price === null) return null;
-      const side: RoomSide = Math.random() < member.bias ? "long" : "short";
-      const [lo, hi] = member.size;
-      const amount = Math.round((lo + Math.random() * (hi - lo)) / 10) * 10;
-      const lev = pick(member.leverage);
-      memberPositions.current.set(name, { coin: c, side, stake: amount, leverage: lev, entryPrice: price, openedAt: at });
-      return { id: nextId("m"), t: at, who: name, coin: c, kind: "open", side, stake: amount, leverage: lev, price };
-    };
-
-    const tick = () => {
-      if (!seeded) {
-        if (ROOM_COINS.some((c) => priceOf(c.id) === null)) return;
-        seeded = true;
-        // A room you walk into is already mid-conversation.
-        const seed = ROOM_MEMBERS.slice(0, 5)
-          .map((m, i) => openFor(m.name, Date.now() - (45 - i * 8) * 1000))
-          .filter((e): e is RoomEvent => e !== null)
-          .reverse();
-        setEvents((current) => [...current, ...seed].slice(0, MAX_EVENTS));
-        return;
-      }
-      if (Math.random() < 0.35) return;
-
-      const member = pick(ROOM_MEMBERS);
-      const open = memberPositions.current.get(member.name);
-      let event: RoomEvent | null = null;
-      if (open) {
-        const price = priceOf(open.coin);
-        if (price === null || Date.now() - open.openedAt < 8000 || Math.random() < 0.4) return;
-        memberPositions.current.delete(member.name);
-        event = { id: nextId("m"), t: Date.now(), who: member.name, coin: open.coin, kind: "close", side: open.side, stake: open.stake, leverage: open.leverage, price, pnl: positionPnl(open, price) };
-      } else {
-        event = openFor(member.name, Date.now());
-      }
-      if (!event) return;
-      pushEvent(event);
-
-      if (Math.random() < 0.22) {
-        const line = pick(chatLineFor(event.side, coinMeta(event.coin).ticker, event.pnl));
-        setChat((current) => [...current, { id: nextId("c"), author: event.who, text: line, time: Date.now() }].slice(-40));
-      }
-    };
-
-    const id = window.setInterval(tick, SIM_TICK_MS);
-    return () => window.clearInterval(id);
-  }, [pushEvent]);
-
   // --- Your trades ---
   const enter = (side: RoomSide) => {
     const price = feed.getLivePrice();
@@ -176,7 +96,7 @@ export function SanctumView({ previewRank }: { previewRank?: string }) {
     if (price === null || position || amount <= 0) return;
     const at = Date.now();
     setPositions((current) => ({ ...current, [coin]: { coin, side, stake: amount, leverage, entryPrice: price, openedAt: at } }));
-    pushEvent({ id: nextId("y"), t: at, who: "You", coin, kind: "open", side, stake: amount, leverage, price });
+    pushEvent({ id: nextId("y"), t: at, coin, kind: "open", side, stake: amount, leverage, price });
   };
 
   const close = useCallback(
@@ -187,12 +107,12 @@ export function SanctumView({ previewRank }: { previewRank?: string }) {
       const pnl = positionPnl(open, price);
       const at = Date.now();
       setBalance((b) => Math.max(0, b + pnl));
-      pushEvent({ id: nextId("y"), t: at, who: "You", coin: target, kind: "close", side: open.side, stake: open.stake, leverage: open.leverage, price, pnl });
+      pushEvent({ id: nextId("y"), t: at, coin: target, kind: "close", side: open.side, stake: open.stake, leverage: open.leverage, price, pnl });
       if (reverse && pnl > -open.stake) {
         const side: RoomSide = open.side === "long" ? "short" : "long";
         const amount = Math.min(open.stake, open.stake + pnl);
         setPositions((current) => ({ ...current, [target]: { ...open, side, stake: amount, entryPrice: price, openedAt: at } }));
-        pushEvent({ id: nextId("y"), t: at + 1, who: "You", coin: target, kind: "open", side, stake: amount, leverage: open.leverage, price });
+        pushEvent({ id: nextId("y"), t: at + 1, coin: target, kind: "open", side, stake: amount, leverage: open.leverage, price });
       } else {
         setPositions((current) => {
           const next = { ...current };
@@ -223,8 +143,8 @@ export function SanctumView({ previewRank }: { previewRank?: string }) {
       p: e.price,
       side: e.side,
       action: e.kind === "open" ? "entry" : "exit",
-      owner: e.who === "You" ? "you" : "room",
-      pnl: e.who === "You" ? e.pnl : undefined,
+      owner: "you",
+      pnl: e.pnl,
     }));
   const otherPositions = ROOM_COINS.filter((c) => c.id !== coin && positions[c.id]);
   const dayChange = feed.day && feed.price !== null ? ((feed.price - feed.day.open) / feed.day.open) * 100 : null;
@@ -247,10 +167,6 @@ export function SanctumView({ previewRank }: { previewRank?: string }) {
           <span className="oracle-tagline">{ROOM.tagline}</span>
         </div>
         <div className="oracle-hero-chips">
-          <span className="oracle-chip">
-            <span className="oracle-chip-dot" aria-hidden="true" />
-            {ROOM.online} online
-          </span>
           {wallet ? (
             <span className="oracle-chip is-wallet">USD · {shortenAddress(wallet)}</span>
           ) : (
@@ -263,7 +179,7 @@ export function SanctumView({ previewRank }: { previewRank?: string }) {
 
       <div className="oracle-grid">
         <aside className="oracle-chat-col">
-          <RoomChat messages={chat} now={now} online={ROOM.online} onSend={sendChat} />
+          <RoomChat messages={chat} now={now} onSend={sendChat} />
         </aside>
 
         <section className="oracle-stage arena-shell" data-market={meta.market}>
@@ -330,7 +246,7 @@ export function SanctumView({ previewRank }: { previewRank?: string }) {
             openEntry={position ? { t: position.openedAt, p: position.entryPrice, side: position.side } : null}
             now={now}
           />
-          <p className="oracle-chart-key">Your trades solid · the room&apos;s dashed · ○ entries □ exits</p>
+          <p className="oracle-chart-key">Your trades · ○ entries □ exits</p>
 
           <section className="arena-dock dock-bar oracle-dock">
             <div className="oracle-dock-balance">

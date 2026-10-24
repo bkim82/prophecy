@@ -32,9 +32,9 @@ export type ChallengeResult = { ok: true } | { ok: false; error: string };
 /**
  * Sends a challenge from a profile's Challenge dialog — it shows in their
  * header bell and as a card in your conversation. Needs a handle of your
- * own. Re-checks everything the dialog offers: the target exists, you follow each other (friends-only,
- * so mock traders — who never follow back — can't be challenged), you're both
- * online (sending counts as you being online), the one-tier-up rank gate,
+ * own. Re-checks everything the dialog offers: the target exists, you follow
+ * each other (friends-only), you're both online (sending counts as you being
+ * online), the one-tier-up rank gate,
  * Pulse market/round, stake preset (or no stakes), and that you could cover
  * the stake. Nothing is reserved — the stake is only a proposal until the
  * round it opens on accept is joined.
@@ -49,12 +49,12 @@ export async function sendChallenge(input: ChallengeInput): Promise<ChallengeRes
   if (!target) return { ok: false, error: "That trader doesn't exist." };
   if (target.userId === userId) return { ok: false, error: "You can't challenge yourself." };
   const [youFollow, theyFollow, viewerRank] = await Promise.all([
-    isFollowing(userId, target.key),
-    target.userId ? isFollowing(target.userId, userId) : false,
+    isFollowing(userId, target.userId),
+    isFollowing(target.userId, userId),
     rankForUser(userId),
   ]);
   if (!youFollow) return { ok: false, error: `Challenges are friends-only — follow ${target.name} first.` };
-  if (!target.userId || !theyFollow) return { ok: false, error: `Challenges are friends-only — ${target.name} doesn't follow you back.` };
+  if (!theyFollow) return { ok: false, error: `Challenges are friends-only — ${target.name} doesn't follow you back.` };
   const [, targetOnline] = await Promise.all([touchPresence(userId), isOnline(target.userId)]);
   if (!targetOnline) return { ok: false, error: `${target.name} just went offline — you can challenge them when you're both online.` };
   if (!canChallenge(target.rank, viewerRank)) {

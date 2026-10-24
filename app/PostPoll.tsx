@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useAppAuth } from "@/app/auth/AuthProvider";
-import type { Poll } from "@/app/lib/mockPosts";
+import type { Poll } from "@/app/lib/posts";
 
 // A composer poll under a post. On a saved post (`postId` + `poll.counts`)
 // the totals are everyone's votes and yours goes to

@@ -231,6 +231,8 @@ export type MatchView = {
   pulseOpponentProfit: number | null;
   /** Revealed only once settled, and only by the poll route (app/api/match/[id]/route.ts). */
   opponentName: string | null;
+  /** Their @handle (stored form, no "@") when they're an account that picked one — the only opponents with a profile page. Same reveal rule. */
+  opponentHandle: string | null;
   /** Lets the client correct for clock skew before running the countdown. */
   serverNow: number;
 };
@@ -279,6 +281,7 @@ export function viewFor(row: MatchRow, you: 1 | 2): MatchView {
         : row.pulseProfit1
       : null,
     opponentName: null,
+    opponentHandle: null,
     serverNow: Date.now(),
   };
 }

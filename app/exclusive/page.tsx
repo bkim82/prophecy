@@ -1,13 +1,9 @@
 import { FeedSidebar } from "@/app/FeedSidebar";
-import { PostCard } from "@/app/PostCard";
-import { EXCLUSIVE_POSTS } from "@/app/lib/mockPosts";
-import { withEngagement } from "@/lib/engagement";
-import { getViewer } from "@/lib/viewer";
 
 // Rank gate temporarily disabled while iterating on the feed look — see
-// app/lib/rank.ts and docs/roadmap.md "Not built" for the real gate.
-export default async function Page() {
-  const posts = await withEngagement(EXCLUSIVE_POSTS, (await getViewer())?.userId ?? null);
+// app/lib/rank.ts and docs/roadmap.md "Not built" for the real gate. There's
+// no way to post here yet, so the feed is empty.
+export default function Page() {
   return (
     <main className="feed-shell">
       <div className="feed-main">
@@ -18,9 +14,7 @@ export default async function Page() {
         </section>
 
         <div className="feed-list feed-panel">
-          {posts.map((post) => (
-            <PostCard key={post.id} post={post} />
-          ))}
+          <p className="muted feed-empty">Nothing here yet.</p>
         </div>
       </div>
       <FeedSidebar />

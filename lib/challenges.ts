@@ -60,12 +60,15 @@ export async function expireStaleChallenges(challengerId: string): Promise<void>
     .where(and(eq(challenges.challengerId, challengerId), eq(challenges.status, "pending"), sql`not ${unexpired}`));
 }
 
-/** Your pending challenges plus declined/expired ones you haven't cleared, newest first — the own-profile Matches tab. Run expireStaleChallenges first. */
+/**
+ * Your pending challenges plus declined/expired ones you haven't cleared, newest first — the own-profile Matches tab.
+ * Only ones to accounts: challenges sent to the retired mock traders (no `target_user_id`) never show. Run expireStaleChallenges first.
+ */
 export async function sentChallengesFrom(challengerId: string): Promise<ChallengeRow[]> {
   return getDb()
     .select()
     .from(challenges)
-    .where(and(eq(challenges.challengerId, challengerId), inArray(challenges.status, ["pending", "declined", "expired"])))
+    .where(and(eq(challenges.challengerId, challengerId), isNotNull(challenges.targetUserId), inArray(challenges.status, ["pending", "declined", "expired"])))
     .orderBy(desc(challenges.createdAt));
 }
 

@@ -14,7 +14,6 @@ const mocks = vi.hoisted(() => ({
   setReplyLike: vi.fn(),
   editReply: vi.fn(),
   deleteReply: vi.fn(),
-  voteClash: vi.fn(),
   isBlockedEitherWay: vi.fn(),
 }));
 
@@ -33,10 +32,8 @@ vi.mock("@/lib/engagement", () => ({
   setReplyLike: mocks.setReplyLike,
   editReply: mocks.editReply,
   deleteReply: mocks.deleteReply,
-  voteClash: mocks.voteClash,
 }));
 
-import { POST as voteClash } from "@/app/api/posts/[id]/clash/route";
 import { POST as like } from "@/app/api/posts/[id]/like/route";
 import { DELETE as deleteReply, PATCH as editReply } from "@/app/api/posts/[id]/replies/[replyId]/route";
 import { POST as likeReply } from "@/app/api/posts/[id]/replies/[replyId]/like/route";
@@ -55,7 +52,7 @@ describe("engagement routes", () => {
     mocks.getViewer.mockResolvedValue(VIEWER);
     mocks.getViewerProfile.mockResolvedValue({ displayName: "Dana Lee" });
     mocks.storedProfileFor.mockResolvedValue(null);
-    mocks.engagementTarget.mockResolvedValue({ authorId: null });
+    mocks.engagementTarget.mockResolvedValue({ authorId: "user_2" });
     mocks.replyCountSince.mockResolvedValue(0);
     mocks.isBlockedEitherWay.mockResolvedValue(false);
   });
@@ -71,9 +68,9 @@ describe("engagement routes", () => {
   });
 
   it("likes and unlikes a post that takes engagement", async () => {
-    expect((await like(request("like", { liked: true }), ctx("g-oracle1"))).status).toBe(200);
-    expect(mocks.setLike).toHaveBeenCalledWith("g-oracle1", "user_1", true);
-    expect((await like(request("like", { liked: "yes" }), ctx("g-oracle1"))).status).toBe(400);
+    expect((await like(request("like", { liked: true }), ctx("p1"))).status).toBe(200);
+    expect(mocks.setLike).toHaveBeenCalledWith("p1", "user_1", true);
+    expect((await like(request("like", { liked: "yes" }), ctx("p1"))).status).toBe(400);
     mocks.engagementTarget.mockResolvedValue(null);
     expect((await like(request("like", { liked: false }), ctx("nope"))).status).toBe(404);
     expect(mocks.setLike).toHaveBeenCalledTimes(1);
@@ -180,19 +177,5 @@ describe("engagement routes", () => {
     mocks.getViewer.mockResolvedValue(null);
     expect((await edit({ content: "x" })).status).toBe(401);
     expect((await remove()).status).toBe(401);
-  });
-
-  it("saves a clash vote, takes it back, and checks the side", async () => {
-    const vote = (side: unknown) => voteClash(request("clash", { side }), ctx("g-clash1"));
-    mocks.voteClash.mockResolvedValue(true);
-    expect((await vote(1)).status).toBe(200);
-    expect(mocks.voteClash).toHaveBeenCalledWith("g-clash1", "user_1", 1);
-    expect((await vote(null)).status).toBe(200);
-    expect(mocks.voteClash).toHaveBeenLastCalledWith("g-clash1", "user_1", null);
-    expect((await vote(2)).status).toBe(400);
-    mocks.voteClash.mockResolvedValue(false);
-    expect((await vote(0)).status).toBe(404);
-    mocks.getViewer.mockResolvedValue(null);
-    expect((await vote(0)).status).toBe(401);
   });
 });

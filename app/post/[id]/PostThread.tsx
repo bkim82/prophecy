@@ -3,12 +3,12 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { BackIcon } from "@/app/icons";
-import type { Post, Reply } from "@/app/lib/mockPosts";
+import type { Post, Reply } from "@/app/lib/posts";
 import { useTopicSignal } from "@/app/lib/topicSignals";
 import { PostCard } from "@/app/PostCard";
 import { ReplyComposer, ReplyItem, withMention } from "@/app/PostReplies";
 
-// `replies` = saved then mock (lib/engagement.ts repliesFor). Replies you post
+// `replies` = saved, newest first (lib/engagement.ts repliesFor). Replies you post
 // here are saved and go on top, ones you delete drop out (both move the
 // comment count); a reply's Reply button @mentions its author in the box.
 export function PostThread({ post, replies }: { post: Post; replies: Reply[] }) {

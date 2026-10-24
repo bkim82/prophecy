@@ -15,7 +15,7 @@ import {
   type SharedPost,
   type ThreadView,
 } from "@/app/lib/messageRules";
-import { EXCLUSIVE_POSTS, GLOBAL_POSTS, type Post } from "@/app/lib/mockPosts";
+import type { Post } from "@/app/lib/posts";
 import { blockStateBetween, blockedIdsFor } from "@/lib/blocks";
 import { challengeCardsFor } from "@/lib/challenges";
 import { friendIdsAmong } from "@/lib/follows";
@@ -73,12 +73,10 @@ const sharedPostView = (post: Post): SharedPost => {
   };
 };
 
-/** Posts that can be shared into a conversation, by id: mock feed posts and saved posts that still exist. */
+/** Posts that can be shared into a conversation, by id: saved posts that still exist. */
 export async function sharedPostsFor(ids: string[], viewerId: string): Promise<Map<string, SharedPost>> {
-  const wanted = new Set(ids);
-  const mocks = [...GLOBAL_POSTS, ...EXCLUSIVE_POSTS].filter((post) => wanted.has(post.id));
-  const saved = await savedPostsByIds([...wanted].filter((id) => !mocks.some((post) => post.id === id)), viewerId);
-  return new Map([...mocks, ...saved].map((post) => [post.id, sharedPostView(post)]));
+  const saved = await savedPostsByIds([...new Set(ids)], viewerId);
+  return new Map(saved.map((post) => [post.id, sharedPostView(post)]));
 }
 
 // Rows → what the dock renders: photo URLs (never bytes), shared posts and challenges resolved live.

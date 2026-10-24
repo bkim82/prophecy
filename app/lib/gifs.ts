@@ -1,6 +1,6 @@
 // Built-in reaction GIFs for the composer's GIF picker (app/compose/GifPicker.tsx).
 // There's no GIF provider key, so these are drawn and looped in HTML/CSS by
-// app/PostMedia.tsx GifShot, like the feed's other mock media. `motion` picks
+// app/PostMedia.tsx GifShot, like its other drawn media. `motion` picks
 // the loop (.shot--gif[data-motion] in app/globals.css), `seed` the gradient,
 // `particle` the emoji that rains/twinkles around it. `tags` feed the search.
 export type GifMotion = "rocket" | "shake" | "pulse" | "wobble" | "pump" | "dump" | "sparkle" | "flicker" | "rise" | "rain" | "bounce" | "zoom" | "sink";

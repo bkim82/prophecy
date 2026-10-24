@@ -74,8 +74,8 @@ describe("POST /api/messages/thread", () => {
     expect(mocks.saveMessage).not.toHaveBeenCalled();
   });
 
-  it("won't send to you, mock traders or unknown handles, or without a handle of your own", async () => {
-    for (const handle of ["@me", "@zane_lfg", "@nobody"]) expect((await send({ handle, body: "hi" })).status).toBe(404);
+  it("won't send to you or unknown handles, or without a handle of your own", async () => {
+    for (const handle of ["@me", "@ghost", "@nobody"]) expect((await send({ handle, body: "hi" })).status).toBe(404);
     mocks.handleFor.mockResolvedValue(null);
     expect(await errorOf(await send({ handle: "@sam", body: "hi" }))).toBe("Choose your @handle on your profile before sending messages.");
     expect(mocks.saveMessage).not.toHaveBeenCalled();
@@ -105,11 +105,11 @@ describe("GET /api/messages/thread", () => {
     mocks.threadWith.mockResolvedValue({ messages: [] });
   });
 
-  it("reads your conversation with a real account, 404 for yourself and mock traders", async () => {
+  it("reads your conversation with a real account, 404 for yourself and unknown handles", async () => {
     const get = (handle: string) => GET(new Request(`http://localhost/api/messages/thread?handle=${encodeURIComponent(handle)}`));
     expect((await get("@sam")).status).toBe(200);
     expect(mocks.threadWith).toHaveBeenCalledWith("user_me", SAM);
     expect((await get("@me")).status).toBe(404);
-    expect((await get("@zane_lfg")).status).toBe(404);
+    expect((await get("@ghost")).status).toBe(404);
   });
 });

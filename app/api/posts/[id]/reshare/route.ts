@@ -32,7 +32,7 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
   if (body.kind !== null && body.kind !== "repost" && target.authorId === viewer.userId) {
     return postsJson({ error: "You can't vouch for or defy your own omen" }, { status: 403 });
   }
-  if (body.kind !== null && target.authorId && target.authorId !== viewer.userId && (await isBlockedEitherWay(viewer.userId, target.authorId))) {
+  if (body.kind !== null && target.authorId !== viewer.userId && (await isBlockedEitherWay(viewer.userId, target.authorId))) {
     return postsJson({ error: "You can't repost this post." }, { status: 403 });
   }
   await setReshare(id, viewer.userId, body.kind === null ? null : { kind: body.kind, text });

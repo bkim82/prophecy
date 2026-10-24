@@ -1,6 +1,6 @@
 import { signedPct } from "@/app/lib/calls";
-import type { Market } from "@/app/lib/mockPosts";
-import type { ProfileRecords } from "@/app/lib/mockAchievements";
+import type { Market } from "@/app/lib/posts";
+import type { ProfileRecords } from "@/app/lib/profileTraits";
 import { rankTier } from "@/app/lib/rank";
 import { RankBadge } from "@/app/RankBadge";
 

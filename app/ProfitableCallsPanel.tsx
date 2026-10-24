@@ -1,38 +1,43 @@
 "use client";
 
 import { useState } from "react";
-import type { Market } from "@/app/lib/mockPosts";
-import { PROFITABLE_CALLS, type CallWindow, type ProfitableCall } from "@/app/lib/sidebarMocks";
+import { signedPct } from "@/app/lib/calls";
+import type { CallWindow, ProfitableCall } from "@/app/lib/sidebar";
+import { ARENA_GLYPHS } from "@/app/lib/trades";
 
-const MARKET_META: Record<Market, { label: string; symbol: string; symbolClass: string }> = {
-  btc: { label: "BTC", symbol: "₿", symbolClass: "btc-symbol" },
-  eth: { label: "ETH", symbol: "Ξ", symbolClass: "eth-symbol" },
-  sol: { label: "SOL", symbol: "◎", symbolClass: "sol-symbol" },
-  doge: { label: "DOGE", symbol: "Ð", symbolClass: "doge-symbol" },
-};
-
-const WINDOWS: { id: CallWindow; label: string }[] = [
-  { id: "1h", label: "1H" },
-  { id: "24h", label: "24H" },
-  { id: "7d", label: "7D" },
+const WINDOWS: { id: CallWindow; label: string; span: string }[] = [
+  { id: "1h", label: "1H", span: "hour" },
+  { id: "24h", label: "24H", span: "day" },
+  { id: "7d", label: "7D", span: "week" },
 ];
 
-const TOP_CALLS = 3;
-
-// Return on margin: the price move times leverage, flipped for shorts — so a
-// 10x long on a +1.8% move is +18%, and that's what the panel ranks by.
-function callRoi(call: ProfitableCall) {
-  return call.changePct * call.leverage * (call.side === "SHORT" ? -1 : 1);
+// Arena markets get the lobby's glyph; Portfolio tokens their first letter.
+function CallGlyph({ call }: { call: ProfitableCall }) {
+  const arena = call.source === "arena" ? ARENA_GLYPHS[call.symbol] : undefined;
+  return arena ? (
+    <span className={`market-symbol ${arena.className}`}>{arena.glyph}</span>
+  ) : (
+    <span className="market-symbol">{call.symbol.replace(/[^a-z0-9]/gi, "").charAt(0) || "?"}</span>
+  );
 }
 
-const formatRoi = (roi: number) => `${roi >= 0 ? "+" : "−"}${Math.abs(roi).toFixed(1)}%`;
+// "BTC ↑ LONG" / "DEGEN SPOT" / "BTC PULSE".
+function callLabel(call: ProfitableCall) {
+  if (call.position === "long") return `${call.symbol} ↑ LONG`;
+  if (call.position === "short") return `${call.symbol} ↓ SHORT`;
+  return `${call.symbol} ${call.position === "spot" ? "SPOT" : "PULSE"}`;
+}
 
-export function ProfitableCallsPanel() {
-  const [activeWindow, setActiveWindow] = useState<CallWindow>("24h");
-  const ranked = PROFITABLE_CALLS[activeWindow]
-    .map((call) => ({ call, roi: callRoi(call) }))
-    .sort((a, b) => b.roi - a.roi)
-    .slice(0, TOP_CALLS);
+// "Most Profitable Calls": the best closed trades per time window (lib/sidebar.ts
+// — 24h Portfolio positions and Arena rounds that made money, by return).
+// Nothing renders until there's at least one in the last week.
+export function ProfitableCallsPanel({ calls }: { calls: Record<CallWindow, ProfitableCall[]> }) {
+  // The day, unless it was quiet and the week has something to show.
+  const [activeWindow, setActiveWindow] = useState<CallWindow>(calls["24h"].length > 0 ? "24h" : "7d");
+  // The week covers the shorter windows, so an empty week means nothing to show.
+  if (calls["7d"].length === 0) return null;
+  const ranked = calls[activeWindow];
+  const span = WINDOWS.find(({ id }) => id === activeWindow)?.span;
 
   return (
     <section className="panel sidebar-panel sidebar-panel--calls">
@@ -53,27 +58,27 @@ export function ProfitableCallsPanel() {
           ))}
         </div>
       </div>
-      <ol className="sidebar-calls-list">
-        {ranked.map(({ call, roi }) => {
-          const meta = MARKET_META[call.market];
-          return (
+      {ranked.length === 0 ? (
+        <p className="muted sidebar-empty">No profitable trades in the last {span}.</p>
+      ) : (
+        <ol className="sidebar-calls-list">
+          {ranked.map((call) => (
             <li className="sidebar-row sidebar-row--call" key={call.id}>
               <div className="sidebar-row-main">
-                <span className={`market-symbol ${meta.symbolClass}`}>{meta.symbol}</span>
+                <CallGlyph call={call} />
                 <div className="sidebar-call-text">
-                  <strong>
-                    {meta.label} {call.side === "LONG" ? "↑" : "↓"} {call.side}
-                  </strong>
+                  <strong>{callLabel(call)}</strong>
                   <span className="sidebar-call-detail">
-                    {call.leverage}× · {call.handle}
+                    {call.leverage ? `${call.leverage}× · ` : ""}
+                    {call.handle}
                   </span>
                 </div>
               </div>
-              <span className={`sidebar-value sidebar-call-roi ${roi >= 0 ? "is-up" : "is-down"}`}>{formatRoi(roi)}</span>
+              <span className="sidebar-value sidebar-call-roi is-up">{signedPct(call.roiPct)}</span>
             </li>
-          );
-        })}
-      </ol>
+          ))}
+        </ol>
+      )}
     </section>
   );
 }

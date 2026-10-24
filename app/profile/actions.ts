@@ -1,7 +1,6 @@
 "use server";
 
 import { refresh } from "next/cache";
-import { PROFILES } from "@/app/lib/mockProfiles";
 import {
   AVATAR_MAX_BYTES,
   AVATAR_TYPES,
@@ -33,8 +32,8 @@ export type ProfileField = keyof typeof PROFILE_LIMITS | "avatar" | "banner";
 export type SaveProfileResult = { ok: true } | { ok: false; error: string; field?: ProfileField };
 type TextField = keyof typeof PROFILE_LIMITS;
 
-// Mock feed authors keep their handles, plus a few that would read as staff.
-const RESERVED_HANDLES = new Set([...PROFILES.map((profile) => profile.handle.slice(1)), "admin", "me", "you", "oracle", "prophecy", "support"]);
+// Handles that would read as staff.
+const RESERVED_HANDLES = new Set(["admin", "me", "you", "oracle", "prophecy", "support"]);
 
 const LABELS: Record<TextField, string> = {
   displayName: "Name",
@@ -246,7 +245,7 @@ export async function togglePinnedMatch(matchId: string): Promise<{ ok: true } |
 }
 
 /**
- * Follows or unfollows a mock trader or real account from its profile;
+ * Follows or unfollows an account from its profile;
  * Challenge re-checks follows both ways (app/profile/challengeActions.ts).
  * No follows across a block either way (lib/blocks.ts). No refresh: the
  * toggle already shows it.
@@ -257,15 +256,15 @@ export async function followProfile(handle: string, following: boolean): Promise
   const target = await followTarget(handle);
   if (!target) return { ok: false, error: "That trader doesn't exist." };
   if (target.userId === userId) return { ok: false, error: "You can't follow yourself." };
-  if (following && target.userId && (await isBlockedEitherWay(userId, target.userId))) {
+  if (following && (await isBlockedEitherWay(userId, target.userId))) {
     return { ok: false, error: `You can't follow ${target.name}.` };
   }
-  await saveFollow(userId, target.key, following === true);
+  await saveFollow(userId, target.userId, following === true);
   return { ok: true };
 }
 
 /**
- * Blocks or unblocks a real account from its profile's ⋯ menu. Blocking
+ * Blocks or unblocks an account from its profile's ⋯ menu. Blocking
  * unfollows you both and stops messages either way (lib/blocks.ts);
  * refresh() re-renders the profile so Follow, Message and Challenge go at once.
  */
@@ -273,7 +272,7 @@ export async function blockProfile(handle: string, blocked: boolean): Promise<{ 
   const userId = (await getViewer())?.userId;
   if (!userId) return { ok: false, error: "Sign in to block accounts." };
   const target = await followTarget(handle);
-  if (!target?.userId) return { ok: false, error: "Only real accounts can be blocked." };
+  if (!target) return { ok: false, error: "That account doesn't exist." };
   if (target.userId === userId) return { ok: false, error: "You can't block yourself." };
   await saveBlock(userId, target.userId, blocked === true);
   refresh();

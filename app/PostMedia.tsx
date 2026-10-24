@@ -1,11 +1,12 @@
 import { avatarGradient } from "@/app/lib/avatar";
 import { gifById } from "@/app/lib/gifs";
-import type { PostImage } from "@/app/lib/mockPosts";
+import type { PostImage } from "@/app/lib/posts";
 
-// X-style media under a post: one item full width, 2–4 tiled in a grid. Each
-// kind is a fake screenshot drawn in HTML/SVG from mock fields (see PostImage
-// in app/lib/mockPosts.ts) and keeps its own fixed palette whatever the app
-// theme, the way a pasted image would. Every item is role="img" with `alt`.
+// X-style media under a post: one item full width, 2–4 tiled in a grid. Saved
+// posts carry photos or a GIF; the other kinds are screenshots drawn in
+// HTML/SVG (see PostImage in app/lib/posts.ts — no saved form yet). Each keeps
+// its own fixed palette whatever the app theme, the way a pasted image would.
+// Every item is role="img" with `alt`.
 
 type Shot<K extends PostImage["kind"]> = Extract<PostImage, { kind: K }>;
 

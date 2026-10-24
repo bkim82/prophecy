@@ -6,7 +6,7 @@ import { useAppAuth } from "@/app/auth/AuthProvider";
 import { HeartIcon } from "@/app/icons";
 import { avatarGradient } from "@/app/lib/avatar";
 import { deleteReply, editReply, loadReplies, publishReply, saveReplyLike, useSaved } from "@/app/lib/engagementApi";
-import type { Post, Reply } from "@/app/lib/mockPosts";
+import type { Post, Reply } from "@/app/lib/posts";
 
 const compactCount = new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 });
 const compact = (n: number) => compactCount.format(n).toLowerCase();

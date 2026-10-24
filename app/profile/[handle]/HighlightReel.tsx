@@ -7,9 +7,9 @@ import { togglePinnedMatch } from "@/app/profile/actions";
 
 // Right-rail panel under Achievements (ProfileAchievements children): up to
 // three pinned wins, each wearing the gold ✦ Fulfilled chip of a fulfilled
-// call (.market-call[data-state="fulfilled"]). Mock traders' reels are pinned
-// omens; on your own profile they're won Arena matches, with Unpin on each
-// card and one hint line for the open slots (pinning lives in the Matches tab).
+// call (.market-call[data-state="fulfilled"]). On your own profile they're won
+// Arena matches, with Unpin on each card and one hint line for the open slots
+// (pinning lives in the Matches tab). Omen cards have no saved source yet.
 
 const usdCents = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 const signedUsd = (n: number) => `${n >= 0 ? "+" : "−"}${usdCents.format(Math.abs(n))}`;
