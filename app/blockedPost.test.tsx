@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/app/auth/AuthProvider", () => ({ useAppAuth: () => ({ isSignedIn: true, openSignIn: vi.fn(), user: { firstName: "Dana" } }) }));
 
-import type { Post } from "@/app/lib/mockPosts";
+import type { Post } from "@/app/lib/posts";
 import { ReplyComposer } from "@/app/PostReplies";
 import { RepostMenu } from "@/app/RepostMenu";
 

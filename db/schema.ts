@@ -344,17 +344,16 @@ export const onboarding = pgTable("onboarding", {
 });
 
 // One row per challenge sent from a profile (app/profile/challengeActions.ts).
-// Requests only for now: profiles you can open are mock traders who can't
-// reply, so nothing reserves Embers or creates a `matches` row yet — that
-// happens on accept, once real accounts can receive challenges. The target
-// is a profile handle ("@vesper"); ranks are snapshots from send time, which
-// is when the one-tier-up gate (app/lib/rank.ts canChallenge) was checked.
+// Sending reserves nothing; accepting opens the private `matches` round. The
+// target is a profile handle ("@sam") plus its account; ranks are snapshots
+// from send time, which is when the one-tier-up gate (app/lib/rank.ts
+// canChallenge) was checked.
 export const challenges = pgTable("challenges", {
   id: text("id").primaryKey(),
   challengerId: text("challenger_id").notNull(), // Clerk user id
   challengerRank: text("challenger_rank").notNull(),
   targetHandle: text("target_handle").notNull(),
-  targetUserId: text("target_user_id"), // real accounts; null for mock traders
+  targetUserId: text("target_user_id"), // null only on old rows sent to the retired mock traders, which never show
   targetRank: text("target_rank").notNull(),
   mode: text("mode").notNull(), // "pulse" | "portfolio"
   market: text("market"), // pulse only: "btc" | "eth" | "hype"
@@ -431,10 +430,8 @@ export const pollVotes = pgTable("poll_votes", {
 ]);
 
 // Engagement on omens, written by the /api/posts/[id]/… routes
-// (lib/engagement.ts). `postId` is a saved post's id or a mock post's id
-// (app/lib/mockPosts.ts), so the mock feed's likes, reposts and replies save
-// too; mock counts stay the base the saved ones are added to. Created by
-// db/engagement.sql.
+// (lib/engagement.ts). `postId` is a saved post's id; old rows keyed to the
+// retired mock posts' ids are never read. Created by db/engagement.sql.
 
 // One like per user per post; unliking deletes it.
 export const postLikes = pgTable("post_likes", {
@@ -479,8 +476,7 @@ export const postReplies = pgTable("post_replies", {
   check("post_replies_content_length", sql`char_length(${table.content}) BETWEEN 1 AND 280`),
 ]);
 
-// One like per user per reply; `replyId` is a `post_replies` id or a mock
-// reply's id (app/lib/mockPosts.ts POST_REPLIES, unique across posts).
+// One like per user per reply; `replyId` is a `post_replies` id.
 export const replyLikes = pgTable("reply_likes", {
   replyId: text("reply_id").notNull(),
   userId: text("user_id").notNull(),
@@ -489,8 +485,9 @@ export const replyLikes = pgTable("reply_likes", {
   primaryKey({ columns: [table.replyId, table.userId] }),
 ]);
 
-// One side per user per clash (a mock `kind: "clash"` post): 0 = first side,
-// 1 = second. Switching replaces it; taking it back deletes it.
+// One side per user per clash: 0 = first side, 1 = second. Only the retired
+// mock clashes ever had votes, so nothing reads or writes it now; kept so
+// db/engagement.sql and old rows stay valid.
 export const clashVotes = pgTable("clash_votes", {
   postId: text("post_id").notNull(),
   userId: text("user_id").notNull(),
@@ -511,8 +508,8 @@ export const presence = pgTable("presence", {
 });
 
 // One row per follow. Everyone starts following no one, with no followers.
-// `target` is the followed account's user id, or a mock trader's "@handle"
-// (app/lib/mockProfiles.ts) — those never follow anyone back. Challenges need
+// `target` is the followed account's user id ("@handle" only on old rows that
+// followed the retired mock traders, never listed or counted). Challenges need
 // a follow both ways (app/profile/challengeActions.ts). Created by db/follows.sql.
 export const follows = pgTable("follows", {
   followerId: text("follower_id").notNull(), // user id
@@ -551,8 +548,8 @@ export const topicSignals = pgTable("topic_signals", {
 // Direct messages between two real accounts (lib/messages.ts), sent from the
 // header's Messages dock (app/MessagesDock.tsx) or a post's Send button
 // (app/SharePostDialog.tsx). A message has text, photos
-// (`direct_message_media`), a shared post (`postId`: a saved post's id or a
-// mock post's, resolved live like a bookmark) or any mix — the route insists
+// (`direct_message_media`), a shared post (`postId`: a saved post's id,
+// resolved live like a bookmark) or any mix — the route insists
 // on at least one. Created by db/messages.sql.
 export const directMessages = pgTable("direct_messages", {
   id: text("id").primaryKey(),

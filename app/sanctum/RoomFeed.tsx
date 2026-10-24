@@ -1,12 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { ROOM_COINS, coinMeta, type RoomCoin, type RoomSide } from "@/app/lib/roomsMocks";
+import { ROOM_COINS, coinMeta, type RoomCoin, type RoomSide } from "@/app/lib/rooms";
 
 export type RoomEvent = {
   id: string;
   t: number;
-  who: string; // "You" for your own trades
   coin: RoomCoin;
   kind: "open" | "close";
   side: RoomSide;
@@ -32,7 +31,7 @@ export const ago = (t: number, now: number) => {
   return `${Math.floor(s / 60)}m`;
 };
 
-/** Live trade tape for everyone in your rank's room, filterable by coin. */
+/** Live tape of your trades in the room, filterable by coin. */
 export function RoomFeed({ events, now }: { events: RoomEvent[]; now: number }) {
   const [filter, setFilter] = useState<Filter>("all");
   const shown = filter === "all" ? events : events.filter((e) => e.coin === filter);
@@ -65,13 +64,12 @@ export function RoomFeed({ events, now }: { events: RoomEvent[]; now: number }) 
         {shown.length === 0 && <li className="oracle-feed-empty">The room is quiet. Watching for signs…</li>}
         {shown.map((e) => {
           const meta = coinMeta(e.coin);
-          const self = e.who === "You";
           return (
-            <li key={e.id} className={`oracle-feed-row${self ? " is-self" : ""}`} data-market={meta.market}>
-              <span className="oracle-feed-avatar" aria-hidden="true">{e.who.slice(0, 1)}</span>
+            <li key={e.id} className="oracle-feed-row" data-market={meta.market}>
+              <span className="oracle-feed-avatar" aria-hidden="true">Y</span>
               <div className="oracle-feed-body">
                 <p>
-                  <strong>{e.who}</strong>{" "}
+                  <strong>You</strong>{" "}
                   {e.kind === "open" ? (
                     <>
                       <span className={`oracle-dir is-${e.side}`}>{e.side === "long" ? "longed" : "shorted"}</span>{" "}

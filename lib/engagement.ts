@@ -1,23 +1,19 @@
 import { and, count, desc, eq, gte, inArray, isNull, notInArray, type SQL } from "drizzle-orm";
 import type { PgColumn } from "drizzle-orm/pg-core";
 import { getDb } from "@/db";
-import { clashVotes, follows, postLikes, postReplies, postReshares, posts, profiles, replyLikes } from "@/db/schema";
-import { EXCLUSIVE_POSTS, GLOBAL_POSTS, POST_REPLIES, type Clash, type Post, type Reply, type Share } from "@/app/lib/mockPosts";
-import type { ProfileActivity, ProfileComment } from "@/app/lib/mockProfiles";
+import { follows, postLikes, postReplies, postReshares, posts, profiles, replyLikes } from "@/db/schema";
+import type { Post, Reply, Share } from "@/app/lib/posts";
+import type { ProfileActivity, ProfileComment } from "@/app/lib/profiles";
 import { playedLabel } from "@/app/lib/playedLabel";
 import type { Reshare, ReshareKind } from "@/app/PostShare";
 import { blockedAccountsFor, blockedIdsFor } from "@/lib/blocks";
 import { isSavedPostId, postsBy, savedPostsByIds } from "@/lib/posts";
 
-// Likes, reposts (repost / vouch / defy), replies and clash votes on omens
-// (db/schema.ts post_likes / post_reshares / post_replies / reply_likes /
-// clash_votes), written by the /api/posts/[id]/… routes. They work on saved
-// posts and on the mock feed alike: a mock post's hand-written counts are the
-// base the saved engagement is added to.
+// Likes, reposts (repost / vouch / defy) and replies on saved omens
+// (db/schema.ts post_likes / post_reshares / post_replies / reply_likes),
+// written by the /api/posts/[id]/… routes.
 
 type ReplyRow = typeof postReplies.$inferSelect;
-
-const MOCK_POSTS = new Map([...GLOBAL_POSTS, ...EXCLUSIVE_POSTS].map((post) => [post.id, post]));
 
 // Leaves out rows by anyone with a block either way with the viewer (lib/blocks.ts) — nothing to leave out for most viewers.
 const notBy = (column: PgColumn, blocked: Set<string>): SQL | undefined => (blocked.size > 0 ? notInArray(column, [...blocked]) : undefined);
@@ -25,18 +21,14 @@ const NO_BLOCKS = { ids: new Set<string>(), handles: new Set<string>() };
 
 // Streak, promo and clash cards have no like / comment / repost row.
 const engageable = (post: Post) => post.kind !== "streak" && post.kind !== "promo" && post.kind !== "clash";
-const isClash = (post: Post): post is Post & { clash: Clash } => post.kind === "clash" && post.clash !== undefined;
 
 export const isReshareKind = (value: unknown): value is ReshareKind => value === "repost" || value === "vouch" || value === "defy";
 
 /**
- * A post that takes likes, reposts and replies: a live saved post (with its
- * author, so they can't vouch for or defy their own) or an engageable mock
- * post (no author). Null for anything else.
+ * A post that takes likes, reposts and replies: a live saved post, with its
+ * author so they can't vouch for or defy their own. Null for anything else.
  */
-export async function engagementTarget(postId: string): Promise<{ authorId: string | null } | null> {
-  const mock = MOCK_POSTS.get(postId);
-  if (mock) return engageable(mock) ? { authorId: null } : null;
+export async function engagementTarget(postId: string): Promise<{ authorId: string } | null> {
   if (!isSavedPostId(postId)) return null;
   const [row] = await getDb()
     .select({ authorId: posts.authorId })
@@ -65,24 +57,9 @@ export async function setReshare(postId: string, userId: string, reshare: Reshar
     .onConflictDoUpdate({ target: [postReshares.postId, postReshares.userId], set: { kind, text, createdAt: new Date() } });
 }
 
-/** Sets (or with `side` null, takes back) the user's side on a mock clash; false when `postId` isn't one. */
-export async function voteClash(postId: string, userId: string, side: 0 | 1 | null): Promise<boolean> {
-  if (MOCK_POSTS.get(postId)?.kind !== "clash") return false;
-  const db = getDb();
-  if (side === null) {
-    await db.delete(clashVotes).where(and(eq(clashVotes.postId, postId), eq(clashVotes.userId, userId)));
-  } else {
-    await db
-      .insert(clashVotes)
-      .values({ postId, userId, side })
-      .onConflictDoUpdate({ target: [clashVotes.postId, clashVotes.userId], set: { side, createdAt: new Date() } });
-  }
-  return true;
-}
-
 /**
- * Adds saved likes, reposts, replies and clash votes to each post's counts,
- * plus the viewer's own: `liked`, `yourReshare` and a clash's `yourVote`.
+ * Adds saved likes, reposts and replies to each post's counts, plus the
+ * viewer's own: `liked` and `yourReshare`.
  * Replies and reposts by anyone with a block either way with the viewer
  * aren't counted (repliesFor doesn't show them either), and saved posts by
  * them get `blocked` — no replying or reposting. Before db/engagement.sql is
@@ -90,8 +67,7 @@ export async function voteClash(postId: string, userId: string, side: 0 | 1 | nu
  */
 export async function withEngagement(list: Post[], viewerId: string | null): Promise<Post[]> {
   const ids = [...new Set(list.filter(engageable).map((post) => post.id))];
-  const clashIds = [...new Set(list.filter(isClash).map((post) => post.id))];
-  if (ids.length === 0 && clashIds.length === 0) return list;
+  if (ids.length === 0) return list;
   const db = getDb();
   // inArray needs at least one id; the viewer's own rows only when signed in.
   const whenAny = <T,>(some: unknown[], query: () => Promise<T[]>) => (some.length ? query() : Promise.resolve([] as T[]));
@@ -99,7 +75,7 @@ export async function withEngagement(list: Post[], viewerId: string | null): Pro
   try {
     // Before db/blocks.sql is applied there's nothing to leave out.
     const blocked = viewerId ? await blockedAccountsFor(viewerId).catch(() => NO_BLOCKS) : NO_BLOCKS;
-    const [likes, liked, reshares, yours, replies, sides, votes] = await Promise.all([
+    const [likes, liked, reshares, yours, replies] = await Promise.all([
       whenAny(ids, () => db.select({ postId: postLikes.postId, n: count() }).from(postLikes).where(inArray(postLikes.postId, ids)).groupBy(postLikes.postId)),
       whenAny(viewerId ? ids : [], () =>
         db.select({ postId: postLikes.postId }).from(postLikes).where(and(inArray(postLikes.postId, ids), eq(postLikes.userId, viewer))),
@@ -124,16 +100,6 @@ export async function withEngagement(list: Post[], viewerId: string | null): Pro
           .where(and(inArray(postReplies.postId, ids), isNull(postReplies.deletedAt), notBy(postReplies.authorId, blocked.ids)))
           .groupBy(postReplies.postId),
       ),
-      whenAny(clashIds, () =>
-        db
-          .select({ postId: clashVotes.postId, side: clashVotes.side, n: count() })
-          .from(clashVotes)
-          .where(inArray(clashVotes.postId, clashIds))
-          .groupBy(clashVotes.postId, clashVotes.side),
-      ),
-      whenAny(viewerId ? clashIds : [], () =>
-        db.select({ postId: clashVotes.postId, side: clashVotes.side }).from(clashVotes).where(and(inArray(clashVotes.postId, clashIds), eq(clashVotes.userId, viewer))),
-      ),
     ]);
 
     const now = Date.now();
@@ -141,18 +107,6 @@ export async function withEngagement(list: Post[], viewerId: string | null): Pro
     const tally = (rows: { postId: string; n: number }[], postId: string) => rows.find((row) => row.postId === postId)?.n ?? 0;
     const reshareCount = (postId: string, kind: ReshareKind) => reshares.find((row) => row.postId === postId && row.kind === kind)?.n ?? 0;
     return list.map((post) => {
-      if (isClash(post)) {
-        const sideVotes = (side: 0 | 1) => post.clash.sides[side].votes + (sides.find((row) => row.postId === post.id && row.side === side)?.n ?? 0);
-        const yourVote = votes.find((row) => row.postId === post.id)?.side;
-        return {
-          ...post,
-          clash: {
-            ...post.clash,
-            sides: [{ ...post.clash.sides[0], votes: sideVotes(0) }, { ...post.clash.sides[1], votes: sideVotes(1) }],
-            yourVote: yourVote === 0 || yourVote === 1 ? yourVote : undefined,
-          },
-        };
-      }
       if (!engageable(post)) return post;
       const own = yours.find((row) => row.postId === post.id);
       return {
@@ -266,11 +220,11 @@ export async function deleteReply(postId: string, replyId: string, authorId: str
 
 /**
  * Saved reply rows (live author name/handle from `profiles`, else the
- * write-time snapshot), then `mock` replies, each with its saved likes added
- * and the viewer's own `liked`; `mine` marks the viewer's saved ones.
+ * write-time snapshot), each with its saved likes and the viewer's own
+ * `liked`; `mine` marks the viewer's own.
  */
-async function toReplies(rows: ReplyRow[], mock: Reply[], viewerId: string | null): Promise<Reply[]> {
-  const ids = [...rows.map((row) => row.id), ...mock.map((reply) => reply.id)];
+async function toReplies(rows: ReplyRow[], viewerId: string | null): Promise<Reply[]> {
+  const ids = rows.map((row) => row.id);
   if (ids.length === 0) return [];
   const db = getDb();
   const authorIds = [...new Set(rows.map((row) => row.authorId))];
@@ -286,12 +240,7 @@ async function toReplies(rows: ReplyRow[], mock: Reply[], viewerId: string | nul
 
   const now = Date.now();
   const likedIds = new Set(liked.map((row) => row.replyId));
-  const withLikes = (reply: Reply): Reply => ({
-    ...reply,
-    likes: reply.likes + (likes.find((row) => row.replyId === reply.id)?.n ?? 0),
-    liked: likedIds.has(reply.id),
-  });
-  const saved = rows.map((row): Reply => {
+  return rows.map((row): Reply => {
     const profile = authors.find((author) => author.userId === row.authorId);
     const name = profile?.displayName ?? row.authorName;
     const handle = profile?.handle ?? row.authorHandle;
@@ -302,20 +251,20 @@ async function toReplies(rows: ReplyRow[], mock: Reply[], viewerId: string | nul
       avatarInitial: name[0]?.toUpperCase() ?? "?",
       content: row.content,
       timestamp: playedLabel(row.createdAt.getTime(), now),
-      likes: 0,
+      likes: likes.find((like) => like.replyId === row.id)?.n ?? 0,
+      liked: likedIds.has(row.id),
       saved: true,
       mine: viewerId !== null && row.authorId === viewerId,
       edited: row.editedAt !== null,
     };
   });
-  return [...saved, ...mock].map(withLikes);
 }
 
 // Newest saved replies per post a thread loads, and per profile Comments tab.
 const REPLY_LIMIT = 100;
 const PROFILE_COMMENT_LIMIT = 30;
 
-/** A post's replies as `viewerId` sees them: saved ones newest first (none by anyone with a block either way), then the mock thread. */
+/** A post's replies as `viewerId` sees them, newest first — none by anyone with a block either way. */
 export async function repliesFor(postId: string, viewerId: string | null): Promise<Reply[]> {
   const blocked = viewerId ? await blockedIdsFor(viewerId).catch(() => new Set<string>()) : new Set<string>();
   const rows = await getDb()
@@ -324,12 +273,11 @@ export async function repliesFor(postId: string, viewerId: string | null): Promi
     .where(and(eq(postReplies.postId, postId), isNull(postReplies.deletedAt), notBy(postReplies.authorId, blocked)))
     .orderBy(desc(postReplies.createdAt))
     .limit(REPLY_LIMIT);
-  return toReplies(rows, POST_REPLIES[postId] ?? [], viewerId);
+  return toReplies(rows, viewerId);
 }
 
-/** Whether `replyId` is a live reply under `postId`, saved or mock. */
+/** Whether `replyId` is a live reply under `postId`. */
 export async function replyExists(postId: string, replyId: string): Promise<boolean> {
-  if (POST_REPLIES[postId]?.some((reply) => reply.id === replyId)) return true;
   if (!isSavedPostId(replyId)) return false;
   const [row] = await getDb()
     .select({ id: postReplies.id })
@@ -361,12 +309,9 @@ export async function accountActivity(authorId: string, viewerId: string | null)
         .orderBy(desc(postReplies.createdAt))
         .limit(PROFILE_COMMENT_LIMIT),
     ]);
-    const [replies, savedParents] = await Promise.all([
-      toReplies(rows, [], viewerId),
-      savedPostsByIds([...new Set(rows.map((row) => row.postId))].filter((id) => !MOCK_POSTS.has(id)), viewerId),
-    ]);
+    const [replies, parents] = await Promise.all([toReplies(rows, viewerId), savedPostsByIds([...new Set(rows.map((row) => row.postId))], viewerId)]);
     const comments = rows.flatMap((row, index): ProfileComment[] => {
-      const post = MOCK_POSTS.get(row.postId) ?? savedParents.find((candidate) => candidate.id === row.postId);
+      const post = parents.find((candidate) => candidate.id === row.postId);
       return post ? [{ reply: replies[index], post }] : [];
     });
     return { omens, comments, trades: [] };

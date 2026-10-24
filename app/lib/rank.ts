@@ -64,7 +64,7 @@ export function rankScore(rank: string): number {
 // Every real account's rank — the signed-in viewer's and anyone else's — until
 // ranking exists: everyone starts at the bottom, Bronze I, except the handles
 // in RANK_OVERRIDES. Gates profile portfolios and challenges.
-// (app/lib/roomsMocks.ts ROOM.subrank separately assumes "Oracle II" for Sanctum.)
+// (app/lib/rooms.ts ROOM.subrank separately assumes "Oracle II" for Sanctum.)
 export const VIEWER_RANK = "Bronze I";
 
 // Hand-granted ranks by real-account handle (stored form: lowercase, no "@").

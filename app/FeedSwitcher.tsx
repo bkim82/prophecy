@@ -6,7 +6,7 @@ import { CoverEyebrow, InterestPicker, MixBanner, MutedNotice, SeeMore, TopicChi
 import { ComposeIcon } from "@/app/icons";
 import { PostCard } from "@/app/PostCard";
 import { clearFreshPost, useFreshPostId } from "@/app/lib/freshPost";
-import { LIVE_CALL_COUNT, SHARES, type Post, type Share } from "@/app/lib/mockPosts";
+import type { Post, Share } from "@/app/lib/posts";
 import { useBookmarks, useTopicPrefs } from "@/app/lib/postLists";
 import type { AccountTopics } from "@/app/lib/topicInterest";
 import { useTopicSignal } from "@/app/lib/topicSignals";
@@ -22,18 +22,20 @@ const FILTERS: { id: FilterId; label: string }[] = [
   { id: "bookmarked", label: "Bookmarked" },
 ];
 
-// The latest repost per post by someone you follow: real accounts' saved
-// ones (`saved`, already limited to who you follow) and the mock `SHARES`.
-// It's the line shown above that post wherever it appears, and it pulls the
-// post into Following.
-function followedShares(followed: string[], saved: Share[]): Map<string, Share> {
+// The latest repost per post by someone you follow (`saved`, already limited
+// to who you follow). It's the line shown above that post wherever it
+// appears, and it pulls the post into Following.
+function followedShares(saved: Share[]): Map<string, Share> {
   const shares = new Map<string, Share>();
-  for (const share of [...saved, ...SHARES.filter((mock) => followed.includes(mock.handle))]) {
+  for (const share of saved) {
     const current = shares.get(share.postId);
     if (!current || ageMinutes(share.timestamp) < ageMinutes(current.timestamp)) shares.set(share.postId, share);
   }
   return shares;
 }
+
+// Live Calls: an omen with one of its author's trades still open attached.
+const isLiveCall = (post: Post) => post.kind === "call" || post.trade?.open === true;
 
 // When a post reached your Following feed: posted, or later reshared.
 function followingAge(post: Post, shares: Map<string, Share>): number {
@@ -72,7 +74,7 @@ export function FeedSwitcher({
   shares: Share[];
   account: AccountTopics | null;
 }) {
-  const shares = useMemo(() => followedShares(followed, savedShares), [followed, savedShares]);
+  const shares = useMemo(() => followedShares(savedShares), [savedShares]);
   const [filter, setFilter] = useState<FilterId>("forYou");
   // Topic chip: "forYou" = every topic, else one followed (or opened) topic.
   const [view, setView] = useState<TopicView>("forYou");
@@ -83,6 +85,7 @@ export function FeedSwitcher({
   // DELETE /api/posts/[id] fails.
   const [deletedIds, setDeletedIds] = useState<string[]>([]);
   const shownSaved = useMemo(() => savedPosts.filter((post) => !deletedIds.includes(post.id)), [savedPosts, deletedIds]);
+  const liveCalls = useMemo(() => [...shownSaved, ...posts].filter(isLiveCall).length, [shownSaved, posts]);
   // Just published from a composer: flashed once on its way in.
   const freshId = useFreshPostId();
   const { ids: bookmarkIds } = useBookmarks();
@@ -104,7 +107,7 @@ export function FeedSwitcher({
   const { pinned, covers, rest } = useMemo(() => {
     const keep = (post: Post) => {
       if (filter === "following" && !followed.includes(post.handle) && !shares.has(post.id)) return false;
-      if (filter === "live" && post.kind !== "call") return false;
+      if (filter === "live" && !isLiveCall(post)) return false;
       if (filter === "clashes" && post.kind !== "clash") return false;
       if (filter === "bookmarked" && !bookmarkIds.includes(post.id)) return false;
       return view === "forYou" || postTopics(post).includes(view);
@@ -118,8 +121,8 @@ export function FeedSwitcher({
     const none: Cover[] = [];
     if (!home) return { pinned: saved, covers: none, rest: feed };
     // On the For You home only your own omens stay pinned; everyone else's
-    // join the suggestions (newest first, ahead of the mock feed) so your
-    // interests' covers lead the feed.
+    // join the suggestions (newest first, ahead of older reposted ones) so
+    // your interests' covers lead the feed.
     const pinned = saved.filter((post) => post.mine);
     // Suggestions skip anything tagged with a "Not interested" topic.
     const suggestions = [...saved.filter((post) => !post.mine), ...feed].filter((post) => !postTopics(post).some((id) => muted.ids.includes(id)));
@@ -210,9 +213,9 @@ export function FeedSwitcher({
               onClick={() => setFilter(id)}
             >
               {label}
-              {id === "live" && (
-                <span className="feed-nav-live" aria-label={`${LIVE_CALL_COUNT} live`}>
-                  {LIVE_CALL_COUNT}
+              {id === "live" && liveCalls > 0 && (
+                <span className="feed-nav-live" aria-label={`${liveCalls} live`}>
+                  {liveCalls}
                 </span>
               )}
             </button>

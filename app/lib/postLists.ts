@@ -6,7 +6,7 @@ import { DEFAULT_INTERESTS, isTopicId, type TopicId } from "@/app/lib/topics";
 import { saveTopics } from "@/app/topicActions";
 
 // Per-browser Bookmarked / Interests / Not interested lists for the Omens
-// feed (app/FeedSwitcher.tsx). Viewer conveniences over mock posts, so they live in
+// feed (app/FeedSwitcher.tsx). Viewer conveniences, so they live in
 // localStorage like the Portfolio watchlist (app/duel/portfolio/watchlist.ts);
 // empty/blocked storage just means empty (or default) lists. Stored as ids only.
 // Signed in, interests and Not interested belong to the account instead

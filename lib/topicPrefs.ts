@@ -1,7 +1,6 @@
 import { and, count, desc, eq, gt, inArray, isNull } from "drizzle-orm";
 import { getDb } from "@/db";
 import { onboarding, posts, topicPrefs, topicSignals } from "@/db/schema";
-import { EXCLUSIVE_POSTS, GLOBAL_POSTS } from "@/app/lib/mockPosts";
 import {
   VIEW_DEDUPE_MINUTES,
   WINDOW_DAYS,
@@ -11,7 +10,8 @@ import {
   type ClientTopicSignal,
   type SignalEvent,
 } from "@/app/lib/topicInterest";
-import { DEFAULT_INTERESTS, isTopicId, postTopics, type TopicId } from "@/app/lib/topics";
+import { DEFAULT_INTERESTS, isTopicId, type TopicId } from "@/app/lib/topics";
+import { isSavedPostId } from "@/lib/posts";
 
 // Reads/writes for `topic_prefs` and `topic_signals` (db/schema.ts): an
 // account's followed / Not interested topics and the engagement that infers
@@ -64,14 +64,12 @@ export async function saveTopicPrefs(userId: string, followed: TopicId[], muted:
 }
 
 /**
- * The topics a signal on `postId` credits: a mock post's (postTopics), or a
- * saved post's own tags. Null for unknown/deleted posts; [] for your own saved
- * posts, which already count through `posts`.
+ * The topics a signal on `postId` credits: the saved post's own tags. Null for
+ * unknown/deleted posts; [] for your own posts, which already count through
+ * `posts`.
  */
 export async function signalTopicsFor(postId: string, userId: string): Promise<TopicId[] | null> {
-  const mock = [...GLOBAL_POSTS, ...EXCLUSIVE_POSTS].find((post) => post.id === postId);
-  if (mock) return postTopics(mock);
-  if (!/^[0-9a-f-]{36}$/.test(postId)) return null;
+  if (!isSavedPostId(postId)) return null;
   const [row] = await getDb()
     .select({ authorId: posts.authorId, topics: posts.topics })
     .from(posts)

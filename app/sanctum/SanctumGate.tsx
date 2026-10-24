@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { RoomId } from "@/app/lib/roomsMocks";
+import type { RoomId } from "@/app/lib/rooms";
 
 // Each tier's sigil, drawn in a 64×64 box centred on 32,32. It sits on the
 // seam and is split between the two doors, so it breaks apart as they open.

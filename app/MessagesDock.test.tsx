@@ -14,7 +14,7 @@ vi.mock("@/app/auth/AuthProvider", () => ({
 
 import type { ConversationView } from "@/app/lib/messageRules";
 import { resetMessages, setMessageSummary, showMessages, toggleMessages } from "@/app/lib/messages";
-import type { Post } from "@/app/lib/mockPosts";
+import type { Post } from "@/app/lib/posts";
 import { MessagesButton } from "@/app/MessagesButton";
 import { MessagesDock } from "@/app/MessagesDock";
 import { SendPostButton } from "@/app/SharePostDialog";

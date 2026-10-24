@@ -62,7 +62,7 @@ describe("conversation actions", () => {
   });
 
   it("only works on real accounts other than you", async () => {
-    for (const handle of ["@me", "@zane_lfg"]) expect((await acceptConversation(handle)).ok).toBe(false);
+    for (const handle of ["@me", "@ghost"]) expect((await acceptConversation(handle)).ok).toBe(false);
     expect(mocks.acceptThread).not.toHaveBeenCalled();
   });
 

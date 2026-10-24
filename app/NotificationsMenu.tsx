@@ -4,7 +4,6 @@ import { useEffect, useId, useRef, useState, type MouseEvent } from "react";
 import { AcceptedRow, ChallengeRow, FeedNotifications } from "@/app/FeedNotifications";
 import { ArenaIcon, BellIcon } from "@/app/icons";
 import { heartbeat, useLiveChallenges } from "@/app/lib/liveChallenges";
-import { NOTIFICATION_IDS } from "@/app/lib/mockNotifications";
 import { useSeenNotifications } from "@/app/lib/postLists";
 
 /**
@@ -28,7 +27,7 @@ export function NotificationsMenu() {
   const { challenges, accepted, answers } = useLiveChallenges();
   // Answered challenges linger until the next heartbeat; they aren't news.
   const live = challenges.filter((challenge) => !answers[challenge.id]);
-  const ids = [...accepted.map((round) => acceptedKey(round.id)), ...live.map((challenge) => challenge.id), ...NOTIFICATION_IDS];
+  const ids = [...accepted.map((round) => acceptedKey(round.id)), ...live.map((challenge) => challenge.id)];
   const unseen = seenIds === null ? 0 : ids.filter((id) => !seenIds.includes(id)).length;
   // Newest first, so these are the latest unseen. Null on the server (seenIds), so they appear after hydration.
   const showPopup = !open && seenIds !== null;

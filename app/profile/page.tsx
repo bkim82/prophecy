@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { challengeTerms } from "@/app/lib/challengeRules";
-import { getProfile, profileHref, type Profile } from "@/app/lib/mockProfiles";
+import type { Profile } from "@/app/lib/profiles";
 import type { ProfileBanner } from "@/app/lib/profileEdit";
 import { archetypeFor, isPinnableMatch, type Highlight } from "@/app/lib/profileTraits";
 import { HighlightReel } from "@/app/profile/[handle]/HighlightReel";
@@ -83,20 +83,17 @@ export default async function OwnProfilePage() {
     net: entry.net,
     date: playedLabel(entry.playedAt, now),
   }));
-  // Mock traders by their mock profile; real accounts by the handle they had when challenged.
-  const challenges: SentChallenge[] = sent.map((row) => {
-    const target = getProfile(row.targetHandle);
-    return {
-      id: row.id,
-      handle: row.targetHandle,
-      name: target?.name ?? row.targetHandle,
-      rank: target?.rank ?? row.targetRank,
-      href: target ? profileHref(row.targetHandle) : `/profile/${row.targetHandle.slice(1)}`,
-      terms: challengeTerms(row),
-      status: row.status === "declined" || row.status === "expired" ? row.status : "pending",
-      sentLabel: playedLabel(row.createdAt.getTime(), now),
-    };
-  });
+  // By the handle they had when challenged.
+  const challenges: SentChallenge[] = sent.map((row) => ({
+    id: row.id,
+    handle: row.targetHandle,
+    name: row.targetHandle,
+    rank: row.targetRank,
+    href: `/profile/${row.targetHandle.slice(1)}`,
+    terms: challengeTerms(row),
+    status: row.status === "declined" || row.status === "expired" ? row.status : "pending",
+    sentLabel: playedLabel(row.createdAt.getTime(), now),
+  }));
   const accuracy = marketAccuracy
     .filter((row) => row.calls > 0)
     .map((row) => ({ asset: row.market.toUpperCase(), accuracy: row.right / row.calls, calls: row.calls }));

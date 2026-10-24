@@ -5,7 +5,7 @@ import { SignInAction, useAppAuth } from "@/app/auth/AuthProvider";
 import { CloseIcon, SearchIcon, SendIcon } from "@/app/icons";
 import { MESSAGE_MAX_LENGTH, normalizeMessage, type Peer } from "@/app/lib/messageRules";
 import { postMessage, showMessages, usePeople } from "@/app/lib/messages";
-import type { Post } from "@/app/lib/mockPosts";
+import type { Post } from "@/app/lib/posts";
 import { PeerAvatar } from "@/app/MessagesDock";
 
 // A post's Send button (app/PostCard.tsx, at the end of its actions) and the

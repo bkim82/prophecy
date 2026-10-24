@@ -1,10 +1,9 @@
 import Link from "next/link";
-import { profileHref } from "@/app/lib/mockProfiles";
+import { profileHref } from "@/app/lib/profiles";
 
-// Author name that links to their profile (`profileHref`: a mock trader's,
-// or a real account's when `account` is set), or to `href` when the caller
-// knows better ("/profile" for your own); bots, profile-less mock authors and
-// accounts without a handle stay plain text.
+// Author name that links to their profile (`profileHref`: when `account` says
+// the handle is a real account's), or to `href` when the caller knows better
+// ("/profile" for your own); bots and accounts without a handle stay plain text.
 export function AuthorLink({
   handle,
   name,

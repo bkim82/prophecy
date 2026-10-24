@@ -12,9 +12,8 @@ const LIMIT = 8;
 
 /**
  * GET ?q= → { people }: who New message in the Messages dock offers. Empty
- * `q` = your friends (you follow each other); otherwise real accounts by
- * handle or name, like the rail search but without mock traders, who can't
- * be messaged. Never you, nor anyone with a block either way.
+ * `q` = your friends (you follow each other); otherwise accounts by handle
+ * or name, like the rail search. Never you, nor anyone with a block either way.
  */
 export async function GET(request: Request) {
   const userId = (await getViewer())?.userId;
