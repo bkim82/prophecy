@@ -24,10 +24,25 @@ export type MessagePhoto = { src: string; width: number; height: number };
 // A post shared into a conversation, as its card in the thread shows it.
 export type SharedPost = { id: string; href: string; author: string; handle: string; avatarInitial: string; content: string; rank?: string; imageUrl?: string };
 
+// A challenge, posted into the conversation as it was sent
+// (app/profile/challengeActions.ts), as it stands now (lib/challenges.ts
+// challengeCardsFor). "closed" = its sender cleared it from their list.
+// `expiresInMs` is measured by the server; 0 unless pending.
+export type ChallengeStatus = "pending" | "accepted" | "declined" | "expired" | "canceled" | "closed";
+export type ChallengeCard = { id: string; mode: string; terms: string; status: ChallengeStatus; expiresInMs: number };
+
 // `sentAt` is ms since the epoch on the database clock. `body` may be "" when
-// there are photos or a post. `post` is set when one was shared — null once
-// it's been deleted.
-export type MessageView = { id: string; body: string; mine: boolean; sentAt: number; photos: MessagePhoto[]; post?: SharedPost | null };
+// there are photos, a post or a challenge. `post` / `challenge` are set when
+// one was attached — null once it's gone.
+export type MessageView = {
+  id: string;
+  body: string;
+  mine: boolean;
+  sentAt: number;
+  photos: MessagePhoto[];
+  post?: SharedPost | null;
+  challenge?: ChallengeCard | null;
+};
 
 export type ConversationView = { peer: Peer; last: MessageView; unread: number; folder: Folder };
 
@@ -45,6 +60,7 @@ export type SendMessageInput = { handle: string; body?: string; photos?: { mime:
 /** A conversation row's one-line preview: the text, else what was attached. */
 export function messagePreview(message: MessageView): string {
   if (message.body) return message.body;
+  if (message.challenge !== undefined) return message.challenge ? `Challenge — ${message.challenge.terms}` : "Challenge";
   if (message.post !== undefined) return "Shared a post";
   return message.photos.length > 1 ? `Sent ${message.photos.length} photos` : "Sent a photo";
 }

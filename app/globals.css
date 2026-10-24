@@ -264,6 +264,25 @@ a.messages-post:hover { border-color: var(--brand); }
 .messages-post-text { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 5; overflow-wrap: anywhere; white-space: pre-line; }
 .messages-post-image { width: 100%; height: 130px; border-radius: 10px; object-fit: cover; }
 .messages-avatar--xs { width: 20px; height: 20px; font-size: 9px; }
+/* A challenge in a conversation (MessagesDock.tsx ChallengeMessage): the Arena gradient edge while it's open, plain once answered. */
+.messages-challenge { display: grid; gap: 6px; width: min(84%, 290px); margin-bottom: 3px; padding: 11px 12px; border: 1px solid transparent; border-radius: 14px; background: linear-gradient(var(--surface), var(--surface)) padding-box, linear-gradient(135deg, #6d4bd8 0%, #b0479c 55%, #e0743a 100%) border-box; color: var(--text); font-size: 12.5px; line-height: 1.4; }
+.messages-challenge:not([data-status="pending"]):not([data-status="accepted"]) { border-color: var(--line); background: var(--surface); }
+.messages-challenge.is-gone { margin-top: 0; border-color: var(--line); background: var(--surface); color: var(--muted); font-style: italic; }
+.messages-challenge p { margin: 0; }
+.messages-challenge-head { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; }
+.messages-challenge-head svg { flex: none; width: 14px; height: 14px; color: #e0743a; }
+.messages-challenge-terms { color: var(--text); }
+.messages-challenge-meta, .messages-challenge-status { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.messages-challenge[data-status="accepted"] .messages-challenge-status { color: var(--positive); font-weight: 700; }
+.messages-challenge-actions { display: flex; gap: 6px; margin-top: 2px; }
+.messages-challenge-actions button { flex: 1; min-height: 30px; border: 1px solid var(--line-strong); border-radius: 999px; background: transparent; color: var(--text); font-size: 12px; font-weight: 700; }
+.messages-challenge-actions button:hover:not(:disabled) { background: var(--surface-hover); }
+.messages-challenge-actions button:disabled { opacity: .55; cursor: default; }
+.messages-challenge-actions .messages-accept { border-color: color-mix(in srgb, var(--violet) 45%, transparent); background: color-mix(in srgb, var(--violet) 16%, transparent); color: var(--violet-strong); }
+.messages-challenge-actions .messages-accept:hover:not(:disabled) { border-color: var(--violet-strong); background: color-mix(in srgb, var(--violet) 24%, transparent); }
+.messages-challenge-join { justify-self: start; padding: 6px 12px; border-radius: 999px; background: color-mix(in srgb, var(--violet) 16%, transparent); color: var(--violet-strong); font-size: 12px; font-weight: 700; text-decoration: none; }
+.messages-challenge-join:hover { background: color-mix(in srgb, var(--violet) 24%, transparent); }
+.messages-challenge-error { color: var(--negative); font-size: 12px; }
 .messages-blocked { flex: none; margin: 0; padding: 14px 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12.5px; line-height: 1.45; text-align: center; }
 .messages-blocked a { color: var(--text); font-weight: 600; }
 .messages-composer textarea { flex: 1; min-width: 0; min-height: 40px; max-height: 132px; padding: 10px 15px; border: 1px solid var(--line); border-radius: 20px; background: var(--field-bg); color: var(--text); font: inherit; font-size: 13.5px; line-height: 1.4; resize: none; field-sizing: content; }
@@ -1639,6 +1658,9 @@ a.post-avatar { text-decoration: none; }
 .profile-edit-foot { display: flex; flex: none; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 18px; border-top: 1px solid var(--line); }
 .profile-edit-buttons { display: flex; gap: 8px; margin-left: auto; }
 .profile-edit-buttons .profile-follow { margin-top: 0; }
+/* Required-handle prompt (app/HandleGate.tsx): the Edit profile shell, narrow; Sign out left, Save right. */
+.handle-gate { width: min(440px, calc(100% - 32px)); text-align: left; }
+.handle-gate-lead { margin: 0; font-size: 13.5px; line-height: 1.5; }
 /* Send post (app/SharePostDialog.tsx): the Edit profile dialog shell, narrower; people rows are the Messages dock's. */
 /* It renders inside .post-actions, so undo that row's mono type, muted color and the card's pointer. */
 .share-dialog { width: min(460px, calc(100% - 32px)); color: var(--text); font-family: var(--font-sans), Inter, system-ui, sans-serif; font-size: 14px; font-variant-numeric: normal; text-align: left; cursor: auto; }

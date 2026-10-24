@@ -142,7 +142,8 @@ export function EditProfileDialog({ initial, onClose }: { initial: EditableProfi
   const selectedPreset = shownBanner?.kind === "preset" ? shownBanner.id : null;
 
   const handle = normalizeHandle(fields.handle);
-  const handleIssue = handle ? handleProblem(handle) : null;
+  // Required: every account keeps a handle (app/HandleGate.tsx).
+  const handleIssue = handle ? handleProblem(handle) : "Pick a handle.";
   const fieldError = (field: NonNullable<FormError["field"]>) => (error && error.field === field ? error.message : null);
   const set = (key: keyof typeof fields) => (event: { target: { value: string } }) => {
     setFields((current) => ({ ...current, [key]: event.target.value }));

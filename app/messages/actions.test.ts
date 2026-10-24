@@ -40,6 +40,7 @@ describe("message rules", () => {
     const photo = { src: "/p", width: 1, height: 1 };
     expect(messagePreview({ ...message, body: "gm" })).toBe("gm");
     expect(messagePreview({ ...message, post: null })).toBe("Shared a post");
+    expect(messagePreview({ ...message, challenge: { id: "c", mode: "pulse", terms: "Pulse · BTC", status: "pending", expiresInMs: 1 } })).toBe("Challenge — Pulse · BTC");
     expect(messagePreview({ ...message, photos: [photo] })).toBe("Sent a photo");
     expect(messagePreview({ ...message, photos: [photo, photo] })).toBe("Sent 2 photos");
   });
