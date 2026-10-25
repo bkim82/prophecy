@@ -12,6 +12,8 @@ import {
   MESSAGE_MAX_PHOTOS,
   messagePreview,
   normalizeMessage,
+  stampLabel,
+  threadLayout,
   type ChallengeCard,
   type ChallengeStatus,
   type ConversationView,
@@ -36,8 +38,6 @@ import { cancelChallenge } from "@/app/profile/challengeActions";
 // the heartbeat reports a newer message (`summary.latest`), so incoming
 // messages show within ~2s in a visible tab.
 
-// A gap this long between two messages from one side starts a new run (its own timestamp).
-const RUN_GAP_MS = 5 * 60_000;
 // How often an open conversation re-reads while one of its challenges is still pending
 // — an answer isn't a new message, so the heartbeat's `latest` doesn't move for it.
 const CHALLENGE_POLL_MS = 3_000;
@@ -398,6 +398,7 @@ function ThreadPane({ opened }: { opened: Peer }) {
     };
   }, [opened.handle, summary.latest, poll]);
 
+  const layout = threadLayout(thread?.messages ?? []);
   const challengePending = thread?.messages.some((message) => message.challenge?.status === "pending") ?? false;
   useEffect(() => {
     if (!challengePending) return;
@@ -652,34 +653,40 @@ function ThreadPane({ opened }: { opened: Peer }) {
         ) : (
           <ol className="messages-thread" aria-label={`Conversation with ${peer.name}`}>
             {thread.messages.map((message, index) => {
-              const next = thread.messages[index + 1];
-              // Timestamp under the last bubble of each run from one side.
-              const endsRun = !next || next.mine !== message.mine || next.sentAt - message.sentAt > RUN_GAP_MS;
+              const { stamp, position } = layout[index];
               const from = message.mine ? "you" : peer.name;
               return (
-                <li key={message.id} className="messages-bubble-row" data-mine={message.mine}>
-                  {message.challenge !== undefined && loaded && (
-                    <ChallengeMessage
-                      card={message.challenge}
-                      mine={message.mine}
-                      peerName={peer.name}
-                      loadedAt={loaded.at}
-                      onCanceled={() => message.challenge && setChallengeStatus(message.challenge.id, "canceled")}
-                    />
-                  )}
-                  {message.post !== undefined && <SharedPostCard post={message.post} />}
-                  {message.photos.length > 0 && <MessagePhotos message={message} from={from} />}
-                  {message.body && (
-                    <p className="messages-bubble">
-                      <span className="sr-only">{message.mine ? "You: " : `${peer.name}: `}</span>
-                      {message.body}
-                    </p>
-                  )}
-                  {endsRun && loaded && (
-                    <time className="messages-bubble-time" dateTime={isoTime(message.sentAt)}>
-                      {playedLabel(message.sentAt, loaded.at)}
+                <li key={message.id} className="messages-item" data-mine={message.mine} data-position={position}>
+                  {stamp && loaded && (
+                    <time className="messages-stamp" dateTime={isoTime(message.sentAt)}>
+                      {stampLabel(message.sentAt, loaded.at)}
                     </time>
                   )}
+                  <div className="messages-bubble-row">
+                    {!message.mine && (
+                      <span className="messages-bubble-avatar">{(position === "single" || position === "last") && <PeerAvatar peer={peer} small />}</span>
+                    )}
+                    {/* The exact time on hover, since only pauses get a stamp. */}
+                    <div className="messages-bubble-stack" title={loaded ? stampLabel(message.sentAt, loaded.at) : undefined}>
+                      {message.challenge !== undefined && loaded && (
+                        <ChallengeMessage
+                          card={message.challenge}
+                          mine={message.mine}
+                          peerName={peer.name}
+                          loadedAt={loaded.at}
+                          onCanceled={() => message.challenge && setChallengeStatus(message.challenge.id, "canceled")}
+                        />
+                      )}
+                      {message.post !== undefined && <SharedPostCard post={message.post} />}
+                      {message.photos.length > 0 && <MessagePhotos message={message} from={from} />}
+                      {message.body && (
+                        <p className="messages-bubble">
+                          <span className="sr-only">{message.mine ? "You: " : `${peer.name}: `}</span>
+                          {message.body}
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 </li>
               );
             })}

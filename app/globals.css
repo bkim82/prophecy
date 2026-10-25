@@ -233,12 +233,25 @@ a.feed-notif:hover { background: var(--surface-hover); }
 .messages-peer-text strong { overflow: hidden; font-size: 14px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
 .messages-peer-text span { overflow: hidden; color: var(--muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .messages-peer:hover strong { text-decoration: underline; }
-.messages-thread { display: flex; flex-direction: column; gap: 3px; margin: 0; padding: 14px 12px 6px; list-style: none; }
-.messages-bubble-row { display: flex; flex-direction: column; align-items: flex-start; }
-.messages-bubble-row[data-mine="true"] { align-items: flex-end; }
-.messages-bubble { max-width: 80%; margin: 0; padding: 8px 13px; border-radius: 18px 18px 18px 6px; background: var(--surface-hover); color: var(--text); font-size: 13.5px; line-height: 1.4; overflow-wrap: anywhere; white-space: pre-wrap; }
-.messages-bubble-row[data-mine="true"] .messages-bubble { border-radius: 18px 18px 6px 18px; background: var(--brand); color: var(--brand-contrast); }
-.messages-bubble-time { margin: 3px 6px 9px; color: var(--muted); font-size: 11px; }
+.messages-thread { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 10px 12px 8px; list-style: none; }
+/* Groups (app/lib/messageRules.ts threadLayout): a new one — their turn, or a pause — gets a little air; a long pause, a centred stamp. */
+.messages-item:not(:first-child):is([data-position="single"], [data-position="first"]) { margin-top: 10px; }
+.messages-stamp { display: block; margin: 8px 0 10px; color: var(--muted); font-size: 11px; font-weight: 600; text-align: center; }
+.messages-item:first-child .messages-stamp { margin-top: 4px; }
+.messages-bubble-row { display: flex; align-items: flex-end; gap: 8px; }
+.messages-bubble-avatar { flex: none; width: 28px; }
+.messages-bubble-avatar .messages-avatar { width: 28px; height: 28px; font-size: 11px; }
+.messages-bubble-stack { display: flex; flex: 1; flex-direction: column; align-items: flex-start; min-width: 0; }
+.messages-item[data-mine="true"] .messages-bubble-stack { align-items: flex-end; }
+.messages-bubble { max-width: 80%; margin: 0; padding: 8px 13px; border-radius: 18px; background: var(--surface-hover); color: var(--text); font-size: 13.5px; line-height: 1.4; overflow-wrap: anywhere; white-space: pre-wrap; }
+.messages-item[data-mine="true"] .messages-bubble { background: var(--brand); color: var(--brand-contrast); }
+/* Joined corners on the sender's side, like iMessage. */
+.messages-item[data-position="first"] .messages-bubble { border-radius: 18px 18px 18px 5px; }
+.messages-item[data-position="middle"] .messages-bubble { border-radius: 5px 18px 18px 5px; }
+.messages-item[data-position="last"] .messages-bubble { border-radius: 5px 18px 18px 18px; }
+.messages-item[data-mine="true"][data-position="first"] .messages-bubble { border-radius: 18px 18px 5px 18px; }
+.messages-item[data-mine="true"][data-position="middle"] .messages-bubble { border-radius: 18px 5px 5px 18px; }
+.messages-item[data-mine="true"][data-position="last"] .messages-bubble { border-radius: 18px 5px 18px 18px; }
 .messages-error { flex: none; margin: 0; padding: 8px 16px 0; color: var(--negative); font-size: 12px; }
 .messages-composer { display: grid; flex: none; gap: 8px; padding: 10px 12px 12px; border-top: 1px solid var(--line); }
 .messages-composer-row { display: flex; align-items: flex-end; gap: 6px; }
@@ -2156,6 +2169,37 @@ a.post-avatar { text-decoration: none; }
 .result-burst-particle { position: absolute; top: 50%; left: 50%; height: 7px; width: 7px; border-radius: 2px; background: var(--brand); opacity: 0; animation: result-burst-fly .85s ease-out forwards; }
 @keyframes result-burst-fly { 0% { opacity: 1; transform: translate(-50%, -50%) rotate(var(--rot, 0deg)) translateY(0); } 100% { opacity: 0; transform: translate(-50%, -50%) rotate(var(--rot, 0deg)) translateY(var(--dist, -90px)); } }
 @media (prefers-reduced-motion: reduce) { .result-burst { display: none; } }
+/* Rematch ready check above a settled challenge round's result card
+   (app/duel/[market]/pulse/[matchId]/Rematch.tsx). `data-state="theirs"` —
+   they pressed Play again and are waiting on you — is the loud one: violet
+   glow, a blinking "Your move" seat, and a beckoning violet Play again. */
+.rematch-check { --tone: var(--brand); margin-bottom: 16px; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--tone) 40%, var(--line)); border-radius: 12px; background: color-mix(in srgb, var(--tone) 7%, var(--surface-raised)); animation: rematch-in .3s cubic-bezier(.2, .9, .3, 1.2); }
+.rematch-check[data-state="theirs"] { --tone: var(--violet-strong); animation: rematch-in .3s cubic-bezier(.2, .9, .3, 1.2), rematch-glow 1.6s ease-in-out infinite; }
+.rematch-check[data-state="starting"] { --tone: var(--positive); }
+.rematch-check:is([data-state="lapsed"], [data-state="missed"], [data-state="left"]) { --tone: var(--muted-dim); }
+.rematch-check-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.rematch-check-eyebrow { color: var(--tone); font-size: 10px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; }
+.rematch-check-clock { color: var(--tone); font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.rematch-check-title { margin-top: 4px; color: var(--text); font-size: 15px; font-weight: 700; }
+.rematch-check-detail { margin-top: 2px; color: var(--muted); font-size: 12px; }
+.rematch-seats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+.rematch-seat { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 6px 8px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.rematch-seat-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); font-size: 13px; font-weight: 600; }
+.rematch-seat-status { flex: none; margin-left: auto; padding: 2px 8px; border-radius: 999px; background: color-mix(in srgb, var(--muted) 12%, transparent); color: var(--muted); font-size: 11px; font-weight: 700; white-space: nowrap; }
+.rematch-seat[data-status="ready"] { border-color: color-mix(in srgb, var(--positive) 50%, var(--line)); }
+.rematch-seat[data-status="ready"] .rematch-seat-status { background: color-mix(in srgb, var(--positive) 15%, transparent); color: var(--positive); }
+.rematch-seat[data-status="turn"] { border-color: color-mix(in srgb, var(--violet-strong) 60%, var(--line)); }
+.rematch-seat[data-status="turn"] .rematch-seat-status { background: color-mix(in srgb, var(--violet-strong) 16%, transparent); color: var(--violet-strong); animation: queue-pulse .9s ease-in-out infinite; }
+@media (max-width: 520px) { .rematch-seats { grid-template-columns: minmax(0, 1fr); gap: 6px; } }
+.rematch-meter { height: 4px; margin-top: 10px; overflow: hidden; border-radius: 999px; background: var(--line); }
+.rematch-meter span { display: block; height: 100%; background: var(--tone); transform-origin: left; transition: transform .25s linear; }
+.rematch-button.is-beckoning { background: linear-gradient(135deg, var(--violet), var(--violet-strong)); color: #fff; font-weight: 700; animation: rematch-beckon 1.2s ease-out infinite; }
+.rematch-button.is-beckoning:hover { filter: brightness(1.08); }
+.rematch-button.is-waiting { border: 1px solid var(--line-strong); background: transparent; color: var(--muted); }
+@keyframes rematch-in { from { opacity: 0; transform: translateY(-6px) scale(.98); } }
+@keyframes rematch-glow { 50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--tone) 18%, transparent), 0 0 24px -6px var(--tone); } }
+@keyframes rematch-beckon { from { box-shadow: 0 0 0 0 color-mix(in srgb, var(--violet-strong) 60%, transparent); } to { box-shadow: 0 0 0 10px transparent; } }
+@media (prefers-reduced-motion: reduce) { .rematch-check, .rematch-seat-status, .rematch-button.is-beckoning { animation: none !important; } }
 .pc-pnl-toast { animation: pc-toast-fade 1.6s ease-out forwards; }
 @keyframes pc-toast-fade { 0% { opacity: 0; transform: translateY(4px); } 15% { opacity: 1; transform: translateY(0); } 75% { opacity: 1; } 100% { opacity: 0; transform: translateY(-6px); } }
 @media (prefers-reduced-motion: reduce) { .pc-pnl-toast { animation: none; opacity: 0; } }
