@@ -19,29 +19,92 @@ import { ClaimedIntentError, useSubmitSwapIntent, useSubmitTypedIntent, useSwapQ
 import { curatedToken, GAS_ALLOWANCE_RAW, NATIVE_ETH, SWAP_SLIPPAGE_BPS, USDC_BASE } from "@/app/lib/embeddedWallet/tokens";
 import { shortenAddress } from "@/app/lib/wallet";
 import { ActionSheet } from "./ActionSheet";
+import { activityAmount } from "./ActivityList";
+import { QrCode } from "./QrCode";
 import { ETH_SENTINEL, type Coin } from "./types";
 
-// See docs/wallet.md: Deposit shows the canonical address with copy-to-clipboard;
+// See docs/wallet.md: Deposit shows the canonical address as a QR code and copyable text;
 // Send (any held token, gas in USDC) and Swap (CDP swap, gas in ETH) sign through app/lib/embeddedWallet/sign.ts;
 // with free gas (walletFreeGasEnabled) the Paymaster sponsors both and no gas balance is needed.
 // Review screens render the server's intent, and the intent is confirmed only by the review's own button.
 
-export function DepositSheet({ address, onClose }: { address: string; onClose: () => void }) {
+type DepositMethod = "card" | "transfer";
+
+/**
+ * Add funds: card checkout (when Onramp is on) or a plain USDC-on-Base transfer
+ * to the canonical address, shown as a QR code and in grouped hex so it can be
+ * checked against the sender's screen. `arrival` comes from the dashboard's
+ * deposit watch, which keeps running after this sheet closes.
+ */
+export function DepositSheet({ address, arrival, onClose }: { address: string; arrival: { value: number | null; asset: string } | null; onClose: () => void }) {
+  const onramp = walletOnrampEnabled();
+  const [method, setMethod] = useState<DepositMethod>("transfer");
   const [copied, setCopied] = useState(false);
   const copy = async () => {
     try { await navigator.clipboard.writeText(address); setCopied(true); setTimeout(() => setCopied(false), 1500); }
     catch { /* clipboard blocked */ }
   };
+  // "0x881e" + 4-char groups: the first and last groups are what people compare, so they're bold.
+  const groups = address.slice(2).match(/.{1,4}/g) ?? [];
   return (
-    <ActionSheet title="Deposit" onClose={onClose}>
-      {walletOnrampEnabled() && <BuyWithCard />}
-      <p className="wd-sheet-copy">Send ETH or any Base token to this address. Other Prophecy users can send to your @username.{walletFreeGasEnabled() ? " Gas is free: Prophecy covers it." : " Keep some USDC here to pay gas when you send, and a little ETH for gas when you swap."}</p>
-      <div className="wd-sheet-address">
-        <code>{address}</code>
-        <button type="button" onClick={copy} className="wd-sheet-primary-button">{copied ? "Copied" : "Copy address"}</button>
+    <ActionSheet title="Add funds" wide onClose={onClose}>
+      {onramp && (
+        <div className="wd-segmented" role="group" aria-label="Deposit method">
+          <button type="button" aria-pressed={method === "card"} onClick={() => setMethod("card")}>Card or Apple Pay</button>
+          <button type="button" aria-pressed={method === "transfer"} onClick={() => setMethod("transfer")}>Transfer USDC</button>
+        </div>
+      )}
+      {method === "card" ? <BuyWithCard /> : (
+        <div className="wd-deposit">
+          <div className="wd-deposit-pair">
+            <div className="wd-deposit-tile"><span>Token</span><strong><UsdcMark /> USDC</strong></div>
+            <div className="wd-deposit-tile"><span>Network</span><strong><span className="wd-base-dot" aria-hidden="true" /> Base</strong></div>
+          </div>
+          <div className="wd-qr"><QrCode value={address} label="QR code of your deposit address" /></div>
+          <div className="wd-deposit-address">
+            <span className="wd-deposit-label">Your deposit address</span>
+            <div className="wd-deposit-address-box">
+              <code aria-label={address}>
+                {groups.map((group, i) => (
+                  <span key={i} aria-hidden="true" className={i === 0 || i === groups.length - 1 ? "is-key" : undefined}>{i === 0 ? `0x${group}` : group}</span>
+                ))}
+              </code>
+              <button type="button" onClick={copy} className="wd-pill wd-pill-primary wd-pill-small">
+                <svg viewBox="0 0 14 14" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" aria-hidden="true"><rect x="4.5" y="4.5" width="7.5" height="7.5" rx="1.5" /><path d="M9.5 4.5V3A1 1 0 0 0 8.5 2H3a1 1 0 0 0-1 1v5.5a1 1 0 0 0 1 1h1.5" /></svg>
+                {copied ? "Copied" : "Copy"}
+              </button>
+            </div>
+          </div>
+          <p className="wd-deposit-warning" role="note">
+            <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M8 2 1.5 13.5h13L8 2Z" /><path d="M8 6.5v3.2M8 11.8v.01" /></svg>
+            <span>Send only <strong>USDC on Base</strong>. Funds sent on another network won&apos;t show up here and may be lost.</span>
+          </p>
+          <p className="wd-sheet-note">{walletFreeGasEnabled() ? "Withdrawals and swaps from this wallet cost you no network fee: Prophecy covers it." : "Keep a little USDC here for network fees when you withdraw, and some ETH if you swap."}</p>
+        </div>
+      )}
+      <div className={`wd-deposit-watch${arrival ? " is-arrived" : ""}`} role="status">
+        <span className="wd-deposit-watch-dot" aria-hidden="true" />
+        <span>
+          <strong>{arrival ? `Received ${activityAmount(arrival.value, arrival.asset)}` : "Watching for your deposit"}</strong>
+          <small>{arrival ? "It's in your wallet now." : "Usually lands within seconds of sending. You can close this, we'll let you know."}</small>
+        </span>
       </div>
-      <p className="wd-sheet-note">Base network only — sending from another chain may not arrive.</p>
+      {method === "transfer" && (
+        <div className="wd-deposit-foot">
+          <span>No minimum deposit</span>
+          <span>Network fee paid by sender</span>
+        </div>
+      )}
     </ActionSheet>
+  );
+}
+
+function UsdcMark() {
+  return (
+    <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true">
+      <circle cx="10" cy="10" r="10" fill="#2775ca" />
+      <path d="M12.6 7.6c-.3-.9-1.2-1.4-2.6-1.4-1.5 0-2.5.7-2.5 1.8 0 2.4 5.2 1.3 5.2 3.9 0 1.1-1 1.9-2.6 1.9-1.5 0-2.5-.6-2.8-1.6M10 4.8v1.4M10 13.8v1.4" fill="none" stroke="#fff" strokeWidth="1.3" strokeLinecap="round" />
+    </svg>
   );
 }
 
@@ -56,7 +119,7 @@ function BuyWithCard() {
   const [error, setError] = useState<string | null>(null);
   return (
     <form
-      className="wd-sheet-form wd-sheet-buy"
+      className="wd-sheet-form wd-deposit"
       onSubmit={async (event) => {
         event.preventDefault();
         const tab = window.open("", "_blank");
@@ -78,12 +141,16 @@ function BuyWithCard() {
         }
       }}
     >
+      <div className="wd-deposit-pair">
+        <div className="wd-deposit-tile"><span>You get</span><strong><UsdcMark /> USDC</strong></div>
+        <div className="wd-deposit-tile"><span>Network</span><strong><span className="wd-base-dot" aria-hidden="true" /> Base</strong></div>
+      </div>
       <label className="wd-sheet-field">
-        <span>Buy USDC with card · amount (USD, optional)</span>
+        <span>Amount in USD (optional)</span>
         <input value={amount} onChange={(event) => setAmount(event.target.value)} inputMode="decimal" placeholder="25.00" />
       </label>
       <button type="submit" className="wd-sheet-primary-button" disabled={pending}>
-        {pending ? "Opening Coinbase…" : "Buy USDC with card"}
+        {pending ? "Opening Coinbase…" : "Continue to Coinbase"}
       </button>
       <p className="wd-sheet-note">Checkout opens on Coinbase, which shows fees and limits before you pay. USDC arrives in this wallet on Base.</p>
       {error && <p className="wd-sheet-error" role="alert">{error}</p>}
@@ -287,11 +354,11 @@ export function SendSheet({
   };
 
   return (
-    <ActionSheet title="Send" onClose={() => { leaveReview(); onClose(); }}>
+    <ActionSheet title="Withdraw" onClose={() => { leaveReview(); onClose(); }}>
       {hash ? (
         <div className="wd-sheet-form">
           <p className="wd-sheet-sent-title">Sent — waiting for Base to confirm</p>
-          <p className="wd-sheet-note">Track it in the Activity tab. It shows as Pending until the network includes it.</p>
+          <p className="wd-sheet-note">Track it in Recent activity. It shows as Pending until the network includes it.</p>
           <code className="wd-sheet-hash">{hash}</code>
           <button type="button" className="wd-sheet-primary-button" onClick={onClose}>Done</button>
         </div>
@@ -622,7 +689,7 @@ export function SwapSheet({
       {hash ? (
         <div className="wd-sheet-form">
           <p className="wd-sheet-sent-title">Swap submitted — waiting for Base to confirm</p>
-          <p className="wd-sheet-note">Track it in the Activity tab. Your new balance shows up once the network includes it.</p>
+          <p className="wd-sheet-note">Track it in Recent activity. Your new balance shows up once the network includes it.</p>
           <code className="wd-sheet-hash">{hash}</code>
           <button type="button" className="wd-sheet-primary-button" onClick={onClose}>Done</button>
         </div>

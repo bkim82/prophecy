@@ -17,22 +17,23 @@ function sortKey(coin: Coin, sort: Sort): number | string {
   return coin.valueUsd ?? 0;
 }
 
+// The search box and sort picker only earn their space once the list is long.
+const SEARCH_THRESHOLD = 6;
+
 /**
- * Owned-coin list: a search box and a sort picker over plain rows (no
- * sparklines) — same "filter the list, order freezes while you're reading
- * it" idiom as app/duel/portfolio/TokenExplorer.tsx, just simpler since the
- * source data is already local (no pagination, no trending/new fetch).
- * Hidden coins (see ./hiddenCoins.ts) are left out unless "Show hidden" is on.
+ * Holdings table (Asset / Price / Balance) — same "filter the list, order
+ * freezes while you're reading it" idiom as app/duel/portfolio/TokenExplorer.tsx,
+ * just simpler since the source data is already local (no pagination, no
+ * trending/new fetch). Hidden coins (see ./hiddenCoins.ts) are left out unless
+ * "Show hidden" is on.
  */
 export function CoinList({
   coins,
-  totalUsd,
   isHidden,
   onToggleHidden,
   onSelect,
 }: {
   coins: Coin[];
-  totalUsd: number;
   isHidden: (address: string) => boolean;
   onToggleHidden: (address: string) => void;
   onSelect: (address: string) => void;
@@ -79,64 +80,64 @@ export function CoinList({
   const byAddress = new Map(coins.map((coin) => [coin.address, coin]));
 
   return (
-    <div>
-      <div className="wd-list-controls">
-        <input
-          type="search"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Filter your coins"
-          aria-label="Filter your coins"
-          spellCheck={false}
-          className="wd-list-search"
-        />
-        <select value={sort} onChange={(event) => setSort(event.target.value as Sort)} className="wd-list-sort" aria-label="Sort">
-          {SORTS.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
-        </select>
-      </div>
-
-      {displayed.length === 0 ? (
-        <p className="wd-empty">
-          {coins.length === 0
-            ? "No holdings on Base yet — deposit ETH or a Base token to see it here."
-            : trimmed
-              ? `No coins match "${query}".`
-              : "All your coins are hidden."}
-        </p>
-      ) : (
-        <>
-          <div className="wd-table-head" aria-hidden="true">
-            <span>Asset</span>
-            <span>Balance</span>
-            <span className="wd-table-head-portfolio">Portfolio</span>
-            <span>Price</span>
+    <>
+      <div className="wd-card wd-holdings">
+        {coins.length > SEARCH_THRESHOLD && (
+          <div className="wd-list-controls">
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Filter your coins"
+              aria-label="Filter your coins"
+              spellCheck={false}
+              className="wd-list-search"
+            />
+            <select value={sort} onChange={(event) => setSort(event.target.value as Sort)} className="wd-list-sort" aria-label="Sort">
+              {SORTS.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
+            </select>
           </div>
-          <ul className="wd-coin-list">
-            {displayed.map((address) => {
-              const coin = byAddress.get(address);
-              if (!coin) return null;
-              const hidden = isHidden(address);
-              const sharePct = hidden ? null : totalUsd > 0 ? ((coin.valueUsd ?? 0) / totalUsd) * 100 : 0;
-              return (
-                <CoinRow
-                  key={address}
-                  coin={coin}
-                  sharePct={sharePct}
-                  hidden={hidden}
-                  onSelect={() => onSelect(address)}
-                  onToggleHidden={() => onToggleHidden(address)}
-                />
-              );
-            })}
-          </ul>
-        </>
-      )}
+        )}
+
+        {displayed.length === 0 ? (
+          <p className="wd-card-empty">
+            {coins.length === 0
+              ? "Nothing here yet. Deposit USDC on Base and it shows up here."
+              : trimmed
+                ? `No coins match "${query}".`
+                : "All your coins are hidden."}
+          </p>
+        ) : (
+          <>
+            <div className="wd-table-head" aria-hidden="true">
+              <span>Asset</span>
+              <span>Price</span>
+              <span>Balance</span>
+            </div>
+            <ul className="wd-coin-list">
+              {displayed.map((address) => {
+                const coin = byAddress.get(address);
+                if (!coin) return null;
+                return (
+                  <CoinRow
+                    key={address}
+                    coin={coin}
+                    hidden={isHidden(address)}
+                    onSelect={() => onSelect(address)}
+                    onToggleHidden={() => onToggleHidden(address)}
+                  />
+                );
+              })}
+            </ul>
+          </>
+        )}
+      </div>
 
       {hiddenCount > 0 && (
         <button type="button" className="wd-list-hidden-toggle" aria-pressed={showHidden} onClick={() => setShowHidden((v) => !v)}>
           {showHidden ? "Hide hidden coins" : `Show hidden (${hiddenCount})`}
         </button>
       )}
-    </div>
+    </>
   );
 }

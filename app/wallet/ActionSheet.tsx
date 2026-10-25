@@ -2,8 +2,8 @@
 
 import { useEffect } from "react";
 
-/** Shared modal shell for Deposit/Send/Swap — none of them move real funds this pass (see docs/wallet.md). */
-export function ActionSheet({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+/** Shared modal shell for Deposit/Send/Swap; `wide` gives Deposit room for its QR code and full address. */
+export function ActionSheet({ title, wide = false, onClose, children }: { title: string; wide?: boolean; onClose: () => void; children: React.ReactNode }) {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
     document.addEventListener("keydown", onKeyDown);
@@ -12,7 +12,7 @@ export function ActionSheet({ title, onClose, children }: { title: string; onClo
 
   return (
     <div className="wd-sheet-backdrop" onPointerDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-      <div className="wd-sheet" role="dialog" aria-modal="true" aria-label={title}>
+      <div className={`wd-sheet${wide ? " wd-sheet-wide" : ""}`} role="dialog" aria-modal="true" aria-label={title}>
         <div className="wd-sheet-heading">
           <h2>{title}</h2>
           <button type="button" className="wd-sheet-close" onClick={onClose} aria-label="Close">
