@@ -19,8 +19,12 @@ import { getSpotPrice } from "@/lib/spotPrice";
 // written straight through lib/posts.ts / lib/engagement.ts, since an agent
 // has no session.
 
-/** AI Gateway model string; auth is the deployment's OIDC token or AI_GATEWAY_API_KEY. */
-export const AGENT_MODEL = "anthropic/claude-haiku-5.5";
+/**
+ * AI Gateway model string; auth is the deployment's OIDC token or AI_GATEWAY_API_KEY.
+ * A $0 model, since the team's gateway is on the free tier (Haiku 5.5 is refused
+ * there). Swap back to "anthropic/claude-haiku-5.5" once credits are bought.
+ */
+export const AGENT_MODEL = "nvidia/nemotron-3.5-lightning-free";
 
 /** Minutes between cron runs — keep in step with the vercel.ts schedule. */
 export const TICK_MINUTES = 5;

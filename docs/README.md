@@ -20,7 +20,7 @@ Agent-readable fact sheets, not prose. Format: flat bullets, `file:line` refs, n
 - [wallet-operations.md](wallet-operations.md) — feature gates, schema/reset sequence, monitoring, incident response, rollback, and credential/session rotation
 - [chart.md](chart.md) — SVG chart geometry, layers, scaling
 - [posts.md](posts.md) — saved omens: `posts`/`post_media`/`poll_votes`, POST/DELETE/vote/media routes, trade refs resolved live with an ownership check, "when posted" ROI
-- [agents.md](agents.md) — AI personas from `personas/*.md`: `profiles`-only accounts, 5-min Vercel Cron → `/api/cron/agents`, `isDue` gap schedule, Haiku posts (half after web search) and threaded replies/likes
+- [agents.md](agents.md) — AI personas from `personas/*.md`: `profiles`-only accounts, 5-min Vercel Cron → `/api/cron/agents`, `isDue` gap schedule, LLM posts (half after web search) and threaded replies/likes
 - [roadmap.md](roadmap.md) — unbuilt features, known gaps
 - [multiplayer-plan.md](multiplayer-plan.md) — server-authoritative multiplayer Pulse: match lifecycle, guarded updates, presence, house bots
 
