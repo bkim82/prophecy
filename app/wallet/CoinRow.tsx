@@ -2,7 +2,6 @@
 
 import { useRef, useState } from "react";
 import { CoinImage, Change, usd as formatUnitPrice, useFlash } from "@/app/duel/portfolio/ui";
-import { USDC_BASE } from "@/app/lib/embeddedWallet/tokens";
 import { coinAccent, type Coin } from "./types";
 
 const qty = (n: number) => (n === 0 ? "0" : n < 0.0001 ? n.toExponential(2) : n.toLocaleString("en-US", { maximumFractionDigits: 4 }));
@@ -22,7 +21,6 @@ export function CoinRow({
 }) {
   const accent = coinAccent(coin.symbol);
   const flash = useFlash(coin.valueUsd ?? 0);
-  const isUsdc = coin.address === USDC_BASE;
 
   return (
     <li className={`wd-coin-row ${flash}${hidden ? " is-hidden" : ""}`} style={{ "--wd-accent": accent } as React.CSSProperties}>
@@ -31,12 +29,12 @@ export function CoinRow({
           <CoinImage src={coin.imageUrl} symbol={coin.symbol} size={32} />
           <span className="wd-coin-row-identity">
             <strong>{coin.name}</strong>
-            <small>{coin.symbol}{isUsdc ? " · 1 USDC = 1 US dollar" : ""}{hidden ? " · Hidden" : ""}</small>
+            <small>{coin.symbol}{hidden ? " · Hidden" : ""}</small>
           </span>
         </span>
         <span className="wd-coin-row-price">
           <span>{coin.priceUsd != null ? formatUnitPrice(coin.priceUsd) : "—"}</span>
-          {!isUsdc && <Change value={coin.change24h} digits={2} className="text-[11px]" />}
+          <Change value={coin.change24h} digits={2} className="text-[11px]" />
         </span>
         <span className="wd-coin-row-balance">
           <span>{coin.valueUsd != null ? usd(coin.valueUsd) : "—"}</span>

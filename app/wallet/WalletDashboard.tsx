@@ -3,12 +3,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { BackIcon, LockIcon, SearchIcon } from "@/app/icons";
 import type { WalletState } from "@/app/lib/useWalletConnection";
+import { USDC_BASE } from "@/app/lib/embeddedWallet/tokens";
 import { shortenAddress } from "@/app/lib/wallet";
 import type { WalletTokenHolding } from "@/lib/alchemy";
 import { AdvancedTab } from "./AdvancedTab";
 import { DepositSheet, SendSheet, SwapSheet } from "./ActionSheets";
 import { ActivityList, ExternalArrow, activityAmount, useWalletActivity, type ActivityEntry } from "./ActivityList";
-import { BalanceCard } from "./BalanceCard";
+import { BalanceCard, type BalanceChip } from "./BalanceCard";
 import { CoinDetailPanel } from "./CoinDetailPanel";
 import { CoinList } from "./CoinList";
 import { useHiddenCoins } from "./hiddenCoins";
@@ -39,12 +40,17 @@ const TRUST_POINTS = [
   { icon: <SearchIcon className="h-4 w-4" />, title: "Verifiable on Base", body: "Every confirmed deposit and withdrawal links to its onchain record on Basescan." },
 ];
 
+/** Fixtures that replace the wallet-specific reads (see mockWallet.ts); market data stays live. */
+export type WalletMock = { holdings: WalletTokenHolding[]; activity: ActivityEntry[] };
+
 export function WalletDashboard({
   wallet,
   signOut,
+  mock,
 }: {
   wallet: WalletState;
   signOut: () => Promise<void>;
+  mock?: WalletMock;
 }) {
   const [view, setView] = useState<View>("home");
   const [tokenHoldings, setTokenHoldings] = useState<WalletTokenHolding[]>([]);
@@ -67,7 +73,8 @@ export function WalletDashboard({
   // Deposit watch, adjusted during render: a watch started before activity first loaded takes its
   // baseline from that load, and `activityFast` mirrors `watching` so polling speeds up only until arrival.
   const [activityFast, setActivityFast] = useState(false);
-  const activity = useWalletActivity(address, { onIncluded: refreshHoldings, fast: activityFast });
+  const liveActivity = useWalletActivity(mock ? null : address, { onIncluded: refreshHoldings, fast: activityFast });
+  const activity = mock ? { entries: mock.activity, failed: false } : liveActivity;
   if (watch && !watch.baseline && activity.entries) setWatch({ baseline: receivedHashes(activity.entries) });
   const arrivalEntry = watch?.baseline
     ? activity.entries?.find((entry) => !entry.local && entry.kind === "received" && !watch.baseline!.has(entry.hash)) ?? null
@@ -78,6 +85,7 @@ export function WalletDashboard({
 
   useEffect(() => {
     if (!address || !onBase) { setTokenHoldings([]); return; }
+    if (mock) { setTokenHoldings(mock.holdings); setHoldingsLoaded(true); return; }
     let cancelled = false;
     const load = () => fetch(`/api/wallet/holdings?address=${address}`)
       .then((res) => (res.ok ? res.json() : { holdings: [] }))
@@ -90,7 +98,7 @@ export function WalletDashboard({
     const onVisible = () => { if (document.visibilityState === "visible") load(); };
     document.addEventListener("visibilitychange", onVisible);
     return () => { cancelled = true; clearInterval(id); document.removeEventListener("visibilitychange", onVisible); };
-  }, [address, onBase, holdingsNonce, arrivalHash]);
+  }, [address, onBase, holdingsNonce, arrivalHash, mock]);
 
   useEffect(() => {
     if (!onBase) { setEth(null); return; }
@@ -150,8 +158,30 @@ export function WalletDashboard({
     })),
   ].filter((coin) => coin.qty > 0);
 
+  // USDC is the wallet's cash: shown in the balance card, never hideable, and never in Holdings.
+  const usdcCoin = coins.find((coin) => coin.address === USDC_BASE) ?? null;
+  const cashUsd = usdcCoin ? usdcCoin.valueUsd ?? usdcCoin.qty : 0;
+  const ethCoin = coins.find((coin) => coin.address === ETH_SENTINEL) ?? null;
+  const balanceChips: BalanceChip[] = [
+    {
+      label: "Gas",
+      symbol: "ETH",
+      usdValue: ethCoin?.valueUsd ?? 0,
+      imageUrl: ethCoin?.imageUrl ?? eth?.imageUrl ?? null,
+      onSelect: ethCoin ? () => setSelected(ETH_SENTINEL) : undefined,
+    },
+    {
+      label: "Cash",
+      symbol: "USDC",
+      usdValue: cashUsd,
+      imageUrl: usdcCoin?.imageUrl ?? null,
+      onSelect: usdcCoin ? () => setSelected(USDC_BASE) : undefined,
+    },
+  ];
+  const holdingCoins = coins.filter((coin) => coin.address !== USDC_BASE);
+
   // Hidden coins (usually spam airdrops) stay in `coins` for Send/Swap but don't count toward the balance.
-  const countedCoins = coins.filter((coin) => !isHidden(coin.address));
+  const countedCoins = coins.filter((coin) => coin === usdcCoin || !isHidden(coin.address));
   const totalUsd = countedCoins.reduce((sum, coin) => sum + (coin.valueUsd ?? 0), 0);
   let yesterdayTotal = 0;
   let hasKnownChange = false;
@@ -173,7 +203,7 @@ export function WalletDashboard({
       : `Across ${countedCoins.length} assets on Base`;
 
   const selectedCoin = selected ? coins.find((coin) => coin.address === selected) ?? null : null;
-  const selectedShare = selectedCoin && !isHidden(selectedCoin.address) && totalUsd > 0 ? ((selectedCoin.valueUsd ?? 0) / totalUsd) * 100 : 0;
+  const selectedShare = selectedCoin && countedCoins.includes(selectedCoin) && totalUsd > 0 ? ((selectedCoin.valueUsd ?? 0) / totalUsd) * 100 : 0;
   const arrival = arrivalEntry ? { value: arrivalEntry.value, asset: arrivalEntry.asset } : null;
 
   const openDeposit = () => {
@@ -196,6 +226,7 @@ export function WalletDashboard({
     setSwapPreset({ initialFrom: token.address });
     setSheet("swap");
   };
+  const openExplore = () => setView("explore");
   const goHome = () => { setView("home"); setSelected(null); };
 
   return (
@@ -231,6 +262,7 @@ export function WalletDashboard({
         <>
           <BalanceCard
             totalUsd={totalUsd}
+            chips={balanceChips}
             loaded={!onBase || (holdingsLoaded && ethLoaded)}
             subline={subline}
             changeUsd={changeUsd}
@@ -239,29 +271,20 @@ export function WalletDashboard({
             onWithdraw={() => setSheet("send")}
             menu={[
               { label: "Swap tokens", onSelect: () => setSheet("swap") },
-              { label: "Explore tokens", onSelect: () => setView("explore") },
+              { label: "Explore tokens", onSelect: openExplore },
               { label: "Sign out", onSelect: () => void signOut() },
             ]}
           />
 
-          <ul className="wd-trust" aria-label="How your wallet is protected">
-            {TRUST_POINTS.map((point) => (
-              <li key={point.title}>
-                <span className="wd-trust-icon" aria-hidden="true">{point.icon}</span>
-                <span>
-                  <strong>{point.title}</strong>
-                  <small>{point.body}</small>
-                </span>
-              </li>
-            ))}
-          </ul>
-
           <section className="wd-section" aria-labelledby="wd-holdings-title">
-            <div className="wd-section-row"><h2 id="wd-holdings-title">Holdings</h2></div>
+            <div className="wd-section-row">
+              <h2 id="wd-holdings-title">Holdings</h2>
+              <button type="button" className="wd-text-link" onClick={openExplore}>Explore tokens</button>
+            </div>
             {!onBase ? (
               <div className="wd-card"><p className="wd-card-empty">Switch to Base to see your holdings.</p></div>
             ) : (
-              <CoinList coins={coins} isHidden={isHidden} onToggleHidden={toggleHidden} onSelect={setSelected} />
+              <CoinList coins={holdingCoins} isHidden={isHidden} onToggleHidden={toggleHidden} onSelect={setSelected} onExplore={openExplore} />
             )}
           </section>
 
@@ -274,6 +297,18 @@ export function WalletDashboard({
               <ActivityList entries={activity.entries} failed={activity.failed} limit={RECENT_ACTIVITY_ROWS} />
             </div>
           </section>
+
+          <ul className="wd-trust" aria-label="How your wallet is protected">
+            {TRUST_POINTS.map((point) => (
+              <li key={point.title}>
+                <span className="wd-trust-icon" aria-hidden="true">{point.icon}</span>
+                <span>
+                  <strong>{point.title}</strong>
+                  <small>{point.body}</small>
+                </span>
+              </li>
+            ))}
+          </ul>
 
           <p className="wd-footnote">
             Prophecy holds no funds on your behalf. Balances are read live from Base.{" "}

@@ -2708,13 +2708,24 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
 .wd-pill-primary:hover { background: color-mix(in srgb, var(--text) 86%, var(--bg)); }
 .wd-pill-round { width: 44px; padding: 0; color: var(--muted); font-size: 16px; }
 .wd-pill-small { height: 34px; gap: 6px; padding: 0 14px; font-size: 13px; }
-.wd-balance-stats { display: flex; flex-wrap: wrap; gap: 12px 44px; margin: 0; border-top: 1px solid var(--line); padding-top: 20px; }
+.wd-balance-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 24px; border-top: 1px solid var(--line); padding-top: 20px; }
+.wd-balance-stats { display: flex; flex-wrap: wrap; gap: 12px 44px; margin: 0; }
 .wd-balance-stats dt { color: var(--muted); font-size: 12px; }
 .wd-balance-stats dd { margin: 4px 0 0; color: var(--text); font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .wd-balance-stats dd.is-up { color: var(--positive); }
 .wd-balance-stats dd.is-down { color: var(--negative); }
+.wd-asset-chips { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; margin-left: auto; }
+.wd-asset-chip { display: inline-flex; align-items: center; gap: 10px; border: 1px solid color-mix(in srgb, var(--brand) 35%, var(--line)); border-radius: 12px; background: var(--selected-bg); padding: 8px 14px 8px 10px; color: var(--text); text-align: left; }
+button.wd-asset-chip { transition: border-color .15s, background-color .15s; }
+button.wd-asset-chip:hover { border-color: var(--brand); background: color-mix(in srgb, var(--brand) 24%, var(--surface)); }
+.wd-asset-chip-text { display: grid; gap: 4px; }
+.wd-asset-chip-label { color: var(--brand-strong); font-size: 12px; font-weight: 600; line-height: 1.2; }
+.wd-asset-chip-value { font-size: 15px; line-height: 1.2; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.wd-asset-chip-value strong { font-weight: 600; }
+.wd-asset-chip-value small { color: var(--muted); font-size: 12px; font-weight: 500; }
+.wd-asset-chip svg { flex: none; color: var(--muted); }
 
-/* Three plain-language guarantees under the balance. */
+/* Three plain-language guarantees under Recent activity. */
 .wd-trust { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
 .wd-trust li { display: flex; align-items: flex-start; gap: 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); padding: 18px; }
 .wd-trust-icon { display: inline-grid; flex: none; place-items: center; width: 16px; height: 18px; color: var(--brand); }
@@ -2733,6 +2744,11 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
 .wd-footnote .wd-text-link { font-size: 12px; }
 
 /* Holdings table (Asset / Price / Balance). */
+.wd-holdings-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; padding: 16px 16px 4px 18px; }
+.wd-holdings-total { display: flex; align-items: baseline; gap: 8px; min-width: 0; font-variant-numeric: tabular-nums; }
+.wd-holdings-total span, .wd-holdings-total small { color: var(--muted); font-size: 12px; }
+.wd-holdings-total strong { color: var(--text); font-size: 20px; font-weight: 600; }
+.wd-list-sort-field { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
 .wd-list-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 14px 16px 2px; }
 .wd-list-search { flex: 1; min-width: 160px; border: 1px solid var(--line); border-radius: 8px; background: var(--field-bg); padding: 8px 12px; font-size: 13px; color: var(--text); }
 .wd-list-sort { border: 1px solid var(--line); border-radius: 8px; background: var(--field-bg); padding: 8px 10px; font-size: 12px; font-weight: 600; color: var(--text); }

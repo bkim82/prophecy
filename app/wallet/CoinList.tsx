@@ -17,26 +17,30 @@ function sortKey(coin: Coin, sort: Sort): number | string {
   return coin.valueUsd ?? 0;
 }
 
-// The search box and sort picker only earn their space once the list is long.
+// The search box only earns its space once the list is long.
 const SEARCH_THRESHOLD = 6;
+
+const usd = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 });
 
 /**
  * Holdings table (Asset / Price / Balance) — same "filter the list, order
  * freezes while you're reading it" idiom as app/duel/portfolio/TokenExplorer.tsx,
  * just simpler since the source data is already local (no pagination, no
  * trending/new fetch). Hidden coins (see ./hiddenCoins.ts) are left out unless
- * "Show hidden" is on.
+ * "Show hidden" is on, and never count toward the total in the header strip.
  */
 export function CoinList({
   coins,
   isHidden,
   onToggleHidden,
   onSelect,
+  onExplore,
 }: {
   coins: Coin[];
   isHidden: (address: string) => boolean;
   onToggleHidden: (address: string) => void;
   onSelect: (address: string) => void;
+  onExplore: () => void;
 }) {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<Sort>("value");
@@ -44,6 +48,7 @@ export function CoinList({
   const trimmed = query.trim().toLowerCase();
 
   const hiddenCount = coins.filter((coin) => isHidden(coin.address)).length;
+  const totalUsd = coins.reduce((sum, coin) => sum + (isHidden(coin.address) ? 0 : coin.valueUsd ?? 0), 0);
   const filtered = coins.filter((coin) =>
     (showHidden || !isHidden(coin.address))
     && (!trimmed || coin.symbol.toLowerCase().includes(trimmed) || coin.name.toLowerCase().includes(trimmed)));
@@ -82,6 +87,21 @@ export function CoinList({
   return (
     <>
       <div className="wd-card wd-holdings">
+        {coins.length > 0 && (
+          <div className="wd-holdings-bar">
+            <div className="wd-holdings-total">
+              <span>Total</span>
+              <strong>{usd(totalUsd)}</strong>
+              <small>{coins.length - hiddenCount} {coins.length - hiddenCount === 1 ? "token" : "tokens"}</small>
+            </div>
+            <label className="wd-list-sort-field">
+              <span>Sort by</span>
+              <select value={sort} onChange={(event) => setSort(event.target.value as Sort)} className="wd-list-sort">
+                {SORTS.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
+              </select>
+            </label>
+          </div>
+        )}
         {coins.length > SEARCH_THRESHOLD && (
           <div className="wd-list-controls">
             <input
@@ -93,16 +113,13 @@ export function CoinList({
               spellCheck={false}
               className="wd-list-search"
             />
-            <select value={sort} onChange={(event) => setSort(event.target.value as Sort)} className="wd-list-sort" aria-label="Sort">
-              {SORTS.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
-            </select>
           </div>
         )}
 
         {displayed.length === 0 ? (
           <p className="wd-card-empty">
             {coins.length === 0
-              ? "Nothing here yet. Deposit USDC on Base and it shows up here."
+              ? <>No tokens yet. Use your cash to buy one. <button type="button" className="wd-text-link" onClick={onExplore}>Explore tokens</button></>
               : trimmed
                 ? `No coins match "${query}".`
                 : "All your coins are hidden."}
