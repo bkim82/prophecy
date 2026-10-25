@@ -1,6 +1,6 @@
-import { and, count, desc, eq, gte, ilike, inArray, isNull, notInArray, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, ilike, inArray, isNull, notExists, notInArray, or, sql } from "drizzle-orm";
 import { getDb } from "@/db";
-import { pollVotes, postMedia, posts, profiles } from "@/db/schema";
+import { pollVotes, postMedia, postViews, posts, profiles } from "@/db/schema";
 import { gifById, type GifId } from "@/app/lib/gifs";
 import type { Post, PostImage } from "@/app/lib/posts";
 import { playedLabel } from "@/app/lib/playedLabel";
@@ -200,10 +200,36 @@ export async function recentCustomTopicsBy(authorId: string, limit = 20): Promis
   return [...new Set(rows.flatMap((row) => row.topics).filter(isCustomTopicId))];
 }
 
-/** The newest saved posts for the feed (app/page.tsx). */
+/**
+ * The feed (app/page.tsx): the newest saved posts, plus — signed in — the
+ * newest ones `viewerId` hasn't seen yet (lib/postViews.ts), of any age, so
+ * For You still has something new when the newest are all seen. Before
+ * db/post-views.sql is applied that half is skipped (logged).
+ */
 export async function feedPosts(viewerId: string | null, limit = 30): Promise<Post[]> {
-  const rows = await getDb().select().from(posts).where(isNull(posts.deletedAt)).orderBy(desc(posts.createdAt)).limit(limit);
-  return toFeedPosts(rows, viewerId);
+  const db = getDb();
+  const [newest, unseen] = await Promise.all([
+    db.select().from(posts).where(isNull(posts.deletedAt)).orderBy(desc(posts.createdAt)).limit(limit),
+    viewerId
+      ? db
+          .select()
+          .from(posts)
+          .where(and(
+            isNull(posts.deletedAt),
+            notExists(db.select({ postId: postViews.postId }).from(postViews).where(and(eq(postViews.userId, viewerId), eq(postViews.postId, posts.id)))),
+          ))
+          .orderBy(desc(posts.createdAt))
+          .limit(limit)
+          .catch((error: unknown) => {
+            console.error("Unseen posts unavailable", error);
+            return [];
+          })
+      : [],
+  ]);
+  // Unseen posts outside the newest are older than all of them, so this
+  // stays newest first.
+  const newestIds = new Set(newest.map((row) => row.id));
+  return toFeedPosts([...newest, ...unseen.filter((row) => !newestIds.has(row.id))], viewerId);
 }
 
 export type PostMatch = { id: string; author: string; handle: string; content: string; timestamp: string };

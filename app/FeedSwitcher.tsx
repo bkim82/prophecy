@@ -8,6 +8,7 @@ import { PostCard } from "@/app/PostCard";
 import { clearFreshPost, useFreshPostId } from "@/app/lib/freshPost";
 import type { Post, Share } from "@/app/lib/posts";
 import { useBookmarks, useTopicPrefs } from "@/app/lib/postLists";
+import { useSeenPostTracker } from "@/app/lib/seenPosts";
 import type { AccountTopics } from "@/app/lib/topicInterest";
 import { useTopicSignal } from "@/app/lib/topicSignals";
 import { ageMinutes, blendTopics, personalize, pickCovers, postTopics, topicById, type Cover, type Topic, type TopicId } from "@/app/lib/topics";
@@ -51,11 +52,14 @@ type Notice = { topic: TopicId; index: number; followAt: number; scope: string }
 type Row =
   | { kind: "post"; key: string; post: Post; cover?: Topic }
   | { kind: "label"; key: string }
+  | { kind: "caughtUp"; key: string }
   | { kind: "notice"; key: string; notice: Notice };
 
 // `savedPosts` = omens from the `posts` table (lib/posts.ts feedPosts,
-// rendered by app/page.tsx), newest first, pinned above everything else
-// (on the For You home, only your own).
+// rendered by app/page.tsx), newest first, above `posts`.
+// `seen`: the ones among either list you'd already seen before this page
+// load (lib/postViews.ts) — For You keeps them below "You're all caught up".
+// Empty signed out.
 // `followed`: everyone you follow as "@handle"s (lib/follows.ts
 // followedHandles); `shares`: what the real accounts among them reposted
 // (lib/engagement.ts followedReshares).
@@ -66,12 +70,14 @@ export function FeedSwitcher({
   savedPosts,
   followed,
   shares: savedShares,
+  seen,
   account,
 }: {
   posts: Post[];
   savedPosts: Post[];
   followed: string[];
   shares: Share[];
+  seen: string[];
   account: AccountTopics | null;
 }) {
   const shares = useMemo(() => followedShares(savedShares), [savedShares]);
@@ -86,8 +92,13 @@ export function FeedSwitcher({
   const [deletedIds, setDeletedIds] = useState<string[]>([]);
   const shownSaved = useMemo(() => savedPosts.filter((post) => !deletedIds.includes(post.id)), [savedPosts, deletedIds]);
   const liveCalls = useMemo(() => [...shownSaved, ...posts].filter(isLiveCall).length, [shownSaved, posts]);
-  // Just published from a composer: flashed once on its way in.
+  // Just published from a composer: flashed once on its way in, and it leads
+  // For You for the rest of this page view.
   const freshId = useFreshPostId();
+  const [leadId, setLeadId] = useState<string | null>(null);
+  if (freshId && freshId !== leadId) setLeadId(freshId);
+  const seenIds = useMemo(() => new Set(seen), [seen]);
+  const [showSeen, setShowSeen] = useState(false);
   const { ids: bookmarkIds } = useBookmarks();
   const { interests, muted, inferred } = useTopicPrefs(account);
   // For You runs on what you follow plus what your activity points to
@@ -104,7 +115,7 @@ export function FeedSwitcher({
   // one cover per interest on top, then the rest weighted to your topics.
   const home = filter === "forYou" && view === "forYou";
 
-  const { pinned, covers, rest } = useMemo(() => {
+  const { lead, covers, rest, already } = useMemo(() => {
     const keep = (post: Post) => {
       if (filter === "following" && !followed.includes(post.handle) && !shares.has(post.id)) return false;
       if (filter === "live" && !isLiveCall(post)) return false;
@@ -112,40 +123,48 @@ export function FeedSwitcher({
       if (filter === "bookmarked" && !bookmarkIds.includes(post.id)) return false;
       return view === "forYou" || postTopics(post).includes(view);
     };
-    // Saved omens stay on top.
+    // Saved omens come first, then older ones reposted by people you follow.
     const saved = shownSaved.filter(keep);
     const feed = posts.filter(keep);
     // Following runs on when things hit it, so a fresh vouch/defy of an old
     // post lands near the top. (Stable sort keeps ties in feed order.)
     if (filter === "following") feed.sort((a, b) => followingAge(a, shares) - followingAge(b, shares));
-    const none: Cover[] = [];
-    if (!home) return { pinned: saved, covers: none, rest: feed };
-    // On the For You home only your own omens stay pinned; everyone else's
-    // join the suggestions (newest first, ahead of older reposted ones) so
-    // your interests' covers lead the feed.
-    const pinned = saved.filter((post) => post.mine);
-    // Suggestions skip anything tagged with a "Not interested" topic.
-    const suggestions = [...saved.filter((post) => !post.mine), ...feed].filter((post) => !postTopics(post).some((id) => muted.ids.includes(id)));
-    if (mixed) return { pinned, covers: none, rest: blendTopics(suggestions, forYouTopics) };
-    const covers = pickCovers(suggestions, forYouTopics);
+    const none: Post[] = [];
+    const noCovers: Cover[] = [];
+    if (filter !== "forYou") return { lead: none, covers: noCovers, rest: [...saved, ...feed], already: none };
+    // For You is what you haven't seen yet — nothing is pinned. On the home,
+    // suggestions also skip anything tagged with a "Not interested" topic.
+    const suggestions = [...saved, ...feed].filter((post) => !home || !postTopics(post).some((id) => muted.ids.includes(id)));
+    const lead = suggestions.filter((post) => post.id === leadId);
+    const pool = suggestions.filter((post) => post.id !== leadId);
+    const unseen = pool.filter((post) => !seenIds.has(post.id));
+    const already = pool.filter((post) => seenIds.has(post.id));
+    if (!home) return { lead, covers: noCovers, rest: unseen, already };
+    if (mixed) return { lead, covers: noCovers, rest: blendTopics(unseen, forYouTopics), already };
+    const covers = pickCovers(unseen, forYouTopics);
     const coverIds = new Set(covers.map((cover) => cover.post.id));
-    return { pinned, covers, rest: personalize(suggestions.filter((post) => !coverIds.has(post.id)), forYouTopics) };
-  }, [filter, view, home, mixed, posts, followed, shares, shownSaved, bookmarkIds, forYouTopics, muted.ids]);
+    return { lead, covers, rest: personalize(unseen.filter((post) => !coverIds.has(post.id)), forYouTopics), already };
+  }, [filter, view, home, mixed, posts, followed, shares, shownSaved, bookmarkIds, forYouTopics, muted.ids, leadId, seenIds]);
 
-  const visible = useMemo(() => [...pinned, ...covers.map((cover) => cover.post), ...rest], [pinned, covers, rest]);
+  const visible = useMemo(() => [...lead, ...covers.map((cover) => cover.post), ...rest], [lead, covers, rest]);
 
   const scope = `${filter}:${view}:${mixed}`;
   const rows = useMemo(() => {
     const rows: Row[] = [
-      ...pinned.map((post) => ({ kind: "post" as const, key: post.id, post })),
+      ...lead.map((post) => ({ kind: "post" as const, key: post.id, post })),
       ...covers.map(({ post, topic }) => ({ kind: "post" as const, key: post.id, post, cover: topic })),
       ...(covers.length > 0 && rest.length > 0 ? [{ kind: "label" as const, key: "more-for-you" }] : []),
       ...rest.map((post) => ({ kind: "post" as const, key: post.id, post })),
+      ...(already.length > 0 ? [{ kind: "caughtUp" as const, key: "caught-up" }] : []),
+      ...(showSeen ? already.map((post) => ({ kind: "post" as const, key: post.id, post })) : []),
     ];
     const shown = notices.filter((notice) => notice.scope === scope && muted.ids.includes(notice.topic)).sort((a, b) => a.index - b.index);
     for (const notice of shown) rows.splice(Math.min(notice.index, rows.length), 0, { kind: "notice", key: `muted-${notice.topic}`, notice });
     return rows;
-  }, [pinned, covers, rest, notices, scope, muted.ids]);
+  }, [lead, covers, rest, already, showSeen, notices, scope, muted.ids]);
+
+  const listRef = useRef<HTMLDivElement>(null);
+  useSeenPostTracker(listRef, rows, seenIds);
 
   function notInterested(topic: TopicId, postId?: string) {
     const at = postId === undefined ? 0 : rows.findIndex((row) => row.kind === "post" && row.post.id === postId);
@@ -254,13 +273,13 @@ export function FeedSwitcher({
           {openTopicData && (
             <TopicHeader
               topic={openTopicData}
-              count={visible.length}
+              count={visible.length + already.length}
               following={interests.has(openTopicData.id)}
               onToggle={() => interests.toggle(openTopicData.id)}
               onNotInterested={() => notInterested(openTopicData.id)}
             />
           )}
-          <div className="feed-list">
+          <div className="feed-list" ref={listRef}>
             {home && !mixed && forYouTopics.length === 0 && (
               <p className="feed-covers-empty">
                 Follow a few coins, companies or people and For You will open with a top post from each.
@@ -271,6 +290,16 @@ export function FeedSwitcher({
             )}
             {rows.map((row) => {
               if (row.kind === "label") return <p key={row.key} className="feed-section-label">More for you</p>;
+              if (row.kind === "caughtUp") {
+                return (
+                  <p key={row.key} className="feed-caught-up">
+                    You&apos;re all caught up.
+                    <button type="button" aria-expanded={showSeen} onClick={() => setShowSeen((open) => !open)}>
+                      {showSeen ? "Hide seen omens" : `Show ${already.length} seen ${already.length === 1 ? "omen" : "omens"}`}
+                    </button>
+                  </p>
+                );
+              }
               if (row.kind === "notice") {
                 return <MutedNotice key={row.key} topic={topicById(row.notice.topic)} onUndo={() => undoNotInterested(row.notice)} />;
               }
@@ -291,7 +320,7 @@ export function FeedSwitcher({
                 />
               );
             })}
-            {visible.length === 0 && (
+            {visible.length === 0 && already.length === 0 && (
               <p className="muted feed-empty">
                 {filter === "bookmarked" ? "No bookmarks yet — tap the bookmark on any post to save it here." : "Nothing here yet."}
               </p>

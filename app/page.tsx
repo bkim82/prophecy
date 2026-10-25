@@ -4,6 +4,7 @@ import type { Post } from "@/app/lib/posts";
 import { blockedHandlesFor } from "@/lib/blocks";
 import { followedReshares, withEngagement } from "@/lib/engagement";
 import { followedHandles } from "@/lib/follows";
+import { seenPostIds } from "@/lib/postViews";
 import { feedPosts, savedPostsByIds } from "@/lib/posts";
 import { accountTopics } from "@/lib/topicPrefs";
 import { getViewer } from "@/lib/viewer";
@@ -21,9 +22,11 @@ export default async function Page() {
         }),
       ])
     : [[], []];
-  // Saved omens: the whole feed. Before db/posts.sql is applied (or during a
-  // DB outage) the feed is empty. Nothing from anyone with a block either way
-  // between you (lib/blocks.ts).
+  // Saved omens: the whole feed — the newest 30, plus (signed in) the newest
+  // 30 you haven't seen, so For You has something new even when the newest
+  // are all seen. Before db/posts.sql is applied (or during a DB outage) the
+  // feed is empty; before db/post-views.sql, nothing counts as seen. Nothing
+  // from anyone with a block either way between you (lib/blocks.ts).
   const [allSaved, blocked] = await Promise.all([
     feedPosts(userId).catch((error: unknown) => {
       console.error("Saved posts unavailable", error);
@@ -42,14 +45,23 @@ export default async function Page() {
     return !hidden.has(post.id);
   };
   const saved = allSaved.filter(visible);
-  // A reposted saved post older than the newest 30 joins the rest of the feed
-  // (not pinned), so its repost has a post to sit on.
+  // A reposted saved post outside those joins the rest of the feed, so its
+  // repost has a post to sit on.
   const sharedIds = shares.map((share) => share.postId).filter((id) => !allSaved.some((post) => post.id === id));
   const older = (await savedPostsByIds([...new Set(sharedIds)], userId).catch(() => [])).filter(visible);
   // A followed account's repost of a hidden post goes with it.
   const reposts = shares.filter((share) => !hidden.has(share.postId));
-  // Saved likes, reposts, replies and clash votes on all of it, in one round of queries.
-  const posts = await withEngagement([...saved, ...older], userId);
+  // Saved likes, reposts, replies and clash votes on all of it, in one round
+  // of queries — and which of it you'd seen before this load.
+  const [posts, seen] = await Promise.all([
+    withEngagement([...saved, ...older], userId),
+    userId
+      ? seenPostIds(userId, [...saved, ...older].map((post) => post.id)).catch((error: unknown) => {
+          console.error("Seen posts unavailable", error);
+          return new Set<string>();
+        })
+      : new Set<string>(),
+  ]);
   // Followed / Not interested / inferred topics. Before db/topics.sql is
   // applied the feed falls back to this browser's lists.
   const topics = userId
@@ -60,7 +72,7 @@ export default async function Page() {
     : null;
   return (
     <main className="feed-shell feed-shell--nav">
-      <FeedSwitcher posts={posts.slice(saved.length)} savedPosts={posts.slice(0, saved.length)} followed={followed} shares={reposts} account={topics} />
+      <FeedSwitcher posts={posts.slice(saved.length)} savedPosts={posts.slice(0, saved.length)} followed={followed} shares={reposts} seen={[...seen]} account={topics} />
       <aside className="feed-sidebar">
         <FeedSidebar />
       </aside>

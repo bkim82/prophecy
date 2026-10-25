@@ -975,6 +975,10 @@ a.messages-post:hover { border-color: var(--brand); }
 .feed-section-label::before { content: "✦"; }
 .feed-covers-empty { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; margin: 0; padding: 16px 18px; color: var(--muted); font-size: 13px; line-height: 1.45; }
 .feed-covers-empty button { flex: none; min-height: 32px; padding: 0 14px; border: 0; border-radius: 8px; background: var(--violet-strong); color: var(--bg); font-size: 12px; font-weight: 700; }
+/* For You's end of new posts; seen ones open below it. */
+.feed-caught-up { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; margin: 0; padding: 16px 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; font-weight: 600; }
+.feed-caught-up button { flex: none; min-height: 32px; padding: 0 14px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--text); font-size: 12px; font-weight: 700; }
+.feed-caught-up button:hover { background: color-mix(in srgb, var(--surface-raised) 60%, transparent); }
 /* "Not interested": cover eyebrow button, topic header button, the notice
    left in a muted post's place, and the picker's muted chips. */
 .cover-dismiss { display: inline-flex; align-items: center; gap: 5px; margin-left: auto; min-height: 28px; padding: 0 10px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--muted); font-family: var(--font-sans), Inter, system-ui, sans-serif; font-size: 11.5px; font-weight: 600; letter-spacing: 0; text-transform: none; white-space: nowrap; transition: color .15s ease, border-color .15s ease, background .15s ease; }
@@ -996,7 +1000,7 @@ a.messages-post:hover { border-color: var(--brand); }
   .topic-chips { padding: 10px 14px; }
   .topic-chip, .topic-chip-add { width: 32px; height: 32px; }
   .topic-chip-label { font-size: 12.5px; }
-  .interest-picker, .topic-header, .feed-section-label, .feed-covers-empty { padding-inline: 14px; }
+  .interest-picker, .topic-header, .feed-section-label, .feed-covers-empty, .feed-caught-up { padding-inline: 14px; }
 }
 /* Sticky, so a rail taller than the viewport scrolls itself rather than
    hiding its lower panels until the feed ends. */

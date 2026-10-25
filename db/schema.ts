@@ -556,6 +556,17 @@ export const topicSignals = pgTable("topic_signals", {
   uniqueIndex("topic_signals_post_once").on(table.userId, table.signal, table.postId, table.topic).where(sql`${table.postId} <> ''`),
 ]);
 
+// Omens an account has seen in a feed (lib/postViews.ts): one row per post,
+// first sighting only. For You leaves them out next time. Created by
+// db/post-views.sql.
+export const postViews = pgTable("post_views", {
+  userId: text("user_id").notNull(),
+  postId: text("post_id").notNull(),
+  seenAt: timestamp("seen_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  primaryKey({ columns: [table.userId, table.postId] }),
+]);
+
 // Direct messages between two real accounts (lib/messages.ts), sent from the
 // header's Messages dock (app/MessagesDock.tsx) or a post's Send button
 // (app/SharePostDialog.tsx). A message has text, photos
