@@ -65,8 +65,6 @@
   --btn-disabled-bg: #1f1d29; --btn-disabled-text: #6f6c80;
   --glass-shadow: 0 10px 30px rgba(0, 0, 0, .45);
 }
-[data-theme="obsidian"] .main-nav-link.active { background: color-mix(in srgb, var(--brand) 16%, var(--structure)); color: var(--structure-text); }
-[data-theme="obsidian"] .main-nav-link.active .main-nav-icon { color: var(--brand-strong); }
 /* Moonstone: a faint violet dawn behind the header so the light page reads as Prophecy, not stock white. */
 [data-theme="light"] body { background: radial-gradient(1100px 440px at 50% 0, rgba(124, 92, 224, .09), transparent 70%) no-repeat, var(--bg); }
 /* Market identity and market chart accents are scoped by data-market. Shared
@@ -116,15 +114,13 @@ button { cursor: pointer; }
    (.feed-shell/.lobby-shell/.wallet-shell) so its edges line up with content. */
 .app-header { width: 100%; max-width: none; margin: 0; padding: 0; border-bottom: 1px solid var(--structure-line); background: var(--structure); }
 .app-header-inner { display: flex; width: min(100% - 56px, var(--shell-max)); height: 64px; align-items: center; justify-content: space-between; gap: 16px; margin-inline: auto; padding: 0; }
-.desktop-header-content { display: grid; width: 100%; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 24px; }
+.desktop-header-content { display: grid; width: 100%; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 36px; }
 .desktop-header-content > .brand { justify-self: start; }
-.brand { flex: none; font-family: var(--font-cinzel), Cinzel, Georgia, serif; color: var(--structure-text); font-size: 21px; font-weight: 600; letter-spacing: .3em; text-decoration: none; }
+.brand { flex: none; font-family: var(--font-cinzel), Cinzel, Georgia, serif; color: var(--structure-text); font-size: 16px; font-weight: 700; letter-spacing: .34em; text-decoration: none; }
 .header-actions { display: flex; justify-self: end; align-items: center; gap: 12px; }
-.main-nav { display: flex; align-items: center; gap: 4px; font-family: var(--font-sans), Inter, system-ui, sans-serif; }
-.main-nav-link { display: inline-flex; align-items: center; gap: 7px; min-height: 36px; border-radius: 8px; padding: 0 12px; color: var(--structure-muted); font-size: 13px; font-weight: 600; text-decoration: none; -webkit-user-drag: none; user-select: none; transition: color .15s ease, background .15s ease; }
-.main-nav-link:hover { background: color-mix(in srgb, var(--structure-text) 6%, transparent); color: var(--structure-text); }
-.main-nav-link.active { background: color-mix(in srgb, var(--brand) 12%, var(--structure)); color: var(--brand); }
-.main-nav-icon { width: 15px; height: 15px; flex: none; }
+.main-nav { display: flex; justify-self: start; align-items: center; gap: 24px; font-family: var(--font-sans), Inter, system-ui, sans-serif; }
+.main-nav-link { display: inline-flex; align-items: center; min-height: 36px; color: var(--structure-muted); font-size: 14px; font-weight: 500; text-decoration: none; -webkit-user-drag: none; user-select: none; transition: color .15s ease; }
+.main-nav-link:hover, .main-nav-link.active { color: var(--structure-text); }
 .main-nav[aria-busy="true"] { opacity: .8; }
 .signin-button { min-height: 36px; border: 1px solid var(--structure-line); border-radius: 8px; background: transparent; color: var(--structure-muted); padding: 0 14px; font-size: 13px; }
 .signin-button:hover { border-color: var(--brand); color: var(--structure-text); }
@@ -348,10 +344,8 @@ a.messages-post:hover { border-color: var(--brand); }
 .daily-coin.active .daily-coin-label { color: var(--market-accent); }
 .mobile-header-content, .mobile-bottom-nav { display: none; }
 @media (min-width: 769px) and (max-width: 1000px) {
-  .desktop-header-content { gap: 12px; }
-  .main-nav { gap: 2px; }
-  .main-nav-link { padding: 0 9px; }
-  .main-nav-icon { display: none; }
+  .desktop-header-content { gap: 24px; }
+  .main-nav { gap: 18px; }
 }
 .wallet-shell { width: min(100% - 56px, var(--shell-max)); margin: 0 auto; padding: 32px 0 64px; display: grid; grid-template-columns: minmax(0, 1fr) 340px; align-items: start; gap: 28px; }
 .wallet-page { width: min(100% - 48px, 520px); margin: 0 auto; padding: 40px 0 56px; }
