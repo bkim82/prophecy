@@ -1,6 +1,6 @@
 # architecture
 
-- Root header (`app/layout.tsx`) is brand | `Omens`/`Arena`/`Sanctum`/`Wallet` nav | balance + avatar on desktop (see [feeds.md](feeds.md)), while `app/MobileBottomNav.tsx` supplies the dedicated phone navigation (`Omens`/`Arena`/`Sanctum`/`Wallet`) at or below 768px and the compact mobile header keeps the brand, theme picker, balance, and account control. Routes: `/` (Global feed), `/sanctum` (Oracle Room: rank-only live Pulse room with room feed + mini chat, `app/sanctum/page.tsx`), `/duel` (the market lobby, moved from `app/page.tsx`), `/wallet` (canonical embedded Base wallet, Portfolio/Activity/Advanced tabs — [wallet.md](wallet.md)), `/welcome` (post-sign-up onboarding — [onboarding.md](onboarding.md)). The bottom-right slot only shows `ActiveMatchBar` during an active match (the idle `QuickTicketBar` plus chip was removed). `/exclusive` (rank-gated feed) still exists but is no longer linked from the header nav. Live ticker on `/duel` reads the client-side BTC feed.
+- Root header (`app/layout.tsx`) is brand | `Omens`/`Arena`/`Wallet` nav | balance + avatar on desktop (see [feeds.md](feeds.md)), while `app/MobileBottomNav.tsx` supplies the dedicated phone navigation (`Omens`/`Arena`/`Wallet`) at or below 768px and the compact mobile header keeps the brand, theme picker, balance, and account control. Routes: `/` (Global feed), `/sanctum` (Oracle Room: rank-only live Pulse room with room feed + mini chat, `app/sanctum/page.tsx`; hidden from both navs, URL-only), `/duel` (the market lobby, moved from `app/page.tsx`), `/wallet` (canonical embedded Base wallet, Portfolio/Activity/Advanced tabs — [wallet.md](wallet.md)), `/welcome` (post-sign-up onboarding — [onboarding.md](onboarding.md)). The bottom-right slot only shows `ActiveMatchBar` during an active match (the idle `QuickTicketBar` plus chip was removed). `/exclusive` (rank-gated feed) still exists but is no longer linked from the header nav. Live ticker on `/duel` reads the client-side BTC feed.
 - Multiplayer Pulse is server-authoritative: a `matches` row owns the round (`db/schema.ts:20`), `/api/match/*` routes own the transitions, clients poll. See [multiplayer-plan.md](multiplayer-plan.md).
 - Practice is client-only: Pulse practice reuses `app/duel/btc/pulse/page.tsx?practice=1` without creating a match or reserving a wager. See [practice-mode.md](practice-mode.md).
 - `/api/price` and `/api/history` remain stateless proxies to public exchange APIs. The price feed and chart stay client-side in every mode.
@@ -9,10 +9,10 @@
 
 ```
 app/layout.tsx (root shell: desktop header, compact mobile header, feature-gated auth provider)
-  ├── app/TabNav.tsx (desktop Omens / Arena / Sanctum / Wallet nav, icons + active pill)
+  ├── app/TabNav.tsx (desktop Omens / Arena / Wallet nav, icons + active pill; Sanctum hidden, URL-only)
   ├── app/BalancePill.tsx (ember balance button + balances dropdown)
   ├── app/AccountMenu.tsx (provider-neutral avatar menu + Profile/sign-out; signed-out Sign in)
-  ├── app/MobileBottomNav.tsx (phone Omens / Arena / Sanctum / Wallet navigation)
+  ├── app/MobileBottomNav.tsx (phone Omens / Arena / Wallet navigation; Sanctum hidden)
   ├── app/page.tsx (Global feed: saved posts, lib/posts.ts + lib/engagement.ts; rail boards lib/sidebar.ts)
   ├── app/sanctum/page.tsx (Sanctum: Oracle Room live Pulse + your feed + chat, app/lib/rooms.ts)
   ├── app/exclusive/page.tsx (Exclusive feed: rank-gated via app/lib/rank.ts stub, unlinked from nav)
@@ -75,8 +75,8 @@ its stake and leverage in-round; so does the 24h Portfolio.
 | `app/page.tsx` | Global feed: saved posts (`lib/posts.ts feedPosts`) + engagement, `FeedSidebar` boards from `lib/sidebar.ts` |
 | `app/exclusive/page.tsx` | Exclusive feed: empty (nothing can be posted there yet); rank gate disabled; not linked from the header nav |
 | `app/sanctum/page.tsx` | Oracle Room: coin toggle, live chart + trading dock, simulated room trade feed with coin filters, mini chat — see [sanctum.md](sanctum.md) |
-| `app/TabNav.tsx` | desktop Omens/Arena/Sanctum/Wallet header nav, active pill via `usePathname()` |
-| `app/MobileBottomNav.tsx` | dedicated sub-768px bottom navigation for Omens, Arena, Sanctum, and Wallet |
+| `app/TabNav.tsx` | desktop Omens/Arena/Wallet header nav (Sanctum hidden, `/sanctum` URL-only), active pill via `usePathname()` |
+| `app/MobileBottomNav.tsx` | dedicated sub-768px bottom navigation for Omens, Arena, and Wallet (Sanctum hidden) |
 | `app/MobileChromeAutoHide.tsx` | sub-768px scroll-direction auto-hide for the header + bottom nav via `html[data-chrome]` ([feeds.md](feeds.md)) |
 | `app/PostCard.tsx` | shared post rendering for both feed pages |
 | `app/lib/posts.ts` | client-safe feed shapes (`Post`, `Reply`, `Share`, …), no data |

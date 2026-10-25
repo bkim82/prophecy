@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArenaIcon, OmensIcon, SanctumIcon, WalletIcon } from "./icons";
+import { ArenaIcon, OmensIcon, WalletIcon } from "./icons";
 
+// Sanctum is hidden from nav for now; /sanctum still works by direct URL.
 const NAV_ITEMS = [
   { href: "/", label: "Omens", Icon: OmensIcon },
   { href: "/duel", label: "Arena", Icon: ArenaIcon, className: "mobile-bottom-nav-link--arena" },
-  { href: "/sanctum", label: "Sanctum", Icon: SanctumIcon },
   { href: "/wallet", label: "Wallet", Icon: WalletIcon, className: "mobile-bottom-nav-link--wallet" },
 ];
 
