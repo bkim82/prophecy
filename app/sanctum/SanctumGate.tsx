@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { RoomId } from "@/app/lib/roomsMocks";
+import type { RoomId } from "@/app/lib/rooms";
 
 // Each tier's sigil, drawn in a 64×64 box centred on 32,32. It sits on the
 // seam and is split between the two doors, so it breaks apart as they open.
@@ -37,12 +37,6 @@ const EMBLEMS: Record<RoomId, React.ReactNode> = {
     <>
       <path d="M24 22h16l7 9-15 17-15-17Z" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
       <path d="M17 31h30M24 22l4 9 4 17 4-17 4-9M28 31l4-9 4 9" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" opacity=".7" />
-    </>
-  ),
-  prophet: (
-    <>
-      <path d="M32 17c4 6 10 10.5 10 18.5a10 10 0 0 1-20 0c0-4 2-7 4.5-9 .2 3 1.6 5 3.5 6-.8-6 .5-11 2-15.5Z" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
-      <path d="M32 32c2 2.6 4 4.4 4 7a4 4 0 0 1-8 0c0-2.6 2-4.4 4-7Z" fill="currentColor" opacity=".8" />
     </>
   ),
   oracle: (

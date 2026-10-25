@@ -2,10 +2,10 @@
 
 import { useRef, useState } from "react";
 import { useAppAuth } from "@/app/auth/AuthProvider";
-import type { Reply } from "@/app/lib/mockPosts";
+import type { Reply } from "@/app/lib/posts";
 import type { Reshare } from "@/app/PostShare";
 
-// Client side of the like / repost / reply / clash routes under
+// Client side of the like / repost / reply routes under
 // /api/posts/[id] (lib/engagement.ts), used by app/PostCard.tsx and
 // app/PostReplies.tsx.
 
@@ -26,9 +26,7 @@ export const saveReshare = async (postId: string, reshare: Reshare | null) =>
 export const saveReplyLike = async (postId: string, replyId: string, liked: boolean) =>
   saved(await send(`${replyPath(postId, replyId)}/like`, { liked }));
 
-export const saveClashVote = async (postId: string, side: 0 | 1 | null) => saved(await send(`${postPath(postId)}/clash`, { side }));
-
-/** A post's replies, saved then mock; null when they couldn't be loaded. */
+/** A post's replies, newest first; null when they couldn't be loaded. */
 export async function loadReplies(postId: string): Promise<Reply[] | null> {
   const response = await fetch(`${postPath(postId)}/replies`, { cache: "no-store" }).catch(() => null);
   if (!response?.ok) return null;

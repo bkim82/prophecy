@@ -1,5 +1,5 @@
 import { hueFromHandle } from "@/app/lib/avatar";
-import type { Market, Post, PostKind } from "@/app/lib/mockPosts";
+import type { Market, Post, PostKind } from "@/app/lib/posts";
 
 // Interest topics for the Omens feed (app/FeedSwitcher.tsx, app/FeedTopics.tsx).
 // Currencies (the majors), coins (trending tokens), companies, people and

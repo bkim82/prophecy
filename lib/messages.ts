@@ -4,9 +4,20 @@ import { and, count, desc, eq, gt, inArray, isNotNull, or, sql, type SQL } from 
 import type { PgColumn } from "drizzle-orm/pg-core";
 import { getDb } from "@/db";
 import { directMessageMedia, directMessages, directThreads, profiles } from "@/db/schema";
-import { folderFor, type ConversationView, type MessagePhoto, type MessageSummary, type MessageView, type Peer, type SharedPost, type ThreadView } from "@/app/lib/messageRules";
-import { EXCLUSIVE_POSTS, GLOBAL_POSTS, type Post } from "@/app/lib/mockPosts";
+import {
+  folderFor,
+  type ChallengeCard,
+  type ConversationView,
+  type MessagePhoto,
+  type MessageSummary,
+  type MessageView,
+  type Peer,
+  type SharedPost,
+  type ThreadView,
+} from "@/app/lib/messageRules";
+import type { Post } from "@/app/lib/posts";
 import { blockStateBetween, blockedIdsFor } from "@/lib/blocks";
+import { challengeCardsFor } from "@/lib/challenges";
 import { friendIdsAmong } from "@/lib/follows";
 import type { PostPhotoInput } from "@/lib/postInput";
 import { savedPostsByIds } from "@/lib/posts";
@@ -37,13 +48,14 @@ const between = (a: string, b: string) =>
     and(eq(directMessages.senderId, b), eq(directMessages.recipientId, a)),
   );
 
-type MessageRow = { id: string; body: string; senderId: string; postId: string | null; createdAt: Date };
+type MessageRow = { id: string; body: string; senderId: string; postId: string | null; challengeId: string | null; createdAt: Date };
 
 const messageColumns = {
   id: directMessages.id,
   body: directMessages.body,
   senderId: directMessages.senderId,
   postId: directMessages.postId,
+  challengeId: directMessages.challengeId,
   createdAt: directMessages.createdAt,
 };
 
@@ -61,25 +73,25 @@ const sharedPostView = (post: Post): SharedPost => {
   };
 };
 
-/** Posts that can be shared into a conversation, by id: mock feed posts and saved posts that still exist. */
+/** Posts that can be shared into a conversation, by id: saved posts that still exist. */
 export async function sharedPostsFor(ids: string[], viewerId: string): Promise<Map<string, SharedPost>> {
-  const wanted = new Set(ids);
-  const mocks = [...GLOBAL_POSTS, ...EXCLUSIVE_POSTS].filter((post) => wanted.has(post.id));
-  const saved = await savedPostsByIds([...wanted].filter((id) => !mocks.some((post) => post.id === id)), viewerId);
-  return new Map([...mocks, ...saved].map((post) => [post.id, sharedPostView(post)]));
+  const saved = await savedPostsByIds([...new Set(ids)], viewerId);
+  return new Map(saved.map((post) => [post.id, sharedPostView(post)]));
 }
 
-// Rows → what the dock renders: photo URLs (never bytes) and shared posts resolved live.
+// Rows → what the dock renders: photo URLs (never bytes), shared posts and challenges resolved live.
 async function messageViews(userId: string, rows: MessageRow[]): Promise<MessageView[]> {
   if (rows.length === 0) return [];
   const postIds = [...new Set(rows.flatMap((row) => (row.postId ? [row.postId] : [])))];
-  const [media, posts] = await Promise.all([
+  const challengeIds = rows.flatMap((row) => (row.challengeId ? [row.challengeId] : []));
+  const [media, posts, challenges] = await Promise.all([
     getDb()
       .select({ messageId: directMessageMedia.messageId, position: directMessageMedia.position, width: directMessageMedia.width, height: directMessageMedia.height })
       .from(directMessageMedia)
       .where(inArray(directMessageMedia.messageId, rows.map((row) => row.id)))
       .orderBy(directMessageMedia.position),
     postIds.length > 0 ? sharedPostsFor(postIds, userId) : new Map<string, SharedPost>(),
+    challengeIds.length > 0 ? challengeCardsFor(challengeIds) : new Map<string, ChallengeCard>(),
   ]);
   return rows.map((row) => {
     const photos: MessagePhoto[] = media
@@ -87,6 +99,7 @@ async function messageViews(userId: string, rows: MessageRow[]): Promise<Message
       .map((item) => ({ src: `/api/messages/media/${row.id}/${item.position}`, width: item.width, height: item.height }));
     const view: MessageView = { id: row.id, body: row.body, mine: row.senderId === userId, sentAt: row.createdAt.getTime(), photos };
     if (row.postId) view.post = posts.get(row.postId) ?? null;
+    if (row.challengeId) view.challenge = challenges.get(row.challengeId) ?? null;
     return view;
   });
 }
@@ -209,14 +222,18 @@ export async function messageCountSince(senderId: string, since: Date): Promise<
   return row?.n ?? 0;
 }
 
-export type NewMessage = { body: string; photos: PostPhotoInput[]; postId: string | null };
+// `challengeId` only from sendChallenge (app/profile/challengeActions.ts), never from the send route.
+export type NewMessage = { body: string; photos: PostPhotoInput[]; postId: string | null; challengeId?: string | null };
 
 /** Saves a message (photos after it, in order) and accepts the conversation on your side — writing to someone takes them out of your Requests. */
 export async function saveMessage(senderId: string, recipientId: string, message: NewMessage): Promise<MessageView> {
   const db = getDb();
   const id = crypto.randomUUID();
   const [[row]] = await Promise.all([
-    db.insert(directMessages).values({ id, senderId, recipientId, body: message.body, postId: message.postId }).returning(messageColumns),
+    db
+      .insert(directMessages)
+      .values({ id, senderId, recipientId, body: message.body, postId: message.postId, challengeId: message.challengeId ?? null })
+      .returning(messageColumns),
     acceptThread(senderId, recipientId),
   ]);
   if (message.photos.length > 0) {

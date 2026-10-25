@@ -1,4 +1,4 @@
-import type { MarketCall } from "@/app/lib/mockPosts";
+import type { MarketCall } from "@/app/lib/posts";
 
 const toNumber = (price: string) => Number(price.replace(/,/g, ""));
 

@@ -1,8 +1,8 @@
-import { and, count, desc, eq, gte, inArray, isNull } from "drizzle-orm";
+import { and, count, desc, eq, gte, ilike, inArray, isNull, notInArray, or, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { pollVotes, postMedia, posts, profiles } from "@/db/schema";
 import { gifById, type GifId } from "@/app/lib/gifs";
-import type { Post, PostImage } from "@/app/lib/mockPosts";
+import type { Post, PostImage } from "@/app/lib/posts";
 import { playedLabel } from "@/app/lib/playedLabel";
 import { rankForHandle } from "@/app/lib/rank";
 import { isCustomTopicId, isTopicId, type CustomTopicId } from "@/app/lib/topics";
@@ -204,6 +204,40 @@ export async function recentCustomTopicsBy(authorId: string, limit = 20): Promis
 export async function feedPosts(viewerId: string | null, limit = 30): Promise<Post[]> {
   const rows = await getDb().select().from(posts).where(isNull(posts.deletedAt)).orderBy(desc(posts.createdAt)).limit(limit);
   return toFeedPosts(rows, viewerId);
+}
+
+export type PostMatch = { id: string; author: string; handle: string; content: string; timestamp: string };
+
+/**
+ * Live posts whose text, author name or @handle contains `query` (any case),
+ * newest first — the rail search (app/api/search/route.ts). Live name/handle
+ * from `profiles`, else the write-time snapshot; nothing by `hiddenAuthors`.
+ */
+export async function searchPosts(query: string, limit: number, hiddenAuthors: Set<string> = new Set()): Promise<PostMatch[]> {
+  const pattern = `%${query.replace(/[\\%_]/g, (char) => `\\${char}`)}%`;
+  const name = sql<string>`coalesce(${profiles.displayName}, ${posts.authorName})`;
+  const handle = sql<string | null>`coalesce(${profiles.handle}, ${posts.authorHandle})`;
+  const rows = await getDb()
+    .select({ id: posts.id, author: name, handle, content: posts.content, createdAt: posts.createdAt })
+    .from(posts)
+    .leftJoin(profiles, eq(profiles.userId, posts.authorId))
+    .where(
+      and(
+        isNull(posts.deletedAt),
+        hiddenAuthors.size > 0 ? notInArray(posts.authorId, [...hiddenAuthors]) : undefined,
+        or(ilike(posts.content, pattern), ilike(name, pattern), ilike(handle, pattern)),
+      ),
+    )
+    .orderBy(desc(posts.createdAt))
+    .limit(limit);
+  const now = Date.now();
+  return rows.map((row) => ({
+    id: row.id,
+    author: row.author,
+    handle: row.handle ? `@${row.handle}` : "",
+    content: row.content,
+    timestamp: playedLabel(row.createdAt.getTime(), now),
+  }));
 }
 
 /** Uuid-shaped, like the ids createPost (and createReply) make. */

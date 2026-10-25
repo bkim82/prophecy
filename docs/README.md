@@ -3,11 +3,11 @@
 Agent-readable fact sheets, not prose. Format: flat bullets, `file:line` refs, no narration. Update per [[AGENTS.md]] orchestration rule when `app/**` behavior changes.
 
 - [architecture.md](architecture.md) — module map, data flow, invariants
-- [feeds.md](feeds.md) — Global/Exclusive Twitter-style feeds, header nav, rank stub, `/compose` composer (attach a trade, photos, GIF, poll, emoji)
+- [feeds.md](feeds.md) — Global/Exclusive Twitter-style feeds (real posts only), real-data rail (leaderboard / best trades / live rounds), header nav, rank stub, `/compose` composer (attach a trade, photos, GIF, poll, emoji)
 - [profiles.md](profiles.md) — `/profile/[handle]`: avatar → rank → stats, Omens/Comments/Trades/Portfolio tabs, rank-locked portfolio; archetype, signature asset + per-asset accuracy, highlight reel; own `/profile`: Edit profile (photo, banner, name, handle, bio, location, website → `profiles` table), match history with pinnable wins, achievements + trading style from real Arena/Portfolio activity (`lib/activity.ts`), zero copy earnings
 - [onboarding.md](onboarding.md) — `/welcome` after Clerk sign-up: profile basics (name/@handle/photo/bio), why you're here, experience + trading pace, feed interests, referral + 18+; `onboarding` table; personalized first move
 - [messages.md](messages.md) — direct messages: header envelope + badge, bottom-right dock (Inbox = friends/accepted, Requests = everyone else), photos, posts shared from the feed's Send button, profile Message + Block, `direct_messages`/`direct_message_media`/`direct_threads`/`blocks`
-- [sanctum.md](sanctum.md) — Oracle Room: rank-only live Pulse room (BTC/ETH/daily), room trade feed, mini chat — mock players/funds
+- [sanctum.md](sanctum.md) — Oracle Room: rank-only live Pulse room (BTC/ETH/daily), your trade feed, local mini chat — no other players yet, preview funds
 - [price-feed.md](price-feed.md) — socket/seed/REST sources, sampling, reconnect
 - [game-loop.md](game-loop.md) — phase machine, lock/settle/reset logic
 - [pulse-mode.md](pulse-mode.md) — solo trading state, leveraged P&L, settlement

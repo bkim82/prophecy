@@ -6,13 +6,13 @@ import { useState, type MouseEvent, type ReactNode } from "react";
 import { AuthorLink } from "@/app/AuthorLink";
 import { avatarGradient } from "@/app/lib/avatar";
 import { callRoi, callTrack, formatCallPrice, signedPct, type CallTrack } from "@/app/lib/calls";
-import { saveClashVote, saveLike, saveReshare, useSaved } from "@/app/lib/engagementApi";
-import { profileHref } from "@/app/lib/mockProfiles";
+import { saveLike, saveReshare, useSaved } from "@/app/lib/engagementApi";
+import { profileHref } from "@/app/lib/profiles";
 import { useBookmarks } from "@/app/lib/postLists";
 import { useTopicSignal } from "@/app/lib/topicSignals";
 import { rankTier } from "@/app/lib/rank";
 import { RankBadge } from "@/app/RankBadge";
-import type { Clash, Market, MarketCall, Post, PostFlair, Share } from "@/app/lib/mockPosts";
+import type { Clash, Market, MarketCall, Post, PostFlair, Share } from "@/app/lib/posts";
 import { TopicIcon } from "@/app/FeedTopics";
 import { BookmarkIcon, ClashIcon, CommentIcon, FlameIcon, HeartIcon, TrendIcon } from "@/app/icons";
 import { postTopics, topicById, type TopicId } from "@/app/lib/topics";
@@ -205,16 +205,15 @@ function PromoCard({ post }: { post: Post }) {
   );
 }
 
-// Two opposing calls; the crowd votes for a side. Your vote is saved
-// (POST /api/posts/[id]/clash, optimistic via useSaved; signed out → sign-in):
-// it adds one to that side, recomputes the split, and can be switched or
-// taken back. Sides stay neutral (the arrows say which way each calls it);
-// your side of the bar turns violet once you vote (data-vote).
+// Two opposing calls; the crowd votes for a side. Clashes have no saved form
+// yet, so your vote is local: it adds one to that side, recomputes the split,
+// and can be switched or taken back. Sides stay neutral (the arrows say which
+// way each calls it); your side of the bar turns violet once you vote
+// (data-vote).
 function ClashCard({ post, clash }: { post: Post; clash: Clash }) {
-  const [vote, setVote] = useSaved<0 | 1 | null>(clash.yourVote ?? null, (next) => saveClashVote(post.id, next));
+  const [vote, setVote] = useState<0 | 1 | null>(null);
   const [a, b] = clash.sides;
-  // Saved counts already include your saved vote (`clash.yourVote`).
-  const counts = clash.sides.map((side, i) => side.votes - (clash.yourVote === i ? 1 : 0) + (vote === i ? 1 : 0));
+  const counts = clash.sides.map((side, i) => side.votes + (vote === i ? 1 : 0));
   const total = counts[0] + counts[1];
   const firstPct = Math.round((counts[0] / total) * 100);
   const pcts = [firstPct, 100 - firstPct];

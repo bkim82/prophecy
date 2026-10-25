@@ -1,13 +1,14 @@
 "use client";
 
 import { useId, useState, type CSSProperties } from "react";
-import { TOP_TRADERS, type LeaderboardPeriod, type TopTrader } from "@/app/lib/sidebarMocks";
+import type { LeaderboardPeriod, TopTrader } from "@/app/lib/sidebar";
 
-// "Top Oracles": the Omens leaderboard as a tarot spread. Ranks I–III are
-// cards on a podium, dealt face-down and flipped III → II → I; the rest is a
-// ranked list. Rank only, no score. Switching period remounts the board
-// (keyed by period) so the whole deal replays. Timing lives in globals.css
-// (.oracles-*); see docs/feeds.md.
+// "Top Oracles": the leaderboard (lib/sidebar.ts — net Embers from settled
+// Arena rounds) as a tarot spread. Ranks I–III are cards on a podium, dealt
+// face-down and flipped III → II → I; the rest is a ranked list. Rank only,
+// no score. Switching period remounts the board (keyed by period) so the
+// whole deal replays. Timing lives in globals.css (.oracles-*); see
+// docs/feeds.md. Nothing renders until someone has played a round.
 
 const PERIODS: { id: LeaderboardPeriod; label: string }[] = [
   { id: "24h", label: "24H" },
@@ -43,7 +44,7 @@ function toRoman(n: number): string {
 }
 
 function tintFor(handle: string): string {
-  // A plain char-code sum spreads the current mock handles across all tints.
+  // A plain char-code sum spreads handles across all tints.
   let sum = 0;
   for (const char of handle) sum += char.charCodeAt(0);
   return AVATAR_TINTS[sum % AVATAR_TINTS.length];
@@ -63,13 +64,16 @@ function OracleAvatar({ trader }: { trader: TopTrader }) {
   );
 }
 
-export function OraclesLeaderboard() {
-  const [period, setPeriod] = useState<LeaderboardPeriod>("7d");
+export function OraclesLeaderboard({ leaders }: { leaders: Record<LeaderboardPeriod, TopTrader[]> }) {
+  // The week, unless it was quiet and there's an all-time board to show.
+  const [period, setPeriod] = useState<LeaderboardPeriod>(leaders["7d"].length > 0 ? "7d" : "all");
   const [expanded, setExpanded] = useState(false);
   const id = useId();
-  const traders = TOP_TRADERS[period];
+  const traders = leaders[period];
   const rest = traders.slice(PODIUM_COUNT, expanded ? undefined : PREVIEW_COUNT);
   const previewRows = PREVIEW_COUNT - PODIUM_COUNT;
+  // "all" covers every other period, so nothing all-time means nothing anywhere.
+  if (leaders.all.length === 0) return null;
 
   return (
     <section className="panel sidebar-panel oracles-panel" aria-labelledby={`${id}-title`}>
@@ -94,60 +98,64 @@ export function OraclesLeaderboard() {
         </div>
       </div>
 
-      <div className="oracles-board" key={period}>
-        <div className="oracles-stage">
-          <div className="oracles-embers" aria-hidden="true">
-            {EMBERS.map((ember, i) => (
-              <span key={i} className="oracle-ember" style={ember as CSSProperties} />
-            ))}
-          </div>
-          {/* DOM order is rank order; CSS `order` lays the podium out II · I · III. */}
-          <ol className="oracles-podium">
-            {traders.slice(0, PODIUM_COUNT).map((trader, i) => (
-              <li
-                key={trader.handle}
-                className="oracle-card"
-                data-place={i + 1}
-                style={{ "--deal": PODIUM_COUNT - 1 - i } as CSSProperties}
-              >
-                <div className="oracle-card-flip">
-                  <div className="oracle-card-face">
-                    <span className="oracle-corners" aria-hidden="true" />
-                    <span className="oracle-card-rank">
-                      <small>Rank</small> {toRoman(i + 1)}
-                    </span>
-                    <span className="oracle-sigil">
-                      <span className="oracle-rays" aria-hidden="true" />
-                      <OracleAvatar trader={trader} />
-                    </span>
-                    <strong className="oracle-card-handle">{trader.handle}</strong>
-                    <span className="oracle-card-tier">{trader.tier}</span>
+      {traders.length === 0 ? (
+        <p className="muted sidebar-empty">No rounds played in the last {period === "24h" ? "day" : "week"}.</p>
+      ) : (
+        <div className="oracles-board" key={period}>
+          <div className="oracles-stage">
+            <div className="oracles-embers" aria-hidden="true">
+              {EMBERS.map((ember, i) => (
+                <span key={i} className="oracle-ember" style={ember as CSSProperties} />
+              ))}
+            </div>
+            {/* DOM order is rank order; CSS `order` lays the podium out II · I · III. */}
+            <ol className="oracles-podium">
+              {traders.slice(0, PODIUM_COUNT).map((trader, i) => (
+                <li
+                  key={trader.handle}
+                  className="oracle-card"
+                  data-place={i + 1}
+                  style={{ "--deal": PODIUM_COUNT - 1 - i } as CSSProperties}
+                >
+                  <div className="oracle-card-flip">
+                    <div className="oracle-card-face">
+                      <span className="oracle-corners" aria-hidden="true" />
+                      <span className="oracle-card-rank">
+                        <small>Rank</small> {toRoman(i + 1)}
+                      </span>
+                      <span className="oracle-sigil">
+                        <span className="oracle-rays" aria-hidden="true" />
+                        <OracleAvatar trader={trader} />
+                      </span>
+                      <strong className="oracle-card-handle">{trader.handle}</strong>
+                      <span className="oracle-card-tier">{trader.tier}</span>
+                    </div>
+                    <div className="oracle-card-back" aria-hidden="true" />
                   </div>
-                  <div className="oracle-card-back" aria-hidden="true" />
-                </div>
-              </li>
-            ))}
+                </li>
+              ))}
+            </ol>
+          </div>
+
+          <ol className="oracles-list" id={`${id}-list`} start={PODIUM_COUNT + 1}>
+            {rest.map((trader, i) => {
+              const enter = i < previewRows ? LIST_ENTER_MS + i * ROW_STEP_MS : (i - previewRows) * ROW_STEP_MS;
+              return (
+                <li key={trader.handle} className="oracle-row" style={{ "--enter": `${enter}ms` } as CSSProperties}>
+                  <span className="oracle-row-rank">
+                    <small>Rank</small> {toRoman(PODIUM_COUNT + 1 + i)}
+                  </span>
+                  <OracleAvatar trader={trader} />
+                  <span className="oracle-row-who">
+                    <strong className="oracle-row-handle">{trader.handle}</strong>
+                    <span className="oracle-row-tier">{trader.tier}</span>
+                  </span>
+                </li>
+              );
+            })}
           </ol>
         </div>
-
-        <ol className="oracles-list" id={`${id}-list`} start={PODIUM_COUNT + 1}>
-          {rest.map((trader, i) => {
-            const enter = i < previewRows ? LIST_ENTER_MS + i * ROW_STEP_MS : (i - previewRows) * ROW_STEP_MS;
-            return (
-              <li key={trader.handle} className="oracle-row" style={{ "--enter": `${enter}ms` } as CSSProperties}>
-                <span className="oracle-row-rank">
-                  <small>Rank</small> {toRoman(PODIUM_COUNT + 1 + i)}
-                </span>
-                <OracleAvatar trader={trader} />
-                <span className="oracle-row-who">
-                  <strong className="oracle-row-handle">{trader.handle}</strong>
-                  <span className="oracle-row-tier">{trader.tier}</span>
-                </span>
-              </li>
-            );
-          })}
-        </ol>
-      </div>
+      )}
 
       {traders.length > PREVIEW_COUNT && (
         <button

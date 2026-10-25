@@ -1,7 +1,8 @@
 import { and, desc, eq, gt, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { challenges, matches, profiles } from "@/db/schema";
-import { CHALLENGE_TTL_SECONDS, ROUND_JOIN_SECONDS, type AcceptedChallenge, type IncomingChallenge } from "@/app/lib/challengeRules";
+import { CHALLENGE_TTL_SECONDS, ROUND_JOIN_SECONDS, challengeTerms, type AcceptedChallenge, type IncomingChallenge } from "@/app/lib/challengeRules";
+import type { ChallengeCard, ChallengeStatus } from "@/app/lib/messageRules";
 import { playedLabel } from "@/app/lib/playedLabel";
 import { refundBalance } from "@/lib/balance";
 import { presenceCutoff } from "@/lib/match";
@@ -39,11 +40,12 @@ const isUniqueViolation = (error: unknown) => {
   return code === "23505" || cause?.code === "23505";
 };
 
-/** "duplicate" when a challenge to that handle is already pending (challenges_one_pending). */
-export async function createChallenge(challenge: NewChallenge): Promise<"ok" | "duplicate"> {
+/** The new challenge's id, or "duplicate" when a challenge to that handle is already pending (challenges_one_pending). */
+export async function createChallenge(challenge: NewChallenge): Promise<{ id: string } | "duplicate"> {
   try {
-    await getDb().insert(challenges).values({ id: crypto.randomUUID(), ...challenge });
-    return "ok";
+    const id = crypto.randomUUID();
+    await getDb().insert(challenges).values({ id, ...challenge });
+    return { id };
   } catch (error) {
     if (isUniqueViolation(error)) return "duplicate";
     throw error;
@@ -58,12 +60,15 @@ export async function expireStaleChallenges(challengerId: string): Promise<void>
     .where(and(eq(challenges.challengerId, challengerId), eq(challenges.status, "pending"), sql`not ${unexpired}`));
 }
 
-/** Your pending challenges plus declined/expired ones you haven't cleared, newest first — the own-profile Matches tab. Run expireStaleChallenges first. */
+/**
+ * Your pending challenges plus declined/expired ones you haven't cleared, newest first — the own-profile Matches tab.
+ * Only ones to accounts: challenges sent to the retired mock traders (no `target_user_id`) never show. Run expireStaleChallenges first.
+ */
 export async function sentChallengesFrom(challengerId: string): Promise<ChallengeRow[]> {
   return getDb()
     .select()
     .from(challenges)
-    .where(and(eq(challenges.challengerId, challengerId), inArray(challenges.status, ["pending", "declined", "expired"])))
+    .where(and(eq(challenges.challengerId, challengerId), isNotNull(challenges.targetUserId), inArray(challenges.status, ["pending", "declined", "expired"])))
     .orderBy(desc(challenges.createdAt));
 }
 
@@ -105,6 +110,24 @@ export async function incomingChallengeViews(userId: string): Promise<IncomingCh
     sentLabel: playedLabel(row.createdAt.getTime(), now),
     expiresInMs: row.expiresInMs,
   }));
+}
+
+// Stored status → what a conversation's card says. A pending row past its TTL has expired.
+const CARD_STATUS: Record<string, ChallengeStatus> = { pending: "pending", accepted: "accepted", declined: "declined", expired: "expired", canceled: "canceled", dismissed: "closed" };
+
+/** Challenges as their cards in a conversation show them (lib/messages.ts), by id. */
+export async function challengeCardsFor(ids: string[]): Promise<Map<string, ChallengeCard>> {
+  if (ids.length === 0) return new Map();
+  const rows = await getDb()
+    .select({ challenge: challenges, live: sql<boolean>`${unexpired}`, expiresInMs })
+    .from(challenges)
+    .where(inArray(challenges.id, ids));
+  return new Map(
+    rows.map(({ challenge, live, expiresInMs: left }) => {
+      const status = challenge.status === "pending" && !live ? "expired" : (CARD_STATUS[challenge.status] ?? "closed");
+      return [challenge.id, { id: challenge.id, mode: challenge.mode, terms: challengeTerms(challenge), status, expiresInMs: status === "pending" ? left : 0 }];
+    }),
+  );
 }
 
 /** A challenge sent to you that's still pending (`expired` once it timed out); null if it isn't (or isn't yours). */

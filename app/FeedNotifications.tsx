@@ -5,15 +5,12 @@ import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
 import { ArenaIcon } from "@/app/icons";
 import { avatarGradient } from "@/app/lib/avatar";
-import { challengeTerms, type AcceptedChallenge } from "@/app/lib/challengeRules";
-import { NOTIFICATIONS, type Notification } from "@/app/lib/mockNotifications";
+import { challengeTerms, clockLabel, type AcceptedChallenge } from "@/app/lib/challengeRules";
 import { acceptIncoming, declineIncoming, useLiveChallenges, useNow, type Answer, type LiveIncoming } from "@/app/lib/liveChallenges";
-import { getProfile, profileHref } from "@/app/lib/mockProfiles";
 
 // The header bell's Notifications list (app/NotificationsMenu.tsx): your
-// accepted challenges waiting for you to join, then real incoming challenges
-// (both from app/lib/liveChallenges.ts), then mock mentions
-// (app/lib/mockNotifications.ts). Accept opens the challenge's private Pulse
+// accepted challenges waiting for you to join, then incoming challenges (both
+// from app/lib/liveChallenges.ts). Accept opens the challenge's private Pulse
 // round and takes you there; the challenger gets a "Join round" row. These
 // rows are also the bodies of the popup under the bell.
 
@@ -42,9 +39,6 @@ function Avatar({ initial, seed, href, challenge = false }: { initial: string; s
 }
 
 const profileLink = (handle: string | null) => (handle ? `/profile/${handle.slice(1)}` : undefined);
-
-// 95 → "1:35"
-const clockLabel = (seconds: number) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 
 // Collapsed to who + when so the list stays short; "Show more" reveals the
 // terms. The popup passes `expanded` to lead with them. `onAccepted` runs
@@ -151,37 +145,6 @@ export function AcceptedRow({ accepted, onJoin }: { accepted: AcceptedChallenge;
   );
 }
 
-function describe(notification: Notification): { action: string; detail?: string } {
-  switch (notification.kind) {
-    case "mention":
-      return { action: "mentioned you", detail: `“${notification.text}”` };
-    case "copy":
-      return { action: "copied your trade", detail: `${notification.market.toUpperCase()} ${notification.side.toLowerCase()}` };
-    case "follow":
-      return { action: "followed you" };
-  }
-}
-
-function NotificationRow({ notification }: { notification: Notification }) {
-  const profile = getProfile(notification.handle);
-  const href = profileHref(notification.handle);
-  if (!profile || !href) return null;
-  const { action, detail } = describe(notification);
-  return (
-    <li>
-      <Link href={href} className="feed-notif">
-        <Avatar initial={profile.avatarInitial} seed={profile.handle} />
-        <span className="feed-notif-body">
-          <span className="feed-notif-line">
-            <strong>{profile.name}</strong> {action}
-          </span>
-          <span className="feed-notif-detail">{detail ? `${notification.timestamp} · ${detail}` : notification.timestamp}</span>
-        </span>
-      </Link>
-    </li>
-  );
-}
-
 type FeedNotificationsProps = { challenges: LiveIncoming[]; accepted: AcceptedChallenge[]; onAccepted?: () => void };
 
 export function FeedNotifications({ challenges, accepted, onAccepted }: FeedNotificationsProps) {
@@ -198,10 +161,8 @@ export function FeedNotifications({ challenges, accepted, onAccepted }: FeedNoti
         {challenges.map((request) => (
           <ChallengeRow key={request.id} request={request} onAccepted={onAccepted} />
         ))}
-        {NOTIFICATIONS.map((notification) => (
-          <NotificationRow key={notification.id} notification={notification} />
-        ))}
       </ul>
+      {accepted.length === 0 && challenges.length === 0 && <p className="muted feed-notifs-empty">No notifications yet.</p>}
     </section>
   );
 }

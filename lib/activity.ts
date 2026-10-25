@@ -1,8 +1,7 @@
 import { and, asc, eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { matches, portfolioSessions, positions } from "@/db/schema";
-import type { BestTrade, ProfileRecords } from "@/app/lib/mockAchievements";
-import type { CopyEarnings, TradingStyle } from "@/app/lib/profileTraits";
+import type { BestTrade, CopyEarnings, ProfileRecords, TradingStyle } from "@/app/lib/profileTraits";
 import { settledFor } from "@/lib/match";
 import { PULSE_STARTING_CASH } from "@/lib/pulse";
 

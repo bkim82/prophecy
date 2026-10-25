@@ -8,8 +8,7 @@ import { ArenaIcon, ContrarianIcon, DaredevilIcon, FlameIcon, LinkIcon, LockIcon
 import { avatarGradient } from "@/app/lib/avatar";
 import { showMessages } from "@/app/lib/messages";
 import { callTrack } from "@/app/lib/calls";
-import type { ProfilePortfolio } from "@/app/lib/mockPortfolios";
-import type { Profile, ProfileActivity, ProfileTrade } from "@/app/lib/mockProfiles";
+import type { Profile, ProfileActivity, ProfilePortfolio, ProfileTrade } from "@/app/lib/profiles";
 import { bannerBackground, websiteLabel } from "@/app/lib/profileEdit";
 import {
   ARCHETYPES,
@@ -102,7 +101,7 @@ type ProfileViewProps = {
   followsYou?: boolean;
   // Friends only: they have the app open right now (challenges need you both online).
   online?: boolean;
-  // A real account (mock traders can't be messaged): show Message beside Follow.
+  // Someone else's profile: show Message beside Follow.
   messageable?: boolean;
   // Signed in on a real account's profile: blocks either way (lib/blocks.ts).
   // Either one swaps Follow/Message/Challenge for a note (and Unblock, if it's yours).

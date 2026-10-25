@@ -1,7 +1,6 @@
 "use server";
 
 import { refresh } from "next/cache";
-import { PROFILES } from "@/app/lib/mockProfiles";
 import {
   AVATAR_MAX_BYTES,
   AVATAR_TYPES,
@@ -19,6 +18,7 @@ import { isBlockedEitherWay, saveBlock } from "@/lib/blocks";
 import { followTarget, saveFollow } from "@/lib/follows";
 import { historyEntryFor, settledMatchesByIds } from "@/lib/match";
 import {
+  handleFor,
   handleOwner,
   savePinnedMatches,
   saveStoredProfile,
@@ -32,8 +32,8 @@ export type ProfileField = keyof typeof PROFILE_LIMITS | "avatar" | "banner";
 export type SaveProfileResult = { ok: true } | { ok: false; error: string; field?: ProfileField };
 type TextField = keyof typeof PROFILE_LIMITS;
 
-// Mock feed authors keep their handles, plus a few that would read as staff.
-const RESERVED_HANDLES = new Set([...PROFILES.map((profile) => profile.handle.slice(1)), "admin", "me", "you", "oracle", "prophecy", "support"]);
+// Handles that would read as staff.
+const RESERVED_HANDLES = new Set(["admin", "me", "you", "oracle", "prophecy", "support"]);
 
 const LABELS: Record<TextField, string> = {
   displayName: "Name",
@@ -46,6 +46,7 @@ const LABELS: Record<TextField, string> = {
 type SaveProfileError = Extract<SaveProfileResult, { ok: false }>;
 
 const HANDLE_TAKEN: SaveProfileError = { ok: false, field: "handle", error: "That handle is taken." };
+const PICK_A_HANDLE: SaveProfileError = { ok: false, field: "handle", error: "Pick a handle." };
 
 const formText = (formData: FormData, key: string) => {
   const value = formData.get(key);
@@ -89,6 +90,8 @@ export async function saveProfile(formData: FormData): Promise<SaveProfileResult
   if (!userId) return { ok: false, error: "Sign in to edit your profile." };
 
   const raw = readTextFields(formData);
+  // Every account keeps a handle (app/HandleGate.tsx makes you pick one).
+  if (!raw.handle) return PICK_A_HANDLE;
   const problem = textProblem(raw, Object.keys(PROFILE_LIMITS) as TextField[]);
   if (problem) return problem;
 
@@ -171,7 +174,7 @@ export async function saveProfileBasics(formData: FormData): Promise<SaveProfile
 
   const raw = readTextFields(formData);
   if (!raw.displayName) return { ok: false, field: "displayName", error: "Add the name other traders will see." };
-  if (!raw.handle) return { ok: false, field: "handle", error: "Pick a handle." };
+  if (!raw.handle) return PICK_A_HANDLE;
   const problem = textProblem(raw, ["displayName", "handle", "bio"]);
   if (problem) return problem;
 
@@ -179,7 +182,30 @@ export async function saveProfileBasics(formData: FormData): Promise<SaveProfile
   return saved === "handle-taken" ? HANDLE_TAKEN : { ok: true };
 }
 
-/** Live "is this handle free?" hint for /welcome. Only a hint — saving re-checks against the unique index. */
+/** Whether the signed-in viewer still has to pick a handle (app/HandleGate.tsx); false signed out. */
+export async function needsHandle(): Promise<boolean> {
+  const userId = (await getViewer())?.userId;
+  return userId ? (await handleFor(userId)) === null : false;
+}
+
+/**
+ * The required-handle prompt (app/HandleGate.tsx): sets just the handle, by
+ * Edit profile's rules — everything else on the profile keeps its stored
+ * value. refresh() re-renders the layout, so the header shows the new @handle.
+ */
+export async function chooseHandle(handle: string): Promise<SaveProfileResult> {
+  const userId = (await getViewer())?.userId;
+  if (!userId) return { ok: false, error: "Sign in to pick a handle." };
+  const normalized = typeof handle === "string" ? normalizeHandle(handle) : "";
+  if (!normalized) return PICK_A_HANDLE;
+  const problem = textProblem({ displayName: "", handle: normalized, bio: "", location: "", website: "" }, ["handle"]);
+  if (problem) return problem;
+  if ((await saveStoredProfile(userId, { handle: normalized }, { kind: "keep" })) === "handle-taken") return HANDLE_TAKEN;
+  refresh();
+  return { ok: true };
+}
+
+/** Live "is this handle free?" hint for /welcome and the required-handle prompt. Only a hint — saving re-checks against the unique index. */
 export async function checkHandle(handle: string): Promise<{ ok: true } | { ok: false; error: string }> {
   const userId = (await getViewer())?.userId;
   if (!userId) return { ok: false, error: "Sign in to pick a handle." };
@@ -219,7 +245,7 @@ export async function togglePinnedMatch(matchId: string): Promise<{ ok: true } |
 }
 
 /**
- * Follows or unfollows a mock trader or real account from its profile;
+ * Follows or unfollows an account from its profile;
  * Challenge re-checks follows both ways (app/profile/challengeActions.ts).
  * No follows across a block either way (lib/blocks.ts). No refresh: the
  * toggle already shows it.
@@ -230,15 +256,15 @@ export async function followProfile(handle: string, following: boolean): Promise
   const target = await followTarget(handle);
   if (!target) return { ok: false, error: "That trader doesn't exist." };
   if (target.userId === userId) return { ok: false, error: "You can't follow yourself." };
-  if (following && target.userId && (await isBlockedEitherWay(userId, target.userId))) {
+  if (following && (await isBlockedEitherWay(userId, target.userId))) {
     return { ok: false, error: `You can't follow ${target.name}.` };
   }
-  await saveFollow(userId, target.key, following === true);
+  await saveFollow(userId, target.userId, following === true);
   return { ok: true };
 }
 
 /**
- * Blocks or unblocks a real account from its profile's ⋯ menu. Blocking
+ * Blocks or unblocks an account from its profile's ⋯ menu. Blocking
  * unfollows you both and stops messages either way (lib/blocks.ts);
  * refresh() re-renders the profile so Follow, Message and Challenge go at once.
  */
@@ -246,7 +272,7 @@ export async function blockProfile(handle: string, blocked: boolean): Promise<{ 
   const userId = (await getViewer())?.userId;
   if (!userId) return { ok: false, error: "Sign in to block accounts." };
   const target = await followTarget(handle);
-  if (!target?.userId) return { ok: false, error: "Only real accounts can be blocked." };
+  if (!target) return { ok: false, error: "That account doesn't exist." };
   if (target.userId === userId) return { ok: false, error: "You can't block yourself." };
   await saveBlock(userId, target.userId, blocked === true);
   refresh();

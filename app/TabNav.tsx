@@ -2,14 +2,13 @@
 
 import { useRouter, usePathname } from "next/navigation";
 import { useTransition } from "react";
-import { ArenaIcon, OmensIcon, SanctumIcon, WalletIcon } from "./icons";
 
-// Same four destinations, same order, as MobileBottomNav.
+// Same destinations, same order, as MobileBottomNav (text only here). Sanctum
+// is hidden from nav for now; /sanctum still works by direct URL.
 const TABS = [
-  { href: "/", label: "Omens", Icon: OmensIcon },
-  { href: "/duel", label: "Arena", Icon: ArenaIcon },
-  { href: "/sanctum", label: "Sanctum", Icon: SanctumIcon },
-  { href: "/wallet", label: "Wallet", Icon: WalletIcon },
+  { href: "/", label: "Omens" },
+  { href: "/duel", label: "Arena" },
+  { href: "/wallet", label: "Wallet" },
 ];
 
 export function TabNav() {
@@ -23,7 +22,7 @@ export function TabNav() {
 
   return (
     <nav className="main-nav" aria-label="Primary" aria-busy={isPending}>
-      {TABS.map(({ href, label, Icon }, index) => {
+      {TABS.map(({ href, label }, index) => {
         const isActive = index === activeIndex;
         return (
           <a
@@ -46,7 +45,6 @@ export function TabNav() {
               });
             }}
           >
-            <Icon className="main-nav-icon" />
             {label}
           </a>
         );

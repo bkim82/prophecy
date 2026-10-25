@@ -10,6 +10,7 @@ import {
 import { getViewer } from "@/lib/viewer";
 import { driveBot, seatBotIfWaiting } from "@/lib/bots";
 import { opponentNames } from "@/lib/opponentNames";
+import { handleFor } from "@/lib/profile";
 
 export const dynamic = "force-dynamic";
 
@@ -54,8 +55,12 @@ export async function GET(request: Request, ctx: { params: Promise<{ id: string 
   // Who you played stays hidden until the round is over.
   if (row.status === "settled") {
     const opponentUserId = role === 1 ? row.player2UserId : row.player1UserId;
-    const names = await opponentNames([opponentUserId]);
+    const [names, handle] = await Promise.all([
+      opponentNames([opponentUserId]),
+      opponentUserId ? handleFor(opponentUserId).catch(() => null) : null,
+    ]);
     view.opponentName = (opponentUserId && names.get(opponentUserId)) || null;
+    view.opponentHandle = handle;
   }
   return Response.json(view, {
     headers: { "Cache-Control": "no-store" },

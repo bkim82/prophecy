@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useAppAuth } from "@/app/auth/AuthProvider";
-import type { Post } from "@/app/lib/mockPosts";
+import type { Post } from "@/app/lib/posts";
 import { RepostIcon } from "@/app/icons";
 import { RESHARE, RESHARE_KINDS, type Reshare, type ReshareKind } from "@/app/PostShare";
 

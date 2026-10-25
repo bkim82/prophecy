@@ -18,7 +18,7 @@ vi.mock("@/lib/messages", () => ({
   messageSummaryFor: mocks.messageSummaryFor,
 }));
 
-import { folderFor, messagePreview, normalizeMessage } from "@/app/lib/messageRules";
+import { folderFor, messagePreview, normalizeMessage, stampLabel, threadLayout } from "@/app/lib/messageRules";
 import { acceptConversation, deleteConversation, markConversationRead } from "@/app/messages/actions";
 
 const SAM = { userId: "user_sam", handle: "sam" };
@@ -40,8 +40,36 @@ describe("message rules", () => {
     const photo = { src: "/p", width: 1, height: 1 };
     expect(messagePreview({ ...message, body: "gm" })).toBe("gm");
     expect(messagePreview({ ...message, post: null })).toBe("Shared a post");
+    expect(messagePreview({ ...message, challenge: { id: "c", mode: "pulse", terms: "Pulse · BTC", status: "pending", expiresInMs: 1 } })).toBe("Challenge — Pulse · BTC");
     expect(messagePreview({ ...message, photos: [photo] })).toBe("Sent a photo");
     expect(messagePreview({ ...message, photos: [photo, photo] })).toBe("Sent 2 photos");
+  });
+
+  it("groups back-to-back messages from one side, breaking on a pause and stamping long ones", () => {
+    const minute = 60_000;
+    const at = (mine: boolean, minutes: number) => ({ mine, sentAt: minutes * minute });
+    const layout = threadLayout([
+      at(false, 0),
+      at(false, 0.5),
+      at(false, 1), // their group of three
+      at(true, 1.5), // your turn
+      at(true, 4), // a couple of minutes on: a new group
+      at(true, 4.2),
+      at(false, 70), // an hour later: stamped
+    ]);
+    expect(layout.map((slot) => slot.position)).toEqual(["first", "middle", "last", "single", "first", "last", "single"]);
+    expect(layout.map((slot) => slot.stamp)).toEqual([true, false, false, false, false, false, true]);
+    expect(threadLayout([])).toEqual([]);
+  });
+
+  it("labels stamps by how long ago the day was", () => {
+    const now = new Date(2026, 9, 25, 18, 0).getTime(); // Sunday
+    expect(stampLabel(new Date(2026, 9, 25, 15, 42).getTime(), now)).toBe("Today 3:42 PM");
+    expect(stampLabel(new Date(2026, 9, 24, 23, 5).getTime(), now)).toBe("Yesterday 11:05 PM");
+    expect(stampLabel(new Date(2026, 9, 20, 9, 0).getTime(), now)).toBe("Tuesday 9:00 AM");
+    expect(stampLabel(new Date(2026, 9, 12, 16, 5).getTime(), now)).toBe("Mon, Oct 12 at 4:05 PM");
+    expect(stampLabel(new Date(2025, 9, 12, 16, 5).getTime(), now)).toBe("Oct 12, 2025 at 4:05 PM");
+    expect(stampLabel(now + 5_000, now)).toBe("Today 6:00 PM");
   });
 });
 
@@ -62,7 +90,7 @@ describe("conversation actions", () => {
   });
 
   it("only works on real accounts other than you", async () => {
-    for (const handle of ["@me", "@zane_lfg"]) expect((await acceptConversation(handle)).ok).toBe(false);
+    for (const handle of ["@me", "@ghost"]) expect((await acceptConversation(handle)).ok).toBe(false);
     expect(mocks.acceptThread).not.toHaveBeenCalled();
   });
 

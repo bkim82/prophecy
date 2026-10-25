@@ -6,6 +6,7 @@ import { AccountMenu } from "./AccountMenu";
 import { ActiveMatchBar } from "./ActiveMatchBar";
 import { AuthProvider, SignedIn, type AuthConfiguration } from "./auth/AuthProvider";
 import { BalancePill } from "./BalancePill";
+import { HandleGate } from "./HandleGate";
 import { LiveChallenges } from "./LiveChallenges";
 import { MessagesButton } from "./MessagesButton";
 import { MessagesDock } from "./MessagesDock";
@@ -93,6 +94,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <SignedIn><LiveChallenges /></SignedIn>
           {/* One dock for both header layouts' Messages buttons, bottom-right. */}
           <SignedIn><MessagesDock /></SignedIn>
+          {/* Signed in without an @handle: pick one before anything else. */}
+          <SignedIn><HandleGate initiallyNeeded={viewer !== null && handle === null} serverSignedIn={viewer !== null} /></SignedIn>
           {children}
           <MobileBottomNav />
           <MobileChromeAutoHide />

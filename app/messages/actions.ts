@@ -16,8 +16,7 @@ export type AcceptResult = { ok: true } | Failure;
 
 const UNAVAILABLE: Failure = { ok: false, error: "That trader can't receive messages." };
 
-// The real account holding `handle` ("@sam" or "sam"), unless it's you. Mock
-// traders have no account, so they can't be messaged.
+// The account holding `handle` ("@sam" or "sam"), unless it's you.
 async function recipient(userId: string, handle: unknown) {
   if (typeof handle !== "string" || handle.length > 40) return null;
   const account = await publicProfileFor(handle.replace(/^@/, "").toLowerCase());

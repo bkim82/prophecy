@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 const PER_MINUTE = 10;
 const PER_DAY = 300;
 
-/** GET → { replies }: a post's saved replies (newest first) then its mock thread, as the viewer sees them. */
+/** GET → { replies }: a post's saved replies, newest first, as the viewer sees them. */
 export async function GET(_request: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   if (!(await engagementTarget(id))) return postsJson({ error: "Post not found" }, { status: 404 });
@@ -38,7 +38,7 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
   try {
     const target = await engagementTarget(id);
     if (!target) return postsJson({ error: "Post not found" }, { status: 404 });
-    if (target.authorId && target.authorId !== viewer.userId && (await isBlockedEitherWay(viewer.userId, target.authorId))) {
+    if (target.authorId !== viewer.userId && (await isBlockedEitherWay(viewer.userId, target.authorId))) {
       return postsJson({ error: "You can't reply to this post." }, { status: 403 });
     }
     const now = Date.now();

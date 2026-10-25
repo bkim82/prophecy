@@ -14,8 +14,9 @@ import {
   pendingChallengeFor,
 } from "@/lib/challenges";
 import { followTarget, isFollowing } from "@/lib/follows";
+import { saveMessage } from "@/lib/messages";
 import { isOnline, touchPresence } from "@/lib/presence";
-import { rankForUser, storedProfileFor } from "@/lib/profile";
+import { handleFor, rankForUser, storedProfileFor } from "@/lib/profile";
 import { getViewer } from "@/lib/viewer";
 
 // Pulse only (app/lib/challengeRules.ts).
@@ -29,10 +30,11 @@ export type ChallengeInput = {
 export type ChallengeResult = { ok: true } | { ok: false; error: string };
 
 /**
- * Sends a challenge from a profile's Challenge dialog. Re-checks everything
- * the dialog offers: the target exists, you follow each other (friends-only,
- * so mock traders — who never follow back — can't be challenged), you're both
- * online (sending counts as you being online), the one-tier-up rank gate,
+ * Sends a challenge from a profile's Challenge dialog — it shows in their
+ * header bell and as a card in your conversation. Needs a handle of your
+ * own. Re-checks everything the dialog offers: the target exists, you follow
+ * each other (friends-only), you're both online (sending counts as you being
+ * online), the one-tier-up rank gate,
  * Pulse market/round, stake preset (or no stakes), and that you could cover
  * the stake. Nothing is reserved — the stake is only a proposal until the
  * round it opens on accept is joined.
@@ -40,17 +42,19 @@ export type ChallengeResult = { ok: true } | { ok: false; error: string };
 export async function sendChallenge(input: ChallengeInput): Promise<ChallengeResult> {
   const userId = (await getViewer())?.userId;
   if (!userId) return { ok: false, error: "Sign in to send challenges." };
+  // So the challenge's card shows in their conversation with you (lib/messages.ts lists people by handle).
+  if (!(await handleFor(userId))) return { ok: false, error: "Choose your @handle before sending challenges." };
 
   const target = await followTarget(input.handle);
   if (!target) return { ok: false, error: "That trader doesn't exist." };
   if (target.userId === userId) return { ok: false, error: "You can't challenge yourself." };
   const [youFollow, theyFollow, viewerRank] = await Promise.all([
-    isFollowing(userId, target.key),
-    target.userId ? isFollowing(target.userId, userId) : false,
+    isFollowing(userId, target.userId),
+    isFollowing(target.userId, userId),
     rankForUser(userId),
   ]);
   if (!youFollow) return { ok: false, error: `Challenges are friends-only — follow ${target.name} first.` };
-  if (!target.userId || !theyFollow) return { ok: false, error: `Challenges are friends-only — ${target.name} doesn't follow you back.` };
+  if (!theyFollow) return { ok: false, error: `Challenges are friends-only — ${target.name} doesn't follow you back.` };
   const [, targetOnline] = await Promise.all([touchPresence(userId), isOnline(target.userId)]);
   if (!targetOnline) return { ok: false, error: `${target.name} just went offline — you can challenge them when you're both online.` };
   if (!canChallenge(target.rank, viewerRank)) {
@@ -78,6 +82,12 @@ export async function sendChallenge(input: ChallengeInput): Promise<ChallengeRes
     stake: input.stake,
   });
   if (created === "duplicate") return { ok: false, error: `You already have a challenge pending with ${target.name}.` };
+
+  // It also lands in your conversation as a live card (app/MessagesDock.tsx).
+  // The challenge stands even if that fails — the bell still shows it.
+  await saveMessage(userId, target.userId, { body: "", photos: [], postId: null, challengeId: created.id }).catch((error: unknown) => {
+    console.error("Posting the challenge to messages failed", error);
+  });
 
   refresh();
   return { ok: true };

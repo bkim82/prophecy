@@ -19,8 +19,8 @@ import { RankBadge } from "@/app/RankBadge";
 
 // The Challenge button on someone else's profile, secondary to Follow in
 // the hero, and the dialog it opens. Challenges are friends-only — you follow
-// each other, from the hero's Follow toggle plus their follow of you (mock
-// traders never follow back) — and live: you both have to be online.
+// each other, from the hero's Follow toggle plus their follow of you — and
+// live: you both have to be online.
 // The page works out the rest of the state (app/profile/[handle]/page.tsx);
 // the server action re-checks all of it.
 

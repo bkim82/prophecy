@@ -50,9 +50,9 @@ export async function GET(request: Request) {
 
   const target = await followTarget(new URL(request.url).searchParams.get("handle") ?? "");
   const friends =
-    target?.userId &&
+    target &&
     target.userId !== userId &&
-    (await Promise.all([isFollowing(userId, target.key), isFollowing(target.userId, userId)])).every(Boolean);
-  if (!target?.userId || !friends) return Response.json({ error: "Not found" }, { status: 404 });
+    (await Promise.all([isFollowing(userId, target.userId), isFollowing(target.userId, userId)])).every(Boolean);
+  if (!target || !friends) return Response.json({ error: "Not found" }, { status: 404 });
   return Response.json({ online: await isOnline(target.userId) }, { headers: NO_STORE });
 }

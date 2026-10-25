@@ -15,7 +15,7 @@ const MAX_BODY_BYTES = Math.ceil((MESSAGE_MAX_PHOTOS * POST_IMAGE_MAX_BYTES * 4)
 const PER_MINUTE = 30;
 const PER_DAY = 1000;
 
-// "@Sam" / "sam" → the account holding it; null for mock traders, unknown handles and you.
+// "@Sam" / "sam" → the account holding it; null for unknown handles and you.
 async function peerAccount(userId: string, handle: unknown) {
   if (typeof handle !== "string") return null;
   const stored = handle.replace(/^@/, "").toLowerCase().slice(0, 40);
@@ -27,7 +27,7 @@ async function peerAccount(userId: string, handle: unknown) {
  * GET ?handle= → your conversation with that real account
  * (app/lib/messageRules.ts ThreadView). Reading doesn't mark it read — the
  * dock does that with markConversationRead (app/messages/actions.ts). 404 for
- * yourself, mock traders and unknown handles.
+ * yourself and unknown handles.
  */
 export async function GET(request: Request) {
   const userId = (await getViewer())?.userId;

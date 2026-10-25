@@ -1,7 +1,8 @@
 const shortDate = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 
-// Same style as the feed's mock timestamps ("16m ago"). Shared by the profile
-// (match history, sent challenges) and the Arena lobby's Recent results.
+// "16m ago"-style relative times. Shared by the feed (posts, replies,
+// reposts), the profile (match history, sent challenges) and the Arena
+// lobby's Recent results.
 export function playedLabel(playedAt: number, now: number): string {
   const minutes = Math.floor((now - playedAt) / 60_000);
   if (minutes < 1) return "just now";

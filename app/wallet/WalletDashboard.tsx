@@ -1,13 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { BackIcon, LockIcon, SearchIcon } from "@/app/icons";
 import type { WalletState } from "@/app/lib/useWalletConnection";
 import { shortenAddress } from "@/app/lib/wallet";
 import type { WalletTokenHolding } from "@/lib/alchemy";
 import { AdvancedTab } from "./AdvancedTab";
 import { DepositSheet, SendSheet, SwapSheet } from "./ActionSheets";
-import { ActivityList } from "./ActivityList";
-import { BalanceChip } from "./BalanceChip";
+import { ActivityList, ExternalArrow, activityAmount, useWalletActivity, type ActivityEntry } from "./ActivityList";
+import { BalanceCard } from "./BalanceCard";
 import { CoinDetailPanel } from "./CoinDetailPanel";
 import { CoinList } from "./CoinList";
 import { useHiddenCoins } from "./hiddenCoins";
@@ -16,11 +17,27 @@ import { ETH_SENTINEL, type Coin } from "./types";
 // Holdings hit Alchemy (metered), so they poll slower than the ETH quote and only while the tab is visible.
 const HOLDINGS_POLL_MS = 30_000;
 const ETH_POLL_MS = 10_000;
+// Opening Deposit starts a watch that keeps polling activity faster (even with the sheet closed) until
+// a new incoming transfer shows up or this long passes.
+const DEPOSIT_WATCH_MS = 15 * 60_000;
+const ARRIVAL_TOAST_MS = 8_000;
+const RECENT_ACTIVITY_ROWS = 4;
 
 type EthSummary = { priceUsd: number; change24h: number | null; imageUrl: string | null };
-type Tab = "portfolio" | "activity" | "advanced";
+type View = "home" | "activity" | "explore";
 type MarketToken = { address: string; symbol: string; priceUsd: number | null };
 type SwapPreset = { initialFrom?: string; initialTo?: string; extraToken?: MarketToken };
+/** Incoming chain transfers already known when the watch started; anything new after that is the deposit. */
+type DepositWatch = { baseline: Set<string> | null };
+
+const receivedHashes = (entries: ActivityEntry[]) =>
+  new Set(entries.filter((entry) => !entry.local && entry.kind === "received").map((entry) => entry.hash));
+
+const TRUST_POINTS = [
+  { icon: <LockIcon className="h-4 w-4" />, title: "Your wallet, your keys", body: "Funds sit in a wallet only you can sign for. Prophecy never sees your key and can't move them." },
+  { icon: <ExternalArrow />, title: "Withdraw anytime", body: "No lockups or holds. Send any amount out of this wallet whenever you like." },
+  { icon: <SearchIcon className="h-4 w-4" />, title: "Verifiable on Base", body: "Every confirmed deposit and withdrawal links to its onchain record on Basescan." },
+];
 
 export function WalletDashboard({
   wallet,
@@ -29,12 +46,16 @@ export function WalletDashboard({
   wallet: WalletState;
   signOut: () => Promise<void>;
 }) {
-  const [tab, setTab] = useState<Tab>("portfolio");
+  const [view, setView] = useState<View>("home");
   const [tokenHoldings, setTokenHoldings] = useState<WalletTokenHolding[]>([]);
+  const [holdingsLoaded, setHoldingsLoaded] = useState(false);
   const [eth, setEth] = useState<EthSummary | null>(null);
+  const [ethLoaded, setEthLoaded] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [sheet, setSheet] = useState<"deposit" | "send" | "swap" | null>(null);
   const [swapPreset, setSwapPreset] = useState<SwapPreset | null>(null);
+  const [watch, setWatch] = useState<DepositWatch | null>(null);
+  const [dismissedArrival, setDismissedArrival] = useState<string | null>(null);
   // Bumped when a local intent reaches inclusion so holdings refresh without waiting out the poll.
   const [holdingsNonce, setHoldingsNonce] = useState(0);
   const refreshHoldings = useCallback(() => setHoldingsNonce((n) => n + 1), []);
@@ -43,20 +64,33 @@ export function WalletDashboard({
   const onBase = wallet.chainId === 8453;
   const address = wallet.address;
 
+  // Deposit watch, adjusted during render: a watch started before activity first loaded takes its
+  // baseline from that load, and `activityFast` mirrors `watching` so polling speeds up only until arrival.
+  const [activityFast, setActivityFast] = useState(false);
+  const activity = useWalletActivity(address, { onIncluded: refreshHoldings, fast: activityFast });
+  if (watch && !watch.baseline && activity.entries) setWatch({ baseline: receivedHashes(activity.entries) });
+  const arrivalEntry = watch?.baseline
+    ? activity.entries?.find((entry) => !entry.local && entry.kind === "received" && !watch.baseline!.has(entry.hash)) ?? null
+    : null;
+  const watching = watch !== null && arrivalEntry === null;
+  if (activityFast !== watching) setActivityFast(watching);
+  const arrivalHash = arrivalEntry?.hash ?? null;
+
   useEffect(() => {
     if (!address || !onBase) { setTokenHoldings([]); return; }
     let cancelled = false;
     const load = () => fetch(`/api/wallet/holdings?address=${address}`)
       .then((res) => (res.ok ? res.json() : { holdings: [] }))
       .then((data: { holdings?: WalletTokenHolding[] }) => { if (!cancelled) setTokenHoldings(data.holdings ?? []); })
-      .catch(() => { if (!cancelled) setTokenHoldings([]); });
+      .catch(() => { if (!cancelled) setTokenHoldings([]); })
+      .finally(() => { if (!cancelled) setHoldingsLoaded(true); });
     load();
     const id = setInterval(() => { if (document.visibilityState === "visible") load(); }, HOLDINGS_POLL_MS);
     // Catch up immediately when the tab comes back instead of waiting out the interval.
     const onVisible = () => { if (document.visibilityState === "visible") load(); };
     document.addEventListener("visibilitychange", onVisible);
     return () => { cancelled = true; clearInterval(id); document.removeEventListener("visibilitychange", onVisible); };
-  }, [address, onBase, holdingsNonce]);
+  }, [address, onBase, holdingsNonce, arrivalHash]);
 
   useEffect(() => {
     if (!onBase) { setEth(null); return; }
@@ -64,11 +98,30 @@ export function WalletDashboard({
     const load = () => fetch("/api/wallet/eth")
       .then((res) => (res.ok ? res.json() : { eth: null }))
       .then((data: { eth?: EthSummary | null }) => { if (!cancelled) setEth(data.eth ?? null); })
-      .catch(() => { if (!cancelled) setEth(null); });
+      .catch(() => { if (!cancelled) setEth(null); })
+      .finally(() => { if (!cancelled) setEthLoaded(true); });
     load();
     const id = setInterval(load, ETH_POLL_MS);
     return () => { cancelled = true; clearInterval(id); };
   }, [onBase]);
+
+  useEffect(() => {
+    if (!watch) return;
+    const id = setTimeout(() => setWatch(null), DEPOSIT_WATCH_MS);
+    return () => clearTimeout(id);
+  }, [watch]);
+
+  // A landed deposit also reloads holdings (arrivalHash is in that effect's deps) and the header balance.
+  useEffect(() => {
+    if (arrivalHash) window.dispatchEvent(new Event("wallet-updated"));
+  }, [arrivalHash]);
+
+  const toastVisible = arrivalHash !== null && sheet !== "deposit" && dismissedArrival !== arrivalHash;
+  useEffect(() => {
+    if (!toastVisible) return;
+    const id = setTimeout(() => setDismissedArrival(arrivalHash), ARRIVAL_TOAST_MS);
+    return () => clearTimeout(id);
+  }, [toastVisible, arrivalHash]);
 
   if (!address) return null;
 
@@ -113,11 +166,27 @@ export function WalletDashboard({
   }
   const changeUsd = hasKnownChange ? totalUsd - yesterdayTotal : null;
   const changePct = hasKnownChange && yesterdayTotal > 0 ? (changeUsd! / yesterdayTotal) * 100 : null;
+  const subline = countedCoins.length === 0
+    ? "No funds yet"
+    : countedCoins.length === 1
+      ? `${activityAmount(countedCoins[0].qty, countedCoins[0].symbol)} on Base`
+      : `Across ${countedCoins.length} assets on Base`;
 
   const selectedCoin = selected ? coins.find((coin) => coin.address === selected) ?? null : null;
   const selectedShare = selectedCoin && !isHidden(selectedCoin.address) && totalUsd > 0 ? ((selectedCoin.valueUsd ?? 0) / totalUsd) * 100 : 0;
+  const arrival = arrivalEntry ? { value: arrivalEntry.value, asset: arrivalEntry.asset } : null;
 
-  const closeSheet = () => { setSheet(null); setSwapPreset(null); };
+  const openDeposit = () => {
+    // Re-baseline unless a watch is still waiting, so a deposit already shown doesn't count twice.
+    if (!watching) setWatch({ baseline: activity.entries ? receivedHashes(activity.entries) : null });
+    setSheet("deposit");
+  };
+  const closeSheet = () => {
+    // The sheet already showed the arrival; no toast for it on the way out.
+    if (sheet === "deposit" && arrivalHash) setDismissedArrival(arrivalHash);
+    setSheet(null);
+    setSwapPreset(null);
+  };
   const openBuy = (token: MarketToken) => {
     setSwapPreset({ initialTo: token.address, extraToken: token });
     setSheet("swap");
@@ -127,69 +196,133 @@ export function WalletDashboard({
     setSwapPreset({ initialFrom: token.address });
     setSheet("swap");
   };
+  const goHome = () => { setView("home"); setSelected(null); };
 
   return (
     <div className="wd-dashboard">
-      <div className="wd-connection-strip">
-        <span className="wd-status-dot" aria-hidden="true" />
-        <span>{shortenAddress(address)}</span>
-        <span>Base</span>
-        <button type="button" onClick={() => void signOut()} className="wd-strip-link">Sign out</button>
-      </div>
+      <header className="wd-header">
+        {view === "home" ? (
+          <h1>Wallet</h1>
+        ) : (
+          <div className="wd-header-sub">
+            <button type="button" className="wd-detail-back" onClick={goHome}><BackIcon className="h-3.5 w-3.5" /> Wallet</button>
+            <h1>{view === "activity" ? "Activity" : "Explore tokens"}</h1>
+          </div>
+        )}
+        <AddressPill address={address} />
+      </header>
 
-      <div className="wd-tabs" role="group" aria-label="Wallet view">
-        <button type="button" className={tab === "portfolio" ? "active" : ""} aria-pressed={tab === "portfolio"} onClick={() => setTab("portfolio")}>
-          Portfolio
-        </button>
-        <button type="button" className={tab === "activity" ? "active" : ""} aria-pressed={tab === "activity"} onClick={() => setTab("activity")}>
-          Activity
-        </button>
-        <button type="button" className={tab === "advanced" ? "active" : ""} aria-pressed={tab === "advanced"} onClick={() => setTab("advanced")}>
-          Advanced
-        </button>
-      </div>
-
-      {tab === "portfolio" ? (
-        <div className="wd-portfolio">
-          {selectedCoin ? (
-            <CoinDetailPanel
-              coin={selectedCoin}
-              sharePct={selectedShare}
-              onClose={() => setSelected(null)}
-              onBuy={() => openBuy(selectedCoin)}
-              onSell={() => openSell(selectedCoin)}
-              onSend={() => setSheet("send")}
-            />
-          ) : (
-            <>
-              <BalanceChip
-                totalUsd={totalUsd}
-                changeUsd={changeUsd}
-                changePct={changePct}
-                onDeposit={() => setSheet("deposit")}
-                onSend={() => setSheet("send")}
-                onSwap={() => setSheet("swap")}
-              />
-
-              {!onBase ? (
-                <p className="wd-empty">Switch to Base to see your holdings.</p>
-              ) : (
-                <CoinList coins={coins} totalUsd={totalUsd} isHidden={isHidden} onToggleHidden={toggleHidden} onSelect={setSelected} />
-              )}
-            </>
-          )}
+      {view === "activity" ? (
+        <div className="wd-card">
+          <ActivityList entries={activity.entries} failed={activity.failed} />
         </div>
-      ) : tab === "activity" ? (
-        <ActivityList address={address} onIncluded={refreshHoldings} />
-      ) : (
+      ) : view === "explore" ? (
         <AdvancedTab coins={coins} onBuy={openBuy} onSell={openSell} />
+      ) : selectedCoin ? (
+        <CoinDetailPanel
+          coin={selectedCoin}
+          sharePct={selectedShare}
+          onClose={() => setSelected(null)}
+          onBuy={() => openBuy(selectedCoin)}
+          onSell={() => openSell(selectedCoin)}
+          onSend={() => setSheet("send")}
+        />
+      ) : (
+        <>
+          <BalanceCard
+            totalUsd={totalUsd}
+            loaded={!onBase || (holdingsLoaded && ethLoaded)}
+            subline={subline}
+            changeUsd={changeUsd}
+            changePct={changePct}
+            onDeposit={openDeposit}
+            onWithdraw={() => setSheet("send")}
+            menu={[
+              { label: "Swap tokens", onSelect: () => setSheet("swap") },
+              { label: "Explore tokens", onSelect: () => setView("explore") },
+              { label: "Sign out", onSelect: () => void signOut() },
+            ]}
+          />
+
+          <ul className="wd-trust" aria-label="How your wallet is protected">
+            {TRUST_POINTS.map((point) => (
+              <li key={point.title}>
+                <span className="wd-trust-icon" aria-hidden="true">{point.icon}</span>
+                <span>
+                  <strong>{point.title}</strong>
+                  <small>{point.body}</small>
+                </span>
+              </li>
+            ))}
+          </ul>
+
+          <section className="wd-section" aria-labelledby="wd-holdings-title">
+            <div className="wd-section-row"><h2 id="wd-holdings-title">Holdings</h2></div>
+            {!onBase ? (
+              <div className="wd-card"><p className="wd-card-empty">Switch to Base to see your holdings.</p></div>
+            ) : (
+              <CoinList coins={coins} isHidden={isHidden} onToggleHidden={toggleHidden} onSelect={setSelected} />
+            )}
+          </section>
+
+          <section className="wd-section" aria-labelledby="wd-activity-title">
+            <div className="wd-section-row">
+              <h2 id="wd-activity-title">Recent activity</h2>
+              <button type="button" className="wd-text-link" onClick={() => setView("activity")}>View all</button>
+            </div>
+            <div className="wd-card">
+              <ActivityList entries={activity.entries} failed={activity.failed} limit={RECENT_ACTIVITY_ROWS} />
+            </div>
+          </section>
+
+          <p className="wd-footnote">
+            Prophecy holds no funds on your behalf. Balances are read live from Base.{" "}
+            <a href={`https://basescan.org/address/${address}`} target="_blank" rel="noopener noreferrer" className="wd-text-link">
+              See this wallet on Basescan <ExternalArrow />
+            </a>
+          </p>
+        </>
       )}
 
-      {sheet === "deposit" && <DepositSheet address={address} onClose={closeSheet} />}
+      {sheet === "deposit" && <DepositSheet address={address} arrival={arrival} onClose={closeSheet} />}
       {sheet === "send" && <SendSheet accountAddress={address} coins={coins} initialAsset={selected ?? undefined} onClose={closeSheet} />}
       {sheet === "swap" && (
         <SwapSheet accountAddress={address} coins={coins} initialFrom={swapPreset?.initialFrom} initialTo={swapPreset?.initialTo} extraToken={swapPreset?.extraToken} onClose={closeSheet} />
       )}
+
+      {toastVisible && arrival && (
+        <div className="wd-toast" role="status">
+          <span className="wd-toast-check" aria-hidden="true">✓</span>
+          Deposit received: +{activityAmount(arrival.value, arrival.asset)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Network + shortened address, with copy and a Basescan link — the identity people check before depositing. */
+function AddressPill({ address }: { address: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(address); setCopied(true); setTimeout(() => setCopied(false), 1500); }
+    catch { /* clipboard blocked */ }
+  };
+  return (
+    <div className="wd-address-pill">
+      <span className="wd-base-dot" aria-hidden="true" />
+      <span>Base</span>
+      <span className="wd-address-sep" aria-hidden="true">/</span>
+      <code title={address}>{shortenAddress(address)}</code>
+      <button type="button" onClick={copy} aria-label={copied ? "Address copied" : "Copy address"} title={copied ? "Copied" : "Copy address"}>
+        {copied ? (
+          <svg viewBox="0 0 14 14" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m3 7.5 2.5 2.5L11 4.5" /></svg>
+        ) : (
+          <svg viewBox="0 0 14 14" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" aria-hidden="true"><rect x="4.5" y="4.5" width="7.5" height="7.5" rx="1.5" /><path d="M9.5 4.5V3A1 1 0 0 0 8.5 2H3a1 1 0 0 0-1 1v5.5a1 1 0 0 0 1 1h1.5" /></svg>
+        )}
+      </button>
+      <a href={`https://basescan.org/address/${address}`} target="_blank" rel="noopener noreferrer" aria-label="View on Basescan" title="View on Basescan">
+        <svg viewBox="0 0 14 14" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M8 2h4v4M12 2 6.5 7.5M10.5 8.5v2.5a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1h2.5" /></svg>
+      </a>
     </div>
   );
 }
