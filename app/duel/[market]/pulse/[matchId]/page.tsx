@@ -38,6 +38,7 @@ import {
   type PulseSide,
 } from "@/lib/pulse";
 import { productForMarket } from "@/lib/spotPrice";
+import { RematchButton, RematchCheck, useRematch } from "./Rematch";
 
 const POLL_MS = 1000;
 const TICK_MS = 200;
@@ -103,6 +104,7 @@ export default function Page({ params }: { params: Promise<{ market: string; mat
   const pointsRef = useRef(points);
   pointsRef.current = points;
   const skewRef = useRef<number | null>(null);
+  const rematchJumpedRef = useRef(false);
 
   const say = useCallback((text: string) => setLine((current) => ({ text, key: (current?.key ?? 0) + 1 })), []);
   const addTrades = (next: LocalTrade[]) => {
@@ -304,6 +306,22 @@ export default function Page({ params }: { params: Promise<{ market: string; mat
       t: trade.t, p: trade.p, side: trade.side, action: trade.action, owner: trade.owner, pnl: trade.pnl,
     })), [trades, revealRoom]);
 
+  // A settled challenge round offers a rematch; both pressing Play again
+  // opens the next round, and both rooms move into it.
+  const goToRematch = useCallback((nextMatchId: string) => {
+    if (rematchJumpedRef.current) return;
+    rematchJumpedRef.current = true;
+    router.push(`/duel/${market}/pulse/${nextMatchId}`);
+  }, [router, market]);
+  const rematch = useRematch(matchId, playerId, phase === "settled" && Boolean(view?.challenge), goToRematch);
+  useEffect(() => {
+    if (rematch.state !== "theirs") return;
+    say(`${view?.opponentName ?? "Opponent"} wants a rematch.`);
+    playFeedback("entry");
+    // Once per ask that reaches you.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rematch.state]);
+
   const postAction = async (body: Record<string, unknown>) => {
     const res = await fetch(`/api/match/${encodeURIComponent(matchId)}/action`, {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -501,8 +519,12 @@ export default function Page({ params }: { params: Promise<{ market: string; mat
         trades: trades.filter((trade) => trade.owner === "you").map((trade) => ({ side: trade.side, action: trade.action, price: trade.p, pnl: trade.pnl, closed: trade.closed })),
         wager: view.wager,
       } : null}
+      rematch={view?.challenge ? {
+        check: <RematchCheck rematch={rematch} rivalName={rivalName} rivalInitial={rivalInitial} terms={{ market, timerSeconds: view.timerSeconds, wager: view.wager }} />,
+        button: <RematchButton rematch={rematch} rivalName={rivalName} />,
+      } : null}
       notice={notice}
-      error={error}
+      error={error ?? rematch.error}
     />
     {phase === "open" || phase === "predict" ? <button type="button" onClick={() => void leave()} className="mx-auto mt-4 block text-xs uppercase tracking-wider text-[var(--muted-dim)] hover:text-[var(--text)]">Leave match</button> : null}
   </main>;
@@ -533,6 +555,8 @@ type DockProps = {
   onClose: () => void;
   onReverse: () => void;
   result: Omit<React.ComponentProps<typeof ArenaResultCard>, "marketLabel" | "rivalName" | "rivalHref" | "playAgain"> | null;
+  /** A challenge round's ready check and Play again (./Rematch.tsx), in place of the link back to the lobby. */
+  rematch: { check: React.ReactNode; button: React.ReactNode } | null;
   notice: string | null;
   error: string | null;
 };
@@ -542,7 +566,7 @@ function RoomDock(props: DockProps) {
   const {
     dockPhase, marketLabel, phase, rivalName, rivalHref, secondsLeft, hasPrice, stake, setStake, leverage, setLeverage,
     availableCash, isOut, canEnter, canManage, position, extraOpen, totalOpenPnl, livePrice,
-    lastClosed, onEnter, onClose, onReverse, result, notice, error,
+    lastClosed, onEnter, onClose, onReverse, result, rematch, notice, error,
   } = props;
   const [pressedSide, setPressedSide] = useState<PulseSide | null>(null);
   const leverageDetailsRef = useRef<HTMLDetailsElement>(null);
@@ -665,20 +689,23 @@ function RoomDock(props: DockProps) {
       )}
 
       {dockPhase === "result" && result && (
-        <ArenaResultCard
-          {...result}
-          marketLabel={marketLabel}
-          rivalName={rivalName}
-          rivalHref={rivalHref}
-          playAgain={
-            <Link
-              href="/duel"
-              className="rounded-md bg-[var(--btn-bg)] px-5 py-2 text-center text-sm font-medium text-[var(--btn-text)] transition hover:bg-[var(--btn-bg-hover)]"
-            >
-              Play Again
-            </Link>
-          }
-        />
+        <>
+          {rematch?.check}
+          <ArenaResultCard
+            {...result}
+            marketLabel={marketLabel}
+            rivalName={rivalName}
+            rivalHref={rivalHref}
+            playAgain={rematch?.button ?? (
+              <Link
+                href="/duel"
+                className="rounded-md bg-[var(--btn-bg)] px-5 py-2 text-center text-sm font-medium text-[var(--btn-text)] transition hover:bg-[var(--btn-bg-hover)]"
+              >
+                Play Again
+              </Link>
+            )}
+          />
+        </>
       )}
 
       {notice && <p className="pt-2 text-center text-xs font-medium text-[var(--negative)]">{notice}</p>}

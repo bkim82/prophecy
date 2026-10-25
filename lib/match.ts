@@ -18,7 +18,7 @@ export const PRESENCE_MS = 8000;
 /** Cutoff for "seen recently", on the app-server clock (all writes use it too). */
 export const presenceCutoff = () => new Date(Date.now() - PRESENCE_MS);
 
-const isFresh = (seen: Date | null) =>
+export const isFresh = (seen: Date | null) =>
   seen !== null && Date.now() - seen.getTime() < PRESENCE_MS;
 
 export const roleOf = (row: MatchRow, playerId: string): 1 | 2 | null =>
@@ -215,6 +215,8 @@ export type MatchView = {
   timerSeconds: number;
   status: MatchStatus;
   you: 1 | 2;
+  /** A challenge's private round (`invited_user_id`): settled, it offers a rematch (lib/rematch.ts). */
+  challenge: boolean;
   opponentJoined: boolean;
   opponentPresent: boolean;
   /** End of the 5s pre-round countdown; null outside `predict`. */
@@ -263,6 +265,7 @@ export function viewFor(row: MatchRow, you: 1 | 2): MatchView {
     timerSeconds: row.timerSeconds,
     status: row.status as MatchStatus,
     you,
+    challenge: row.invitedUserId !== null,
     opponentJoined: row.player2Id !== null,
     opponentPresent: row.botState?.role === (you === 1 ? 2 : 1) || isFresh(oppLastSeen),
     lockDeadlineAt: row.status === "predict" ? lockDeadlineOf(row) : null,
