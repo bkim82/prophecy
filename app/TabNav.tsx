@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, usePathname } from "next/navigation";
-import { useTransition } from "react";
+import { useOptimistic, useTransition } from "react";
 
 // Same destinations, same order, as MobileBottomNav (text only here). Sanctum
 // is hidden from nav for now; /sanctum still works by direct URL.
@@ -15,10 +15,13 @@ export function TabNav() {
   const pathname = usePathname();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  // A click moves the underline to its tab at once instead of after the route
+  // loads; it falls back to the real pathname when the transition settles.
+  const [activePath, setActivePath] = useOptimistic(pathname);
 
   // "/" only matches itself; the rest match by prefix so nested routes
   // (/duel/portfolio, /duel/btc/pulse/…) keep their section highlighted.
-  const activeIndex = TABS.findIndex((tab) => (tab.href === "/" ? pathname === "/" : pathname.startsWith(tab.href)));
+  const activeIndex = TABS.findIndex((tab) => (tab.href === "/" ? activePath === "/" : activePath.startsWith(tab.href)));
 
   return (
     <nav className="main-nav" aria-label="Primary" aria-busy={isPending}>
@@ -41,6 +44,7 @@ export function TabNav() {
               // behind it.
               event.preventDefault();
               startTransition(() => {
+                setActivePath(href);
                 router.push(href);
               });
             }}

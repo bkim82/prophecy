@@ -114,14 +114,22 @@ button { cursor: pointer; }
    (.feed-shell/.lobby-shell/.wallet-shell) so its edges line up with content. */
 .app-header { width: 100%; max-width: none; margin: 0; padding: 0; border-bottom: 1px solid var(--structure-line); background: var(--structure); }
 .app-header-inner { display: flex; width: min(100% - 56px, var(--shell-max)); height: 64px; align-items: center; justify-content: space-between; gap: 16px; margin-inline: auto; padding: 0; }
-.desktop-header-content { display: grid; width: 100%; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 36px; }
+.desktop-header-content { display: grid; width: 100%; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 32px; }
 .desktop-header-content > .brand { justify-self: start; }
-.brand { flex: none; font-family: var(--font-cinzel), Cinzel, Georgia, serif; color: var(--structure-text); font-size: 16px; font-weight: 700; letter-spacing: .34em; text-decoration: none; }
+.brand { display: inline-flex; flex: none; align-items: center; gap: 10px; color: var(--structure-text); font-family: var(--font-sans), Inter, system-ui, sans-serif; font-size: 20px; font-weight: 450; letter-spacing: .025em; line-height: 1; text-decoration: none; }
+/* The mark keeps its violet in every theme: dark orb, lit rim, white crescent. */
+.brand-mark { display: grid; width: 26px; height: 26px; flex: none; place-items: center; border-radius: 50%; background: radial-gradient(circle, #0d0a17 54%, #221846 74%, #8467ea 94%, #c3b3fd 100%); box-shadow: 0 0 6px rgba(140, 110, 240, .5), 0 0 14px rgba(140, 110, 240, .22); color: #fff; }
+.brand-mark svg { width: 100%; height: 100%; }
 .header-actions { display: flex; justify-self: end; align-items: center; gap: 12px; }
+/* Underline tabs: hover draws a faint underline out from the center, the active tab keeps a solid one. */
 .main-nav { display: flex; justify-self: start; align-items: center; gap: 24px; font-family: var(--font-sans), Inter, system-ui, sans-serif; }
-.main-nav-link { display: inline-flex; align-items: center; min-height: 36px; color: var(--structure-muted); font-size: 14px; font-weight: 500; text-decoration: none; -webkit-user-drag: none; user-select: none; transition: color .15s ease; }
+.main-nav-link { position: relative; display: inline-flex; align-items: center; min-height: 36px; color: var(--structure-muted); font-size: 13px; font-weight: 500; text-decoration: none; -webkit-user-drag: none; user-select: none; transition: color .15s ease; }
+.main-nav-link::after { content: ""; position: absolute; right: 0; bottom: 3px; left: 0; height: 2px; border-radius: 2px; background: color-mix(in srgb, var(--structure-text) 35%, transparent); transform: scaleX(0); transition: transform .2s ease, background-color .15s ease; }
 .main-nav-link:hover, .main-nav-link.active { color: var(--structure-text); }
-.main-nav[aria-busy="true"] { opacity: .8; }
+.main-nav-link:hover::after { transform: scaleX(1); }
+.main-nav-link.active::after { background: var(--structure-text); transform: scaleX(1); }
+.main-nav-link:focus-visible { border-radius: 4px; outline: 2px solid var(--brand); outline-offset: 2px; }
+.main-nav[aria-busy="true"] .main-nav-link:not(.active) { opacity: .8; }
 .signin-button { min-height: 36px; border: 1px solid var(--structure-line); border-radius: 8px; background: transparent; color: var(--structure-muted); padding: 0 14px; font-size: 13px; }
 .signin-button:hover { border-color: var(--brand); color: var(--structure-text); }
 .theme-toggle { display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid var(--structure-line); border-radius: 8px; background: transparent; color: var(--structure-muted); padding: 0; }
@@ -2335,7 +2343,9 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
   .desktop-header-content { display: none; }
   .mobile-header-content { display: flex; width: 100%; min-width: 0; align-items: center; justify-content: space-between; gap: 12px; }
   /* Shrinkable so a long Embers balance squeezes the wordmark, never pushes the avatar off-screen. */
-  .mobile-header-content .brand { flex: 0 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; font-size: 19px; letter-spacing: .2em; line-height: 1; }
+  .mobile-header-content .brand { flex: 0 1 auto; min-width: 0; gap: 8px; font-size: 19px; }
+  /* Only the word clips (the mark's glow would be cut off); 1.25 keeps p/y descenders. */
+  .mobile-header-content .brand-word { min-width: 0; overflow: hidden; white-space: nowrap; line-height: 1.25; }
   .mobile-header-actions { display: flex; flex: none; align-items: center; gap: 6px; }
   .mobile-header-actions .theme-toggle, .mobile-header-actions .notif-bell { width: 38px; height: 38px; }
   /* Phone popover spans the screen under the header instead of hanging off the bell. */
@@ -2462,8 +2472,8 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
 /* ProfileShowcase skips the flip itself under reduced motion; this drops the cards' rise and the toggle's pulse. */
 @media (prefers-reduced-motion: reduce) { .profile-face--panel :is(.profile-record-hero, .sidebar-row, .profile-reel-card), .profile-face-toggle { animation: none !important; } }
 
-@media (max-width: 420px) { .mobile-header-content .brand { font-size: 17px; letter-spacing: .16em; } }
-@media (max-width: 380px) { .mobile-header-content .brand { font-size: 16px; letter-spacing: .12em; } .mobile-header-actions .theme-toggle, .mobile-header-actions .notif-bell { width: 34px; height: 34px; } }
+@media (max-width: 420px) { .mobile-header-content .brand { font-size: 18px; } }
+@media (max-width: 380px) { .mobile-header-content .brand { gap: 7px; font-size: 17px; } .mobile-header-content .brand-mark { width: 22px; height: 22px; } .mobile-header-actions .theme-toggle, .mobile-header-actions .notif-bell { width: 34px; height: 34px; } }
 @media (max-width: 340px) {
   .app-header { padding-inline: 16px; }
 }
