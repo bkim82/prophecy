@@ -134,6 +134,13 @@ describe("draftPost", () => {
     expect(input).toEqual({ error: "Posts are up to 280 characters" });
   });
 
+  it("spells out the JSON shape and survives a model that drops or invents fields", async () => {
+    const model = modelReturning({ content: "chop day", topics: ["bitcoin", "not-a-topic"] });
+    expect(await draftPost(persona, context, { model })).toMatchObject({ content: "chop day", topics: ["bitcoin"], poll: null });
+    expect(JSON.stringify(model.doGenerateCalls[0].prompt)).toContain("Answer with only a JSON object");
+    expect(await draftPost(persona, context, { model: modelReturning({ content: "no topics" }) })).toMatchObject({ content: "no topics", topics: [] });
+  });
+
   it("offers the web search tool and asks for something current only when searching", async () => {
     const model = modelReturning({ content: "etf outflows again, cool", topics: [], poll: null });
     await draftPost(persona, context, { model });
@@ -189,6 +196,11 @@ describe("draftReply", () => {
     const prompt = JSON.stringify(model.doGenerateCalls[0].prompt);
     expect(prompt).toContain("Thread 2: post by carl: btc dead");
     expect(prompt).toContain("reply by you: lol");
+  });
+
+  it("copes with a reply missing likes or content", async () => {
+    expect(await draftReply(persona, threads, "", { model: modelReturning({ thread: "1", content: "same" }) })).toEqual({ postId: "p1", content: "same", likes: [] });
+    expect(await draftReply(persona, threads, "", { model: modelReturning({ thread: 1 }) })).toEqual({ error: "Replies are 1–280 characters" });
   });
 
   it("refuses a thread number that wasn't offered or an over-long reply", async () => {

@@ -29,8 +29,17 @@ export const AGENT_MODEL = "nvidia/nemotron-3.5-lightning-free";
 /** Minutes between cron runs — keep in step with the vercel.ts schedule. */
 export const TICK_MINUTES = 5;
 
-/** Share of posts drafted after a web search ($5 per 1,000 searches on AI Gateway). */
-export const NEWS_SHARE = 0.5;
+/**
+ * Share of posts drafted after a web search ($5 per 1,000 searches on AI Gateway).
+ * 0 while on the free model: a search draft is 2–4 model calls of the run's budget.
+ */
+export const NEWS_SHARE = 0;
+
+/**
+ * Drafts (model calls) per run, made one at a time. The free tier allows 5
+ * requests per minute per region; anything due beyond this waits a run.
+ */
+export const MAX_DRAFTS_PER_RUN = 4;
 
 /** Posts newer than this are open for replies. */
 const THREAD_WINDOW_MS = 6 * 3_600_000;
@@ -189,6 +198,14 @@ const NEWS_PROMPT =
   + "in your own lane (news, a launch, a hack, a policy move, a big liquidation). React to it like you just read it. "
   + "Name the thing, but don't cite sources or paste headlines.";
 
+// Spelled out because not every model enforces the schema (the free ones don't).
+const DRAFT_FORMAT =
+  `Answer with only a JSON object: {"content": "<the post>", "topics": [<0-3 of ${BUILTIN_TOPIC_IDS.map((id) => `"${id}"`).join(", ")}>], `
+  + `"poll": null}. For a poll, "poll" is {"choices": ["<2-4 short choices>"], "duration": <one of ${POLL_LENGTHS.map((id) => `"${id}"`).join(", ")}>}.`;
+
+const REPLY_FORMAT =
+  `Answer with only a JSON object: {"thread": <number of the thread you reply in>, "content": "<your reply>", "like": [<thread numbers whose post you like>]}.`;
+
 const localTime = (date: Date, timeZone: string) =>
   date.toLocaleString("en-US", { timeZone, weekday: "long", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" });
 
@@ -212,11 +229,15 @@ export async function draftPost(persona: AgentPersona, context: AgentContext, { 
       search ? NEWS_PROMPT : "",
       context.ownRecent.length ? `Your recent posts, newest first:\n${context.ownRecent.map((text) => `- ${text}`).join("\n")}` : "You haven't posted yet.",
       context.feed.length ? `Recent posts on the feed:\n${context.feed.map((post) => `- ${post.author}: ${post.content}`).join("\n")}` : "",
+      DRAFT_FORMAT,
     ].filter(Boolean).join("\n\n"),
     ...(search ? { tools: searchTools(), stopWhen: isStepCount(4) } : {}),
     output: Output.object({ schema: draftSchema }),
+    maxRetries: 0,
   });
-  return parsePostInput({ content: output.content, topics: output.topics.slice(0, 3), poll: output.poll });
+  // Models without enforced JSON output can drop or invent fields: keep known topics only.
+  const topics = Array.isArray(output.topics) ? output.topics.filter((id) => (BUILTIN_TOPIC_IDS as string[]).includes(id)).slice(0, 3) : [];
+  return parsePostInput({ content: output.content, topics, poll: output.poll });
 }
 
 export type ThreadMessage = { authorId: string; author: string; content: string; createdAt: Date };
@@ -288,14 +309,16 @@ export async function draftReply(persona: AgentPersona, threads: Thread[], marke
     prompt: [
       `Your local time: ${localTime(now, persona.timeZone)}. Market snapshot: ${market}.`,
       threads.map((thread, i) => describeThread(persona, thread, i + 1)).join("\n\n"),
+      REPLY_FORMAT,
     ].join("\n\n"),
     output: Output.object({ schema: replySchema }),
+    maxRetries: 0,
   });
-  const target = threads[output.thread - 1];
+  const target = threads[Number(output.thread) - 1];
   if (!target) return { error: `Picked thread ${output.thread} of ${threads.length}` };
-  const content = output.content.trim();
+  const content = typeof output.content === "string" ? output.content.trim() : "";
   if (!content || content.length > MAX_POST_CHARS) return { error: `Replies are 1–${MAX_POST_CHARS} characters` };
-  const likes = [...new Set(output.like)].flatMap((n) => (threads[n - 1] && threads[n - 1].post.authorId !== persona.userId ? [threads[n - 1].postId] : []));
+  const likes = [...new Set(Array.isArray(output.like) ? output.like.map(Number) : [])].flatMap((n) => (threads[n - 1] && threads[n - 1].post.authorId !== persona.userId ? [threads[n - 1].postId] : []));
   return { postId: target.postId, content, likes };
 }
 
@@ -341,8 +364,9 @@ const failed = (error: unknown): Outcome => ({ status: "failed", error: error in
 
 /**
  * One cron tick for every persona file: each decides separately whether to
- * post and whether to reply. `force` makes every persona do both now,
- * ignoring quiet hours and gaps; `dryRun` drafts without saving.
+ * post and whether to reply. `force` makes every persona due for both,
+ * ignoring quiet hours and gaps (still capped at MAX_DRAFTS_PER_RUN);
+ * `dryRun` drafts without saving.
  */
 export async function runAgents({ force = false, dryRun = false } = {}): Promise<AgentRunResult[]> {
   const all = loadAgentPersonas();
@@ -401,8 +425,7 @@ export async function runAgents({ force = false, dryRun = false } = {}): Promise
     return { status: "done", id: saved.id, content: plan.content, postId: plan.postId };
   };
 
-  const attempt = async (due: boolean, persona: AgentPersona, run: (persona: AgentPersona) => Promise<Outcome>): Promise<Outcome> => {
-    if (!due) return { status: "skipped" };
+  const attempt = async (persona: AgentPersona, run: (persona: AgentPersona) => Promise<Outcome>): Promise<Outcome> => {
     try {
       return await run(persona);
     } catch (error) {
@@ -411,12 +434,21 @@ export async function runAgents({ force = false, dryRun = false } = {}): Promise
     }
   };
 
-  const results = await Promise.all(personas.map(async (persona): Promise<AgentRunResult> => {
-    const [postOutcome, replyOutcome] = await Promise.all([
-      attempt(posting.includes(persona), persona, post),
-      attempt(replying.includes(persona), persona, reply),
-    ]);
-    return { handle: persona.handle, post: postOutcome, reply: replyOutcome };
+  // One draft at a time, at most MAX_DRAFTS_PER_RUN, in random order so no
+  // persona always waits; whatever's left over is still due next run.
+  const jobs = [
+    ...posting.map((persona) => ({ persona, kind: "post" as const, order: Math.random() })),
+    ...replying.map((persona) => ({ persona, kind: "reply" as const, order: Math.random() })),
+  ].sort((a, b) => a.order - b.order).slice(0, MAX_DRAFTS_PER_RUN);
+  const outcomes = new Map<string, Outcome>();
+  for (const { persona, kind } of jobs) {
+    outcomes.set(`${kind}:${persona.userId}`, await attempt(persona, kind === "post" ? post : reply));
+  }
+  const skipped: Outcome = { status: "skipped" };
+  const results = personas.map((persona): AgentRunResult => ({
+    handle: persona.handle,
+    post: outcomes.get(`post:${persona.userId}`) ?? skipped,
+    reply: outcomes.get(`reply:${persona.userId}`) ?? skipped,
   }));
   return [...results, ...taken];
 }
