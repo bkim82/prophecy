@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import { Cinzel, IBM_Plex_Mono, Inter } from "next/font/google";
-import Link from "next/link";
 import { headers } from "next/headers";
 import { AccountMenu } from "./AccountMenu";
 import { ActiveMatchBar } from "./ActiveMatchBar";
 import { AuthProvider, SignedIn, type AuthConfiguration } from "./auth/AuthProvider";
 import { BalancePill } from "./BalancePill";
+import { Brand } from "./Brand";
 import { HandleGate } from "./HandleGate";
 import { LiveChallenges } from "./LiveChallenges";
 import { MessagesButton } from "./MessagesButton";
@@ -21,10 +21,10 @@ import { handleFor } from "@/lib/profile";
 import { getViewer } from "@/lib/viewer";
 import "./globals.css";
 
-// Cinzel carries the ancient-inscription weight for headings/brand; Inter
-// keeps body copy legible; IBM Plex Mono gives prices, timers, and balances
-// a console/oracle-readout feel. See the font-family assignments in
-// globals.css (.display-font, .tabular-nums).
+// Cinzel carries the ancient-inscription weight for headings; Inter keeps
+// body copy and the header (wordmark + nav) legible; IBM Plex Mono gives
+// prices, timers, and balances a console/oracle-readout feel. See the
+// font-family assignments in globals.css (.display-font, .tabular-nums).
 const cinzel = Cinzel({ subsets: ["latin"], weight: ["500", "600", "700"], variable: "--font-cinzel" });
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 const plexMono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--font-mono" });
@@ -66,7 +66,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <header className="app-header">
             <div className="app-header-inner">
               <div className="desktop-header-content">
-                <Link href="/" className="brand">PROPHECY</Link>
+                <Brand />
                 <TabNav />
                 <div className="header-actions">
                   <ThemeToggle />
@@ -77,7 +77,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 </div>
               </div>
               <div className="mobile-header-content">
-                <Link href="/" className="brand">PROPHECY</Link>
+                <Brand />
                 <div className="mobile-header-actions">
                   <ThemeToggle />
                   <SignedIn><BalancePill /></SignedIn>
