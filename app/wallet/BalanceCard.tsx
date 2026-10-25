@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { CoinImage } from "@/app/duel/portfolio/ui";
 import { walletFreeGasEnabled } from "@/app/lib/embeddedWallet/config";
 
 const usd = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 });
@@ -44,13 +45,25 @@ function AnimatedTotal({ value }: { value: number }) {
 
 export type WalletMenuItem = { label: string; onSelect: () => void };
 
+export type BalanceChip = {
+  label: string;
+  symbol: string;
+  usdValue: number;
+  imageUrl: string | null;
+  /** Opens the coin's detail panel; omitted when the wallet doesn't hold it. */
+  onSelect?: () => void;
+};
+
 /**
  * Balance card: available total (blank until the first holdings read, so a
  * not-yet-loaded wallet never flashes $0.00), Deposit/Withdraw, a ⋯ menu for
- * the less common actions, and a stats row under a divider.
+ * the less common actions, and a stats row under a divider. Chips at the right
+ * end of that row (Gas = ETH, Cash = USDC, the wallet's default asset) call out
+ * the balances the wallet runs on.
  */
 export function BalanceCard({
   totalUsd,
+  chips,
   loaded,
   subline,
   changeUsd,
@@ -60,6 +73,7 @@ export function BalanceCard({
   menu,
 }: {
   totalUsd: number;
+  chips: BalanceChip[];
   loaded: boolean;
   subline: string;
   changeUsd: number | null;
@@ -92,21 +106,45 @@ export function BalanceCard({
           <WalletMenu items={menu} />
         </div>
       </div>
-      <dl className="wd-balance-stats">
-        <div>
-          <dt>24h change</dt>
-          <dd className={tone}>{!loaded || changeUsd === null || changePct === null ? "—" : `${signedUsd(changeUsd)} (${signedPct(changePct)})`}</dd>
-        </div>
-        <div>
-          <dt>Withdrawable now</dt>
-          <dd>{loaded ? usd(totalUsd) : "—"}</dd>
-        </div>
-        <div>
-          <dt>Network fees</dt>
-          <dd>{walletFreeGasEnabled() ? "Covered by Prophecy" : "Paid from balance"}</dd>
-        </div>
-      </dl>
+      <div className="wd-balance-foot">
+        <dl className="wd-balance-stats">
+          <div>
+            <dt>24h change</dt>
+            <dd className={tone}>{!loaded || changeUsd === null || changePct === null ? "—" : `${signedUsd(changeUsd)} (${signedPct(changePct)})`}</dd>
+          </div>
+          <div>
+            <dt>Network fees</dt>
+            <dd>{walletFreeGasEnabled() ? "Covered by Prophecy" : "Paid from balance"}</dd>
+          </div>
+        </dl>
+        {loaded && (
+          <div className="wd-asset-chips">
+            {chips.map((chip) => <AssetChip key={chip.label} chip={chip} />)}
+          </div>
+        )}
+      </div>
     </section>
+  );
+}
+
+/** A tinted stat (label over value, like its neighbours); opens the coin's detail panel when held. */
+function AssetChip({ chip }: { chip: BalanceChip }) {
+  const body = (
+    <>
+      <CoinImage src={chip.imageUrl} symbol={chip.symbol} size={28} />
+      <span className="wd-asset-chip-text">
+        <span className="wd-asset-chip-label">{chip.label}</span>
+        <span className="wd-asset-chip-value"><strong>{usd(chip.usdValue)}</strong> <small>{chip.symbol}</small></span>
+      </span>
+    </>
+  );
+  return chip.onSelect ? (
+    <button type="button" className="wd-asset-chip" onClick={chip.onSelect} aria-label={`${chip.label}: ${usd(chip.usdValue)} ${chip.symbol}. View details`}>
+      {body}
+      <svg viewBox="0 0 12 12" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m4.5 2.5 3.5 3.5-3.5 3.5" /></svg>
+    </button>
+  ) : (
+    <span className="wd-asset-chip">{body}</span>
   );
 }
 

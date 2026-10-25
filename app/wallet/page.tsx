@@ -1,10 +1,23 @@
 "use client";
 
 import { useWalletIdentity } from "@/app/lib/useWalletConnection";
-import { WalletDashboard } from "./WalletDashboard";
+import { MOCK_ACTIVITY, MOCK_HOLDINGS, MOCK_WALLET, WALLET_MOCK_ENABLED } from "./mockWallet";
+import { WalletDashboard, type WalletMock } from "./WalletDashboard";
+
+const MOCK: WalletMock = { holdings: MOCK_HOLDINGS, activity: MOCK_ACTIVITY };
 
 export default function WalletPage() {
   const { wallet, notice, isLoaded, signIn, signOut } = useWalletIdentity();
+
+  // `next dev` can't complete sign-in, so a signed-out local session gets the mock wallet.
+  if (!wallet.address && WALLET_MOCK_ENABLED) {
+    return (
+      <main className="wd-page">
+        <p className="wallet-notice" role="status">Mock wallet: local dev only, sign-in skipped. Send and swap won&apos;t go through.</p>
+        <WalletDashboard wallet={MOCK_WALLET} signOut={async () => {}} mock={MOCK} />
+      </main>
+    );
+  }
 
   if (!wallet.address) {
     return (
