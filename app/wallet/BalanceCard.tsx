@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { DepositIcon, SendIcon, SwapIcon } from "@/app/icons";
+import { walletFreeGasEnabled } from "@/app/lib/embeddedWallet/config";
 
 const usd = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 });
 const signedUsd = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${usd(Math.abs(n))}`;
@@ -29,7 +29,7 @@ function AnimatedTotal({ value }: { value: number }) {
   }, [text]);
 
   return (
-    <span className="wd-chip-total tabular-nums" aria-label={text}>
+    <span className="wd-balance-total" aria-label={text}>
       {text.split("").map((char, i) => {
         const tinted = change !== null && i >= change.from && /\d/.test(char);
         return (
@@ -42,46 +42,122 @@ function AnimatedTotal({ value }: { value: number }) {
   );
 }
 
-/** Big centerpiece balance card — dotted backdrop, large total, 24h change, Swap/Send/Deposit tiles (Coinbase Wallet home layout). */
-export function BalanceChip({
+export type WalletMenuItem = { label: string; onSelect: () => void };
+
+/**
+ * Balance card: available total (blank until the first holdings read, so a
+ * not-yet-loaded wallet never flashes $0.00), Deposit/Withdraw, a ⋯ menu for
+ * the less common actions, and a stats row under a divider.
+ */
+export function BalanceCard({
   totalUsd,
+  loaded,
+  subline,
   changeUsd,
   changePct,
   onDeposit,
-  onSend,
-  onSwap,
+  onWithdraw,
+  menu,
 }: {
   totalUsd: number;
+  loaded: boolean;
+  subline: string;
   changeUsd: number | null;
   changePct: number | null;
   onDeposit: () => void;
-  onSend: () => void;
-  onSwap: () => void;
+  onWithdraw: () => void;
+  menu: WalletMenuItem[];
 }) {
-  const flat = changePct === null || Math.abs(changePct) < 0.005;
-  const color = flat ? "var(--muted)" : (changePct ?? 0) > 0 ? "var(--positive)" : "var(--negative)";
+  // Sub-cent moves (a stablecoin's drift) read as flat, not as a green "+$0.00".
+  const flat = changePct === null || changeUsd === null || Math.abs(changePct) < 0.005 || Math.abs(changeUsd) < 0.005;
+  const tone = flat ? "" : (changePct ?? 0) > 0 ? "is-up" : "is-down";
 
   return (
-    <section className="wd-chip" aria-label="Wallet balance">
-      <span className="wd-chip-grid" aria-hidden="true" />
-      <AnimatedTotal value={totalUsd} />
-      <p className="wd-chip-change" style={{ color }}>
-        {changeUsd === null || changePct === null ? "—" : <>{signedUsd(changeUsd)} <span>({signedPct(changePct)}) today</span></>}
-      </p>
-      <div className="wd-chip-tiles">
-        <button type="button" onClick={onSwap} className="wd-tile">
-          <span className="wd-tile-icon"><SwapIcon className="h-5 w-5" /></span>
-          Swap
-        </button>
-        <button type="button" onClick={onSend} className="wd-tile">
-          <span className="wd-tile-icon"><SendIcon className="h-5 w-5" /></span>
-          Send
-        </button>
-        <button type="button" onClick={onDeposit} className="wd-tile">
-          <span className="wd-tile-icon"><DepositIcon className="h-5 w-5" /></span>
-          Deposit
-        </button>
+    <section className="wd-balance" aria-label="Wallet balance">
+      <div className="wd-balance-top">
+        <div className="wd-balance-figure">
+          <span className="wd-balance-label">Available balance</span>
+          {loaded ? <AnimatedTotal value={totalUsd} /> : <span className="wd-balance-total wd-balance-loading" aria-label="Loading balance">$—</span>}
+          <span className="wd-balance-sub">{loaded ? subline : "Reading balances from Base…"}</span>
+        </div>
+        <div className="wd-balance-actions">
+          <button type="button" className="wd-pill wd-pill-primary" onClick={onDeposit}>
+            <svg viewBox="0 0 14 14" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true"><path d="M7 2v10M2 7h10" /></svg>
+            Deposit
+          </button>
+          <button type="button" className="wd-pill" onClick={onWithdraw}>
+            <svg viewBox="0 0 12 12" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 2.5h5.5V8M9.5 2.5 2.5 9.5" /></svg>
+            Withdraw
+          </button>
+          <WalletMenu items={menu} />
+        </div>
       </div>
+      <dl className="wd-balance-stats">
+        <div>
+          <dt>24h change</dt>
+          <dd className={tone}>{!loaded || changeUsd === null || changePct === null ? "—" : `${signedUsd(changeUsd)} (${signedPct(changePct)})`}</dd>
+        </div>
+        <div>
+          <dt>Withdrawable now</dt>
+          <dd>{loaded ? usd(totalUsd) : "—"}</dd>
+        </div>
+        <div>
+          <dt>Network fees</dt>
+          <dd>{walletFreeGasEnabled() ? "Covered by Prophecy" : "Paid from balance"}</dd>
+        </div>
+      </dl>
     </section>
+  );
+}
+
+// Same open/blur/Escape handling as app/PostMenu.tsx, reusing its dropdown styles.
+function WalletMenu({ items }: { items: WalletMenuItem[] }) {
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+  function close() {
+    triggerRef.current?.focus();
+    setOpen(false);
+  }
+
+  return (
+    <div
+      className="post-menu"
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget)) setOpen(false);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Escape" && open) close();
+      }}
+    >
+      <button
+        ref={triggerRef}
+        type="button"
+        className="wd-pill wd-pill-round"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label="More wallet actions"
+        onClick={() => (open ? close() : setOpen(true))}
+      >
+        ⋯
+      </button>
+      {open && (
+        <div className="post-menu-dropdown" role="menu">
+          {items.map((item) => (
+            <button
+              key={item.label}
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                item.onSelect();
+              }}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

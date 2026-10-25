@@ -2635,88 +2635,114 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
    `.wallet-*` rules above (still used by WalletDesk's connect card). Reuses .pf-flash-up/.pf-flash-down (price flash),
    .pf-crossfade/.pf-live-dot/.pf-shimmer/.pf-select-indicator/.pf-row-star
    (shared with app/duel/portfolio, since AdvancedTab embeds TokenExplorer
-   directly) and .panel/.eyebrow (shared chrome). */
-.wd-page { width: min(100% - 32px, 980px); margin: 0 auto; padding: 32px 0 64px; }
-.wd-dashboard { display: grid; gap: 18px; }
+   directly) and .post-menu* (dropdowns). Numbers use tabular figures in the
+   sans face rather than the mono `.tabular-nums` class: a bank-statement look. */
+.wd-page { width: min(100% - 32px, 960px); margin: 0 auto; padding: 36px 0 72px; }
+.wd-dashboard { display: grid; gap: 20px; }
 
-.wd-connection-strip { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12px; font-family: var(--font-mono), monospace; }
-.wd-status-dot { width: 7px; height: 7px; border-radius: 999px; background: var(--positive); box-shadow: 0 0 0 0 color-mix(in srgb, var(--positive) 45%, transparent); animation: wd-live 2s ease-out infinite; }
-@keyframes wd-live { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--positive) 45%, transparent); } 70%, 100% { box-shadow: 0 0 0 6px transparent; } }
-.wd-strip-link { margin-left: auto; border: 0; background: none; color: var(--muted-dim); font-size: 11px; font-family: var(--font-sans), sans-serif; }
-.wd-strip-link + .wd-strip-link { margin-left: 14px; }
-.wd-strip-link:hover { color: var(--text); }
+/* Title + network/address pill */
+.wd-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 16px; margin-bottom: 4px; }
+.wd-header h1 { margin: 0; color: var(--text); font-size: 30px; font-weight: 700; letter-spacing: -.02em; }
+.wd-header-sub { display: grid; justify-items: start; gap: 6px; }
+.wd-address-pill { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); padding: 5px 6px 5px 12px; color: var(--muted); font-size: 13px; }
+.wd-address-pill code { color: var(--text); font-family: var(--font-mono), monospace; font-size: 12px; font-weight: 600; }
+.wd-address-sep { color: var(--muted-dim); }
+.wd-address-pill button, .wd-address-pill a { display: inline-grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: 999px; background: none; color: var(--muted); padding: 0; }
+.wd-address-pill button:hover, .wd-address-pill a:hover { background: var(--surface-hover); color: var(--text); }
+.wd-base-dot { display: inline-block; flex: none; width: 14px; height: 14px; border-radius: 999px; background: #0052ff; }
 
-/* Portfolio / Advanced switcher — plain underline tabs, Coinbase Wallet
-   home style (Coins/Collectibles/Orders), not the pill `.feed-tabs` look. */
-.wd-tabs { display: flex; gap: 22px; margin: 4px 2px 18px; border-bottom: 1px solid var(--line); }
-.wd-tabs button { position: relative; border: 0; background: none; color: var(--muted); padding: 10px 1px 12px; font-size: 14px; font-weight: 600; transition: color .15s ease; }
-.wd-tabs button:hover { color: var(--text); }
-.wd-tabs button.active { color: var(--text); }
-.wd-tabs button.active::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; border-radius: 2px; background: var(--brand); }
-
-/* Portfolio tab content (chip + table, or detail panel) stays a narrower
-   centered column instead of stretching to the full `.wd-page` width the
-   Advanced tab's explorer+detail layout uses. */
-.wd-portfolio { display: grid; gap: 18px; width: min(100%, 640px); margin: 0 auto; }
-
-/* Balance card: dotted backdrop fading toward the edges, big total, digit-diff
-   tint on change, Swap/Send/Deposit tiles — Coinbase Wallet home layout. */
-.wd-chip { position: relative; display: grid; justify-items: center; gap: 6px; padding: 40px 16px 28px; text-align: center; overflow: hidden; border-radius: 20px; border: 1px solid var(--line); background: var(--surface); }
-.wd-chip-grid { position: absolute; inset: 0; pointer-events: none; background-image: radial-gradient(circle, color-mix(in srgb, var(--line-strong) 75%, transparent) 1px, transparent 1.6px); background-size: 16px 16px; background-position: center; -webkit-mask-image: radial-gradient(ellipse 70% 100% at center, black 30%, transparent 85%); mask-image: radial-gradient(ellipse 70% 100% at center, black 30%, transparent 85%); }
-.wd-chip-total { position: relative; font-size: 44px; font-weight: 700; letter-spacing: -.01em; color: var(--text); }
-.wd-chip-change { position: relative; margin: 0; font-size: 13px; font-weight: 600; }
-.wd-chip-change span { font-weight: 500; color: var(--muted); }
+/* Balance card: available total + Deposit/Withdraw/⋯, stats row under a divider. */
+.wd-balance { display: grid; gap: 24px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); padding: 32px; }
+.wd-balance-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 20px; }
+.wd-balance-figure { display: grid; justify-items: start; gap: 4px; min-width: 0; }
+.wd-balance-label, .wd-balance-sub { color: var(--muted); font-size: 13px; }
+.wd-balance-total { color: var(--text); font-size: 60px; font-weight: 300; line-height: 1.08; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.wd-balance-loading { color: var(--muted-dim); }
 .wd-digit-up { animation: wd-digit-up .9s ease-out; }
 .wd-digit-down { animation: wd-digit-down .9s ease-out; }
 @keyframes wd-digit-up { from { color: var(--positive); } }
 @keyframes wd-digit-down { from { color: var(--negative); } }
-.wd-chip-tiles { position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 10px; margin-top: 20px; width: 100%; max-width: 360px; }
-.wd-tile { display: grid; justify-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-raised); color: var(--text); padding: 14px 8px 12px; font-size: 12px; font-weight: 600; transition: border-color .15s, background-color .15s, transform .15s; }
-.wd-tile:hover { border-color: var(--brand); background: var(--surface-hover); transform: translateY(-1px); }
-.wd-tile-icon { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 999px; background: color-mix(in srgb, var(--brand) 16%, transparent); color: var(--brand-strong); }
+.wd-balance-actions { display: flex; align-items: center; gap: 10px; }
+.wd-pill { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 44px; border: 1px solid var(--line-strong); border-radius: 999px; background: transparent; color: var(--text); padding: 0 22px; font-size: 14px; font-weight: 600; white-space: nowrap; transition: background-color .15s, border-color .15s; }
+.wd-pill:hover { background: var(--surface-hover); }
+.wd-pill-primary { border-color: var(--text); background: var(--text); color: var(--bg); }
+.wd-pill-primary:hover { background: color-mix(in srgb, var(--text) 86%, var(--bg)); }
+.wd-pill-round { width: 44px; padding: 0; color: var(--muted); font-size: 16px; }
+.wd-pill-small { height: 34px; gap: 6px; padding: 0 14px; font-size: 13px; }
+.wd-balance-stats { display: flex; flex-wrap: wrap; gap: 12px 44px; margin: 0; border-top: 1px solid var(--line); padding-top: 20px; }
+.wd-balance-stats dt { color: var(--muted); font-size: 12px; }
+.wd-balance-stats dd { margin: 4px 0 0; color: var(--text); font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.wd-balance-stats dd.is-up { color: var(--positive); }
+.wd-balance-stats dd.is-down { color: var(--negative); }
 
-/* Coin list: search + sort over a Coinbase-style table (Asset/Balance/Portfolio/Price). */
-.wd-list-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+/* Three plain-language guarantees under the balance. */
+.wd-trust { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
+.wd-trust li { display: flex; align-items: flex-start; gap: 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); padding: 18px; }
+.wd-trust-icon { display: inline-grid; flex: none; place-items: center; width: 16px; height: 18px; color: var(--brand); }
+.wd-trust strong { display: block; color: var(--text); font-size: 14px; font-weight: 600; }
+.wd-trust small { display: block; margin-top: 4px; color: var(--muted); font-size: 13px; line-height: 1.45; }
+
+/* Holdings / Recent activity sections: a heading row over a bordered card. */
+.wd-section { display: grid; gap: 12px; margin-top: 10px; }
+.wd-section-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.wd-section-row h2 { margin: 0; color: var(--text); font-size: 16px; font-weight: 600; }
+.wd-text-link { display: inline-flex; align-items: center; gap: 4px; border: 0; background: none; padding: 0; color: var(--brand); font-size: 13px; font-weight: 500; text-decoration: none; }
+.wd-text-link:hover { color: var(--brand-strong); text-decoration: underline; text-underline-offset: 3px; }
+.wd-card { border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.wd-card-empty { margin: 0; padding: 22px 20px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.wd-footnote { margin: 6px 0 0; color: var(--muted-dim); font-size: 12px; line-height: 1.6; }
+.wd-footnote .wd-text-link { font-size: 12px; }
+
+/* Holdings table (Asset / Price / Balance). */
+.wd-list-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 14px 16px 2px; }
 .wd-list-search { flex: 1; min-width: 160px; border: 1px solid var(--line); border-radius: 8px; background: var(--field-bg); padding: 8px 12px; font-size: 13px; color: var(--text); }
 .wd-list-sort { border: 1px solid var(--line); border-radius: 8px; background: var(--field-bg); padding: 8px 10px; font-size: 12px; font-weight: 600; color: var(--text); }
-.wd-table-head, .wd-coin-row-grid { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr) minmax(0, 0.4fr) minmax(0, 1fr); align-items: center; gap: 10px; }
-.wd-table-head { margin: 18px 2px 6px; padding: 0 42px 0 14px; color: var(--muted-dim); font-size: 11px; text-transform: uppercase; letter-spacing: .07em; }
-.wd-table-head span:not(:first-child), .wd-coin-row-balance, .wd-coin-row-share, .wd-coin-row-price { text-align: right; justify-self: end; }
-.wd-coin-list { display: grid; gap: 6px; }
-.wd-coin-row { position: relative; display: flex; align-items: center; border-radius: 10px; background: var(--surface); transition: background-color .15s; }
+.wd-table-head, .wd-coin-row-grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: 12px; }
+.wd-table-head { padding: 12px 56px 12px 18px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+.wd-table-head span:not(:first-child), .wd-coin-row-price, .wd-coin-row-balance { justify-self: end; text-align: right; }
+.wd-coin-list { display: grid; margin: 0; padding: 0; list-style: none; }
+.wd-coin-row { position: relative; display: flex; align-items: center; transition: background-color .15s; }
+.wd-coin-row + .wd-coin-row { border-top: 1px solid var(--line); }
+.wd-coin-row:last-child { border-radius: 0 0 13px 13px; }
 .wd-coin-row:hover { background: var(--surface-hover); }
 .wd-coin-row:has([aria-expanded="true"]) { z-index: 11; }
 .wd-coin-row.is-hidden .wd-coin-row-grid { opacity: .55; }
-.wd-coin-row-grid { flex: 1; min-width: 0; padding: 10px 6px 10px 14px; text-align: left; }
-.wd-coin-row-menu { flex: none; margin-right: 8px; }
-.wd-list-hidden-toggle { justify-self: center; display: block; margin: 10px auto 0; border: 0; background: none; color: var(--muted); font-size: 12px; font-weight: 600; }
+.wd-coin-row-grid { flex: 1; min-width: 0; border: 0; background: none; padding: 16px 8px 16px 18px; color: inherit; text-align: left; }
+.wd-coin-row-menu { flex: none; display: grid; place-items: center; width: 40px; margin-right: 8px; opacity: 0; transition: opacity .15s; }
+.wd-coin-row:hover .wd-coin-row-menu, .wd-coin-row:focus-within .wd-coin-row-menu { opacity: 1; }
+@media (hover: none) { .wd-coin-row-menu { opacity: 1; } }
+.wd-list-hidden-toggle { justify-self: center; display: block; margin: 0 auto; border: 0; background: none; color: var(--muted); font-size: 12px; font-weight: 600; }
 .wd-list-hidden-toggle:hover { color: var(--text); }
-.wd-coin-row-asset { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.wd-coin-row-identity { display: grid; gap: 1px; min-width: 0; }
-.wd-coin-row-identity strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: var(--text); }
-.wd-coin-row-identity small { color: var(--muted-dim); font-size: 11px; }
-.wd-coin-row-balance, .wd-coin-row-price { display: grid; gap: 1px; }
-.wd-coin-row-balance > span:first-child { font-size: 14px; font-weight: 700; color: var(--text); }
-.wd-coin-row-balance small { color: var(--muted-dim); font-size: 11px; }
-.wd-coin-row-share { color: var(--muted); font-size: 12px; }
-.wd-coin-row-price > span:first-child { font-size: 13px; font-weight: 600; color: var(--text); }
+.wd-coin-row-asset { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.wd-coin-row-identity { display: grid; gap: 2px; min-width: 0; }
+.wd-coin-row-identity strong, .wd-coin-row-identity small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wd-coin-row-identity strong { color: var(--text); font-size: 14px; font-weight: 600; }
+.wd-coin-row-identity small { color: var(--muted); font-size: 12px; }
+.wd-coin-row-price, .wd-coin-row-balance { display: grid; justify-items: end; gap: 2px; font-variant-numeric: tabular-nums; }
+.wd-coin-row-price > span:first-child, .wd-coin-row-balance > span:first-child { color: var(--text); font-size: 14px; font-weight: 600; }
+.wd-coin-row-balance small { color: var(--muted); font-size: 12px; }
 
-.wd-empty { margin: 8px 2px; color: var(--muted); font-size: 12px; }
-.wd-activity-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
-.wd-activity-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-radius: 10px; background: var(--surface); padding: 10px 14px; }
-.wd-activity-main, .wd-activity-side { display: grid; gap: 2px; min-width: 0; }
-.wd-activity-side { justify-items: end; text-align: right; }
-.wd-activity-main strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: var(--text); }
-.wd-activity-main small, .wd-activity-side small { display: flex; gap: 8px; color: var(--muted-dim); font-size: 11px; }
-.wd-activity-side > span:first-child { font-size: 13px; font-weight: 600; color: var(--text); overflow-wrap: anywhere; }
-.wd-activity-side > span.wd-activity-in { color: var(--positive); }
-.wd-activity-status { font-weight: 600; }
+/* Activity rows: kind icon, title + date · status, amount + Basescan link. */
+.wd-activity-list { display: grid; margin: 0; padding: 0; list-style: none; }
+.wd-activity-row { display: flex; align-items: center; gap: 14px; padding: 14px 18px; }
+.wd-activity-row + .wd-activity-row { border-top: 1px solid var(--line); }
+.wd-activity-icon { display: inline-grid; flex: none; place-items: center; width: 32px; height: 32px; border-radius: 999px; background: var(--surface-raised); color: var(--muted); }
+.wd-activity-row.is-received .wd-activity-icon { color: var(--positive); }
+.wd-activity-main { display: grid; flex: 1; gap: 2px; min-width: 0; }
+.wd-activity-main strong { color: var(--text); font-size: 14px; font-weight: 600; }
+.wd-activity-main small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 12px; }
+.wd-activity-side { display: flex; flex: none; align-items: center; justify-content: flex-end; gap: 16px; max-width: 55%; }
+.wd-activity-amount { color: var(--text); font-size: 14px; font-weight: 500; font-variant-numeric: tabular-nums; text-align: right; overflow-wrap: anywhere; }
+.wd-activity-amount.wd-activity-in { color: var(--positive); }
 .wd-activity-pending { color: var(--gold); }
-.wd-activity-done { color: var(--positive); }
 .wd-activity-failed { color: var(--negative); }
-.wd-activity-link { color: var(--muted-dim); text-decoration: underline; text-underline-offset: 2px; }
-.wd-activity-link:hover { color: var(--text); }
-.wd-section-heading { margin: 0 0 10px; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .1em; }
+.wd-activity-link { display: inline-flex; align-items: center; gap: 4px; color: var(--brand); font-size: 13px; white-space: nowrap; text-decoration: none; }
+.wd-activity-link:hover { color: var(--brand-strong); text-decoration: underline; text-underline-offset: 3px; }
+
+/* Deposit-arrived notice, shown when the deposit watch lands with the sheet closed. */
+.wd-toast { position: fixed; left: 50%; bottom: 28px; z-index: 70; display: inline-flex; align-items: center; gap: 10px; transform: translateX(-50%); border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface-raised); box-shadow: var(--glass-shadow); padding: 10px 18px 10px 10px; color: var(--text); font-size: 14px; font-weight: 600; white-space: nowrap; animation: wd-toast-in .2s ease-out; }
+.wd-toast-check { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 999px; background: color-mix(in srgb, var(--positive) 18%, transparent); color: var(--positive); font-size: 12px; }
+@keyframes wd-toast-in { from { opacity: 0; transform: translate(-50%, 8px); } }
 
 .wd-advanced { margin-top: 2px; }
 .wd-advanced [aria-label="Filter tokens"] button { font-size: 11px; }
@@ -2748,18 +2774,43 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
 /* Action sheets (Deposit/Send/Swap) */
 .wd-sheet-backdrop { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; background: rgba(4, 10, 18, .5); padding: 16px; animation: wd-fade-in .15s ease-out; }
 @keyframes wd-fade-in { from { opacity: 0; } to { opacity: 1; } }
-.wd-sheet { width: min(100%, 360px); border-radius: 14px; background: var(--surface); padding: 18px; animation: wd-sheet-in .18s cubic-bezier(.2, .8, .2, 1); }
+.wd-sheet { width: min(100%, 380px); max-height: calc(100dvh - 32px); overflow-y: auto; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); padding: 22px; animation: wd-sheet-in .18s cubic-bezier(.2, .8, .2, 1); }
+.wd-sheet-wide { width: min(100%, 440px); }
 @keyframes wd-sheet-in { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
-.wd-sheet-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-.wd-sheet-heading h2 { margin: 0; font-size: 16px; }
+.wd-sheet-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+.wd-sheet-heading h2 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -.01em; }
 .wd-sheet-close { border: 0; background: none; color: var(--muted); padding: 4px; }
 .wd-sheet-close:hover { color: var(--text); }
-.wd-sheet-copy { margin: 0 0 12px; color: var(--muted); font-size: 12px; line-height: 1.5; }
-.wd-sheet-address { display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--field-bg); padding: 10px 12px; }
-.wd-sheet-address code { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--text); }
 .wd-sheet-note { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+
+/* Add funds: method switch, token/network tiles, QR, grouped address, Base-only warning, deposit watch. */
+.wd-segmented { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-bottom: 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--field-bg); padding: 4px; }
+.wd-segmented button { border: 0; border-radius: 10px; background: none; color: var(--muted); padding: 10px 8px; font-size: 14px; font-weight: 500; }
+.wd-segmented button:hover { color: var(--text); }
+.wd-segmented button[aria-pressed="true"] { background: var(--surface-hover); color: var(--text); font-weight: 600; }
+.wd-deposit { display: grid; gap: 14px; }
+.wd-deposit-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.wd-deposit-tile { display: grid; gap: 4px; border: 1px solid var(--line); border-radius: 12px; background: var(--field-bg); padding: 10px 14px; }
+.wd-deposit-tile > span { color: var(--muted); font-size: 12px; }
+.wd-deposit-tile strong { display: inline-flex; align-items: center; gap: 8px; color: var(--text); font-size: 15px; font-weight: 600; }
+.wd-deposit-tile .wd-base-dot { width: 16px; height: 16px; }
+.wd-qr { justify-self: center; width: 184px; border: 1px solid var(--line); border-radius: 16px; background: #fff; padding: 14px; color: #0b0b0f; }
+.wd-qr-code { display: block; width: 100%; height: auto; }
+.wd-deposit-address { display: grid; gap: 8px; }
+.wd-deposit-label { color: var(--muted); font-size: 13px; }
+.wd-deposit-address-box { display: flex; align-items: center; gap: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--field-bg); padding: 12px 12px 12px 14px; }
+.wd-deposit-address-box code { display: flex; flex: 1; flex-wrap: wrap; gap: 2px 7px; min-width: 0; color: var(--muted); font-family: var(--font-mono), monospace; font-size: 13px; line-height: 1.6; }
+.wd-deposit-address-box code .is-key { color: var(--text); font-weight: 600; }
+.wd-deposit-warning { display: flex; align-items: flex-start; gap: 10px; margin: 0; border: 1px solid color-mix(in srgb, var(--gold) 35%, transparent); border-radius: 12px; background: color-mix(in srgb, var(--gold) 9%, transparent); padding: 12px 14px; color: var(--text); font-size: 13px; line-height: 1.5; }
+.wd-deposit-warning svg { flex: none; margin-top: 2px; color: var(--gold); }
+.wd-deposit-watch { display: flex; align-items: center; gap: 12px; margin-top: 18px; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+.wd-deposit-watch strong { display: block; color: var(--text); font-size: 14px; font-weight: 600; }
+.wd-deposit-watch small { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; line-height: 1.4; }
+.wd-deposit-watch-dot { flex: none; width: 10px; height: 10px; margin: 0 4px; border-radius: 999px; background: var(--brand); animation: wd-watch 1.6s ease-out infinite; }
+.wd-deposit-watch.is-arrived .wd-deposit-watch-dot { background: var(--positive); animation: none; }
+@keyframes wd-watch { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--brand) 55%, transparent); } 70%, 100% { box-shadow: 0 0 0 8px transparent; } }
+.wd-deposit-foot { display: flex; justify-content: space-between; gap: 12px; margin-top: 14px; color: var(--muted); font-size: 12px; }
 .wd-sheet-form { display: grid; gap: 10px; }
-.wd-sheet-buy { margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
 .wd-sheet-field { display: grid; gap: 4px; font-size: 11px; color: var(--muted); }
 .wd-sheet-field input, .wd-sheet-field select { border: 1px solid var(--line); border-radius: 6px; background: var(--field-bg); color: var(--text); padding: 8px 10px; font-size: 13px; }
 .wd-sheet-recipient { display: flex; align-items: center; justify-content: space-between; gap: 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--field-bg); color: var(--text); padding: 8px 10px; font-size: 13px; }
@@ -2785,22 +2836,32 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
 .wd-sheet-sent-title { margin: 0; font-size: 14px; font-weight: 700; color: var(--text); }
 .wd-sheet-swap-flip { justify-self: center; display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-raised); color: var(--muted); }
 .wd-sheet-swap-flip:hover { color: var(--text); border-color: var(--line-strong); }
-.wd-sheet-primary-button { border: 1px solid var(--brand); border-radius: 6px; background: var(--brand); color: var(--brand-contrast); padding: 10px 12px; font-size: 13px; font-weight: 700; }
+.wd-sheet-primary-button { border: 1px solid var(--text); border-radius: 999px; background: var(--text); color: var(--bg); padding: 11px 16px; font-size: 14px; font-weight: 600; }
+.wd-sheet-primary-button:hover:not(:disabled) { background: color-mix(in srgb, var(--text) 86%, var(--bg)); }
 .wd-sheet-primary-button:disabled { opacity: .6; cursor: not-allowed; }
 
+@media (max-width: 760px) {
+  .wd-trust { grid-template-columns: 1fr; }
+}
+
 @media (max-width: 620px) {
-  .wd-page { width: min(100% - 24px, 980px); padding-top: 20px; }
-  .wd-chip-total { font-size: 34px; }
-  .wd-table-head, .wd-coin-row-grid { grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr) minmax(0, 1fr); }
-  .wd-table-head-portfolio, .wd-coin-row-share { display: none; }
+  .wd-page { padding-top: 20px; }
+  .wd-header h1 { font-size: 26px; }
+  .wd-balance { gap: 18px; padding: 22px 18px; }
+  .wd-balance-total { font-size: 44px; }
+  .wd-balance-actions { width: 100%; }
+  .wd-balance-actions .wd-pill:not(.wd-pill-round) { flex: 1; }
+  .wd-balance-stats { gap: 12px 28px; }
+  .wd-table-head, .wd-coin-row-grid { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); }
+  .wd-table-head span:nth-child(2), .wd-coin-row-price { display: none; }
+  .wd-activity-row { align-items: flex-start; padding: 12px 14px; }
+  .wd-activity-side { flex-direction: column; align-items: flex-end; gap: 2px; }
+  .wd-toast { bottom: 84px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .wd-status-dot, .wd-digit-up, .wd-digit-down, .wd-sheet-backdrop, .wd-sheet {
+  .wd-digit-up, .wd-digit-down, .wd-sheet-backdrop, .wd-sheet, .wd-deposit-watch-dot, .wd-toast {
     animation: none;
-  }
-  .wd-tile:hover {
-    transform: none;
   }
 }
 

@@ -2,28 +2,27 @@
 
 import { useRef, useState } from "react";
 import { CoinImage, Change, usd as formatUnitPrice, useFlash } from "@/app/duel/portfolio/ui";
+import { USDC_BASE } from "@/app/lib/embeddedWallet/tokens";
 import { coinAccent, type Coin } from "./types";
 
 const qty = (n: number) => (n === 0 ? "0" : n < 0.0001 ? n.toExponential(2) : n.toLocaleString("en-US", { maximumFractionDigits: 4 }));
 const usd = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 });
 
-/** One owned coin as a table row (Asset / Balance / Portfolio / Price), Coinbase Wallet home style, with a ⋯ menu to hide/unhide it. */
+/** One owned coin as a holdings row (Asset / Price / Balance), with a ⋯ menu to hide/unhide it. */
 export function CoinRow({
   coin,
-  sharePct,
   hidden,
   onSelect,
   onToggleHidden,
 }: {
   coin: Coin;
-  /** null for a hidden coin — it isn't part of the total. */
-  sharePct: number | null;
   hidden: boolean;
   onSelect: () => void;
   onToggleHidden: () => void;
 }) {
   const accent = coinAccent(coin.symbol);
   const flash = useFlash(coin.valueUsd ?? 0);
+  const isUsdc = coin.address === USDC_BASE;
 
   return (
     <li className={`wd-coin-row ${flash}${hidden ? " is-hidden" : ""}`} style={{ "--wd-accent": accent } as React.CSSProperties}>
@@ -32,17 +31,16 @@ export function CoinRow({
           <CoinImage src={coin.imageUrl} symbol={coin.symbol} size={32} />
           <span className="wd-coin-row-identity">
             <strong>{coin.name}</strong>
-            <small>{coin.symbol}{hidden ? " · Hidden" : ""}</small>
+            <small>{coin.symbol}{isUsdc ? " · 1 USDC = 1 US dollar" : ""}{hidden ? " · Hidden" : ""}</small>
           </span>
         </span>
-        <span className="wd-coin-row-balance">
-          <span className="tabular-nums">{coin.valueUsd != null ? usd(coin.valueUsd) : "—"}</span>
-          <small className="tabular-nums">{qty(coin.qty)} {coin.symbol}</small>
-        </span>
-        <span className="wd-coin-row-share tabular-nums">{coin.valueUsd && sharePct != null ? `${Math.round(sharePct)}%` : "—"}</span>
         <span className="wd-coin-row-price">
-          <span className="tabular-nums">{coin.priceUsd != null ? formatUnitPrice(coin.priceUsd) : "—"}</span>
-          <Change value={coin.change24h} digits={2} className="text-[11px]" />
+          <span>{coin.priceUsd != null ? formatUnitPrice(coin.priceUsd) : "—"}</span>
+          {!isUsdc && <Change value={coin.change24h} digits={2} className="text-[11px]" />}
+        </span>
+        <span className="wd-coin-row-balance">
+          <span>{coin.valueUsd != null ? usd(coin.valueUsd) : "—"}</span>
+          <small>{qty(coin.qty)} {coin.symbol}</small>
         </span>
       </button>
       <CoinRowMenu symbol={coin.symbol} hidden={hidden} onToggleHidden={onToggleHidden} />
