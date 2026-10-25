@@ -112,6 +112,21 @@ describe("Messages dock thread", () => {
     expect(screen.getByRole("button", { name: "Add photos" })).toBeTruthy();
   });
 
+  it("shows their avatar once per group, a small break after a pause and a stamp after a long one", async () => {
+    const at = (id: string, mine: boolean, minutesAgo: number) => ({ id, body: `message ${id}`, mine, sentAt: Date.now() - minutesAgo * 60_000, photos: [] });
+    const messages = [at("1", false, 180), at("2", false, 179.5), at("3", true, 179), at("4", false, 60), at("5", false, 57)];
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ ...thread(null), messages }), { status: 200 })));
+    const { container } = render(<MessagesDock />);
+    act(() => showMessages({ kind: "thread", peer: { handle: "@ben", name: "Ben" } }));
+    await screen.findByText("message 5");
+    const items = [...container.querySelectorAll(".messages-item")];
+    expect(items.map((item) => item.getAttribute("data-position"))).toEqual(["first", "last", "single", "single", "single"]);
+    // One avatar per run of theirs (beside its last message), none on yours.
+    expect(items.map((item) => item.querySelector(".messages-bubble-avatar .messages-avatar") !== null)).toEqual([false, true, false, true, true]);
+    expect(items.map((item) => item.querySelector(".messages-stamp") !== null)).toEqual([true, false, false, true, false]);
+    expect(items[0].querySelector(".messages-stamp")?.textContent).toMatch(/^(Today|Yesterday) \d{1,2}:\d{2} [AP]M$/);
+  });
+
   it("swaps the composer for a notice across a block", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(thread("by-them")), { status: 200 })));
     render(<MessagesDock />);

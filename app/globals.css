@@ -233,12 +233,25 @@ a.feed-notif:hover { background: var(--surface-hover); }
 .messages-peer-text strong { overflow: hidden; font-size: 14px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
 .messages-peer-text span { overflow: hidden; color: var(--muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .messages-peer:hover strong { text-decoration: underline; }
-.messages-thread { display: flex; flex-direction: column; gap: 3px; margin: 0; padding: 14px 12px 6px; list-style: none; }
-.messages-bubble-row { display: flex; flex-direction: column; align-items: flex-start; }
-.messages-bubble-row[data-mine="true"] { align-items: flex-end; }
-.messages-bubble { max-width: 80%; margin: 0; padding: 8px 13px; border-radius: 18px 18px 18px 6px; background: var(--surface-hover); color: var(--text); font-size: 13.5px; line-height: 1.4; overflow-wrap: anywhere; white-space: pre-wrap; }
-.messages-bubble-row[data-mine="true"] .messages-bubble { border-radius: 18px 18px 6px 18px; background: var(--brand); color: var(--brand-contrast); }
-.messages-bubble-time { margin: 3px 6px 9px; color: var(--muted); font-size: 11px; }
+.messages-thread { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 10px 12px 8px; list-style: none; }
+/* Groups (app/lib/messageRules.ts threadLayout): a new one — their turn, or a pause — gets a little air; a long pause, a centred stamp. */
+.messages-item:not(:first-child):is([data-position="single"], [data-position="first"]) { margin-top: 10px; }
+.messages-stamp { display: block; margin: 8px 0 10px; color: var(--muted); font-size: 11px; font-weight: 600; text-align: center; }
+.messages-item:first-child .messages-stamp { margin-top: 4px; }
+.messages-bubble-row { display: flex; align-items: flex-end; gap: 8px; }
+.messages-bubble-avatar { flex: none; width: 28px; }
+.messages-bubble-avatar .messages-avatar { width: 28px; height: 28px; font-size: 11px; }
+.messages-bubble-stack { display: flex; flex: 1; flex-direction: column; align-items: flex-start; min-width: 0; }
+.messages-item[data-mine="true"] .messages-bubble-stack { align-items: flex-end; }
+.messages-bubble { max-width: 80%; margin: 0; padding: 8px 13px; border-radius: 18px; background: var(--surface-hover); color: var(--text); font-size: 13.5px; line-height: 1.4; overflow-wrap: anywhere; white-space: pre-wrap; }
+.messages-item[data-mine="true"] .messages-bubble { background: var(--brand); color: var(--brand-contrast); }
+/* Joined corners on the sender's side, like iMessage. */
+.messages-item[data-position="first"] .messages-bubble { border-radius: 18px 18px 18px 5px; }
+.messages-item[data-position="middle"] .messages-bubble { border-radius: 5px 18px 18px 5px; }
+.messages-item[data-position="last"] .messages-bubble { border-radius: 5px 18px 18px 18px; }
+.messages-item[data-mine="true"][data-position="first"] .messages-bubble { border-radius: 18px 18px 5px 18px; }
+.messages-item[data-mine="true"][data-position="middle"] .messages-bubble { border-radius: 18px 5px 5px 18px; }
+.messages-item[data-mine="true"][data-position="last"] .messages-bubble { border-radius: 18px 5px 18px 18px; }
 .messages-error { flex: none; margin: 0; padding: 8px 16px 0; color: var(--negative); font-size: 12px; }
 .messages-composer { display: grid; flex: none; gap: 8px; padding: 10px 12px 12px; border-top: 1px solid var(--line); }
 .messages-composer-row { display: flex; align-items: flex-end; gap: 6px; }
