@@ -371,6 +371,17 @@ export const challenges = pgTable("challenges", {
     .where(sql`${table.status} = 'pending'`),
 }));
 
+// "Play again" on a settled challenge round (lib/rematch.ts), one row per
+// round: the seat that pressed it last and when. Once the other seat presses
+// it within REMATCH_SECONDS, `next_match_id` is the new round both are
+// seated in. Created by db/rematches.sql.
+export const rematches = pgTable("rematches", {
+  matchId: text("match_id").primaryKey(),
+  role: integer("role").notNull(), // 1 | 2
+  requestedAt: timestamp("requested_at", { withTimezone: true }).notNull(),
+  nextMatchId: text("next_match_id"),
+});
+
 // One row per omen written in the composer (/compose, app/FeedComposer.tsx),
 // created by POST /api/posts (lib/posts.ts). Everything about the author is
 // derived server-side; `authorName`/`authorHandle` are the write-time
