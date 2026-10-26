@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@/db", () => ({ getDb: vi.fn() }));
 
 import type { AgentPersona } from "@/lib/agentPersonas";
-import { draftPost, draftReply, isDue, MAX_REPLIES_PER_THREAD, pickThreads, TICK_MINUTES, type Thread } from "@/lib/agents";
+import { draftPost, draftReply, isDue, MAX_REPLIES_PER_THREAD, overusedPhrases, pickThreads, TICK_MINUTES, type Thread } from "@/lib/agents";
 
 const persona: AgentPersona = {
   file: "test.md",
@@ -14,6 +14,7 @@ const persona: AgentPersona = {
   bio: "bio",
   location: null,
   voice: "You're a test.",
+  material: [],
   postsPer2Hours: [3, 5],
   repliesPer2Hours: [3, 5],
   quietHours: [0, 9 * 60],
@@ -110,11 +111,11 @@ const modelReturning = (draft: object) =>
     }),
   });
 
-const context = { market: "BTC $100,000", ownRecent: [], feed: [] };
+const context = { market: "BTC $100.0k", ownRecent: [], avoid: [], feed: [] };
 
 describe("draftPost", () => {
   it("returns post input that passes the composer's rules", async () => {
-    const input = await draftPost(persona, context, { model: modelReturning({
+    const input = await draftPost(persona, context, { shape: "poll", model: modelReturning({
       content: "  btc holding 100k again. range traders eating  ",
       topics: ["bitcoin"],
       poll: { choices: ["breakout", "fakeout"], duration: "1d" },
@@ -126,17 +127,48 @@ describe("draftPost", () => {
       gif: null,
       poll: { choices: ["breakout", "fakeout"], durationMs: 86_400_000 },
       photos: [],
+      thread: [],
     });
   });
 
+  it("asks for the drawn shape, and keeps a poll or thread only when that's the shape", async () => {
+    const model = modelReturning({ content: "who's buying", topics: [], poll: { choices: ["me", "not me"], duration: "1h" }, thread: ["2/ more"] });
+    expect(await draftPost(persona, context, { shape: "one-liner", model })).toMatchObject({ poll: null, thread: [] });
+    const oneLiner = JSON.stringify(model.doGenerateCalls[0].prompt);
+    expect(oneLiner).toContain("One punchy line");
+    expect(oneLiner).not.toMatch(/\\"(poll|thread)\\":/);
+    expect(await draftPost(persona, context, { shape: "thread", model })).toMatchObject({ content: "who's buying", poll: null, thread: ["2/ more"] });
+    expect(JSON.stringify(model.doGenerateCalls[1].prompt)).toMatch(/\\"thread\\":/);
+    // Weighted draw: 0 lands on the first shape.
+    await draftPost(persona, context, { model, random: () => 0 });
+    expect(JSON.stringify(model.doGenerateCalls[2].prompt)).toContain("One punchy line");
+    await expect(draftPost(persona, context, { shape: "sonnet", model })).rejects.toThrow('Unknown post shape "sonnet"');
+  });
+
+  it("refuses a thread with no follow-ups or an over-long one", async () => {
+    expect(await draftPost(persona, context, { shape: "thread", model: modelReturning({ content: "1/ hear me out", topics: [] }) }))
+      .toEqual({ error: "A thread has 1–3 follow-up posts" });
+    expect(await draftPost(persona, context, { shape: "thread", model: modelReturning({ content: "1/", topics: [], thread: ["x".repeat(281)] }) }))
+      .toEqual({ error: "Thread posts are up to 280 characters" });
+  });
+
+  it("feeds in sampled material and the phrases it keeps repeating", async () => {
+    const model = modelReturning({ content: "gm", topics: [] });
+    await draftPost({ ...persona, material: ["your dog", "the moon"] }, { ...context, avoid: ["ser", "aped in"] }, { model, shape: "take" });
+    const prompt = JSON.stringify(model.doGenerateCalls[0].prompt);
+    expect(prompt).toContain("- your dog");
+    expect(prompt).toContain("- the moon");
+    expect(prompt).toContain(String.raw`Don't use any of them this time: \"ser\", \"aped in\"`);
+  });
+
   it("reports a draft that breaks the rules instead of posting it", async () => {
-    const input = await draftPost(persona, context, { model: modelReturning({ content: "x".repeat(281), topics: [], poll: null }) });
+    const input = await draftPost(persona, context, { shape: "take", model: modelReturning({ content: "x".repeat(281), topics: [], poll: null }) });
     expect(input).toEqual({ error: "Posts are up to 280 characters" });
   });
 
   it("spells out the JSON shape and survives a model that drops or invents fields", async () => {
     const model = modelReturning({ content: "chop day", topics: ["bitcoin", "not-a-topic"] });
-    expect(await draftPost(persona, context, { model })).toMatchObject({ content: "chop day", topics: ["bitcoin"], poll: null });
+    expect(await draftPost(persona, context, { model, shape: "take" })).toMatchObject({ content: "chop day", topics: ["bitcoin"], poll: null });
     expect(JSON.stringify(model.doGenerateCalls[0].prompt)).toContain("Answer with only a JSON object");
     expect(await draftPost(persona, context, { model: modelReturning({ content: "no topics" }) })).toMatchObject({ content: "no topics", topics: [] });
   });
@@ -175,10 +207,25 @@ describe("pickThreads", () => {
     expect(pickThreads(persona, [spokeLast, ownSilent, capped, blockedPost], new Set(["troll"]))).toEqual([]);
   });
 
+  it("doesn't count the follow-ups of its own thread toward the reply cap", () => {
+    const ownThread = thread("own", msg(ME, "1/ hear me out"),
+      ...Array.from({ length: MAX_REPLIES_PER_THREAD }, (_, i) => msg(ME, `${i + 2}/`, i)), msg("bob", "no", 9));
+    expect(pickThreads(persona, [ownThread], new Set()).map((t) => t.postId)).toEqual(["own"]);
+  });
+
   it("hides blocked accounts' replies, so their message never counts as the last word", () => {
     const withTroll = thread("t", msg("bob", "pump?"), msg(ME, "nah", 1), msg("troll", "cope", 2));
     expect(pickThreads(persona, [withTroll], new Set(["troll"]))).toEqual([]);
     expect(pickThreads(persona, [withTroll], new Set()).map((t) => t.replies.length)).toEqual([2]);
+  });
+});
+
+describe("overusedPhrases", () => {
+  it("picks phrases in a quarter of the texts (3+), most frequent first, skipping stopwords and overlaps", () => {
+    const texts = ["aped in again ser 💀", "ser i aped in at the top 💀", "bags heavy, aped in, ser", "the range is the range", "gm", "it is what it is"];
+    expect(overusedPhrases(texts)).toEqual(["aped in", "ser"]);
+    expect(overusedPhrases(texts.slice(0, 2))).toEqual([]);
+    expect(overusedPhrases(["is it the", "is it the", "is it the"])).toEqual([]);
   });
 });
 
@@ -196,6 +243,12 @@ describe("draftReply", () => {
     const prompt = JSON.stringify(model.doGenerateCalls[0].prompt);
     expect(prompt).toContain("Thread 2: post by carl: btc dead");
     expect(prompt).toContain("reply by you: lol");
+  });
+
+  it("names its overused phrases when given them", async () => {
+    const model = modelReturning({ thread: 1, content: "nah", like: [] });
+    await draftReply(persona, threads, "", { model, avoid: ["transfer from impatient"] });
+    expect(JSON.stringify(model.doGenerateCalls[0].prompt)).toContain("transfer from impatient");
   });
 
   it("copes with a reply missing likes or content", async () => {

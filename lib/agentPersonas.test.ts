@@ -14,6 +14,7 @@ describe("parsePersona", () => {
       bio: "hi",
       location: "NYC",
       voice: "# Voice\nBe brief.",
+      material: [],
       postsPer2Hours: [4, 6],
       repliesPer2Hours: [2, 2],
       quietHours: [22 * 60, 6 * 60 + 30],
@@ -32,6 +33,16 @@ describe("parsePersona", () => {
       .toMatchObject({ postsPer2Hours: [4, 4], repliesPer2Hours: null, quietHours: null });
   });
 
+  it("lifts the \"## On your mind\" bullets out of the voice as material", () => {
+    const body = "You're a test.\n\n## On your mind\n\n- the moon\n* your dog\nnot a bullet\n\n## How you write\n- short";
+    expect(parsePersona("t.md", file(base, body))).toMatchObject({
+      voice: "You're a test.\n\n## How you write\n- short",
+      material: ["the moon", "your dog"],
+    });
+    expect(parsePersona("t.md", file(base, "Voice.\n## on your mind\n- last section"))).toMatchObject({ voice: "Voice.", material: ["last section"] });
+    expect(() => parsePersona("t.md", file(base, "Voice.\n## On your mind\nnothing"))).toThrow("needs at least one");
+  });
+
   it("names the file and field when something is off", () => {
     expect(() => parsePersona("t.md", "no frontmatter")).toThrow("personas/t.md: must start with");
     expect(() => parsePersona("t.md", file(`${base}\npostsPer2hours: 3-5`))).toThrow('unknown field "postsPer2hours"');
@@ -47,7 +58,7 @@ describe("parsePersona", () => {
 describe("loadAgentPersonas", () => {
   it("loads every file in personas/ (skipping README and _drafts), each posting 3+ per 2h outside midnight–9am ET", () => {
     const personas = loadAgentPersonas();
-    expect(personas.map((persona) => persona.handle)).toEqual(["0xdevonchain", "jordy_longs", "macro_rach", "miatrades", "samstacksats"]);
+    expect(personas.map((persona) => persona.handle)).toEqual(["0xdevonchain", "btc_1m_dale", "jordy_longs", "macro_rach", "mercury_in_btc", "miatrades", "samstacksats", "short_everything"]);
     for (const persona of personas) {
       expect(persona.postsPer2Hours[0]).toBeGreaterThanOrEqual(3);
       expect(persona.quietHours).toEqual([0, 9 * 60]);
