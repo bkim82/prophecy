@@ -1,11 +1,11 @@
-import { gateway, generateText, isStepCount, jsonSchema, Output, type LanguageModel } from "ai";
+import { gateway, generateText, isStepCount, jsonSchema, Output, type JSONSchema7, type LanguageModel } from "ai";
 import { and, asc, desc, eq, gte, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { blocks, postReplies, posts, profiles } from "@/db/schema";
 import { TOPICS } from "@/app/lib/topics";
 import { loadAgentPersonas, type AgentPersona } from "@/lib/agentPersonas";
 import { createReply, setLike } from "@/lib/engagement";
-import { MAX_POLL_CHOICE_CHARS, MAX_POST_CHARS, POLL_DURATIONS_MS, parsePostInput } from "@/lib/postInput";
+import { MAX_POLL_CHOICE_CHARS, MAX_POST_CHARS, POLL_DURATIONS_MS, parsePostInput, type PostInput } from "@/lib/postInput";
 import { createPost } from "@/lib/posts";
 import { getSpotPrice } from "@/lib/spotPrice";
 
@@ -119,78 +119,170 @@ export async function ensureAgentProfiles(personas: AgentPersona[]): Promise<Age
   return free;
 }
 
+// Rounded the way people say prices (80.4k, 2,343), so drafts don't parrot them to the cent.
+const spokenPrice = (price: number) =>
+  price >= 10_000 ? `$${(price / 1000).toFixed(1)}k` : price >= 1_000 ? `$${Math.round(price).toLocaleString("en-US")}` : `$${price.toFixed(price >= 10 ? 1 : 2)}`;
+
 async function marketSnapshot(): Promise<string> {
   const prices = await Promise.all(["BTC-USD", "ETH-USD", "HYPE-USD"].map(async (product) => [product, await getSpotPrice(product)] as const));
   const market = prices
-    .flatMap(([product, spot]) => (spot ? [`${product.replace("-USD", "")} $${spot.price.toLocaleString("en-US", { maximumFractionDigits: 2 })}`] : []))
+    .flatMap(([product, spot]) => (spot ? [`${product.replace("-USD", "")} ${spokenPrice(spot.price)}`] : []))
     .join(", ");
   return market || "unavailable";
 }
 
-type AgentContext = { market: string; ownRecent: string[]; feed: { author: string; content: string }[] };
+/** Own posts shown in the post prompt; more than this anchors the model on its own phrasing. */
+const OWN_POSTS_SHOWN = 6;
+
+const STOPWORDS = new Set(
+  ("a about after all am an and any are as at back be been but by can could did do does don't for from get got had has have he her him his how i i'd i'll "
+    + "i'm i've if im in into is isn't it it's its just let's like me more my no not now of off on one only or our out over really she so some still than that "
+    + "that's the their them then there they this to too up us very was we were what when where which who why will with would yeah you you're your").split(" "),
+);
+
+/**
+ * Words and phrases (1–3 words) that show up in at least a quarter of
+ * `texts` (and at least 3 of them), most frequent first, minus stopwords and
+ * any phrase overlapping one already picked. Fed back to the model as
+ * "don't use these", since small models copy their own recent posts. Pure.
+ */
+export function overusedPhrases(texts: string[], limit = 12): string[] {
+  const counts = new Map<string, number>();
+  for (const text of texts) {
+    const words = text.toLowerCase().replace(/’/g, "'").match(/[\p{L}\p{N}']+|\p{Extended_Pictographic}/gu) ?? [];
+    const seen = new Set<string>();
+    for (let size = 1; size <= 3; size++) {
+      for (let i = 0; i + size <= words.length; i++) {
+        const gram = words.slice(i, i + size);
+        if (gram.every((word) => STOPWORDS.has(word) || /^\d+$/.test(word))) continue;
+        if (size === 1 && gram[0].length < 3 && !/\p{Extended_Pictographic}/u.test(gram[0])) continue;
+        seen.add(gram.join(" "));
+      }
+    }
+    for (const phrase of seen) counts.set(phrase, (counts.get(phrase) ?? 0) + 1);
+  }
+  const floor = Math.max(3, Math.ceil(texts.length / 4));
+  const overlaps = (a: string, b: string) => ` ${a} `.includes(` ${b} `) || ` ${b} `.includes(` ${a} `);
+  const picked: string[] = [];
+  const ranked = [...counts].filter(([, n]) => n >= floor).sort((a, b) => b[1] - a[1] || b[0].split(" ").length - a[0].split(" ").length);
+  for (const [phrase] of ranked) {
+    if (picked.length >= limit) break;
+    if (!picked.some((other) => overlaps(other, phrase))) picked.push(phrase);
+  }
+  return picked;
+}
+
+/** The persona's newest posts (≤ 20) and replies (≤ 12), newest first. */
+async function ownRecent(persona: AgentPersona) {
+  const db = getDb();
+  const [own, replies] = await Promise.all([
+    db.select({ content: posts.content }).from(posts)
+      .where(and(isNull(posts.deletedAt), ne(posts.content, ""), eq(posts.authorId, persona.userId)))
+      .orderBy(desc(posts.createdAt)).limit(20),
+    db.select({ content: postReplies.content }).from(postReplies)
+      .where(and(isNull(postReplies.deletedAt), eq(postReplies.authorId, persona.userId)))
+      .orderBy(desc(postReplies.createdAt)).limit(12),
+  ]);
+  return { posts: own.map((row) => row.content), replies: replies.map((row) => row.content) };
+}
+
+type AgentContext = { market: string; ownRecent: string[]; avoid: string[]; feed: { author: string; content: string }[] };
 
 async function postContext(persona: AgentPersona, market: string): Promise<AgentContext> {
-  const db = getDb();
-  const live = and(isNull(posts.deletedAt), ne(posts.content, ""));
   const [own, feed] = await Promise.all([
-    db.select({ content: posts.content }).from(posts)
-      .where(and(live, eq(posts.authorId, persona.userId)))
-      .orderBy(desc(posts.createdAt)).limit(20),
-    db.select({ author: posts.authorName, content: posts.content }).from(posts)
-      .where(and(live, ne(posts.authorId, persona.userId)))
+    ownRecent(persona),
+    getDb().select({ author: posts.authorName, content: posts.content }).from(posts)
+      .where(and(isNull(posts.deletedAt), ne(posts.content, ""), ne(posts.authorId, persona.userId)))
       .orderBy(desc(posts.createdAt)).limit(8),
   ]);
-  return { market, ownRecent: own.map((row) => row.content), feed };
+  return { market, ownRecent: own.posts.slice(0, OWN_POSTS_SHOWN), avoid: overusedPhrases([...own.posts, ...own.replies]), feed };
 }
 
 const BUILTIN_TOPIC_IDS = TOPICS.map((topic) => topic.id);
 const POLL_LENGTHS = Object.keys(POLL_DURATIONS_MS);
 
+/** Follow-up posts after a thread's first one, saved as the author's own replies under it. */
+export const MAX_THREAD_FOLLOW_UPS = 3;
+
 type Draft = {
   content: string;
   topics: string[];
-  poll: { choices: string[]; duration: string } | null;
+  poll?: { choices: string[]; duration: string } | null;
+  thread?: string[];
 };
 
-const draftSchema = jsonSchema<Draft>({
+type PostShape = { id: string; weight: number; brief: string; poll?: true; thread?: true; needsFeed?: true };
+
+/**
+ * What kind of post this draft is, drawn per draft by weight. The model
+ * left to itself writes the same one-paragraph post every time; real
+ * timelines mix one-liners, rants, lists, shitposts, threads and polls.
+ */
+export const POST_SHAPES: PostShape[] = [
+  { id: "one-liner", weight: 4, brief: "One punchy line, under 70 characters. No setup, no explanation." },
+  { id: "take", weight: 4, brief: "A hot take stated as plain fact, one or two sentences. Commit to it, no hedging." },
+  { id: "rant", weight: 3, brief: "A rant of 160–250 characters, broken into 3–5 short lines with line breaks. Build up to the point." },
+  { id: "list", weight: 2, brief: "A list post: a one-line setup, then 3–5 short lines that each start with \"- \" or a number, one per line." },
+  { id: "story", weight: 3, brief: "A tiny story about something that just happened to you: a trade, a conversation, your day. Two to four sentences with one specific detail." },
+  { id: "question", weight: 2, brief: "Ask the timeline a real question you want answers to. Short." },
+  { id: "reaction", weight: 3, needsFeed: true, brief: "React to ONE post from the feed below the way you'd quote-tweet it: dunk on it, agree way too hard, or riff on it. Don't name or tag its author." },
+  { id: "call", weight: 2, brief: "A specific, bold call with a number and a timeframe, and why in a few words." },
+  { id: "shitpost", weight: 3, brief: "A shitpost or meme format: \"nobody:\" / \"me:\", \"me in 2021 vs me now\", a fake headline, a fake text exchange, a bit. Line breaks welcome." },
+  { id: "confession", weight: 1, brief: "Something honest or embarrassing you'd only admit online. Short." },
+  { id: "life", weight: 2, brief: "Something from your life away from the charts (sleep, food, work, family, the gym, your commute), still in your voice. The market is optional." },
+  { id: "thread", weight: 2, thread: true, brief: `A thread. The first post is a hook that makes people open it, ending with "🧵" or "1/". Then 2–${MAX_THREAD_FOLLOW_UPS} follow-up posts that build the argument, each a full post of its own, numbered "2/", "3/" and so on.` },
+  { id: "poll", weight: 1, poll: true, brief: "Make the timeline pick a side with a poll. The post sets it up; the 2–4 choices are short and pointed or funny." },
+];
+
+const pickWeighted = <T extends { weight: number }>(items: T[], random: () => number): T => {
+  let roll = random() * items.reduce((sum, item) => sum + item.weight, 0);
+  return items.find((item) => (roll -= item.weight) < 0) ?? items[items.length - 1];
+};
+
+/** `count` distinct items of `items` in random order. */
+const sample = <T,>(items: T[], count: number, random: () => number): T[] => {
+  const pool = [...items];
+  return Array.from({ length: Math.min(count, pool.length) }, () => pool.splice(Math.floor(random() * pool.length), 1)[0]);
+};
+
+const pollSchema: JSONSchema7 = {
+  type: "object",
+  properties: {
+    choices: { type: "array", items: { type: "string" }, description: `2–4 choices, each at most ${MAX_POLL_CHOICE_CHARS} characters.` },
+    duration: { type: "string", enum: POLL_LENGTHS },
+  },
+  required: ["choices", "duration"],
+  additionalProperties: false,
+};
+
+const draftSchema = (shape: PostShape) => jsonSchema<Draft>({
   type: "object",
   properties: {
     content: { type: "string", description: `The post text, at most ${MAX_POST_CHARS} characters.` },
     topics: { type: "array", items: { type: "string", enum: BUILTIN_TOPIC_IDS }, description: "0–3 topics the post is about." },
-    poll: {
-      anyOf: [
-        { type: "null" },
-        {
-          type: "object",
-          properties: {
-            choices: { type: "array", items: { type: "string" }, description: `2–4 choices, each at most ${MAX_POLL_CHOICE_CHARS} characters.` },
-            duration: { type: "string", enum: POLL_LENGTHS },
-          },
-          required: ["choices", "duration"],
-          additionalProperties: false,
-        },
-      ],
-      description: "Usually null. Only when the post asks the timeline to pick a side.",
-    },
+    ...(shape.poll ? { poll: pollSchema } : {}),
+    ...(shape.thread ? { thread: { type: "array", items: { type: "string" }, description: `2–${MAX_THREAD_FOLLOW_UPS} follow-up posts, each at most ${MAX_POST_CHARS} characters.` } } : {}),
   },
-  required: ["content", "topics", "poll"],
+  required: ["content", "topics", ...(shape.poll ? ["poll"] : []), ...(shape.thread ? ["thread"] : [])],
   additionalProperties: false,
 });
 
 const APP = "You are on Prophecy, a social trading app where people post market calls (\"omens\"), trade memecoins, and play 60-second BTC prediction duels (\"Pulse\").";
 
 const VOICE_RULES = [
-  "Sound like a real person typing on their phone, not a brand or an assistant.",
+  "Sound like a real person typing on their phone, not a brand or an assistant. You have opinions, moods, grudges and running jokes.",
   "No hashtags, no em dashes, no \"Let's dive in\", no calls to action, no disclaimers, no links. Never mention being an AI.",
-  "Only use prices from the market snapshot; if it's unavailable, don't name prices.",
+  "Don't invent news, data releases or statistics as fact. Opinions, predictions and your own (made-up) trades and life are fine.",
+  "Most of what you write doesn't mention a price. If you do name a current price it must match the market snapshot, rounded the way people say it (80k, 80.4k, 2.3k), never to the cent. If the snapshot is unavailable, don't name prices.",
 ];
 
 const STYLE_RULES = [
   APP,
-  "Write exactly one post as yourself.",
-  `Keep it under ${MAX_POST_CHARS} characters; most posts are well under 140.`,
+  "Write one post as yourself, in the shape asked for at the end.",
+  `Hard limit of ${MAX_POST_CHARS} characters per post. Line breaks are fine.`,
   ...VOICE_RULES,
-  "Don't repeat the ideas or phrasing of your recent posts. You may react to a feed post, but don't quote it or tag anyone.",
+  "Real timelines are uneven: fragments, run-ons, the odd typo, callbacks to your own running bits. Never open with a ticker and a price.",
+  "Don't reuse the ideas, openers or phrases of your recent posts. You may react to a feed post, but don't quote it or tag anyone.",
 ].join("\n");
 
 const NEWS_PROMPT =
@@ -199,9 +291,23 @@ const NEWS_PROMPT =
   + "Name the thing, but don't cite sources or paste headlines.";
 
 // Spelled out because not every model enforces the schema (the free ones don't).
-const DRAFT_FORMAT =
-  `Answer with only a JSON object: {"content": "<the post>", "topics": [<0-3 of ${BUILTIN_TOPIC_IDS.map((id) => `"${id}"`).join(", ")}>], `
-  + `"poll": null}. For a poll, "poll" is {"choices": ["<2-4 short choices>"], "duration": <one of ${POLL_LENGTHS.map((id) => `"${id}"`).join(", ")}>}.`;
+const draftFormat = (shape: PostShape) =>
+  `Answer with only a JSON object: {"content": "<the post${shape.thread ? "'s first post" : ""}>", "topics": [<0-3 of ${BUILTIN_TOPIC_IDS.map((id) => `"${id}"`).join(", ")}>]`
+  + (shape.poll ? `, "poll": {"choices": ["<2-4 short choices>"], "duration": <one of ${POLL_LENGTHS.map((id) => `"${id}"`).join(", ")}>}` : "")
+  + (shape.thread ? `, "thread": ["<follow-up post 2/>", "<follow-up post 3/>"]` : "")
+  + "}. Use \\n for line breaks inside the strings.";
+
+/** Your character outranks the shape: a one-liner account still writes its rant its own way. */
+const shapeLine = (brief: string) => `This time, write: ${brief} Your character comes first, so do it the way you would.`;
+
+// Sampling temperature: high, since sameness is the failure mode here.
+const TEMPERATURE = 1;
+
+/**
+ * Per draft. The free model sometimes never answers; without a cap one hung
+ * call eats the route's whole maxDuration. MAX_DRAFTS_PER_RUN × this < 300s.
+ */
+export const DRAFT_TIMEOUT_MS = 60_000;
 
 const REPLY_FORMAT =
   `Answer with only a JSON object: {"thread": <number of the thread you reply in>, "content": "<your reply>", "like": [<thread numbers whose post you like>]}.`;
@@ -209,35 +315,63 @@ const REPLY_FORMAT =
 const localTime = (date: Date, timeZone: string) =>
   date.toLocaleString("en-US", { timeZone, weekday: "long", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" });
 
-type DraftOptions = { model?: LanguageModel; search?: boolean; now?: Date };
+type DraftOptions = { model?: LanguageModel; search?: boolean; now?: Date; random?: () => number };
 
 // Gateway-run search (any model): a few short, same-day results keep each search cheap.
 const searchTools = () => ({
   web_search: gateway.tools.perplexitySearch({ maxResults: 5, maxTokensPerPage: 512, maxTokens: 4_000, searchRecencyFilter: "day", searchLanguageFilter: ["en"] }),
 });
 
+const avoidLine = (avoid: string[]) =>
+  avoid.length ? `Words and phrases you've overused lately. Don't use any of them this time: ${avoid.map((phrase) => `"${phrase}"`).join(", ")}.` : "";
+
+export type DraftedPost = PostInput & { thread: string[] };
+
 /**
- * One drafted post for `persona`, or the parse error if the draft breaks the
- * posting rules. `search` lets it look up current events first.
+ * One drafted post for `persona` in `shape` (a POST_SHAPES id; drawn by
+ * weight when omitted), or the parse error if the draft breaks the posting
+ * rules. A thread's follow-ups come back in `thread`. `search` lets it look
+ * up current events first.
  */
-export async function draftPost(persona: AgentPersona, context: AgentContext, { model = AGENT_MODEL, search = false, now = new Date() }: DraftOptions = {}) {
+export async function draftPost(
+  persona: AgentPersona,
+  context: AgentContext,
+  { model = AGENT_MODEL, search = false, now = new Date(), random = Math.random, shape: shapeId }: DraftOptions & { shape?: string } = {},
+): Promise<DraftedPost | { error: string }> {
+  const shape = shapeId
+    ? POST_SHAPES.find((candidate) => candidate.id === shapeId)
+    : pickWeighted(POST_SHAPES.filter((candidate) => !candidate.needsFeed || context.feed.length), random);
+  if (!shape) throw new Error(`Unknown post shape "${shapeId}"`);
+  const onMind = sample(persona.material, 2, random);
   const { output } = await generateText({
     model,
     system: `${persona.voice}\n\n${STYLE_RULES}`,
     prompt: [
-      `Your local time: ${localTime(now, persona.timeZone)}. Market snapshot: ${context.market}.`,
+      `Your local time: ${localTime(now, persona.timeZone)}. Market snapshot (background, not something to narrate): ${context.market}.`,
       search ? NEWS_PROMPT : "",
+      onMind.length ? `On your mind lately (riff on one in your own words if it fits, or ignore them; don't copy them):\n${onMind.map((item) => `- ${item}`).join("\n")}` : "",
       context.ownRecent.length ? `Your recent posts, newest first:\n${context.ownRecent.map((text) => `- ${text}`).join("\n")}` : "You haven't posted yet.",
+      avoidLine(context.avoid),
       context.feed.length ? `Recent posts on the feed:\n${context.feed.map((post) => `- ${post.author}: ${post.content}`).join("\n")}` : "",
-      DRAFT_FORMAT,
+      shapeLine(shape.brief),
+      draftFormat(shape),
     ].filter(Boolean).join("\n\n"),
     ...(search ? { tools: searchTools(), stopWhen: isStepCount(4) } : {}),
-    output: Output.object({ schema: draftSchema }),
+    output: Output.object({ schema: draftSchema(shape) }),
+    temperature: TEMPERATURE,
+    timeout: DRAFT_TIMEOUT_MS,
     maxRetries: 0,
   });
-  // Models without enforced JSON output can drop or invent fields: keep known topics only.
+  // Models without enforced JSON output can drop or invent fields: keep known topics only,
+  // and a poll or thread only when that's the shape asked for.
   const topics = Array.isArray(output.topics) ? output.topics.filter((id) => (BUILTIN_TOPIC_IDS as string[]).includes(id)).slice(0, 3) : [];
-  return parsePostInput({ content: output.content, topics, poll: output.poll });
+  const input = parsePostInput({ content: output.content, topics, poll: shape.poll ? output.poll : null });
+  if ("error" in input) return input;
+  if (!shape.thread) return { ...input, thread: [] };
+  const thread = (Array.isArray(output.thread) ? output.thread : []).map((text) => (typeof text === "string" ? text.trim() : "")).filter(Boolean);
+  if (!thread.length || thread.length > MAX_THREAD_FOLLOW_UPS) return { error: `A thread has 1–${MAX_THREAD_FOLLOW_UPS} follow-up posts` };
+  if (thread.some((text) => text.length > MAX_POST_CHARS)) return { error: `Thread posts are up to ${MAX_POST_CHARS} characters` };
+  return { ...input, thread };
 }
 
 export type ThreadMessage = { authorId: string; author: string; content: string; createdAt: Date };
@@ -247,8 +381,9 @@ export type Thread = { postId: string; post: ThreadMessage; replies: ThreadMessa
  * Threads `persona` could reply in, best first: ones where someone answered
  * it (its post or its reply) since it last spoke, then recent posts by others
  * it hasn't joined. Never a thread whose newest message is its own, one it
- * has replied in MAX_REPLIES_PER_THREAD times, or one involving an account
- * it's blocked with. `threads` newest post first. Pure.
+ * has replied in MAX_REPLIES_PER_THREAD times (not counting the follow-ups
+ * of its own thread post), or one involving an account it's blocked with.
+ * `threads` newest post first. Pure.
  */
 export function pickThreads(persona: AgentPersona, threads: Thread[], blocked: Set<string>, limit = CANDIDATE_THREADS): Thread[] {
   const owed: Thread[] = [];
@@ -256,7 +391,8 @@ export function pickThreads(persona: AgentPersona, threads: Thread[], blocked: S
   for (const thread of threads) {
     if (blocked.has(thread.post.authorId)) continue;
     const replies = thread.replies.filter((reply) => !blocked.has(reply.authorId));
-    const mine = replies.filter((reply) => reply.authorId === persona.userId);
+    const followUps = thread.post.authorId === persona.userId ? replies.findIndex((reply) => reply.authorId !== persona.userId) : 0;
+    const mine = replies.slice(followUps < 0 ? replies.length : followUps).filter((reply) => reply.authorId === persona.userId);
     if (mine.length >= MAX_REPLIES_PER_THREAD) continue;
     const newest = replies.at(-1) ?? thread.post;
     if (newest.authorId === persona.userId) continue;
@@ -281,12 +417,22 @@ const replySchema = jsonSchema<ReplyDraft>({
 
 const REPLY_RULES = [
   APP,
-  "Pick one of the threads below and write one reply in it as yourself, the way you'd reply on X: short, reacting to the last thing said.",
-  "If someone replied to you, answer them: agree, push back, joke, ask something back. Keep the conversation going in your own voice.",
-  `Keep it under ${MAX_POST_CHARS} characters; most replies are under 100.`,
+  "Pick one of the threads below and write one reply in it as yourself, the way you'd reply on X, reacting to the last thing said.",
+  "If someone replied to you, answer them and keep the conversation going in your own voice. Pick fights with people you'd disagree with.",
+  `Hard limit of ${MAX_POST_CHARS} characters.`,
   ...VOICE_RULES,
-  "Don't tag anyone or start with their name.",
+  "Don't restate the price unless the argument is about it. Don't tag anyone or start with their name. Don't reuse your own recent phrasing.",
 ].join("\n");
+
+/** The move a reply makes, drawn per draft by weight, like POST_SHAPES. */
+export const REPLY_SHAPES: { id: string; weight: number; brief: string }[] = [
+  { id: "short", weight: 4, brief: "Very short: a few words, a one-word verdict, or just an emoji or two." },
+  { id: "pushback", weight: 3, brief: "Disagree and say exactly why, in a sentence or two." },
+  { id: "joke", weight: 3, brief: "A joke or a roast of what they said." },
+  { id: "question", weight: 2, brief: "Ask them something pointed back." },
+  { id: "yes-and", weight: 2, brief: "Agree and add the thing they missed, or take it further than they would." },
+  { id: "long", weight: 2, brief: "A longer reply of 140–280 characters making your full case, line breaks allowed." },
+];
 
 const describeThread = (persona: AgentPersona, thread: Thread, n: number) => {
   const who = (message: ThreadMessage) => (message.authorId === persona.userId ? "you" : message.author);
@@ -301,17 +447,29 @@ const describeThread = (persona: AgentPersona, thread: Thread, n: number) => {
 
 export type ReplyPlan = { postId: string; content: string; likes: string[] } | { error: string };
 
-/** One drafted reply for `persona` among `threads` (pickThreads), with the posts it likes; or why it can't be used. */
-export async function draftReply(persona: AgentPersona, threads: Thread[], market: string, { model = AGENT_MODEL, now = new Date() }: DraftOptions = {}): Promise<ReplyPlan> {
+/**
+ * One drafted reply for `persona` among `threads` (pickThreads), with the
+ * posts it likes; or why it can't be used. `avoid` = its overused phrases.
+ */
+export async function draftReply(
+  persona: AgentPersona,
+  threads: Thread[],
+  market: string,
+  { model = AGENT_MODEL, now = new Date(), random = Math.random, avoid = [] }: DraftOptions & { avoid?: string[] } = {},
+): Promise<ReplyPlan> {
   const { output } = await generateText({
     model,
     system: `${persona.voice}\n\n${REPLY_RULES}`,
     prompt: [
-      `Your local time: ${localTime(now, persona.timeZone)}. Market snapshot: ${market}.`,
+      `Your local time: ${localTime(now, persona.timeZone)}. Market snapshot (background): ${market}.`,
       threads.map((thread, i) => describeThread(persona, thread, i + 1)).join("\n\n"),
+      avoidLine(avoid),
+      shapeLine(pickWeighted(REPLY_SHAPES, random).brief),
       REPLY_FORMAT,
-    ].join("\n\n"),
+    ].filter(Boolean).join("\n\n"),
     output: Output.object({ schema: replySchema }),
+    temperature: TEMPERATURE,
+    timeout: DRAFT_TIMEOUT_MS,
     maxRetries: 0,
   });
   const target = threads[Number(output.thread) - 1];
@@ -355,7 +513,7 @@ async function blockedByPersona(personas: AgentPersona[]): Promise<Map<string, S
 
 type Outcome =
   | { status: "skipped" }
-  | { status: "done"; id: string | null; content: string; postId?: string; searched?: boolean }
+  | { status: "done"; id: string | null; content: string; thread?: string[]; postId?: string; searched?: boolean }
   | { status: "failed"; error: string };
 
 export type AgentRunResult = { handle: string; post: Outcome; reply: Outcome };
@@ -409,15 +567,21 @@ export async function runAgents({ force = false, dryRun = false } = {}): Promise
       return draftPost(persona, context, { now });
     });
     if ("error" in input) return { status: "failed", error: input.error };
-    if (dryRun) return { status: "done", id: null, content: input.content, searched: search };
-    const id = await createPost({ ...input, authorId: persona.userId, authorName: persona.displayName, authorHandle: persona.handle, tradeRoiAtPost: null });
-    return { status: "done", id, content: input.content, searched: search };
+    const { thread, ...draft } = input;
+    const done = { status: "done" as const, content: draft.content, ...(thread.length ? { thread } : {}), searched: search };
+    if (dryRun) return { ...done, id: null };
+    const author = { authorId: persona.userId, authorName: persona.displayName, authorHandle: persona.handle };
+    const id = await createPost({ ...draft, ...author, tradeRoiAtPost: null });
+    // A thread's follow-ups are the author's own replies, in order, like a thread on X.
+    for (const content of thread) await createReply({ postId: id, ...author, content });
+    return { ...done, id };
   };
 
   const reply = async (persona: AgentPersona): Promise<Outcome> => {
     const candidates = pickThreads(persona, threads, blocked.get(persona.userId) ?? new Set());
     if (!candidates.length) return { status: "skipped" };
-    const plan = await draftReply(persona, candidates, market, { now });
+    const own = await ownRecent(persona);
+    const plan = await draftReply(persona, candidates, market, { now, avoid: overusedPhrases([...own.replies, ...own.posts]) });
     if ("error" in plan) return { status: "failed", error: plan.error };
     if (dryRun) return { status: "done", id: null, content: plan.content, postId: plan.postId };
     const saved = await createReply({ postId: plan.postId, authorId: persona.userId, authorName: persona.displayName, authorHandle: persona.handle, content: plan.content });

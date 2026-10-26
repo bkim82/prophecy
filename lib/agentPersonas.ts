@@ -19,6 +19,8 @@ export type AgentPersona = {
   bio: string;
   location: string | null;
   voice: string;
+  /** Bullets under the body's "## On your mind" heading: running bits, a couple sampled per post. Not part of `voice`. */
+  material: string[];
   /** Posts in any 2 hours outside quiet hours: [fewest, most]. */
   postsPer2Hours: [number, number];
   /** Replies in any 2 hours outside quiet hours: [fewest, most]; null = never replies. */
@@ -100,7 +102,11 @@ export function parsePersona(file: string, text: string): AgentPersona {
     fail(`timezone "${timeZone}" isn't an IANA zone like America/New_York`);
   }
 
-  const voice = body.trim() || fail("the personality text after the frontmatter is empty");
+  // "## On your mind" runs to the next # or ## heading (or the end); the rest is the voice.
+  const mind = /^##[^\S\r\n]+on your mind[^\S\r\n]*$([\s\S]*?)(?=^#{1,2}[^\S\r\n]|(?![\s\S]))/im.exec(body);
+  const material = mind ? mind[1].split(/\r?\n/).flatMap((line) => /^\s*[-*][^\S\r\n]+(.+)$/.exec(line)?.[1].trim() ?? []) : [];
+  if (mind && !material.length) fail(`"## On your mind" needs at least one "- " bullet`);
+  const voice = (mind ? body.replace(mind[0], "") : body).trim() || fail("the personality text after the frontmatter is empty");
   const location = field("location");
   return {
     file,
@@ -110,6 +116,7 @@ export function parsePersona(file: string, text: string): AgentPersona {
     bio: limited("bio", required("bio"), PROFILE_LIMITS.bio),
     location: location ? limited("location", location, PROFILE_LIMITS.location) : null,
     voice,
+    material,
     postsPer2Hours,
     repliesPer2Hours,
     quietHours,
