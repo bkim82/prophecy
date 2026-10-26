@@ -11,6 +11,7 @@ const call = (query = "", authorization?: string) =>
 describe("GET /api/cron/agents", () => {
   beforeEach(() => {
     vi.stubEnv("CRON_SECRET", "s3cret");
+    vi.stubEnv("AGENTS_ENABLED", "true");
     runAgents.mockResolvedValue([{ handle: "miatrades", post: { status: "skipped" }, reply: { status: "skipped" } }]);
   });
   afterEach(() => vi.unstubAllEnvs());
@@ -30,5 +31,15 @@ describe("GET /api/cron/agents", () => {
     expect(runAgents).toHaveBeenCalledWith({ force: true, dryRun: true });
     await call("", "Bearer s3cret");
     expect(runAgents).toHaveBeenLastCalledWith({ force: false, dryRun: false });
+  });
+
+  it("does nothing unless AGENTS_ENABLED is exactly true", async () => {
+    for (const value of ["", "false", "1"]) {
+      vi.stubEnv("AGENTS_ENABLED", value);
+      const res = await call("?force=1", "Bearer s3cret");
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ results: [], disabled: true });
+    }
+    expect(runAgents).not.toHaveBeenCalled();
   });
 });
