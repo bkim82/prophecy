@@ -31,7 +31,7 @@ multiplayer Pulse room → POST /api/match/[id]/action → server multi-position
 pulse/page.tsx settle() → GET /api/price → fallback if socket stale (solo route)
 
 duel/page.tsx Play → POST /api/match/find-or-create → mode-specific match room
-duel/page.tsx lobby list → GET /api/match/open (3s poll) → POST .../join
+duel/page.tsx Opponent "N waiting" count → GET /api/match/open (3s poll; no lobby list, so no lobby-side join)
 duel/page.tsx Recent results → GET /api/match/recent (once per mount, signed in)
 match room → GET /api/match/[id] (1s poll: view + heartbeat + lazy settle)
 match room → POST /api/match/[id]/{action,leave}
@@ -81,7 +81,7 @@ its stake and leverage in-round; so does the 24h Portfolio.
 | `app/PostCard.tsx` | shared post rendering for both feed pages |
 | `app/lib/posts.ts` | client-safe feed shapes (`Post`, `Reply`, `Share`, …), no data |
 | `app/lib/rank.ts` | hardcoded mock rank/threshold stub gating `/exclusive` — no real rank system exists |
-| `app/duel/page.tsx` | live lobby, BTC ticker/chart, mode switcher, Pulse controls, matchmaking + open-match list, your Recent results (moved from `app/page.tsx`) |
+| `app/duel/page.tsx` | live lobby, BTC ticker/chart, mode switcher, Pulse controls, matchmaking + open-match count, your Recent results (full width; the Open matches list was removed) (moved from `app/page.tsx`) |
 | `app/wallet/page.tsx` + `app/wallet/*` | wallet dashboard: balance hero, coin grid/detail, activity timeline, mock creator earnings — see [wallet.md](wallet.md) |
 | `app/lib/useWalletConnection.ts` | canonical smart-account identity + public native-balance polling from the validated auth context |
 | `app/lib/wallet.ts` | display/Base helpers only: `BASE_CHAIN_ID`, `isBaseChain`, ETH formatting, address shortening (no wallet provider) |

@@ -1425,6 +1425,8 @@ a.messages-post:hover { border-color: var(--brand); }
 @media (prefers-reduced-motion: reduce) { .oracle-sigil-ring, .oracle-sigil-iris, .oracle-live-dot, .oracle-feed-status.is-live::before, .oracle-feed-row { animation: none; } }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 @media (max-width: 960px) { .feed-shell { grid-template-columns: 1fr; } .feed-sidebar { position: static; max-height: none; overflow-y: visible; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); } }
+/* A post page keeps the rail only beside the thread; stacked under it, it's noise. */
+@media (max-width: 960px) { .post-shell > .feed-sidebar { display: none; } }
 .locked-teaser { position: relative; padding: 28px 24px; text-align: center; display: grid; gap: 8px; justify-items: center; }
 .locked-teaser h2 { margin: 0; font-size: 16px; }
 .locked-rank-bar { width: 100%; max-width: 260px; height: 6px; border-radius: 999px; background: var(--field-bg); overflow: hidden; margin-top: 6px; }
@@ -2001,10 +2003,9 @@ a.post-avatar { text-decoration: none; }
 .pulse-stage .control-group--format .field-label { flex-basis: 100%; }
 /* Wager picker: Embers per side; the pot line shows the 2× payout. */
 .wager-option { display: inline-flex; align-items: center; justify-content: center; gap: 4px; font-variant-numeric: tabular-nums; }
-.wager-option .balance-ember-icon, .wager-pot .balance-ember-icon, .wager-detail .balance-ember-icon { width: 12px; height: 12px; }
+.wager-option .balance-ember-icon, .wager-pot .balance-ember-icon { width: 12px; height: 12px; }
 .wager-pot { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; }
 .wager-pot strong { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
-.wager-detail { display: inline-flex; align-items: center; justify-content: flex-end; gap: 3px; font-variant-numeric: tabular-nums; }
 .pulse-stage .play-actions { display: grid; align-self: end; gap: 8px; width: 100%; padding-top: 2px; }
 .pulse-stage .play-actions > * { grid-column: 1 / -1; }
 .pulse-stage .play-button { position: relative; overflow: hidden; width: 100%; min-height: 48px; border-radius: 10px; font-size: 18px; letter-spacing: .01em; }
@@ -2256,17 +2257,13 @@ html.pulse-screen-shake { animation: pulse-screen-shake .24s ease-in-out; }
 .pulse-mini-dock-link { align-self: center; color: var(--muted-dim); font-size: 11px; text-decoration: none; }
 .pulse-mini-dock-link:hover { color: var(--text); }
 @media (prefers-reduced-motion: reduce) { .pulse-mini-dock { animation: none; } }
-.lower-grid { display: grid; grid-template-columns: 1.25fr 1fr; gap: 28px; margin-top: 30px; }
+.lower-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 28px; margin-top: 30px; }
 .list-heading { display: flex; justify-content: space-between; align-items: center; margin: 0 2px 10px; }
 .list-heading h2 { margin: 0; font-size: 14px; font-weight: 600; }
 .list-heading .muted { font-size: 11px; }
 .data-list { overflow: hidden; }
 .data-row { display: grid; grid-template-columns: minmax(150px, 1fr) 65px 82px 42px; gap: 12px; align-items: center; min-height: 57px; padding: 9px 14px; }
 .data-row + .data-row { border-top: 1px solid var(--line); }
-/* Joinable open matches are buttons wearing the same row grid. */
-button.data-row { width: 100%; border: 0; border-radius: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
-button.data-row:hover:not(:disabled) { background: var(--surface-hover); }
-button.data-row:disabled { cursor: default; opacity: 0.6; }
 .row-detail, .row-age { color: var(--muted); font-size: 11px; text-align: right; }
 .row-age { color: var(--muted-dim); }
 .result-row { grid-template-columns: minmax(110px, 1fr) 44px 55px 52px; }
@@ -2282,7 +2279,7 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
 .market-switcher .market-symbol { width: 18px; height: 18px; border: 0; font-size: 13px; }
 .market-switcher small { color: var(--muted-dim); font-size: 9px; }
 @media (max-width: 900px) { .market-overview { grid-template-columns: 1fr 1.4fr; } .market-stats { grid-column: 1 / -1; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--line); border-left: 0; padding: 15px 0 0; } .play-panel { grid-template-columns: repeat(3, 1fr); } .play-panel-market { grid-column: span 3; } .play-panel-market + .control-group { padding-left: 0; border-left: 0; } .opponent-status { grid-column: span 2; } }
-@media (max-width: 640px) { .lobby-shell { width: min(100% - 28px, 1080px); padding-top: 18px; } .market-overview { grid-template-columns: 1fr; gap: 18px; padding: 18px; } .ticker-chart-wrap { order: 3; } .market-stats { grid-template-columns: 1fr 1fr 1fr; } .market-stats div { display: grid; gap: 4px; } .section-heading { align-items: start; flex-direction: column; margin-top: 24px; gap: 7px; } .play-panel { grid-template-columns: 1fr 1fr; gap: 16px; } .play-panel-market, .opponent-status { grid-column: span 2; padding-left: 0; border-left: 0; } .play-panel-market + .control-group { padding-left: 0; border-left: 0; } .play-button { grid-column: span 2; } .queue-panel { align-items: start; flex-wrap: wrap; } .queue-copy { flex: 1 1 calc(100% - 24px); } .queue-elapsed { margin-left: 23px; } .queue-actions { margin-left: auto; } .queue-cancel { margin-left: 23px; } .lower-grid { grid-template-columns: 1fr; gap: 24px; margin-top: 24px; } .data-row { grid-template-columns: minmax(130px, 1fr) 55px 72px 35px; gap: 8px; padding-inline: 10px; } }
+@media (max-width: 640px) { .lobby-shell { width: min(100% - 28px, 1080px); padding-top: 18px; } .market-overview { grid-template-columns: 1fr; gap: 18px; padding: 18px; } .ticker-chart-wrap { order: 3; } .market-stats { grid-template-columns: 1fr 1fr 1fr; } .market-stats div { display: grid; gap: 4px; } .section-heading { align-items: start; flex-direction: column; margin-top: 24px; gap: 7px; } .play-panel { grid-template-columns: 1fr 1fr; gap: 16px; } .play-panel-market, .opponent-status { grid-column: span 2; padding-left: 0; border-left: 0; } .play-panel-market + .control-group { padding-left: 0; border-left: 0; } .play-button { grid-column: span 2; } .queue-panel { align-items: start; flex-wrap: wrap; } .queue-copy { flex: 1 1 calc(100% - 24px); } .queue-elapsed { margin-left: 23px; } .queue-actions { margin-left: auto; } .queue-cancel { margin-left: 23px; } .lower-grid { margin-top: 24px; } .data-row { grid-template-columns: minmax(130px, 1fr) 55px 72px 35px; gap: 8px; padding-inline: 10px; } }
 /* Phone-specific polish: keep every interactive target comfortable to tap and
    reflow the data rows into two readable lines instead of letting the desktop
    four-column grid create horizontal overflow. */
@@ -2325,7 +2322,6 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
   .data-row .row-market { grid-column: 1; grid-row: 1; min-width: 0; }
   .data-row > .row-detail:nth-child(2) { grid-column: 2; grid-row: 1; text-align: right; }
   .data-row > .row-detail:nth-child(3) { grid-column: 1; grid-row: 2; margin-left: 38px; text-align: left; }
-  .data-row > .wager-detail { justify-content: flex-start; }
   .data-row > .row-age { grid-column: 2; grid-row: 2; text-align: right; }
   .result-row > span:nth-child(2) { grid-column: 2; grid-row: 1; text-align: right; }
   .result-row > .row-detail { grid-column: 1; grid-row: 2; margin-left: 38px; text-align: left; }
@@ -2486,6 +2482,25 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
 
 @media (max-width: 420px) { .mobile-header-content .brand { font-size: 18px; } }
 @media (max-width: 380px) { .mobile-header-content .brand { gap: 7px; font-size: 17px; } .mobile-header-content .brand-mark { width: 22px; height: 22px; } .mobile-header-actions .theme-toggle, .mobile-header-actions .notif-bell { width: 34px; height: 34px; } }
+/* Signed in (the bell is there), the phone header holds theme, Embers, messages,
+   bell and avatar: a smaller wordmark and tighter buttons keep "prophecy" whole. */
+@media (max-width: 768px) {
+  .mobile-header-content:has(.notif-bell) { gap: 10px; }
+  .mobile-header-content:has(.notif-bell) .brand { gap: 6px; font-size: 16px; }
+  .mobile-header-content:has(.notif-bell) .brand-mark { width: 22px; height: 22px; }
+  .mobile-header-content:has(.notif-bell) .mobile-header-actions { gap: 4px; }
+  .mobile-header-content:has(.notif-bell) :is(.theme-toggle, .notif-bell, .account-avatar) { width: 34px; height: 34px; }
+  .mobile-header-content:has(.notif-bell) .mobile-account-control { min-width: 34px; height: 34px; }
+  .mobile-header-content:has(.notif-bell) .balance-display { min-height: 32px; padding: 0 7px 0 8px; }
+}
+@media (max-width: 380px) {
+  .mobile-header-content:has(.notif-bell) { gap: 8px; }
+  .mobile-header-content:has(.notif-bell) .brand { gap: 5px; font-size: 15px; }
+  .mobile-header-content:has(.notif-bell) .brand-mark { width: 20px; height: 20px; }
+  .mobile-header-content:has(.notif-bell) .mobile-header-actions { gap: 3px; }
+  .mobile-header-content:has(.notif-bell) :is(.theme-toggle, .notif-bell, .account-avatar) { width: 32px; height: 32px; }
+  .mobile-header-content:has(.notif-bell) .mobile-account-control { min-width: 32px; height: 32px; }
+}
 @media (max-width: 340px) {
   .app-header { padding-inline: 16px; }
 }
@@ -2673,7 +2688,8 @@ button.data-row:disabled { cursor: default; opacity: 0.6; }
   .pulse-stage .play-panel .control-group--wager { order: 1; }
   .pulse-stage .play-actions { order: 2; margin-top: 0; padding-top: 0; }
   .pulse-stage .play-panel-note { order: 3; }
-  .pulse-stage .play-panel .opponent-status { order: 4; }
+  /* Full width, text on the left: the desktop align-self: end would push it right in this flex column. */
+  .pulse-stage .play-panel .opponent-status { order: 4; align-self: stretch; }
   .pulse-stage .play-panel .control-group--format { order: 5; }
   .pulse-stage .play-button { min-height: 52px; font-size: 18px; }
 }

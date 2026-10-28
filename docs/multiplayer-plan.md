@@ -8,7 +8,7 @@ polling, and lazy settlement.
 - One `matches` row = one round, single source of truth (`db/schema.ts:20`). Pulse
   positions, realized P&L, and final P&L live in the same row.
 - Match-seat identity: anonymous per-browser UUID in `localStorage.playerId` (`app/lib/playerId.ts:20`), separate from the signed-in application viewer.
-- Sync: ~1s polling (`app/duel/[market]/pulse/[matchId]/page.tsx:22`), no WebSocket registry. Lobby list polls at 3s (`app/duel/page.tsx:25`), the queue at 1s (`app/duel/page.tsx:30`).
+- Sync: ~1s polling (`app/duel/[market]/pulse/[matchId]/page.tsx:22`), no WebSocket registry. Lobby open-match count polls at 3s (`app/duel/page.tsx:30`), the queue at 1s (`app/duel/page.tsx:35`).
 - Nobody sits in a room alone: an `open` match is waited out on the lobby page (`app/duel/page.tsx` `queue` panel); the room is entered only once `status` leaves `open`. The queued state exposes a shareable invite URL (`app/duel/page.tsx` `shareInvite`) that auto-joins a friend as player 2 (`app/duel/[market]/pulse/[matchId]/page.tsx:59`, `:89-99`).
 - Requires application sign-in (`getViewer()`, `lib/viewer.ts`). Wager is picked in the lobby from `PULSE_WAGER_OPTIONS` (50/100/200 Embers, default 100; `lib/pulse.ts`, Wager segmented control in `app/duel/page.tsx`). Each player's `wager` is reserved atomically from `users.balance` on entry; open/predict cancellation refunds it, ties refund both stakes, and the winner receives the 2× pot (`lib/balance.ts`). Pulse reserves each entry's stake from the player's round bankroll and returns that stake when the position closes.
 
@@ -23,7 +23,7 @@ open --(p2 joins)--> predict --(5s countdown)--> countdown --(deadline)--> settl
 ```
 
 - Maps 1:1 onto the client `Phase` names in [game-loop.md](game-loop.md); only the owner changed.
-- `open` — auto-joinable by matching `(market, mode, wager, timerSeconds)` exactly, or by id from the lobby list.
+- `open` — auto-joinable by matching `(market, mode, wager, timerSeconds)` exactly, or by id via an invite link (the lobby no longer lists open matches).
 - `predict` — 5s automatic pre-round countdown (`PULSE_START_SECONDS`, `lib/match.ts:33`) from `predictStartAt`. Starts even if neither player has entered yet; the start is lazy, like settlement (`expireLocksIfDue`, `lib/match.ts:80`).
 - `countdown` — deadline = `roundStartAt + timerSeconds` (`lib/match.ts:25`). Needs nobody online. Supports server-priced entries up to the player's available bankroll and independent closes during this phase.
 - `settled` — final price + winner written once, idempotently.
@@ -69,7 +69,7 @@ multi-statement transactions or row locks. Every transition is a single guarded
 | --- | --- |
 | `POST /api/match/find-or-create` | join oldest live `open` match with identical criteria, else create one. Returns `status`, which is how the lobby decides between entering the room and queueing (`app/api/match/find-or-create/route.ts:74`,`:97`,`:117`) |
 | `GET /api/match/[id]?playerId=` | role-scoped view + heartbeat + pre-round expiry + lazy settlement (`app/api/match/[id]/route.ts:38`). Polled by the room, and by the lobby while queued |
-| `POST /api/match/[id]/join` | take a specific fresh open match (lobby list or invite link path); a challenge round only seats `invited_user_id` |
+| `POST /api/match/[id]/join` | take a specific fresh open match (invite link path); a challenge round only seats `invited_user_id` |
 | `POST /api/match/[id]/action` | Pulse server-priced `enter` actions up to available bankroll and per-position `close` actions; rejects unless the application viewer owns the browser player's stored match slot (`app/api/match/[id]/action/route.ts:33-51`) |
 | `POST /api/match/[id]/leave` | delete while `open`/`predict`; 409 once counting down |
 | `GET /api/match/open?market=&mode=&playerId=` | joinable matches with a fresh host heartbeat (not challenge rounds) |

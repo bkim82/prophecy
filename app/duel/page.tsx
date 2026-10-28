@@ -26,7 +26,7 @@ const TIMER_PRESETS = [
   { label: "300s", value: 300 },
 ];
 
-// The open-match list is a lobby view, not a round — it can lag a poll or two.
+// The open-match count is a lobby view, not a round — it can lag a poll or two.
 const LOBBY_POLL_MS = 3000;
 // Pressing Play holds you here, in an `open` match, until someone joins. The
 // queue poll doubles as that match's presence heartbeat, so it runs at round
@@ -45,11 +45,6 @@ const usd = (value: number | null, tickSize = 0.01) => {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
   });
-};
-
-const age = (since: number) => {
-  const seconds = Math.max(0, Math.round((Date.now() - since) / 1000));
-  return seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m`;
 };
 
 type Queue = {
@@ -136,7 +131,7 @@ export default function Page() {
   const [mode, setMode] = useState<ModeId>("pulse");
   const [playerId, setPlayerId] = useState<string | null>(null);
   const [openMatches, setOpenMatches] = useState<OpenMatch[]>([]);
-  const [pending, setPending] = useState<string | null>(null); // "play" | match id
+  const [pending, setPending] = useState<"play" | null>(null);
   const [matchError, setMatchError] = useState<string | null>(null);
   // Set while this browser is sitting in its own `open` match. The room is
   // only entered once an opponent takes the seat.
@@ -190,7 +185,8 @@ export default function Page() {
     return () => setQueueing(false);
   }, [queue]);
 
-  // Only poll the lobby list while a networked mode is on screen.
+  // Only poll the lobby (the Opponent "waiting" count; the route also keeps
+  // house bots seated) while a networked mode is on screen.
   useEffect(() => {
     if (!takesCall) return;
     let cancelled = false;
@@ -375,26 +371,6 @@ export default function Page() {
     }
   };
 
-  const join = async (match: OpenMatch) => {
-    if (!playerId || !isSignedIn || pending || queue || activeMatch) return;
-    setPending(match.id);
-    setMatchError(null);
-    try {
-      const res = await fetch(`/api/match/${encodeURIComponent(match.id)}/join`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ playerId }),
-      });
-      if (!res.ok) throw new Error(res.status === 402 ? "insufficient" : "taken");
-      enterMatch(match.market, match.id);
-    } catch (error) {
-      setMatchError(error instanceof Error && error.message === "insufficient"
-        ? "Not enough coins to join that match."
-        : isSignedIn ? "That match was taken. Pick another, or press Play." : "Sign in to wager your balance.");
-      setPending(null);
-    }
-  };
-
   return (
     <main className="lobby-shell" data-market={market}>
       <h1 className="sr-only">Arena</h1>
@@ -546,21 +522,6 @@ export default function Page() {
 
       {mode !== "battle-24h" && (
       <section className="lower-grid">
-        <div><div className="list-heading"><h2>Open matches</h2><span className="muted">Live lobby</span></div><div className="data-list panel">
-          {!takesCall && <div className="data-row"><span className="muted">Choose Pulse</span></div>}
-          {takesCall && openMatches.length === 0 && <div className="data-row"><span className="muted">No one is waiting — press Play to open one.</span></div>}
-          {takesCall && openMatches.map((match) => {
-            const label = MARKETS[match.market as MarketId]?.label ?? match.market.toUpperCase();
-            return (
-              <button type="button" className="data-row" key={match.id} onClick={() => join(match)} disabled={pending !== null || queue !== null || match.isYours || activeMatch !== null}>
-                <div className="row-market"><span className={`market-symbol ${match.market === "btc" ? "btc-symbol" : "eth-symbol"}`}>{match.market === "btc" ? "₿" : "Ξ"}</span><span><strong>{label}</strong><span className="muted">{match.timerSeconds}s · {match.isYours ? "yours" : "Pulse"}</span></span></div>
-                <span className="row-detail">1 / 2</span>
-                <span className="row-detail wager-detail"><FlameIcon className="balance-ember-icon" /> {match.wager}</span>
-                <span className="row-age">{pending === match.id ? "joining…" : age(match.createdAt)}</span>
-              </button>
-            );
-          })}
-        </div></div>
         <div><div className="list-heading"><h2>Recent results</h2><span className="muted">Your Pulse matches</span></div><div className="data-list panel">
           {isSignedIn === false && <div className="data-row"><span className="muted">Sign in to see your results.</span></div>}
           {isSignedIn && recentResults === null && <div className="data-row"><span className="muted">Loading…</span></div>}
