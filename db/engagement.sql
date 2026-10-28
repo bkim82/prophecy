@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS post_reshares (
 CREATE TABLE IF NOT EXISTS post_replies (
   id text PRIMARY KEY,
   post_id text NOT NULL,
+  parent_id text,
   author_id text NOT NULL,
   author_name text NOT NULL,
   author_handle text,
@@ -37,6 +38,8 @@ CREATE TABLE IF NOT EXISTS post_replies (
 -- For databases that created post_replies before replies could be edited.
 ALTER TABLE post_replies ADD COLUMN IF NOT EXISTS edited_at timestamp with time zone;
 ALTER TABLE post_replies ADD COLUMN IF NOT EXISTS deleted_at timestamp with time zone;
+-- For databases that created post_replies before replies could answer replies.
+ALTER TABLE post_replies ADD COLUMN IF NOT EXISTS parent_id text;
 CREATE INDEX IF NOT EXISTS post_replies_post_created_at_idx ON post_replies (post_id, created_at);
 CREATE INDEX IF NOT EXISTS post_replies_author_created_at_idx ON post_replies (author_id, created_at);
 

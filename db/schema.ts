@@ -474,6 +474,9 @@ export const postReshares = pgTable("post_reshares", {
 export const postReplies = pgTable("post_replies", {
   id: text("id").primaryKey(),
   postId: text("post_id").notNull(),
+  // The reply this one answers (a `post_replies` id under the same post);
+  // null = a reply to the post itself.
+  parentId: text("parent_id"),
   authorId: text("author_id").notNull(),
   authorName: text("author_name").notNull(),
   authorHandle: text("author_handle"),

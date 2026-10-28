@@ -6,18 +6,19 @@ import { BackIcon } from "@/app/icons";
 import type { Post, Reply } from "@/app/lib/posts";
 import { useTopicSignal } from "@/app/lib/topicSignals";
 import { PostCard } from "@/app/PostCard";
-import { ReplyComposer, ReplyItem, withMention } from "@/app/PostReplies";
+import { ReplyBranch, ReplyComposer, threadReplies } from "@/app/PostReplies";
 
-// `replies` = saved, newest first (lib/engagement.ts repliesFor). Replies you post
-// here are saved and go on top, ones you delete drop out (both move the
-// comment count); a reply's Reply button @mentions its author in the box.
+// `replies` = saved, newest first (lib/engagement.ts repliesFor), each
+// comment with every reply under it (ReplyBranch: a reply's Reply button
+// opens a box under its comment). Replies you post here are saved — comments
+// on top — and ones you delete drop out (both move the comment count).
 export function PostThread({ post, replies }: { post: Post; replies: Reply[] }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState("");
   const [mine, setMine] = useState<Reply[]>([]);
   const [removed, setRemoved] = useState<string[]>([]);
-  const all = [...mine, ...replies].filter((reply) => !removed.includes(reply.id));
+  const groups = threadReplies([...mine, ...replies].filter((reply) => !removed.includes(reply.id)));
   // Opening a post and replying to it count toward inferred interests
   // (once per post; the server skips your own).
   const signal = useTopicSignal();
@@ -30,9 +31,9 @@ export function PostThread({ post, replies }: { post: Post; replies: Reply[] }) 
     else router.push("/");
   }
 
-  function mention(reply: Reply) {
-    setDraft((current) => withMention(current, reply.handle));
-    inputRef.current?.focus();
+  function addReply(reply: Reply) {
+    signal("reply", { postId: post.id });
+    setMine((current) => [reply, ...current]);
   }
 
   return (
@@ -52,22 +53,20 @@ export function PostThread({ post, replies }: { post: Post; replies: Reply[] }) 
           inputRef={inputRef}
           draft={draft}
           onDraft={setDraft}
-          onPosted={(reply) => {
-            signal("reply", { postId: post.id });
-            setMine((current) => [reply, ...current]);
-          }}
+          onPosted={addReply}
         />
         <div className="post-replies">
-          {all.map((reply) => (
-            <ReplyItem
-              key={reply.id}
-              reply={reply}
+          {groups.map((group) => (
+            <ReplyBranch
+              key={group.comment.id}
+              group={group}
               postId={post.id}
-              onReply={mention}
+              blocked={post.blocked}
+              onPosted={addReply}
               onDeleted={({ id }) => setRemoved((current) => [...current, id])}
             />
           ))}
-          {all.length === 0 && <p className="muted post-replies-empty">No replies yet. Be the first.</p>}
+          {groups.length === 0 && <p className="muted post-replies-empty">No replies yet. Be the first.</p>}
         </div>
       </div>
     </section>

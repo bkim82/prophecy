@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   replyCountSince: vi.fn(),
   repliesFor: vi.fn(),
   replyExists: vi.fn(),
+  replyTarget: vi.fn(),
   setReplyLike: vi.fn(),
   editReply: vi.fn(),
   deleteReply: vi.fn(),
@@ -29,6 +30,7 @@ vi.mock("@/lib/engagement", () => ({
   replyCountSince: mocks.replyCountSince,
   repliesFor: mocks.repliesFor,
   replyExists: mocks.replyExists,
+  replyTarget: mocks.replyTarget,
   setReplyLike: mocks.setReplyLike,
   editReply: mocks.editReply,
   deleteReply: mocks.deleteReply,
@@ -116,7 +118,24 @@ describe("engagement routes", () => {
     const response = await reply(request("replies", { content: " agreed ", authorName: "Someone else" }), ctx("p1"));
     expect(response.status).toBe(201);
     expect(await response.json()).toEqual({ reply: { id: "r1", content: "agreed" } });
-    expect(mocks.createReply).toHaveBeenCalledWith({ postId: "p1", authorId: "user_1", authorName: "Dana", authorHandle: "dana", content: "agreed" });
+    expect(mocks.createReply).toHaveBeenCalledWith({ postId: "p1", parentId: null, authorId: "user_1", authorName: "Dana", authorHandle: "dana", content: "agreed" });
+  });
+
+  it("saves a reply to a reply under the same post, not to a gone one or across a block", async () => {
+    mocks.replyTarget.mockResolvedValue({ authorId: "user_3" });
+    mocks.createReply.mockResolvedValue({ id: "r2", parentId: "r1", content: "same" });
+    expect((await reply(request("replies", { content: "same", parentId: "r1" }), ctx("p1"))).status).toBe(201);
+    expect(mocks.replyTarget).toHaveBeenCalledWith("p1", "r1");
+    expect(mocks.createReply).toHaveBeenCalledWith(expect.objectContaining({ postId: "p1", parentId: "r1", content: "same" }));
+
+    mocks.createReply.mockClear();
+    mocks.isBlockedEitherWay.mockImplementation(async (_viewer: string, other: string) => other === "user_3");
+    const blocked = await reply(request("replies", { content: "hi", parentId: "r1" }), ctx("p1"));
+    expect(blocked.status).toBe(403);
+    expect(await blocked.json()).toEqual({ error: "You can't reply to this reply." });
+    mocks.replyTarget.mockResolvedValue(null);
+    expect((await reply(request("replies", { content: "hi", parentId: "gone" }), ctx("p1"))).status).toBe(404);
+    expect(mocks.createReply).not.toHaveBeenCalled();
   });
 
   it("rejects empty or long replies, unknown posts and fast replying", async () => {
