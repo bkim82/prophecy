@@ -745,6 +745,9 @@ a.messages-post:hover { border-color: var(--brand); }
 /* Replying to a post across a block (app/PostReplies.tsx ReplyComposer `blocked`). */
 .reply-blocked { margin: 0 0 10px; padding: 10px 12px; border: 1px dashed var(--line-strong); border-radius: 10px; font-size: 12.5px; text-align: center; }
 .reply-item { display: flex; gap: 8px; }
+/* A comment and the replies under it (app/PostReplies.tsx ReplyBranch), indented to the comment's text. */
+.reply-branch { display: grid; gap: 10px; }
+.reply-nested { display: grid; gap: 10px; padding-left: 34px; }
 .reply-avatar { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 999px; color: #fff; font-size: 11px; font-weight: 700; text-shadow: 0 1px 2px rgba(0, 0, 0, .35); }
 .reply-body { min-width: 0; display: grid; gap: 4px; }
 .reply-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 5px; font-size: 12px; }
@@ -795,12 +798,17 @@ a.messages-post:hover { border-color: var(--brand); }
 .reply-composer--inline .feed-composer-post { min-height: 28px; padding: 0 12px; }
 .reply-thread .feed-composer-error { padding: 0 0 0 34px; }
 .post-replies .reply-item { gap: 12px; padding: 14px 18px; }
-.post-replies .reply-item + .reply-item { border-top: 1px solid var(--line); }
+.post-replies .reply-branch { gap: 0; }
+.post-replies .reply-branch + .reply-branch { border-top: 1px solid var(--line); }
+.post-replies .reply-nested { gap: 12px; padding: 0 18px 14px 68px; }
+.post-replies .reply-nested .reply-item { gap: 10px; padding: 0; }
+.post-replies .reply-nested .reply-avatar { width: 30px; height: 30px; font-size: 12px; }
+.post-replies .reply-nested .reply-content { font-size: 14px; }
 .post-replies .reply-avatar { width: 38px; height: 38px; font-size: 15px; }
 .post-replies .reply-meta { font-size: 13px; }
 .post-replies .reply-content { font-size: 15px; }
 .post-replies-empty { margin: 0; padding: 22px 18px; }
-@media (max-width: 768px) { .post-card--detail { padding: 14px; } .post-card--detail .post-content { font-size: 16px; } .post-replies .reply-item { padding: 12px 14px; } .post-replies .reply-content { font-size: 14px; } .post-replies .reply-meta { font-size: 12px; } }
+@media (max-width: 768px) { .post-card--detail { padding: 14px; } .post-card--detail .post-content { font-size: 16px; } .post-replies .reply-item { padding: 12px 14px; } .post-replies .reply-nested { padding: 0 14px 12px 64px; } .post-replies .reply-content { font-size: 14px; } .post-replies .reply-meta { font-size: 12px; } }
 /* Trade card: time ring + coin │ asset/terms │ doom→destiny track │ ROI +
    status │ Copy w/ tailing (open only). The frame is a size container: wide
    (≥680px) = one row; default = track on its own row; narrow (≤420px) adds

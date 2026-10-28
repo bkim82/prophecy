@@ -180,7 +180,7 @@ export async function replyCountSince(authorId: string, since: Date): Promise<nu
   return row?.n ?? 0;
 }
 
-export type NewReply = { postId: string; authorId: string; authorName: string; authorHandle: string | null; content: string };
+export type NewReply = { postId: string; parentId?: string | null; authorId: string; authorName: string; authorHandle: string | null; content: string };
 
 /** Saves a reply and returns it as its author now sees it. */
 export async function createReply(input: NewReply): Promise<Reply> {
@@ -188,6 +188,7 @@ export async function createReply(input: NewReply): Promise<Reply> {
   await getDb().insert(postReplies).values({ id, ...input });
   return {
     id,
+    ...(input.parentId ? { parentId: input.parentId } : {}),
     author: input.authorName,
     handle: input.authorHandle ? `@${input.authorHandle}` : "",
     avatarInitial: input.authorName[0]?.toUpperCase() ?? "?",
@@ -246,6 +247,7 @@ async function toReplies(rows: ReplyRow[], viewerId: string | null): Promise<Rep
     const handle = profile?.handle ?? row.authorHandle;
     return {
       id: row.id,
+      ...(row.parentId ? { parentId: row.parentId } : {}),
       author: name,
       handle: handle ? `@${handle}` : "",
       avatarInitial: name[0]?.toUpperCase() ?? "?",
@@ -276,14 +278,19 @@ export async function repliesFor(postId: string, viewerId: string | null): Promi
   return toReplies(rows, viewerId);
 }
 
-/** Whether `replyId` is a live reply under `postId`. */
-export async function replyExists(postId: string, replyId: string): Promise<boolean> {
-  if (!isSavedPostId(replyId)) return false;
+/** `replyId` as a live reply under `postId` (with its author), else null. */
+export async function replyTarget(postId: string, replyId: string): Promise<{ authorId: string } | null> {
+  if (!isSavedPostId(replyId)) return null;
   const [row] = await getDb()
-    .select({ id: postReplies.id })
+    .select({ authorId: postReplies.authorId })
     .from(postReplies)
     .where(and(eq(postReplies.id, replyId), eq(postReplies.postId, postId), isNull(postReplies.deletedAt)));
-  return row !== undefined;
+  return row ?? null;
+}
+
+/** Whether `replyId` is a live reply under `postId`. */
+export async function replyExists(postId: string, replyId: string): Promise<boolean> {
+  return (await replyTarget(postId, replyId)) !== null;
 }
 
 export async function setReplyLike(replyId: string, userId: string, liked: boolean): Promise<void> {

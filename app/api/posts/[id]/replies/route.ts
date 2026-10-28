@@ -1,7 +1,7 @@
 import { authorFor } from "@/app/api/posts/author";
 import { postsJson, postsMutationFailure, readPostsJson } from "@/app/api/posts/responses";
 import { isBlockedEitherWay } from "@/lib/blocks";
-import { createReply, engagementTarget, replyCountSince, repliesFor } from "@/lib/engagement";
+import { createReply, engagementTarget, replyCountSince, repliesFor, replyTarget } from "@/lib/engagement";
 import { MAX_POST_CHARS } from "@/lib/postInput";
 import { getViewer } from "@/lib/viewer";
 
@@ -19,10 +19,12 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
 }
 
 /**
- * POST { content } → 201 { reply }: saves the viewer's reply (1–280 chars).
- * The author is derived like a post's (app/api/posts/author.ts); rate
- * limited per author via the post_replies table. Not across a block either
- * way with the post's author (403, lib/blocks.ts).
+ * POST { content, parentId? } → 201 { reply }: saves the viewer's reply
+ * (1–280 chars); `parentId` = a live reply under the same post that it
+ * answers (else 404). The author is derived like a post's
+ * (app/api/posts/author.ts); rate limited per author via the post_replies
+ * table. Not across a block either way with the post's author, or with the
+ * author of the reply it answers (403, lib/blocks.ts).
  */
 export async function POST(request: Request, ctx: { params: Promise<{ id: string }> }) {
   const failure = postsMutationFailure(request);
@@ -33,6 +35,7 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
   const body = await readPostsJson(request, 4_096);
   const content = body && body !== "too-large" && typeof body.content === "string" ? body.content.trim() : "";
   if (!content || content.length > MAX_POST_CHARS) return postsJson({ error: `Replies are 1–${MAX_POST_CHARS} characters` }, { status: 400 });
+  const parentId = body && body !== "too-large" && typeof body.parentId === "string" ? body.parentId : null;
 
   const { id } = await ctx.params;
   try {
@@ -40,6 +43,13 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
     if (!target) return postsJson({ error: "Post not found" }, { status: 404 });
     if (target.authorId !== viewer.userId && (await isBlockedEitherWay(viewer.userId, target.authorId))) {
       return postsJson({ error: "You can't reply to this post." }, { status: 403 });
+    }
+    if (parentId) {
+      const parent = await replyTarget(id, parentId);
+      if (!parent) return postsJson({ error: "That reply was deleted." }, { status: 404 });
+      if (parent.authorId !== viewer.userId && (await isBlockedEitherWay(viewer.userId, parent.authorId))) {
+        return postsJson({ error: "You can't reply to this reply." }, { status: 403 });
+      }
     }
     const now = Date.now();
     const [lastMinute, lastDay] = await Promise.all([
@@ -49,7 +59,7 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
     if (lastMinute >= PER_MINUTE || lastDay >= PER_DAY) {
       return postsJson({ error: "You're replying too fast. Try again in a minute." }, { status: 429, headers: { "Retry-After": "60" } });
     }
-    const reply = await createReply({ postId: id, authorId: viewer.userId, ...(await authorFor(viewer)), content });
+    const reply = await createReply({ postId: id, parentId, authorId: viewer.userId, ...(await authorFor(viewer)), content });
     return postsJson({ reply }, { status: 201 });
   } catch (error) {
     // Most likely db/engagement.sql hasn't been applied to this database yet.

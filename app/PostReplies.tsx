@@ -205,7 +205,8 @@ export function ReplyItem({
 }
 
 // The reply box: full width on the post page ("Replying to @x" over the
-// field), `inline` at the top of a feed post's thread. The parent owns
+// field), `inline` at the top of a feed post's thread and under a comment
+// (`parentId` = the reply it answers; Esc → `onCancel`). The parent owns
 // `draft` so a reply's Reply button can @mention into it. Saves through
 // POST /api/posts/[id]/replies; signed out, Reply opens sign-in and keeps the
 // draft. Authorship is server-derived; the avatar initial here is the
@@ -213,20 +214,24 @@ export function ReplyItem({
 // `post.blocked`) swaps the box for a note — the server refuses anyway.
 export function ReplyComposer({
   postId,
+  parentId,
   replyingTo,
   inputRef,
   draft,
   onDraft,
   onPosted,
+  onCancel,
   inline = false,
   blocked = false,
 }: {
   postId: string;
+  parentId?: string;
   replyingTo: string;
   inputRef: RefObject<HTMLInputElement | null>;
   draft: string;
   onDraft: (draft: string) => void;
   onPosted: (reply: Reply) => void;
+  onCancel?: () => void;
   inline?: boolean;
   blocked?: boolean;
 }) {
@@ -235,7 +240,7 @@ export function ReplyComposer({
   const [error, setError] = useState<string | null>(null);
   const name = user?.firstName ?? user?.username ?? "You";
   const initial = name[0].toUpperCase();
-  const errorId = `reply-error-${postId}`;
+  const errorId = `reply-error-${parentId ?? postId}`;
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -247,7 +252,7 @@ export function ReplyComposer({
     }
     setPosting(true);
     setError(null);
-    const result = await publishReply(postId, content);
+    const result = await publishReply(postId, content, parentId);
     setPosting(false);
     if (!result.ok) {
       setError(result.error);
@@ -262,7 +267,13 @@ export function ReplyComposer({
 
   return (
     <>
-      <form className={`feed-composer reply-composer${inline ? " reply-composer--inline" : ""}`} onSubmit={submit}>
+      <form
+        className={`feed-composer reply-composer${inline ? " reply-composer--inline" : ""}`}
+        onSubmit={submit}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") onCancel?.();
+        }}
+      >
         <span className="feed-composer-avatar" aria-hidden="true">
           {initial}
         </span>
@@ -292,10 +303,107 @@ export function ReplyComposer({
   );
 }
 
+export type ReplyGroup = { comment: Reply; replies: Reply[] };
+
+// Replies under the comment they answer, one level deep: comments keep their
+// order in `replies` (newest first) and everything under one — replies to
+// its replies too — follows it oldest first. A reply whose parent isn't here
+// (deleted, hidden by a block, past the load limit) stands as a comment.
+export function threadReplies(replies: Reply[]): ReplyGroup[] {
+  const byId = new Map(replies.map((reply) => [reply.id, reply]));
+  const rootOf = (reply: Reply): Reply => {
+    const parent = reply.parentId ? byId.get(reply.parentId) : undefined;
+    return parent ? rootOf(parent) : reply;
+  };
+  const groups = new Map<string, ReplyGroup>();
+  for (const reply of replies) if (rootOf(reply) === reply) groups.set(reply.id, { comment: reply, replies: [] });
+  for (const reply of [...replies].reverse()) {
+    const root = rootOf(reply);
+    if (root !== reply) groups.get(root.id)?.replies.push(reply);
+  }
+  return [...groups.values()];
+}
+
+// A comment with the replies under it (past `limit`, "View N more"). Reply
+// on any of them opens a box at the foot of the group with that author
+// @mentioned (not you); what you post there answers that reply and lands at
+// the end of the group, then the box closes (Esc closes it too).
+export function ReplyBranch({
+  group,
+  postId,
+  blocked,
+  limit = Infinity,
+  onPosted,
+  onDeleted,
+}: {
+  group: ReplyGroup;
+  postId: string;
+  blocked?: boolean;
+  limit?: number;
+  onPosted: (reply: Reply) => void;
+  onDeleted: (reply: Reply) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [answering, setAnswering] = useState<Reply | null>(null);
+  const [draft, setDraft] = useState("");
+  const [expanded, setExpanded] = useState(false);
+  const [focusRequest, setFocusRequest] = useState(0);
+
+  useEffect(() => {
+    if (focusRequest) inputRef.current?.focus();
+  }, [focusRequest]);
+
+  function answer(reply: Reply) {
+    setAnswering(reply);
+    setExpanded(true);
+    if (!reply.mine) setDraft((current) => withMention(current, reply.handle));
+    setFocusRequest((n) => n + 1);
+  }
+
+  const shown = expanded ? group.replies : group.replies.slice(0, limit);
+  const hidden = group.replies.length - shown.length;
+
+  return (
+    <div className="reply-branch">
+      <ReplyItem reply={group.comment} postId={postId} onReply={answer} onDeleted={onDeleted} />
+      {(group.replies.length > 0 || answering) && (
+        <div className="reply-nested">
+          {shown.map((reply) => (
+            <ReplyItem key={reply.id} reply={reply} postId={postId} onReply={answer} onDeleted={onDeleted} />
+          ))}
+          {hidden > 0 && (
+            <button type="button" className="reply-thread-more" onClick={() => setExpanded(true)}>
+              View {hidden} more {hidden === 1 ? "reply" : "replies"}
+            </button>
+          )}
+          {answering && (
+            <ReplyComposer
+              inline
+              blocked={blocked}
+              postId={postId}
+              parentId={answering.id}
+              replyingTo={answering.handle || answering.author}
+              inputRef={inputRef}
+              draft={draft}
+              onDraft={setDraft}
+              onPosted={(reply) => {
+                setAnswering(null);
+                onPosted(reply);
+              }}
+              onCancel={() => setAnswering(null)}
+            />
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // The comment action's thread under a feed post (expands in place, X/Reddit
 // style): the reply box first, focused as it opens so you can type straight
-// away, then the post's replies from GET /api/posts/[id]/replies — the first
-// couple, "View N more" reveals the rest. Replies you post go on top; ones
+// away, then the post's replies from GET /api/posts/[id]/replies, each
+// comment with its replies under it (ReplyBranch) — the first couple of
+// each, "View N more" reveals the rest. Comments you post go on top; ones
 // you delete drop out. `onCountChange` moves the card's comment count.
 export function ReplyThread({ post, onCountChange }: { post: Post; onCountChange: (delta: number) => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -321,9 +429,9 @@ export function ReplyThread({ post, onCountChange }: { post: Post; onCountChange
     };
   }, [post.id, attempt]);
 
-  function mention(reply: Reply) {
-    setDraft((current) => withMention(current, reply.handle));
-    inputRef.current?.focus();
+  function addReply(reply: Reply) {
+    setMine((current) => [reply, ...current]);
+    onCountChange(1);
   }
 
   function removeReply(reply: Reply) {
@@ -332,9 +440,10 @@ export function ReplyThread({ post, onCountChange }: { post: Post; onCountChange
   }
 
   const kept = (reply: Reply) => !removed.includes(reply.id);
-  const replies = (Array.isArray(loaded) ? loaded : []).filter(kept);
-  const visible = [...mine.filter(kept), ...replies.slice(0, shown)];
-  const remaining = replies.length - Math.min(shown, replies.length);
+  const groups = threadReplies([...mine, ...(Array.isArray(loaded) ? loaded : [])].filter(kept));
+  // Comments you post here show on top of the first couple.
+  const visible = groups.slice(0, shown + mine.filter((reply) => !reply.parentId && kept(reply)).length);
+  const remaining = groups.length - visible.length;
 
   return (
     <div className="reply-thread">
@@ -346,13 +455,18 @@ export function ReplyThread({ post, onCountChange }: { post: Post; onCountChange
         inputRef={inputRef}
         draft={draft}
         onDraft={setDraft}
-        onPosted={(reply) => {
-          setMine((current) => [reply, ...current]);
-          onCountChange(1);
-        }}
+        onPosted={addReply}
       />
-      {visible.map((reply) => (
-        <ReplyItem key={reply.id} reply={reply} postId={post.id} onReply={mention} onDeleted={removeReply} />
+      {visible.map((group) => (
+        <ReplyBranch
+          key={group.comment.id}
+          group={group}
+          postId={post.id}
+          blocked={post.blocked}
+          limit={REPLIES_SHOWN_INITIALLY}
+          onPosted={addReply}
+          onDeleted={removeReply}
+        />
       ))}
       {loaded === null ? (
         <p className="muted reply-thread-empty">Loading replies…</p>

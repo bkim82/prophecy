@@ -36,8 +36,8 @@ export async function loadReplies(postId: string): Promise<Reply[] | null> {
 
 export type ReplyResult = { ok: true; reply: Reply } | { ok: false; status: number; error: string };
 
-export async function publishReply(postId: string, content: string): Promise<ReplyResult> {
-  const response = await send(`${postPath(postId)}/replies`, { content });
+export async function publishReply(postId: string, content: string, parentId?: string): Promise<ReplyResult> {
+  const response = await send(`${postPath(postId)}/replies`, { content, ...(parentId ? { parentId } : {}) });
   if (!response) return { ok: false, status: 0, error: "Couldn't reach Prophecy. Check your connection and try again." };
   const body = (await response.json().catch(() => ({}))) as { reply?: Reply; error?: string };
   if (response.ok && body.reply) return { ok: true, reply: body.reply };

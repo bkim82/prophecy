@@ -176,6 +176,8 @@ export type Share = {
 
 export type Reply = {
   id: string;
+  // The saved reply this one answers; none = a reply to the post itself.
+  parentId?: string;
   author: string;
   handle: string;
   avatarInitial: string;
