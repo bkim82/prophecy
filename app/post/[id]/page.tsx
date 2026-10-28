@@ -24,7 +24,7 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
   ]);
 
   return (
-    <main className="feed-shell">
+    <main className="feed-shell post-shell">
       <div className="feed-main">
         <PostThread post={post} replies={replies} />
       </div>
