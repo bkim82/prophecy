@@ -7,14 +7,14 @@
 - At rendered widths ≤560px, the chart switches to a 520×440 viewBox with expanded padding and label sizes (`app/PriceChart.tsx:213-220`, `:465-479`) so the full chart remains visible without shrinking mobile text to desktop scale.
 - Desktop `viewBox` is 880×400 and scales via CSS `h-auto w-full`; compact mode uses 520×440 (`:213-220`) — resolution-independent; DOM measurement is used only to route wheel events between axes.
 - `PAD` top 20 / right 86 / bottom 44 / left 12 (`app/PriceChart.tsx:47`). Compact right padding is 100 (`:225`). Right reserves price-label space and the live price pill; bottom reserves the time axis (ticks + clock labels).
-- `x()` maps ts→horizontal over the **fixed window**, not the data extent; the live edge lands at 84% of plot width, matching the lobby chart's 16% future-time region before the price axis; `y()` maps price→vertical (`app/PriceChart.tsx:345-346`).
+- `x()` maps ts→horizontal over the **fixed window**, not the data extent; the live edge lands at 84% of plot width, matching `MarketChart`'s 16% future-time region before the price axis; `y()` maps price→vertical (`app/PriceChart.tsx:345-346`).
 
 ## Time window (fixed width, scrolling)
 
 - `t1` = `max(now, last point)`, `t0` = `t1 - viewMs`; the price history maps to the first 84% of the plot and the remaining 16% maps to future wall-clock time with axis ticks but no price data (`app/PriceChart.tsx:257-268`, `:373-379`). The domain width is constant from the first frame, so the axis scrolls left instead of compressing as points accumulate. `viewMs` is `windowMs` unless the wheel has zoomed in — see Zoom.
 - `now` comes in as a prop from `usePriceFeed` (`app/duel/[market]/pulse/[matchId]/page.tsx:201`), which ticks it every `CLOCK_MS`=100ms (`app/usePriceFeed.ts:11`, `:48-51`) — ~1px of travel per tick at the default window. A silent socket scrolls the axis past the last point rather than freezing the chart.
 - `frozen` pins `t1` to the last point so a settled chart stops scrolling (`:147-151`).
-- `windowSlice()` clips to `[t0, …]` and **interpolates** the price where the line crosses the left edge (`:104-112`), so a scrolled-past segment ends on the axis instead of floating in. Needs one sample of slack outside the window — supplied by `trim()` and `/api/history`, both cutting at `WINDOW_MS + SAMPLE_MS`.
+- `windowSlice()` clips to `[t0, …]` and **interpolates** the price where the line crosses the left edge (`:104-112`), so a scrolled-past segment ends on the axis instead of floating in. Needs a point outside the window — `trim()` and `/api/history` both cut at `windowMs + SAMPLE_MS` and keep the newest point before the cut.
 - Every point older than the window → `windowSlice` returns `[]` → placeholder. That is the dead-feed rendering.
 - Price scale is computed from the **visible** slice only, so scrolled-off extremes don't hold the axis open.
 
@@ -106,26 +106,39 @@ Settlement passes frozen snapshot + `frozen={true}` (`app/duel/[market]/pulse/[m
 
 Visible slice <2 points → fixed 400px placeholder "Waiting for price data…" (matches rendered chart height, prevents layout jump) (`:303-311`).
 
-## Lobby chart (`app/MarketChart.tsx`)
+## Arena lobby chart (`app/duel/ArenaChart.tsx`)
 
-Separate from `PriceChart`; renders in the lobby `market-overview` (`app/duel/page.tsx`).
+Renders in the `/duel` chart card (`app/duel/page.tsx`). Reuses `MarketChart`'s exported helpers (`useFrameClock`, `useReducedMotion`, `windowSlice`, `monotonePath`, `priceAt`, `formatChartPrice`) and its look: line/glow/area/fan/head/pill-entrance markup reuses the global `mc-*`/`market-chart-*` classes (`app/globals.css`, Lobby ticker chart block); layout, grid, pill and scrub are `.arena-chart*` (Arena lobby block).
+
+- Window `LOBBY_WINDOW_MS`=5min (`app/feedConfig.ts`); the page asks `usePriceFeed(..., { windowMs })` for that much history. Head at `NOW_FRAC`=68% of plot width.
+- y fits the slice padded `Y_PAD`=14%, half-span floored at `MIN_HALF_SPAN`=±0.03% of the live price, then widened so the head keeps `HEADROOM`=30% of the span above and below (the fan always has room). Eased like MarketChart (`HEAD_TAU_MS`/`RANGE_TAU_MS`).
+- Line, glow, area tint, orb, pill, sparks in the market colour (`--chart-line`/`--chart-point` from `main.arena[data-market]`), same gradients as MarketChart (stroke faint → full at head, area fades to `--violet`, masked in from the left). Dashed open line at the window's first price.
+- Same entrance as MarketChart (line sweeps in → orb pops → fan unfolds → pill slides in; re-plays on market change via `key={label}`); gridlines fade in staggered (`.arena-chart-grid-row`).
+- Ahead of the head: MarketChart's fan (green/red cones + flowing dashed `RAYS`, not clickable) and teal "now" line. No UP/DOWN zones.
+- 4 evenly spaced gridlines with mono labels in the right gutter (decimals from the step, capped at tick precision; hidden within 16px of the pill); minute labels along the bottom, thinned to ≥56px apart.
+- No starfield: the card's radial glows are CSS (`.arena-chart-card`).
+- Live price pill (market colour) flashes green/red per move; head = aura + spinning halo + ping + ripple + trailing sparks + gradient orb, as MarketChart. Scrub crosshair/tooltip as MarketChart, lifted via `onScrub`. Loading: scanning bar; stale feed → frozen window + "Reconnecting…" chip.
+- `aria-label` states market, window, current price and change. `.arena-chart` is absolutely positioned inside `.arena-chart-wrap` so the SVG never feeds back into the size it measures.
+- Lobby headline price = chart head; change ($ and %) measured from the window's left edge, or the oldest point while the series is still filling, labelled with the span actually covered ("last 4 min").
+
+## Market chart (`app/MarketChart.tsx`)
+
+Separate from `PriceChart`; renders in token details (`app/duel/portfolio/TokenDetail.tsx`, `app/wallet/AdvancedTokenDetail.tsx`, `app/wallet/CoinDetailPanel.tsx`). Was the lobby chart before `ArenaChart`.
 
 - Time-based x over a fixed `MARKET_CHART_WINDOW_MS`=30s window ending at `max(now, last point)`; left edge interpolated via `priceAt`/`windowSlice`. Not index-based.
 - Pixel viewBox from a `ResizeObserver` width × `height` prop (default 148, or `"fill"` = observed box height, `.market-chart.is-fill` min 220px). Lobby passes `"fill"` — no `preserveAspectRatio="none"` stretching.
 - Axis/pill/tooltip prices at the market's tick precision (`formatChartPrice(value, tickSize)`).
-- y fits the visible slice, padded `Y_PAD`=14% each side, span floored at `MIN_SPAN_TICKS`=10 × the market's `tickSize` prop (Coinbase quote_increment, set in `MARKETS` in `app/duel/page.tsx`: $0.01 BTC/ETH/HYPE) so a one-tick flicker doesn't fill the height.
+- y fits the visible slice, padded `Y_PAD`=14% each side, span floored at `MIN_SPAN_TICKS`=10 × the market's `tickSize` prop (Coinbase quote_increment) so a one-tick flicker doesn't fill the height.
 - Line: monotone cubic (Fritsch–Carlson, no overshoot) + blurred glow. Line, glow, area tint, orb, pill, sparks in the market colour (`--chart-line`/`--chart-point`, set per `[data-market]`: BTC soft amber `#f0a868` — pure `#f7931a` glared on navy; chips keep it —, ETH blue, HYPE mint `#7ce0c3`, darker `#0f9e86` on light), stroke faint at left → full at head; area fades to `--violet` and in from the left. Stars, fan, "now" line, loading beam stay brand teal/violet.
-- Seeded starfield (`STARS`, 54, twinkling) behind; panel gets teal/violet radial glows (`.pulse-stage .market-overview.panel`, `app/globals.css`).
+- Seeded starfield (`STARS`, 54, twinkling) behind.
 - Head at `1 - FUTURE_FRAC`=84% of plot width; right of it a fan of possible paths (green up / red down cone + flowing dashed `RAYS`) and a vertical "now" line. Head = orb (radial gradient) + aura + spinning halo + ping + trailing sparks.
 - Each of the 6 rays is clickable/focusable (`RAY_PCT`, nearest 1%/2%/3% label per ray, `app/MarketChart.tsx:159`): opens a centered confirm card (`rayConfirm` state, `:333`, `:559-583`) showing the projected price at that %, then a fading "Long/Short confirmed" toast (`rayToast`, `:339-341`, `:585-590`) on confirm. Side-thing only — no embers move, nothing persists, unrelated to the Pulse round itself.
 - Dashed open line at the window's first price.
 - Live price pill in the right gutter on a dashed line from the pulsing head; grid labels within 14px of the pill are dropped.
 - Clock ticks every 10s (`HH:MM:SS`), dropped within 24px of either edge.
-- Scrub (pointer move/down, touch with `touch-action: pan-y`): crosshair, dot, tooltip with time + Δ vs open. `onScrub` lifts the point so the lobby headline price/% shows the scrubbed value; 24h stats stay on the live price.
-- Lobby headline price = chart head (midpoint), not last trade, so it matches the pill. 24h high/low/change from feed `day` (were fabricated as price ×1.018/×0.982).
-- Lobby `change` % is measured from the chart's left edge (`priceAt(points, now - MARKET_CHART_WINDOW_MS)`), so it matches the fill colour.
+- Scrub (pointer move/down, touch with `touch-action: pan-y`): crosshair, dot, tooltip with time + Δ vs open; `onScrub` lifts the point to the caller.
 - No "waiting" text. <2 visible points → same starfield with a scanning beam (`.mc-loading`). Feed dead long enough that the live window is empty → window freezes on the last data, greyed, with a "Reconnecting…" chip (`is-stale`) — never blank.
-- Entrance (CSS, on SVG mount; `key={label}` replays it per market): stars → grid stagger → line/area sweep (`clip-path`, `backwards` fill so no clip remains) → orb pops + shockwave → fan unfolds → pill slides in (~1.9s). Lobby panels rise in (`stage-rise`).
+- Entrance (CSS, on SVG mount; `key={label}` replays it per market): stars → grid stagger → line/area sweep (`clip-path`, `backwards` fill so no clip remains) → orb pops + shockwave → fan unfolds → pill slides in (~1.9s).
 - Motion (`prefers-reduced-motion` disables all): own rAF clock (`useFrameClock`) scrolls per frame instead of the feed's 100ms steps; feed's live edge (within `EDGE_SLACK_MS`) re-pinned to the frame clock. Head price eased (`HEAD_TAU_MS`=140) and y-range eased (`RANGE_TAU_MS`=320), never clipping the line; ease state reset on market switch.
-- Live price change → pill flashes and head ripples green/red (keyed remount restarts the CSS animation). Lobby headline price flashes too, on whole-tick changes (`app/duel/page.tsx`).
+- Live price change → pill flashes and head ripples green/red (keyed remount restarts the CSS animation).
 - `PriceChart` reuses this component's unscoped CSS classes directly (`.mc-stars`, `.mc-grid`, `.mc-reveal`, `.mc-aura`/`.mc-head-pop`/`.mc-orb`/`.mc-halo`, `.market-chart-pill`, `.market-chart-scrub`, …) rather than redefining them — none of those rules are scoped to `.market-chart`, so they apply unchanged under `.price-chart`. It does *not* reuse the fan/"now"-line/market-colour theming (`FUTURE_FRAC`/`RAYS`, `--chart-line`/`--chart-point`): the in-round chart colours by win/loss direction (`--chart-up`/`--chart-down`) instead, since that's the number a player is actually watching. `docs/pulse-mode.md` covers the pages that render it.

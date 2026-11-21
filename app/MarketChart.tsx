@@ -33,7 +33,7 @@ const RANGE_TAU_MS = 320;
 // `now` is that edge, and gets re-pinned to the frame clock so it doesn't stutter.
 const EDGE_SLACK_MS = 250;
 
-function useReducedMotion() {
+export function useReducedMotion() {
   const [reduced, setReduced] = useState(false);
   useEffect(() => {
     const query = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -47,7 +47,7 @@ function useReducedMotion() {
 
 // Per-frame clock. The feed ticks `now` every 100ms, which scrolls the axis in
 // visible steps; a rAF clock scrolls it continuously.
-function useFrameClock(fallback: number, enabled: boolean) {
+export function useFrameClock(fallback: number, enabled: boolean) {
   const [frame, setFrame] = useState(fallback);
   // Only queue the next frame once the last one has committed and run its
   // effects. When a render outlasts a frame, queuing anyway nests each update
@@ -94,7 +94,7 @@ export function priceAt(points: PricePoint[], t: number): number | null {
 }
 
 // Clip to [t0, …] and interpolate the crossing so the line starts on the edge.
-function windowSlice(points: PricePoint[], t0: number) {
+export function windowSlice(points: PricePoint[], t0: number) {
   const first = points.findIndex((point) => point.t >= t0);
   if (first === -1) return [];
   if (first === 0) return points;
@@ -104,7 +104,7 @@ function windowSlice(points: PricePoint[], t0: number) {
 
 // Monotone cubic (Fritsch–Carlson): smooth, but never overshoots a sample —
 // a fake peak above the real high would be a lie on a price chart.
-function monotonePath(xs: number[], ys: number[]) {
+export function monotonePath(xs: number[], ys: number[]) {
   const n = xs.length;
   if (n < 2) return "";
   const d: number[] = [];

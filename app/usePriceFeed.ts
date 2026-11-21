@@ -21,16 +21,18 @@ const CLOCK_MS = 100; // ~3px of chart travel per tick at the tightest zoom
 const POLL_AFTER_MS = 2500;
 const POLL_MS = 2000;
 
-// One sample of slack past the window so the chart can interpolate the point
-// where the line crosses its left edge instead of starting in mid-air.
+// One sample of slack past the window, plus the newest point older than that,
+// so the chart can interpolate the point where the line crosses its left edge
+// instead of starting in mid-air — the seed's candle stretch has points up to
+// a minute apart, far more than one sample of slack.
 // Cut relative to the newest point, not the wall clock: a dead feed keeps its
 // last window to show (frozen) rather than emptying the chart.
-const trim = (points: PricePoint[]) => {
+const trim = (points: PricePoint[], windowMs: number) => {
   const newest = points[points.length - 1]?.t ?? Date.now();
-  const cutoff = Math.min(Date.now(), newest) - WINDOW_MS - SAMPLE_MS;
+  const cutoff = Math.min(Date.now(), newest) - windowMs - SAMPLE_MS;
   const first = points.findIndex((point) => point.t >= cutoff);
   if (first === -1) return [];
-  return first <= 0 ? points : points.slice(first);
+  return first <= 0 ? points : points.slice(first - 1);
 };
 
 /**
@@ -59,17 +61,24 @@ const mergeSeed = (seed: PricePoint[], live: PricePoint[]) => {
   return [...seed.filter((point) => point.t < first), ...live, ...seed.filter((point) => point.t > last)];
 };
 
-export function usePriceFeed(product: string = "BTC-USD") {
+/**
+ * `windowMs` is how much history the series keeps (and the seed asks
+ * /api/history for); the Arena lobby passes LOBBY_WINDOW_MS, match rooms keep
+ * the default.
+ */
+export function usePriceFeed(product: string = "BTC-USD", { windowMs = WINDOW_MS }: { windowMs?: number } = {}) {
   // Tagged with its product so a render between a switch and the reset effect
   // never shows (or caches) one market's line under another's name.
   const [series, setSeries] = useState<{ product: string; points: PricePoint[] }>(() => ({
     product,
-    points: trim(seriesCache.get(product) ?? []),
+    points: trim(seriesCache.get(product) ?? [], windowMs),
   }));
   const samples = useMemo(
-    () => (series.product === product ? series.points : trim(seriesCache.get(product) ?? [])),
-    [series, product],
+    () => (series.product === product ? series.points : trim(seriesCache.get(product) ?? [], windowMs)),
+    [series, product, windowMs],
   );
+  const windowRef = useRef(windowMs);
+  windowRef.current = windowMs;
   const [price, setPrice] = useState<number | null>(null);
   const [day, setDay] = useState<DayStats | null>(null);
   const [status, setStatus] = useState<FeedStatus>("connecting");
@@ -108,7 +117,7 @@ export function usePriceFeed(product: string = "BTC-USD") {
       if (t - lastSampleAtRef.current < SAMPLE_MS) return;
       lastSampleAtRef.current = t;
       setSeries((prev) =>
-        prev.product === productRef.current ? { ...prev, points: trim([...prev.points, { t, p }]) } : prev,
+        prev.product === productRef.current ? { ...prev, points: trim([...prev.points, { t, p }], windowRef.current) } : prev,
       );
     }, CLOCK_MS);
     return () => clearInterval(id);
@@ -119,7 +128,7 @@ export function usePriceFeed(product: string = "BTC-USD") {
 
     // Switching product invalidates whatever was ticking for the old one; start
     // from this product's cached series while the seed loads.
-    const cached = trim(seriesCache.get(product) ?? []);
+    const cached = trim(seriesCache.get(product) ?? [], windowRef.current);
     setSeries({ product, points: cached });
     setPrice(null);
     setDay(null);
@@ -129,12 +138,12 @@ export function usePriceFeed(product: string = "BTC-USD") {
     lastSampleAtRef.current = cached.at(-1)?.t ?? 0;
     setStatus("connecting");
 
-    fetch(`/api/history?symbol=${encodeURIComponent(product)}`, { cache: "no-store" })
+    fetch(`/api/history?symbol=${encodeURIComponent(product)}&windowMs=${windowRef.current}`, { cache: "no-store" })
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error())))
       .then(({ points: seed }: { points: PricePoint[] }) => {
         if (cancelled || seed.length === 0) return;
         setSeries((prev) =>
-          prev.product === product ? { product, points: trim(mergeSeed(seed, prev.points)) } : prev,
+          prev.product === product ? { product, points: trim(mergeSeed(seed, prev.points), windowRef.current) } : prev,
         );
         setPrice((prev) => prev ?? seed[seed.length - 1].p);
         // Seed only — the socket's first message is what makes it "alive".

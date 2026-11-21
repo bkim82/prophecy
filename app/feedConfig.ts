@@ -3,6 +3,13 @@
 export const WINDOW_MS = 60 * 1000;
 export const SAMPLE_MS = 1000;
 
+// The Arena lobby chart (app/duel/ArenaChart.tsx) reads a longer stretch than
+// the in-round chart: usePriceFeed and /api/history both take it as an
+// override, so a match room keeps the 60s window above. MAX bounds what a
+// caller can ask /api/history for.
+export const LOBBY_WINDOW_MS = 5 * 60 * 1000;
+export const MAX_WINDOW_MS = 10 * 60 * 1000;
+
 // Tightest the chart will zoom to. At WINDOW_MS the line is ~60 samples wide;
 // at MIN_WINDOW_MS it is ~30, which still draws as a curve rather than a
 // polygon — that lower bound is what SAMPLE_MS has to keep up with.
