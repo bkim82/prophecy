@@ -2475,6 +2475,11 @@ html.pulse-screen-shake { animation: pulse-screen-shake .24s ease-in-out; }
   html[data-chrome="hidden"] .app-header:not(:has(:focus-visible)) { transform: translateY(-100%); }
   html[data-chrome="hidden"] .mobile-bottom-nav:not(:has(:focus-visible)) { transform: translateY(100%); }
   html[data-chrome="hidden"] .active-match-bar { transform: translateY(70px); }
+
+  /* Beta mode renders no bottom nav (app/layout.tsx): drop the space reserved for it. */
+  body:not(:has(.mobile-bottom-nav)) { padding-bottom: env(safe-area-inset-bottom); }
+  body:not(:has(.mobile-bottom-nav)) .active-match-bar { bottom: 0; padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
+  html[data-chrome="hidden"] body:not(:has(.mobile-bottom-nav)) .active-match-bar { transform: none; }
 }
 @media (prefers-reduced-motion: reduce) { .app-header, .mobile-bottom-nav, .active-match-bar { transition: none; } }
 /* ProfileShowcase skips the flip itself under reduced motion; this drops the cards' rise and the toggle's pulse. */

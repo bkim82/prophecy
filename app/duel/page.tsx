@@ -379,6 +379,8 @@ export default function Page() {
 
       {/* Pulse: tabs, markets and the stage share one screen-tall fold on desktop (.arena-fold). */}
       <div className={mode === "pulse" ? "arena-fold" : undefined}>
+      {/* Beta mode leaves Pulse as the only mode, so there's nothing to choose. */}
+      {modes.length > 1 && (
       <div className="feed-tabs arena-mode-tabs" role="group" aria-label="Choose a mode">
         {modes.map((option) => (
           <button key={option.id} type="button" className={option.id === mode ? "active" : ""} aria-pressed={option.id === mode} onClick={() => setMode(option.id)}>
@@ -387,6 +389,7 @@ export default function Page() {
           </button>
         ))}
       </div>
+      )}
 
       {mode === "pulse" && (
       <nav className="market-nav" aria-label="Market switcher">

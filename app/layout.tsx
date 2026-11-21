@@ -16,6 +16,7 @@ import { NotificationsMenu } from "./NotificationsMenu";
 import { TabNav } from "./TabNav";
 import { DEFAULT_THEME, THEME_INIT_SCRIPT } from "./theme";
 import { ThemeToggle } from "./ThemeToggle";
+import { betaModeEnabled } from "@/app/lib/betaMode";
 import { embeddedWalletAuthEnabled } from "@/lib/embeddedWalletFeature";
 import { handleFor } from "@/lib/profile";
 import { getViewer } from "@/lib/viewer";
@@ -67,7 +68,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <div className="app-header-inner">
               <div className="desktop-header-content">
                 <Brand />
-                <TabNav />
+                {/* Beta mode: no top nav — the Arena is the only section and it's home. */}
+                {!betaModeEnabled() && <TabNav />}
                 <div className="header-actions">
                   <ThemeToggle />
                   <SignedIn><BalancePill /></SignedIn>
@@ -97,7 +99,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           {/* Signed in without an @handle: pick one before anything else. */}
           <SignedIn><HandleGate initiallyNeeded={viewer !== null && handle === null} serverSignedIn={viewer !== null} /></SignedIn>
           {children}
-          <MobileBottomNav />
+          {/* Beta mode: no bottom nav either — the Arena is the only section. */}
+          {!betaModeEnabled() && <MobileBottomNav />}
           <MobileChromeAutoHide />
           <ActiveMatchBar />
         </AuthProvider>
