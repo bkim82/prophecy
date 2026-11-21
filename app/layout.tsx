@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Cinzel, IBM_Plex_Mono, Inter } from "next/font/google";
+import { Cinzel, IBM_Plex_Mono, Inter, JetBrains_Mono, Space_Grotesk } from "next/font/google";
 import { headers } from "next/headers";
 import { AccountMenu } from "./AccountMenu";
 import { ActiveMatchBar } from "./ActiveMatchBar";
@@ -28,6 +28,10 @@ import "./globals.css";
 const cinzel = Cinzel({ subsets: ["latin"], weight: ["500", "600", "700"], variable: "--font-cinzel" });
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 const plexMono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--font-mono" });
+// Arena page only (app/duel, .arena-* in globals.css): JetBrains Mono for its
+// numbers, Space Grotesk for the PULSE wordmark.
+const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--font-arena-mono" });
+const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], weight: ["600", "700"], variable: "--font-arena-display" });
 
 export const metadata: Metadata = {
   title: "Prophecy — Live market arenas",
@@ -56,7 +60,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       lang="en"
       data-theme={DEFAULT_THEME}
       suppressHydrationWarning
-      className={`${cinzel.variable} ${inter.variable} ${plexMono.variable}`}
+      className={`${cinzel.variable} ${inter.variable} ${plexMono.variable} ${jetbrainsMono.variable} ${spaceGrotesk.variable}`}
     >
       <head>
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />

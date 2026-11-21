@@ -20,8 +20,8 @@ No API key on any path.
 - Series + live edge plot the bid/ask midpoint (`best_bid`/`best_ask`), falling back to trade price. Trades alternate bid/ask, so trade price zigzags 1 tick on a quiet tape with nothing moving.
 - `day` = `{ open, high, low }` from the ticker's `open_24h`/`high_24h`/`low_24h`; `null` until first tick.
 - Plotted series commits 1 point per `SAMPLE_MS`=1s **on the clock**, carrying the last midpoint forward, while `heardAtRef` < `FRESH_MS` old (`app/usePriceFeed.ts:65-76`). Was trade-driven: a 17s+ trade gap froze the line, and >30s emptied the lobby window → placeholder. Raw ticks would render as flat noise band. 1s is set by the chart's zoom floor, not by the default view: at `MIN_WINDOW_MS`=30s a 5s cadence gave 6 points across 880px — a hexagon, not a curve.
-- `WINDOW_MS`=1min → ~60 points held. Trim on each commit via `trim()` (`app/usePriceFeed.ts:13-20`).
-- `trim()` cuts at `WINDOW_MS + SAMPLE_MS`, one sample of slack: the chart interpolates its left-edge crossing from the point just outside the window (`docs/chart.md` → Time window).
+- `WINDOW_MS`=1min → ~60 points held; `usePriceFeed(product, { windowMs })` overrides it (the Arena lobby passes `LOBBY_WINDOW_MS`=5min → ~300 points) and sends the same window to `/api/history?windowMs=` (clamped to `WINDOW_MS`…`MAX_WINDOW_MS`=10min). Trim on each commit via `trim()` (`app/usePriceFeed.ts:13-20`).
+- `trim()` cuts at `windowMs + SAMPLE_MS`, one sample of slack, and keeps the newest point before that cut: the chart interpolates its left-edge crossing from it (`docs/chart.md` → Time window). Needed for the seed's candle stretch, whose points are up to 60s apart.
 - `trim()` cuts relative to `min(now, newest point)`, so a dead feed keeps its last window (chart shows it frozen, `is-stale`) instead of emptying.
 - Per-product `seriesCache` (module-level): series state is tagged `{ product, points }`; a market switch starts from the cached series, then `mergeSeed` adds only seed points outside the live range.
 - Returned `status` is `"live"` whenever any message (socket or REST) arrived < `FRESH_MS` ago, regardless of socket state.
@@ -39,7 +39,7 @@ it — a seed covering only the last 40s would leave most of the axis empty.
 - The open bucket's close is the running price, so it is dated `now`, not at a bucket end that hasn't happened yet (`app/api/history/route.ts:68-74`).
 - Merge: trades win wherever they exist, candles only fill the stretch *before* the oldest trade (`app/api/history/route.ts:102-107`).
 - Both fail → `{ points: [] }`, HTTP 200 (`app/api/history/route.ts:109-110`) — socket refills in seconds, no error surfaced.
-- Cutoff is `WINDOW_MS + SAMPLE_MS`, matching `trim()` — the chart needs one point outside the left edge to interpolate the crossing from (`app/api/history/route.ts:89-92`).
+- Cutoff is `windowMs + SAMPLE_MS` (`?windowMs=`, default `WINDOW_MS`), matching `trim()`, plus the newest candle point before it — the chart needs one point outside the left edge to interpolate the crossing from. Candles are requested from the minute before the one holding the cutoff: Coinbase only returns candles starting at or after `start`.
 - Client merges seed + trims; `lastSampleAtRef` set to seed's newest ts so live feed continues seed cadence (`app/usePriceFeed.ts:58-66`).
 
 ## Freshness / settlement guard

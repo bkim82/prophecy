@@ -1,4 +1,4 @@
-import { SAMPLE_MS, WINDOW_MS } from "../../feedConfig";
+import { MAX_WINDOW_MS, SAMPLE_MS, WINDOW_MS } from "../../feedConfig";
 
 export const dynamic = "force-dynamic";
 
@@ -60,7 +60,10 @@ async function fromTrades(product: string, cutoff: number): Promise<Point[]> {
  * backfill exists to cover.
  */
 async function fromCandles(product: string, cutoff: number, now: number): Promise<Point[]> {
-  const range = `start=${new Date(cutoff).toISOString()}&end=${new Date(
+  // Coinbase only returns candles that start at or after `start`, so ask from a
+  // minute before the one holding the cutoff: its points straddle the left edge.
+  const from = Math.floor(cutoff / 60_000) * 60_000 - 60_000;
+  const range = `start=${new Date(from).toISOString()}&end=${new Date(
     now,
   ).toISOString()}`;
   const res = await fetch(
@@ -83,15 +86,13 @@ async function fromCandles(product: string, cutoff: number, now: number): Promis
     );
   }
 
-  return points
-    .filter(
-      (point) =>
-        Number.isFinite(point.p) &&
-        point.p > 0 &&
-        point.t >= cutoff &&
-        point.t <= now,
-    )
+  const sorted = points
+    .filter((point) => Number.isFinite(point.p) && point.p > 0 && point.t <= now)
     .sort((a, b) => a.t - b.t);
+  // Everything inside the window, plus the newest point before it to
+  // interpolate the left edge from.
+  const first = sorted.findIndex((point) => point.t >= cutoff);
+  return first === -1 ? sorted.slice(-1) : sorted.slice(Math.max(0, first - 1));
 }
 
 export async function GET(request: Request) {
@@ -101,10 +102,15 @@ export async function GET(request: Request) {
     return Response.json({ error: "Unsupported symbol" }, { status: 400 });
   }
 
+  // Optional longer window (the Arena lobby's LOBBY_WINDOW_MS), clamped so a
+  // caller can't ask for an unbounded candle range.
+  const asked = Number(searchParams.get("windowMs"));
+  const windowMs = Number.isFinite(asked) && asked > 0 ? Math.min(Math.max(asked, WINDOW_MS), MAX_WINDOW_MS) : WINDOW_MS;
+
   const now = Date.now();
   // One sample of slack past the window, matching the hook: the chart needs a
   // point just outside the left edge to interpolate the crossing from.
-  const cutoff = now - WINDOW_MS - SAMPLE_MS;
+  const cutoff = now - windowMs - SAMPLE_MS;
 
   // Both sources, always: the chart draws a fixed-width window, so a seed that
   // only covers the last 40 seconds would leave most of the axis empty. 1000

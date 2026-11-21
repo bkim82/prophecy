@@ -90,7 +90,7 @@ cap, so winnings can be staked), leverage, and position id.
 - One ticker drives both deadlines — the pre-round timer in `predict`, the round in `countdown` (`app/duel/[market]/pulse/[matchId]/page.tsx:121-127`).
 - `<PriceChart>` still reads the browser's own `usePriceFeed()` — the chart stays client-direct to Coinbase, no server round trip. Only `roundStart`/trade-marker times come from the poll.
 - Settlement freezes the series with the final point pinned to the deadline, not to whenever the tab noticed (`app/duel/[market]/pulse/[matchId]/page.tsx:132`).
-- Lobby Play button is an async matchmaker, not a `Link` (`app/duel/page.tsx` `play`). Signed out, provider-neutral `SignInAction` opens the active provider modal with "Sign in to play", not a disabled button. Styled violet (`.pulse-stage .play-button`, `--play-a/b`) — the only non-teal action on the page. While queued, Share invite uses native sharing when available and clipboard copy otherwise (`app/duel/page.tsx` `shareInvite`).
+- Lobby Play button is an async matchmaker, not a `Link` (`app/duel/page.tsx` `play`). Signed out, provider-neutral `SignInAction` opens the active provider modal with "Sign in to play", not a disabled button. Styled as the violet CTA gradient (`.arena-play`, `--arena-cta-a/b`), pinned to the bottom of the call panel. While queued, Share invite uses native sharing when available and clipboard copy otherwise (`app/duel/page.tsx` `shareInvite`).
 - Queueing replaces the whole play control panel rather than disabling it — the criteria are already committed to a row. Cancel deletes the row via `leave` (`app/duel/page.tsx` `cancelQueue`); the room is prefetched while waiting so navigation does not eat into the 5s (`app/duel/page.tsx:293`).
 
 ## Rematch (challenge rounds)

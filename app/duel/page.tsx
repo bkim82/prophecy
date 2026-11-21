@@ -2,22 +2,25 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { SignInAction, useAppAuth } from "@/app/auth/AuthProvider";
-import { DailyCoin, pickDailyCoin } from "@/app/DailyCoin";
+import { pickDailyCoin } from "@/app/DailyCoin";
+import { LOBBY_WINDOW_MS } from "@/app/feedConfig";
 import { FlameIcon } from "@/app/icons";
 import { PortfolioGame } from "@/app/duel/portfolio/PortfolioGame";
 import { hasFinishedTutorial, TUTORIAL_HREF } from "@/app/duel/tutorial/progress";
+import { ArenaChart } from "@/app/duel/ArenaChart";
+import { FeaturedMatchStrip, RecentResults, Skeleton, TopCallers, WinsTicker, type RecentResult } from "@/app/duel/ArenaParts";
 import {
   getActiveMatch,
   setQueueing,
   subscribeActiveMatch,
   type ActiveMatch,
 } from "@/app/lib/activeMatch";
+import type { ArenaLobby, MarketStats } from "@/app/lib/arenaLobby";
 import { getPlayerId } from "@/app/lib/playerId";
-import { playedLabel } from "@/app/lib/playedLabel";
 import { usePriceFeed } from "@/app/usePriceFeed";
-import { clockLabel, MARKET_CHART_WINDOW_MS, MarketChart, priceAt, type ScrubPoint } from "@/app/MarketChart";
+import { clockLabel, priceAt, type ScrubPoint } from "@/app/MarketChart";
 import { PULSE_DEFAULT_WAGER, PULSE_WAGER_OPTIONS } from "@/lib/pulse";
 
 const TIMER_PRESETS = [
@@ -33,11 +36,16 @@ const LOBBY_POLL_MS = 3000;
 // speed rather than lobby speed — a slower beat would age the row out of the
 // very list it is waiting to be found in (lib/match.ts PRESENCE_MS).
 const QUEUE_POLL_MS = 1000;
+// Wins ticker, featured match, top callers, players online (GET /api/arena/lobby).
+const ARENA_POLL_MS = 5000;
+// The other markets' 24h % on the switcher (GET /api/market-stats).
+const STATS_POLL_MS = 30_000;
+// Stacked avatars in the Opponent section before the "+N".
+const STACKED_AVATARS = 3;
 
 // Cents by default; pass the market's tick size so a sub-dollar coin's finer
 // quote increment isn't rounded away.
-const usd = (value: number | null, tickSize = 0.01) => {
-  if (value === null) return "—";
+const usd = (value: number, tickSize = 0.01) => {
   const decimals = Math.max(2, Math.round(-Math.log10(tickSize)));
   return value.toLocaleString("en-US", {
     style: "currency",
@@ -46,6 +54,8 @@ const usd = (value: number | null, tickSize = 0.01) => {
     maximumFractionDigits: decimals,
   });
 };
+
+const pct = (value: number) => `${value >= 0 ? "+" : "−"}${Math.abs(value).toFixed(Math.abs(value) < 0.1 ? 3 : 2)}%`;
 
 type Queue = {
   matchId: string;
@@ -66,53 +76,31 @@ type OpenMatch = {
   isYours: boolean;
 };
 
-// One of your settled Pulse matches, from GET /api/match/recent.
-type RecentResult = {
-  id: string;
-  market: string;
-  result: "won" | "lost" | "tie";
-  yourProfit: number | null;
-  opponentName: string;
-  playedAt: number;
-};
-
-const RESULT_LABEL: Record<RecentResult["result"], string> = { won: "Won", lost: "Lost", tie: "Tie" };
-const RESULT_CLASS: Record<RecentResult["result"], string> = { won: "change-up", lost: "change-down", tie: "muted" };
-
-const signedUsd = (value: number | null) =>
-  value === null ? "—" : `${value >= 0 ? "+" : "−"}${usd(Math.abs(value))}`;
-
 type ModeId = "pulse" | "battle-24h";
 type MarketId = "btc" | "eth" | "hype";
 
-const MARKETS: Record<MarketId, { label: string; symbol: string; name: string; tickSize: number }> = {
-  btc: { label: "BTC", symbol: "₿", name: "BTC-USD", tickSize: 0.01 },
-  eth: { label: "ETH", symbol: "Ξ", name: "ETH-USD", tickSize: 0.01 },
-  hype: { label: "HYPE", symbol: "H", name: "HYPE-USD", tickSize: 0.01 },
+const MARKETS: Record<MarketId, { label: string; name: string; tickSize: number }> = {
+  btc: { label: "BTC", name: "BTC-USD", tickSize: 0.01 },
+  eth: { label: "ETH", name: "ETH-USD", tickSize: 0.01 },
+  hype: { label: "HYPE", name: "HYPE-USD", tickSize: 0.01 },
 };
+const MARKET_ORDER: MarketId[] = ["btc", "eth", "hype"];
 
-// Every market's Pulse goes through matchmaking. A mode with neither `href`
-// nor `matched` renders as "soon" and stays inert.
-const MODES_BY_MARKET: Record<MarketId, { id: ModeId; label: string; meta: string; href?: string; matched?: boolean }[]> = {
-  btc: [
-    { id: "pulse", label: "Pulse", meta: "BTC · head to head · trade live", matched: true },
-    { id: "battle-24h", label: "24h Portfolio", meta: "Base meme coins · spot & leverage · 24h session", href: "/duel/portfolio" },
-  ],
-  eth: [
-    { id: "pulse", label: "Pulse", meta: "ETH · head to head · trade live", matched: true },
-    { id: "battle-24h", label: "24h Portfolio", meta: "Base meme coins · spot & leverage · 24h session", href: "/duel/portfolio" },
-  ],
-  hype: [
-    { id: "pulse", label: "Pulse", meta: "HYPE · head to head · trade live", matched: true },
-    { id: "battle-24h", label: "24h Portfolio", meta: "Base meme coins · spot & leverage · 24h session", href: "/duel/portfolio" },
-  ],
-};
+// Pulse goes through matchmaking on every market; 24h Portfolio is its own page.
+const MODES: { id: ModeId; label: string; href?: string }[] = [
+  { id: "pulse", label: "Pulse" },
+  { id: "battle-24h", label: "24h Portfolio", href: "/duel/portfolio" },
+];
 
-const SYMBOL_CLASS: Record<MarketId, string> = {
-  btc: "btc-symbol",
-  eth: "eth-symbol",
-  hype: "hype-symbol",
-};
+const roundLength = (seconds: number) => (seconds >= 120 ? `${seconds / 60} min` : `${seconds}s`);
+
+const windowLabel = (ms: number) => (ms >= 60_000 ? `last ${Math.round(ms / 60_000)} min` : `last ${Math.max(1, Math.round(ms / 1000))}s`);
+
+/** "$60,069" and ".49", so the cents can sit dimmer than the dollars. */
+function splitPrice(text: string) {
+  const dot = text.lastIndexOf(".");
+  return dot === -1 ? [text, ""] : [text.slice(0, dot), text.slice(dot)];
+}
 
 export default function Page() {
   const { isSignedIn } = useAppAuth();
@@ -120,14 +108,12 @@ export default function Page() {
   const [market, setMarket] = useState<MarketId>("btc");
   const dailyCoinId = pickDailyCoin().toLowerCase() as MarketId;
   const activeMarket = MARKETS[market];
-  const { price, points, status, now, day } = usePriceFeed(activeMarket.name);
+  const { price, points, status, now, day } = usePriceFeed(activeMarket.name, { windowMs: LOBBY_WINDOW_MS });
   // While the chart is being scrubbed, the headline reads the scrubbed point.
   const [scrub, setScrub] = useState<ScrubPoint>(null);
   const [timer, setTimer] = useState(60);
   // Embers each side puts in; matchmaking only pairs identical wagers.
   const [wager, setWager] = useState<number>(PULSE_DEFAULT_WAGER);
-  // Phones only: 24h high/low/players collapse so Play stays above the fold.
-  const [statsOpen, setStatsOpen] = useState(false);
   const [mode, setMode] = useState<ModeId>("pulse");
   const [playerId, setPlayerId] = useState<string | null>(null);
   const [openMatches, setOpenMatches] = useState<OpenMatch[]>([]);
@@ -145,7 +131,11 @@ export default function Page() {
   const [recentResults, setRecentResults] = useState<RecentResult[] | null>(null);
   // First-timer nudge toward the tutorial; read after mount (localStorage), so it never flashes for players who finished it.
   const [tutorialNudge, setTutorialNudge] = useState(false);
-  const modes = MODES_BY_MARKET[market];
+  // null until the first poll lands (skeletons until then).
+  const [lobby, setLobby] = useState<{ data: ArenaLobby; receivedAt: number } | null>(null);
+  const [marketStats, setMarketStats] = useState<MarketStats>({});
+  const activeMode = MODES.find((option) => option.id === mode) ?? MODES[0];
+  const isPulse = mode === "pulse";
   // The chart's head (bid/ask midpoint), so the headline matches the pill.
   const livePrice = points.at(-1)?.p ?? price;
   const currentPrice = scrub?.p ?? livePrice;
@@ -160,15 +150,15 @@ export default function Page() {
     setPriceFlash((f) => ({ key: f.key + 1, dir: liveTicks > prev ? "up" : "down" }));
   }, [liveTicks]);
   useEffect(() => { prevTicks.current = null; }, [market]);
-  // Change is measured from the chart's left edge so the % and the
-  // green/red fill above and below the open line always agree.
-  const firstPrice = priceAt(points, now - MARKET_CHART_WINDOW_MS) ?? currentPrice;
-  const change = currentPrice !== null && firstPrice ? ((currentPrice - firstPrice) / firstPrice) * 100 : null;
-  const activeMode = modes.find((option) => option.id === mode) ?? modes[0];
-  const isPlayable = Boolean(activeMode.href || activeMode.matched);
-  const takesCall = mode === "pulse";
-  const matchMode = "pulse";
-  const playHref = activeMode.href ?? "/duel";
+  // Change is measured from the chart's left edge — or the oldest point, while
+  // the series hasn't filled the window yet, and the label says how far back.
+  const windowStart = Math.max(now - LOBBY_WINDOW_MS, points[0]?.t ?? now);
+  const firstPrice = priceAt(points, windowStart);
+  const changeAbs = currentPrice !== null && firstPrice ? currentPrice - firstPrice : null;
+  const change = changeAbs !== null && firstPrice ? (changeAbs / firstPrice) * 100 : null;
+  const coveredMs = (scrub?.t ?? now) - windowStart;
+  const dayChange = day && livePrice !== null ? ((livePrice - day.open) / day.open) * 100 : null;
+  const players = lobby?.data.playersOnline;
 
   useEffect(() => setPlayerId(getPlayerId()), []);
   useEffect(() => setTutorialNudge(!hasFinishedTutorial()), []);
@@ -186,15 +176,15 @@ export default function Page() {
   }, [queue]);
 
   // Only poll the lobby (the Opponent "waiting" count; the route also keeps
-  // house bots seated) while a networked mode is on screen.
+  // house bots seated) while Pulse is on screen.
   useEffect(() => {
-    if (!takesCall) return;
+    if (!isPulse) return;
     let cancelled = false;
     let timerId: ReturnType<typeof setTimeout>;
 
     const poll = async () => {
       try {
-        const query = new URLSearchParams({ market, mode: matchMode });
+        const query = new URLSearchParams({ market, mode: "pulse" });
         if (playerId) query.set("playerId", playerId);
         const res = await fetch(`/api/match/open?${query}`, { cache: "no-store" });
         if (!cancelled && res.ok) {
@@ -212,7 +202,49 @@ export default function Page() {
       cancelled = true;
       clearTimeout(timerId);
     };
-  }, [market, takesCall, matchMode, playerId]);
+  }, [market, isPulse, playerId]);
+
+  // Wins ticker, featured match, leaders and players online. A failed first
+  // poll settles on an empty lobby so skeletons don't spin forever.
+  useEffect(() => {
+    let cancelled = false;
+    let timerId: ReturnType<typeof setTimeout>;
+    const poll = async () => {
+      if (document.visibilityState === "visible") {
+        try {
+          const res = await fetch(`/api/arena/lobby?market=${market}`, { cache: "no-store" });
+          if (!res.ok) throw new Error();
+          const data = (await res.json()) as ArenaLobby;
+          if (!cancelled) setLobby({ data, receivedAt: Date.now() });
+        } catch {
+          if (!cancelled) {
+            setLobby((prev) => prev ?? { data: { wins: [], featured: null, leaders: [], playersOnline: null, serverNow: Date.now() }, receivedAt: Date.now() });
+          }
+        }
+      }
+      if (!cancelled) timerId = setTimeout(poll, ARENA_POLL_MS);
+    };
+    poll();
+    return () => {
+      cancelled = true;
+      clearTimeout(timerId);
+    };
+  }, [market]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = () =>
+      fetch("/api/market-stats", { cache: "no-store" })
+        .then((res) => (res.ok ? (res.json() as Promise<MarketStats>) : null))
+        .then((data) => { if (!cancelled && data) setMarketStats(data); })
+        .catch(() => { /* The pills just keep their last figures. */ });
+    load();
+    const id = setInterval(load, STATS_POLL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, []);
 
   useEffect(() => {
     if (!isSignedIn) return;
@@ -231,7 +263,7 @@ export default function Page() {
     ? `${matchHref(queue.market, queue.matchId)}?invite=1`
     : null;
 
-  const practiceHref = mode === "pulse" && activeMode.matched ? `/duel/btc/pulse?practice=1&market=${market}` : null;
+  const practiceHref = `/duel/btc/pulse?practice=1&market=${market}`;
 
   const shareInvite = async () => {
     if (!inviteHref || !queue) return;
@@ -277,7 +309,7 @@ export default function Page() {
         body: JSON.stringify({
           playerId,
           market,
-          mode: matchMode,
+          mode: "pulse",
           wager,
           timerSeconds: timer,
         }),
@@ -288,7 +320,7 @@ export default function Page() {
         status: string;
       };
       if (matchStatus === "open") {
-        setQueue({ matchId, market, mode: matchMode, wager, timerSeconds: timer, since: Date.now() });
+        setQueue({ matchId, market, mode: "pulse", wager, timerSeconds: timer, since: Date.now() });
         setQueuedFor(0);
         setPending(null);
         return;
@@ -371,176 +403,253 @@ export default function Page() {
     }
   };
 
+  const queuePanel = queue && (
+    <section className="arena-queue" aria-live="polite">
+      <span className="arena-queue-pulse" aria-hidden="true" />
+      <div className="arena-queue-copy">
+        <span className="arena-eyebrow">In queue</span>
+        <strong>Waiting for an opponent…</strong>
+        <span className="arena-muted">
+          {MARKETS[queue.market].label} Pulse · {queue.timerSeconds}s round · {queue.wager} Embers each, winner takes {queue.wager * 2}
+        </span>
+      </div>
+      <span className="arena-queue-elapsed arena-mono">{queuedFor}s</span>
+      <div className="arena-queue-actions">
+        <button type="button" className="arena-ghost-button" onClick={shareInvite}>
+          {inviteState === "shared" ? "Shared" : inviteState === "copied" ? "Copied" : "Share invite"}
+        </button>
+        <button type="button" className="arena-ghost-button is-quiet" onClick={cancelQueue}>Cancel</button>
+      </div>
+      {inviteState === "error" && <span className="arena-muted arena-note">Copy the link from your browser address bar.</span>}
+    </section>
+  );
+
+  const [priceWhole, priceCents] = currentPrice === null ? ["", ""] : splitPrice(usd(currentPrice, activeMarket.tickSize));
+  const statusLabel = status === "live" ? "Live" : status === "reconnecting" ? "Reconnecting" : "Connecting";
+  const waiting = openMatches.length;
+
   return (
-    <main className="lobby-shell" data-market={market}>
+    <main className="arena" data-market={market}>
       <h1 className="sr-only">Arena</h1>
 
-      {/* Pulse: tabs, markets and the stage share one screen-tall fold on desktop (.arena-fold). */}
-      <div className={mode === "pulse" ? "arena-fold" : undefined}>
-      <div className="feed-tabs arena-mode-tabs" role="group" aria-label="Choose a mode">
-        {modes.map((option) => (
-          <button key={option.id} type="button" className={option.id === mode ? "active" : ""} aria-pressed={option.id === mode} onClick={() => setMode(option.id)}>
-            {option.label}
-            {option.href || option.matched ? null : <small>soon</small>}
-          </button>
-        ))}
-      </div>
+      {lobby && <WinsTicker wins={lobby.data.wins} now={now} />}
 
-      {mode === "pulse" && (
-      <nav className="market-nav" aria-label="Market switcher">
-        <div className="market-switcher">
-          <span className="field-label">Markets</span>
-          <button className={market === "btc" ? "active" : ""} aria-pressed={market === "btc"} type="button" onClick={() => setMarket("btc")}><span className="market-symbol btc-symbol">₿</span> BTC</button>
-          <button className={market === "eth" ? "active" : ""} aria-pressed={market === "eth"} type="button" onClick={() => setMarket("eth")}><span className="market-symbol eth-symbol">Ξ</span> ETH</button>
-          <DailyCoin active={market === dailyCoinId} symbol={MARKETS[dailyCoinId].symbol} symbolClass={SYMBOL_CLASS[dailyCoinId]} onSelect={() => setMarket(dailyCoinId)} />
-        </div>
-      </nav>
-      )}
-
-      {/* Pulse: market on the left, the call on the right. Portfolio: just the call. */}
-      <div className={mode === "pulse" ? "pulse-stage" : undefined}>
-      {mode === "pulse" && (
-      <section className="market-overview panel">
-        <div className="ticker-copy">
-          <div className="eyebrow-row">
-            <span className="eyebrow">{activeMarket.label} / USD</span>
-            <span className={`feed-status ${status === "live" ? "is-live" : ""}`}><span className="status-dot" /> {status === "live" ? "Live" : status}</span>
-          </div>
-          <div className="ticker-price display-font"><span key={priceFlash.key} className={priceFlash.key > 0 && !scrub ? `price-flash is-${priceFlash.dir}` : undefined}>{usd(currentPrice, activeMarket.tickSize)}</span></div>
-          <div className="ticker-change"><span className={change !== null && change >= 0 ? "change-up" : "change-down"}>{change === null ? "—" : `${change >= 0 ? "+" : ""}${change.toFixed(Math.abs(change) < 0.1 ? 3 : 2)}%`}</span><span className="muted">{scrub ? clockLabel(scrub.t) : `last ${MARKET_CHART_WINDOW_MS / 1000}s`}</span></div>
-        </div>
-        <div className="ticker-chart-wrap"><MarketChart points={points} now={now} label={activeMarket.label} tickSize={activeMarket.tickSize} height="fill" onScrub={setScrub} /></div>
-        <button type="button" className="market-stats-toggle" aria-expanded={statsOpen} aria-controls="arena-market-stats" onClick={() => setStatsOpen((open) => !open)}>
-          {statsOpen ? "Hide market stats" : "Market stats"}
-        </button>
-        <dl id="arena-market-stats" className={`market-stats${statsOpen ? "" : " is-collapsed"}`}>
-          <div><dt>24h high</dt><dd>{usd(day?.high ?? null, activeMarket.tickSize)}</dd></div>
-          <div><dt>24h low</dt><dd>{usd(day?.low ?? null, activeMarket.tickSize)}</dd></div>
-          <div><dt>24h change</dt><dd className={day && livePrice !== null ? (livePrice >= day.open ? "change-up" : "change-down") : ""}>{day && livePrice !== null ? `${livePrice >= day.open ? "+" : ""}${(((livePrice - day.open) / day.open) * 100).toFixed(2)}%` : "—"}</dd></div>
-          <div><dt>Players</dt><dd>2,486</dd></div>
-        </dl>
-      </section>
-      )}
-
-      <div className="call-box">
-      {mode !== "battle-24h" && (
-      <div className="section-heading">
-        <div>
-          <span className="eyebrow">Make a call</span>
-          <h2 className="display-font">{activeMode.label}</h2>
-          <span className="round-meta">{activeMode.meta}</span>
-        </div>
-      </div>
-      )}
-
-      {takesCall && tutorialNudge && !queue && (
-        <Link href={TUTORIAL_HREF} className="tutorial-callout">
-          <span>
-            <strong>New to Pulse?</strong>
-            <span className="muted">Learn it in a few minutes with practice money.</span>
-          </span>
-          <span className="tutorial-callout-cta">Start tutorial <span aria-hidden="true">→</span></span>
-        </Link>
-      )}
-
-      {queue ? (
-        <section className="queue-panel panel" aria-live="polite">
-          <span className="queue-pulse" aria-hidden="true" />
-          <div className="queue-copy">
-            <span className="field-label">In queue</span>
-            <strong>Waiting for an opponent…</strong>
-            <span className="muted">
-              {MARKETS[queue.market].label} Pulse · {queue.timerSeconds}s round · {queue.wager} Embers each, winner takes {queue.wager * 2}
-            </span>
-          </div>
-          <span className="queue-elapsed">{queuedFor}s</span>
-          <div className="queue-actions">
-            <button type="button" className="queue-share" onClick={shareInvite}>
-              {inviteState === "shared" ? "Shared" : inviteState === "copied" ? "Copied" : "Share invite"}
+      <div className="arena-toolbar">
+        <div className="arena-modes" role="group" aria-label="Choose a mode">
+          {MODES.map((option) => (
+            <button key={option.id} type="button" aria-pressed={option.id === mode} onClick={() => setMode(option.id)}>
+              {option.label}
             </button>
-            {inviteState === "error" && <span className="queue-share-error">Copy the link from your browser address bar.</span>}
-          </div>
-          <button type="button" className="queue-cancel" onClick={cancelQueue}>Cancel</button>
-        </section>
-      ) : mode === "battle-24h" && isPlayable ? (
-        <PortfolioGame />
-      ) : (
-      <section className="play-panel panel">
-        <div className="play-panel-market"><span className={`market-symbol ${SYMBOL_CLASS[market]}`}>{activeMarket.symbol}</span><div><strong>{activeMarket.label} / USD</strong><span className="muted">{isPlayable ? "Current round" : "Not open yet"}</span></div></div>
-        <div className="control-group control-group--format">
-          <span className="field-label">Pulse format</span>
-          <strong className="muted">$100 bankroll</strong>
-          <span className="muted">Stake + leverage in room</span>
+          ))}
         </div>
-        <div className="control-group control-group--timer">
-          <span className="field-label">Timer</span>
-          <div className="segmented-control" role="group" aria-label="Choose round length">
-            {TIMER_PRESETS.map((preset) => (
-              <button key={preset.value} type="button" disabled={!takesCall} className={timer === preset.value ? "is-selected" : ""} onClick={() => setTimer(preset.value)}>{preset.label}</button>
-            ))}
-          </div>
-        </div>
-        <div className="control-group control-group--wager">
-          <span className="field-label">Wager</span>
-          <div className="segmented-control" role="group" aria-label="Choose wager">
-            {PULSE_WAGER_OPTIONS.map((option) => (
-              <button key={option} type="button" disabled={!takesCall} className={`wager-option${wager === option ? " is-selected" : ""}`} aria-pressed={wager === option} onClick={() => setWager(option)}>
-                <FlameIcon className="balance-ember-icon" /> {option}
-              </button>
-            ))}
-          </div>
-          <span className="muted wager-pot">Winner takes <FlameIcon className="balance-ember-icon" /> <strong>{wager * 2}</strong></span>
-        </div>
-        <div className="opponent-status"><span className="field-label">Opponent</span><strong><span className={`status-dot ${isPlayable ? "is-online" : ""}`} /> {takesCall ? "Open lobby" : isPlayable ? "Solo · NOVA AI" : "Unavailable"}</strong><span className="muted">{takesCall ? `${openMatches.length} Pulse match${openMatches.length === 1 ? "" : "es"} waiting` : isPlayable ? "Stake and leverage set in-round" : "Mode in development"}</span></div>
-        <div className="play-actions">
-          {activeMode.matched
-            ? isSignedIn === false
-              // Signed out: still the bright call to action — it opens sign-in.
-              ? <SignInAction><button type="button" className="play-button">Sign in to play <span aria-hidden="true">→</span></button></SignInAction>
-              : <button type="button" className="play-button" onClick={play} disabled={!playerId || !isSignedIn || pending !== null || queue !== null || activeMatch !== null}>{pending === "play" ? "Finding a match…" : <>Play <span aria-hidden="true">→</span></>}</button>
-            : isPlayable
-              ? <Link href={playHref} className="play-button">Play <span aria-hidden="true">→</span></Link>
-              : <button type="button" className="play-button" disabled>Soon</button>}
-          {takesCall && practiceHref && (
-            <div className="play-secondary">
-              <Link href={practiceHref} className="practice-button">
-                Practice
-              </Link>
-            </div>
-          )}
-        </div>
-        {activeMatch ? (
-          <span className="muted play-panel-note">Finish your live arena before starting another.</span>
-        ) : (
-          matchError && <span className="muted play-panel-note">{matchError}</span>
+        {isPulse && (
+          <>
+            <span className="arena-toolbar-divider" aria-hidden="true" />
+            <nav className="arena-markets" aria-label="Market switcher">
+              {MARKET_ORDER.map((id) => {
+                const selected = id === market;
+                const stats = marketStats[id];
+                const dayPct = selected && dayChange !== null ? dayChange : stats ? ((stats.last - stats.open) / stats.open) * 100 : null;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    className="arena-market-pill"
+                    aria-pressed={selected}
+                    onClick={() => setMarket(id)}
+                    style={{ "--coin": `var(--market-${id})` } as CSSProperties}
+                  >
+                    <span className="arena-coin-dot" aria-hidden="true" />
+                    <span className="arena-market-symbol">{MARKETS[id].label}</span>
+                    {dayPct === null ? (
+                      <Skeleton style={{ width: 44, height: 10 }} />
+                    ) : (
+                      <span className={`arena-market-change arena-mono ${dayPct >= 0 ? "is-up" : "is-down"}`}>
+                        <span className="sr-only">24 hour change </span>{pct(dayPct)}
+                      </span>
+                    )}
+                    {id === dailyCoinId && <span className="arena-daily-tag" title="Daily coin, rotates by day of the year">Daily</span>}
+                  </button>
+                );
+              })}
+            </nav>
+          </>
         )}
-      </section>
-      )}
-      </div>
-      </div>
       </div>
 
-      {mode !== "battle-24h" && (
-      <section className="lower-grid">
-        <div><div className="list-heading"><h2>Recent results</h2><span className="muted">Your Pulse matches</span></div><div className="data-list panel">
-          {isSignedIn === false && <div className="data-row"><span className="muted">Sign in to see your results.</span></div>}
-          {isSignedIn && recentResults === null && <div className="data-row"><span className="muted">Loading…</span></div>}
-          {isSignedIn && recentResults?.length === 0 && <div className="data-row"><span className="muted">No results yet — finish a Pulse match to see it here.</span></div>}
-          {isSignedIn && recentResults?.map((result) => {
-            const resultMarket = MARKETS[result.market as MarketId];
-            return (
-              <div className="data-row result-row" key={result.id}>
-                <div className="row-market"><span className={`market-symbol ${SYMBOL_CLASS[result.market as MarketId] ?? "eth-symbol"}`}>{resultMarket?.symbol ?? "?"}</span><span><strong>{resultMarket?.label ?? result.market.toUpperCase()}</strong><span className="muted">vs {result.opponentName}</span></span></div>
-                <span className={RESULT_CLASS[result.result]}>{RESULT_LABEL[result.result]}</span>
-                <span className="row-detail">{signedUsd(result.yourProfit)}</span>
-                <span className="row-age">{playedLabel(result.playedAt, Date.now())}</span>
+      {isPulse ? (
+        <div className="arena-stage">
+          <section className="arena-card arena-chart-card" aria-label={`${activeMarket.label} live chart`}>
+            <div className="arena-price-head">
+              <div className="arena-price-copy">
+                <div className="arena-price-eyebrow">
+                  <span>{activeMarket.label} / USD</span>
+                  <span className={`arena-live-badge is-${status}`} role="status">
+                    <span className="arena-live-dot" aria-hidden="true" />{statusLabel}
+                  </span>
+                </div>
+                <div className="arena-price arena-mono">
+                  {currentPrice === null ? (
+                    <Skeleton style={{ width: 240, height: 40 }} />
+                  ) : (
+                    <span key={priceFlash.key} className={priceFlash.key > 0 && !scrub ? `arena-price-flash is-${priceFlash.dir}` : undefined}>
+                      {priceWhole}<span className="arena-price-cents">{priceCents}</span>
+                    </span>
+                  )}
+                </div>
+                <div className="arena-price-change">
+                  {change === null || changeAbs === null ? (
+                    <Skeleton style={{ width: 180, height: 14 }} />
+                  ) : (
+                    <span className={`arena-mono ${changeAbs >= 0 ? "is-up" : "is-down"}`}>
+                      <span aria-hidden="true">{changeAbs >= 0 ? "▲" : "▼"} </span>
+                      {changeAbs >= 0 ? "+" : "−"}{usd(Math.abs(changeAbs), activeMarket.tickSize)} ({pct(change)})
+                    </span>
+                  )}
+                  <span className="arena-muted">{scrub ? clockLabel(scrub.t) : windowLabel(coveredMs)}</span>
+                </div>
               </div>
-            );
-          })}
-        </div></div>
-      </section>
+              <dl className="arena-stats">
+                <div>
+                  <dt>24h high</dt>
+                  <dd className="arena-mono">{day ? usd(day.high, activeMarket.tickSize) : <Skeleton style={{ width: 72, height: 12 }} />}</dd>
+                </div>
+                <div>
+                  <dt>24h low</dt>
+                  <dd className="arena-mono">{day ? usd(day.low, activeMarket.tickSize) : <Skeleton style={{ width: 72, height: 12 }} />}</dd>
+                </div>
+                <div>
+                  <dt>24h change</dt>
+                  <dd className={`arena-mono${dayChange === null ? "" : dayChange >= 0 ? " is-up" : " is-down"}`}>
+                    {dayChange === null ? <Skeleton style={{ width: 56, height: 12 }} /> : pct(dayChange)}
+                  </dd>
+                </div>
+                <div>
+                  <dt title="Signed-in players with Prophecy open">Players</dt>
+                  <dd className="arena-mono">
+                    {players === undefined ? <Skeleton style={{ width: 40, height: 12 }} /> : players === null ? "—" : players.toLocaleString("en-US")}
+                  </dd>
+                </div>
+              </dl>
+            </div>
+
+            {lobby && <FeaturedMatchStrip match={lobby.data.featured} receivedAt={lobby.receivedAt} />}
+
+            <div className="arena-chart-wrap">
+              <ArenaChart points={points} now={now} label={activeMarket.label} tickSize={activeMarket.tickSize} onScrub={setScrub} />
+            </div>
+          </section>
+
+          <aside className="arena-card arena-call" aria-labelledby="arena-call-title">
+            <div className="arena-call-head">
+              <span className="arena-eyebrow">Make a call</span>
+              <div className="arena-call-title">
+                <h2 id="arena-call-title" className="arena-wordmark">Pulse</h2>
+                <span className="arena-muted">{activeMarket.label} · head to head · trade live</span>
+              </div>
+            </div>
+
+            {tutorialNudge && !queue && (
+              <Link href={TUTORIAL_HREF} className="arena-tutorial">
+                <span className="arena-tutorial-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="18" height="18"><path d="M7 4.5v15l12-7.5z" /></svg>
+                </span>
+                <span className="arena-tutorial-copy">
+                  <strong>New to Pulse?</strong>
+                  <span className="arena-muted">Learn it in a few minutes with practice money.</span>
+                </span>
+                <span className="arena-tutorial-cta">Start <span aria-hidden="true">→</span></span>
+              </Link>
+            )}
+
+            {queue ? queuePanel : (
+              <>
+                <div className="arena-format">
+                  <span className="arena-eyebrow">Format</span>
+                  <span><strong>$100 bankroll</strong> <span className="arena-muted">· stake + leverage in room</span></span>
+                </div>
+
+                <div className="arena-field">
+                  <span className="arena-eyebrow" id="arena-timer-label">Round length</span>
+                  <div className="arena-segments" role="group" aria-labelledby="arena-timer-label">
+                    {TIMER_PRESETS.map((preset) => (
+                      <button key={preset.value} type="button" aria-pressed={timer === preset.value} onClick={() => setTimer(preset.value)}>
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="arena-field">
+                  <span className="arena-eyebrow" id="arena-wager-label">Wager</span>
+                  <div className="arena-segments" role="group" aria-labelledby="arena-wager-label">
+                    {PULSE_WAGER_OPTIONS.map((option) => (
+                      <button key={option} type="button" aria-pressed={wager === option} onClick={() => setWager(option)}>
+                        <FlameIcon className="arena-ember" /> {option}
+                        <span className="sr-only"> Embers</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="arena-payout">
+                  <div>
+                    <span className="arena-muted">You stake</span>
+                    <strong className="arena-mono"><FlameIcon className="arena-ember" />{wager}</strong>
+                  </div>
+                  <svg className="arena-payout-arrow" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+                  <div className="is-end">
+                    <span className="arena-muted">Winner takes</span>
+                    <strong className="arena-mono is-pot"><FlameIcon className="arena-ember" />{wager * 2}</strong>
+                  </div>
+                </div>
+                <p className="arena-payout-note">{roundLength(timer)} round · higher P&amp;L at the bell takes the pot</p>
+
+                <div className="arena-opponent">
+                  {waiting > 0 && (
+                    <span className="arena-stack" aria-hidden="true">
+                      {openMatches.slice(0, STACKED_AVATARS).map((match, i) => (
+                        <span key={match.id} className="arena-stack-face" style={{ "--i": i } as CSSProperties}>
+                          <svg viewBox="0 0 24 24" width="14" height="14"><circle cx="12" cy="9" r="4" /><path d="M4.5 20a7.5 7.5 0 0 1 15 0" /></svg>
+                        </span>
+                      ))}
+                      {waiting > STACKED_AVATARS && <span className="arena-stack-face is-more">+{waiting - STACKED_AVATARS}</span>}
+                    </span>
+                  )}
+                  <div>
+                    <strong>Open lobby</strong>
+                    <span className="arena-muted">{waiting} Pulse match{waiting === 1 ? "" : "es"} waiting</span>
+                  </div>
+                </div>
+              </>
+            )}
+
+            <div className="arena-call-actions">
+              {!queue && (isSignedIn === false
+                // Signed out: still the bright call to action — it opens sign-in.
+                ? <SignInAction><button type="button" className="arena-play">Sign in to play <span aria-hidden="true">→</span></button></SignInAction>
+                : <button type="button" className="arena-play" onClick={play} disabled={!playerId || !isSignedIn || pending !== null || activeMatch !== null}>{pending === "play" ? "Finding a match…" : <>Play <span aria-hidden="true">→</span></>}</button>)}
+              <Link href={practiceHref} className="arena-practice">Practice with play money</Link>
+              {activeMatch ? (
+                <span className="arena-muted arena-note">Finish your live arena before starting another.</span>
+              ) : (
+                matchError && <span className="arena-muted arena-note">{matchError}</span>
+              )}
+            </div>
+          </aside>
+        </div>
+      ) : (
+        <div className="arena-portfolio">
+          {queue ? <div className="arena-card">{queuePanel}</div> : activeMode.href ? <PortfolioGame /> : null}
+        </div>
       )}
 
+      {isPulse && (
+        <section className="arena-bottom">
+          <TopCallers leaders={lobby ? lobby.data.leaders : null} />
+          <RecentResults isSignedIn={isSignedIn} results={recentResults} now={now} />
+        </section>
+      )}
     </main>
   );
 }

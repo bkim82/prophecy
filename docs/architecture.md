@@ -17,7 +17,7 @@ app/layout.tsx (root shell: desktop header, compact mobile header, feature-gated
   ├── app/sanctum/page.tsx (Sanctum: Oracle Room live Pulse + your feed + chat, app/lib/rooms.ts)
   ├── app/exclusive/page.tsx (Exclusive feed: rank-gated via app/lib/rank.ts stub, unlinked from nav)
   ├── app/wallet/page.tsx (canonical embedded Base wallet: balance, holdings, recent activity, Explore tokens — docs/wallet.md)
-  └── app/duel/page.tsx (live lobby: screen-reader-only `Arena` h1 → Pulse/24h Portfolio `.feed-tabs.arena-mode-tabs` → market row (BTC, ETH, then the `DailyCoin` "Daily · H HYPE" chip (market symbol from `MARKETS`), all in one `.market-switcher`, selectable) → Pulse = `.pulse-stage` grid — ticker + MarketChart (app/MarketChart.tsx) left, call box (format, timer, wager packed at top; opponent directly above Play at the bottom) right, stacks <1000px; >1000px tabs + market row + stage sit in `.arena-fold` (`app/duel/page.tsx:403`), a viewport-tall flex column (`app/globals.css:1771-1787`, `clamp(540px, 100dvh - 105px, 720px)`; ≤760px tall: call-box title and callout subline hidden, opponent on one line) — **invariant: the whole stage fits the screen with no page scroll**; the chart absorbs leftover height, the call box scrolls itself only as a last resort; verify at 1280×720 and 1440×900 after any stage change; ≤640px: 220px plot, 24h stats behind `.market-stats-toggle`, call box reorders timer → Play first; match rows)
+  └── app/duel/page.tsx (live lobby: screen-reader-only `Arena` h1 → Live wins ticker (full bleed, hidden when empty) → toolbar: Pulse/24h Portfolio `.arena-modes` + market pills (`.arena-markets`: coin dot, symbol, live 24h %, `Daily` tag on `pickDailyCoin()`) → Pulse = `.arena-stage` grid: chart card (price header + 4-col stat strip, featured live match strip, `ArenaChart`) left, `.arena-call` panel (380px: PULSE wordmark, tutorial nudge, format, round length + wager segments, payout preview, open-lobby avatars/count, Play/Sign in + Practice pinned to the bottom) right; stacks <1000px → bottom row: Top callers today + Your recent results (`app/duel/ArenaParts.tsx`). The page scrolls: the old `.arena-fold` no-scroll stage is gone)
         └── usePriceFeed() → price, sampled series, status, now
 app/duel/[market]/pulse/[matchId]/page.tsx (multiplayer Pulse positions, countdown, result)
 app/duel/portfolio/page.tsx (solo 24h Portfolio: freely-tradeable spot/leverage positions on Base meme coins)
@@ -33,6 +33,8 @@ pulse/page.tsx settle() → GET /api/price → fallback if socket stale (solo ro
 duel/page.tsx Play → POST /api/match/find-or-create → mode-specific match room
 duel/page.tsx Opponent "N waiting" count → GET /api/match/open (3s poll; no lobby list, so no lobby-side join)
 duel/page.tsx Recent results → GET /api/match/recent (once per mount, signed in)
+duel/page.tsx wins ticker / featured match / top callers / players → GET /api/arena/lobby?market= (5s poll, visible tab; lib/arenaLobby.ts, 5s server cache)
+duel/page.tsx market pills' 24h % → GET /api/market-stats (30s poll; Coinbase /stats, 30s server cache); the selected market uses the socket's `day`
 match room → GET /api/match/[id] (1s poll: view + heartbeat + lazy settle)
 match room → POST /api/match/[id]/{action,leave}
 /api/match/* → Neon Postgres (matches); settlement → lib/spotPrice.ts
@@ -50,22 +52,19 @@ getViewer() → Clerk by default; when EMBEDDED_WALLET_AUTH_ENABLED=true, hashed
 /api/history → api.exchange.coinbase.com (trades + candles, both, merged)
 /api/price   → lib/spotPrice.ts → Coinbase Exchange ticker → api.coinbase.com spot → api.binance.com fallback chain
 
-duel/page.tsx Play controls → compact Practice action under Play; first-timer nudge (hidden once finished) → /duel/tutorial (client-only lessons + live round vs bot, docs/tutorial.md)
+duel/page.tsx Play controls → "Practice with play money" under Play; first-timer nudge (hidden once finished) → /duel/tutorial (client-only lessons + live round vs bot, docs/tutorial.md)
 ```
 
 Multiplayer BTC, ETH and HYPE (daily coin) Pulse are wired up (same room, `/duel/[market]/pulse/[matchId]`; solo practice serves both via `app/duel/btc/pulse/page.tsx?practice=1&market=`). The 24h Portfolio (solo,
 DB-backed — see [portfolio.md](portfolio.md)) is wired up identically across
 all three market tabs, since it's asset-agnostic (token search picks the
 coin, not the lobby's market switcher). The mode switcher
-locks the play panel when the chosen mode has neither `href` nor `matched`
-(`app/duel/page.tsx:101-115`, `:173`). `matched` marks a mode that goes
-through matchmaking with no fixed URL: Play posts to `find-or-create` and
-routes to the mode-specific room. `href` marks a mode with a fixed,
-non-matchmade URL, normally reached via a plain `Link` (`app/duel/page.tsx`
-`playHref`) — the 24h Portfolio is the one exception: selecting it renders
-`<PortfolioGame />` inline in the lobby instead (same as the retired
-`Battle24h` widget did for 24h Reading), and its `href` only exists so
-`/duel/portfolio` stays directly linkable as a standalone room. Pulse takes
+(`MODES` in `app/duel/page.tsx`) has two entries: Pulse, which goes
+through matchmaking with no fixed URL (Play posts to `find-or-create` and
+routes to the room), and the 24h Portfolio, whose `href` keeps
+`/duel/portfolio` linkable while selecting it renders
+`<PortfolioGame />` inline in the lobby (same as the retired
+`Battle24h` widget did for 24h Reading). Pulse takes
 its stake and leverage in-round; so does the 24h Portfolio.
 
 ## Modules
@@ -81,7 +80,10 @@ its stake and leverage in-round; so does the 24h Portfolio.
 | `app/PostCard.tsx` | shared post rendering for both feed pages |
 | `app/lib/posts.ts` | client-safe feed shapes (`Post`, `Reply`, `Share`, …), no data |
 | `app/lib/rank.ts` | hardcoded mock rank/threshold stub gating `/exclusive` — no real rank system exists |
-| `app/duel/page.tsx` | live lobby, BTC ticker/chart, mode switcher, Pulse controls, matchmaking + open-match count, your Recent results (full width; the Open matches list was removed) (moved from `app/page.tsx`) |
+| `app/duel/page.tsx` | live lobby: mode switcher, market pills, price header + stats, Pulse controls, matchmaking + open-match count, lobby polls (moved from `app/page.tsx`) |
+| `app/duel/ArenaChart.tsx` / `app/duel/ArenaParts.tsx` | lobby chart ([chart.md](chart.md)); wins ticker, featured match strip, top callers, recent results, avatar/skeleton |
+| `lib/arenaLobby.ts` + `app/api/arena/lobby/route.ts` | public lobby reads: last-24h public wins (accounts with a handle only), one live public round with each seat's net side + realized/open P&L at spot, 24h top callers (`rankedRecords`, `lib/sidebar.ts`), presence online count |
+| `app/api/market-stats/route.ts` | Coinbase rolling 24h open/high/low/last for btc/eth/hype |
 | `app/wallet/page.tsx` + `app/wallet/*` | wallet dashboard: balance hero, coin grid/detail, activity timeline, mock creator earnings — see [wallet.md](wallet.md) |
 | `app/lib/useWalletConnection.ts` | canonical smart-account identity + public native-balance polling from the validated auth context |
 | `app/lib/wallet.ts` | display/Base helpers only: `BASE_CHAIN_ID`, `isBaseChain`, ETH formatting, address shortening (no wallet provider) |
@@ -112,7 +114,7 @@ its stake and leverage in-round; so does the 24h Portfolio.
 | `app/duel/btc/pulse/trading.ts` | pure buy/sell portfolio accounting and full-position clamping — **no importers yet**, the page tracks a single leveraged position instead |
 | `app/usePriceFeed.ts` | websocket, history seed, reconnection, sampled series |
 | `app/PriceChart.tsx` | pure props→SVG, no fetch, no state |
-| `app/feedConfig.ts` | `WINDOW_MS`, `MIN_WINDOW_MS`, `SAMPLE_MS` + axis interval defaults — shared by hook, seed route, chart |
+| `app/feedConfig.ts` | `WINDOW_MS`, `MIN_WINDOW_MS`, `SAMPLE_MS`, `LOBBY_WINDOW_MS` (5min lobby override), `MAX_WINDOW_MS` + axis interval defaults — shared by hook, seed route, chart |
 | `app/api/price/route.ts` | REST spot price, 2-source fallback chain |
 | `app/api/history/route.ts` | chart seed for the full window: trades + candle backfill, merged |
 | `app/layout.tsx` | root HTML, header shell, server-selected `AuthProvider` (Clerk default; CDP only behind `EMBEDDED_WALLET_AUTH_ENABLED=true`), metadata, Tailwind import, pre-paint theme script |
@@ -130,7 +132,7 @@ its stake and leverage in-round; so does the 24h Portfolio.
 - Websocket stays client-side (no key needed, no relay hop). Do not move to server without reason.
 - `feedConfig.ts` constants must stay shared, not duplicated (`app/feedConfig.ts:3-10`) — divergence = visible seam between seeded and live chart segments.
 - The chart's x-domain is a **fixed window ending now**, never the extent of the data (`app/PriceChart.tsx:101-108`). Deriving it from the data is what made the axis cram as points accumulated.
-- `trim()` and `/api/history` must cut at the same `WINDOW_MS + SAMPLE_MS`, one sample wider than the window (`app/usePriceFeed.ts:16`, `app/api/history/route.ts:92`) — the chart interpolates its left-edge crossing from that extra point.
+- `trim()` and `/api/history` must cut at the same `windowMs + SAMPLE_MS` (default `WINDOW_MS`; the lobby passes `LOBBY_WINDOW_MS` to both via `usePriceFeed`'s `windowMs` option and `?windowMs=`), one sample wider than the window, and both also keep the newest point older than that cut (`app/usePriceFeed.ts:28`, `app/api/history/route.ts`) — the chart interpolates its left-edge crossing from it; candle points are up to 60s apart, so one sample of slack alone left the 5-min lobby line starting up to a minute in from the edge.
 - Every API route: `export const dynamic = "force-dynamic"`. Price, history, match views and portfolio state also send `Cache-Control: no-store` (`app/api/price/route.ts:3`, `app/api/history/route.ts:3`, `app/api/match/[id]/route.ts:3`, `app/api/portfolio/session/route.ts`, `app/api/tokens/*`). Never cache a price or a round at the HTTP layer — this is distinct from the intentional in-memory TTL caches in `lib/basePrices.ts` and `lib/tokenHistory.ts`, which exist purely to stay under DexScreener's/GeckoTerminal's rate limits and are never surfaced as an HTTP cache header.
 - Match state transitions are single guarded `UPDATE ... WHERE <guard> RETURNING *` statements, never read-then-write: `neon-http` has no transactions or row locks, so the guard *is* the lock (`app/api/match/[id]/action/route.ts:89`). 0 rows back means someone else won — re-read, never retry blindly.
 - The opponent's positions are withheld server-side until `countdown`, not hidden in the client (`lib/match.ts:182-187`). Anything added to `MatchView` must be safe for the other player to read.

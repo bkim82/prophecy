@@ -1,7 +1,8 @@
 "use client";
 
 // One coin so far — add more here and the day-of-year rotation spreads them
-// out automatically, no rotation logic to touch.
+// out automatically, no rotation logic to touch. The Arena market switcher
+// (app/duel/page.tsx) tags whichever coin this picks as "Daily".
 const DAILY_COINS = ["HYPE"];
 
 function dayOfYear(date: Date) {
@@ -12,24 +13,4 @@ function dayOfYear(date: Date) {
 
 export function pickDailyCoin(date: Date = new Date()) {
   return DAILY_COINS[dayOfYear(date) % DAILY_COINS.length];
-}
-
-// Rendered inside a .market-switcher so it selects exactly like BTC/ETH; the
-// "Daily" prefix is the only thing marking it as the rotating slot.
-export function DailyCoin({ active, symbol, symbolClass, onSelect }: { active: boolean; symbol: string; symbolClass: string; onSelect: () => void }) {
-  const coin = pickDailyCoin();
-
-  return (
-    <button
-      type="button"
-      className={`daily-coin${active ? " active" : ""}`}
-      aria-pressed={active}
-      title="Daily coin — rotates by day of the year"
-      onClick={onSelect}
-    >
-      <span className="daily-coin-label">Daily</span>
-      <span className="daily-coin-sep" aria-hidden="true">·</span>
-      <span className={`market-symbol ${symbolClass}`}>{symbol}</span> {coin}
-    </button>
-  );
 }

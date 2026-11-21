@@ -49,6 +49,7 @@ function seatRecords(seat: Seat, ms: number | null) {
       handle: profiles.handle,
       rounds: count(),
       won: sql<number>`(count(*) filter (where ${matches.winner} = ${mine}))::int`,
+      lost: sql<number>`(count(*) filter (where ${matches.winner} = ${theirs}))::int`,
       net: sql<number>`coalesce(sum(case when ${matches.winner} = ${mine} then ${matches.wager} when ${matches.winner} = ${theirs} then -${matches.wager} else 0 end), 0)::int`,
     })
     .from(matches)
@@ -57,19 +58,23 @@ function seatRecords(seat: Seat, ms: number | null) {
     .groupBy(profiles.handle);
 }
 
-/** Top Oracles: most net Embers from settled Arena rounds, then win rate, then rounds played. */
-async function topTraders(ms: number | null): Promise<TopTrader[]> {
-  const totals = new Map<string, { rounds: number; won: number; net: number }>();
+/** Both seats' records summed per handle, ranked: most net Embers, then win rate, then rounds played. */
+export async function rankedRecords(ms: number | null, limit: number) {
+  const totals = new Map<string, { rounds: number; won: number; lost: number; net: number }>();
   for (const row of (await Promise.all(SEATS.map((seat) => seatRecords(seat, ms)))).flat()) {
     if (!row.handle) continue;
-    const total = totals.get(row.handle) ?? { rounds: 0, won: 0, net: 0 };
-    totals.set(row.handle, { rounds: total.rounds + row.rounds, won: total.won + row.won, net: total.net + row.net });
+    const total = totals.get(row.handle) ?? { rounds: 0, won: 0, lost: 0, net: 0 };
+    totals.set(row.handle, { rounds: total.rounds + row.rounds, won: total.won + row.won, lost: total.lost + row.lost, net: total.net + row.net });
   }
   return [...totals]
     .map(([handle, total]) => ({ handle, ...total, winRate: total.won / total.rounds }))
     .sort((a, b) => b.net - a.net || b.winRate - a.winRate || b.rounds - a.rounds || a.handle.localeCompare(b.handle))
-    .slice(0, LEADERS)
-    .map(({ handle, winRate }) => ({ handle: `@${handle}`, tier: rankForHandle(handle), winRate }));
+    .slice(0, limit);
+}
+
+/** Top Oracles: rank only (no score) for the feed rail. */
+async function topTraders(ms: number | null): Promise<TopTrader[]> {
+  return (await rankedRecords(ms, LEADERS)).map(({ handle, winRate }) => ({ handle: `@${handle}`, tier: rankForHandle(handle), winRate }));
 }
 
 /** Closed 24h Portfolio positions that made money, best return on committed cash first. */
