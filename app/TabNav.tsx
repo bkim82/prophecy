@@ -2,6 +2,7 @@
 
 import { useRouter, usePathname } from "next/navigation";
 import { useOptimistic, useTransition } from "react";
+import { betaModeEnabled } from "@/app/lib/betaMode";
 
 // Same destinations, same order, as MobileBottomNav (text only here). Sanctum
 // is hidden from nav for now; /sanctum still works by direct URL.
@@ -10,6 +11,8 @@ const TABS = [
   { href: "/duel", label: "Arena" },
   { href: "/wallet", label: "Wallet" },
 ];
+// Beta mode: the Arena is the home page; Omens and Wallet are hidden.
+const BETA_TABS = [{ href: "/", label: "Arena" }];
 
 export function TabNav() {
   const pathname = usePathname();
@@ -21,11 +24,16 @@ export function TabNav() {
 
   // "/" only matches itself; the rest match by prefix so nested routes
   // (/duel/portfolio, /duel/btc/pulse/…) keep their section highlighted.
-  const activeIndex = TABS.findIndex((tab) => (tab.href === "/" ? activePath === "/" : activePath.startsWith(tab.href)));
+  // In beta mode the Arena tab is "/" but /duel/* still belongs to it.
+  const beta = betaModeEnabled();
+  const tabs = beta ? BETA_TABS : TABS;
+  const activeIndex = beta
+    ? activePath === "/" || activePath.startsWith("/duel") ? 0 : -1
+    : TABS.findIndex((tab) => (tab.href === "/" ? activePath === "/" : activePath.startsWith(tab.href)));
 
   return (
     <nav className="main-nav" aria-label="Primary" aria-busy={isPending}>
-      {TABS.map(({ href, label }, index) => {
+      {tabs.map(({ href, label }, index) => {
         const isActive = index === activeIndex;
         return (
           <a

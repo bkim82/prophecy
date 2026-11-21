@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useAppAuth } from "@/app/auth/AuthProvider";
 import { FlameIcon } from "@/app/icons";
+import { betaModeEnabled } from "@/app/lib/betaMode";
 import { formatEth } from "@/app/lib/wallet";
 
 /**
@@ -26,6 +27,8 @@ export function BalancePill() {
       });
     refresh();
     const refreshWalletValue = async () => {
+      // Beta mode hides the wallet, so there's no wallet value to show.
+      if (betaModeEnabled()) return setWalletUsd(null);
       const address = user?.smartAccountAddress;
       if (!address || user.walletChainId !== 8453) return setWalletUsd(null);
       try {
@@ -81,9 +84,9 @@ export function BalancePill() {
         <div id="balance-menu-popover" className="balance-menu-popover" role="dialog" aria-label="Balances">
           <dl>
             <div><dt><FlameIcon className="balance-ember-icon" /> Embers</dt><dd className="tabular-nums">{embers}</dd></div>
-            <div><dt>Wallet (USD)</dt><dd className="tabular-nums">{walletUsd === null ? "Unavailable" : `$${walletUsd.toFixed(2)}`}</dd></div>
+            {!betaModeEnabled() && <div><dt>Wallet (USD)</dt><dd className="tabular-nums">{walletUsd === null ? "Unavailable" : `$${walletUsd.toFixed(2)}`}</dd></div>}
           </dl>
-          <Link href="/wallet" className="balance-menu-link" onClick={() => setOpen(false)}>Open wallet <span aria-hidden="true">→</span></Link>
+          {!betaModeEnabled() && <Link href="/wallet" className="balance-menu-link" onClick={() => setOpen(false)}>Open wallet <span aria-hidden="true">→</span></Link>}
         </div>
       )}
     </div>

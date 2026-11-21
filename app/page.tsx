@@ -1,5 +1,7 @@
 import { FeedSidebar } from "@/app/FeedSidebar";
 import { FeedSwitcher } from "@/app/FeedSwitcher";
+import ArenaPage from "@/app/duel/page";
+import { betaModeEnabled } from "@/app/lib/betaMode";
 import type { Post } from "@/app/lib/posts";
 import { blockedHandlesFor } from "@/lib/blocks";
 import { followedReshares, withEngagement } from "@/lib/engagement";
@@ -10,6 +12,8 @@ import { accountTopics } from "@/lib/topicPrefs";
 import { getViewer } from "@/lib/viewer";
 
 export default async function Page() {
+  // Beta mode: the Arena lobby is the home page and the feed is hidden.
+  if (betaModeEnabled()) return <ArenaPage />;
   const userId = (await getViewer())?.userId ?? null;
   // The Following filter: everyone you follow, plus what they reposted. New
   // accounts follow no one.

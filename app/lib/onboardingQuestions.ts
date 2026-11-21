@@ -4,6 +4,8 @@
 // ids, never the copy, so labels can be reworded freely; removing or renaming
 // an id orphans old answers. No server-only imports, so it stays client-safe.
 
+import { betaModeEnabled } from "@/app/lib/betaMode";
+
 export const GOALS = [
   { id: "learn", title: "Learn crypto & trading", blurb: "Get the fundamentals down and build real instincts on live markets." },
   { id: "community", title: "Find my people", blurb: "Swap calls, talk markets and hang out with other crypto traders." },
@@ -90,7 +92,9 @@ export function firstMovesFor(
     : has("strategies") ? (paces.length > 0 && !paces.includes("quick") ? "portfolio" : "tutorial")
     : has("profit") ? "arena"
     : "omens";
-  const lead = tutorialDone && pick === "tutorial" ? "arena" : pick;
-  const rest = (["arena", "omens", "tutorial", "portfolio"] as const).filter((id) => id !== lead && !(tutorialDone && id === "tutorial"));
+  // Beta mode hides Omens and the 24h Portfolio, so neither can be suggested.
+  const hidden = (id: FirstMove["id"]) => (tutorialDone && id === "tutorial") || (betaModeEnabled() && (id === "omens" || id === "portfolio"));
+  const lead = hidden(pick) ? (tutorialDone ? "arena" : "tutorial") : pick;
+  const rest = (["arena", "omens", "tutorial", "portfolio"] as const).filter((id) => id !== lead && !hidden(id));
   return [lead, ...rest].slice(0, 3).map((id) => MOVES[id]);
 }

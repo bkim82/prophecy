@@ -8,6 +8,7 @@ import { DailyCoin, pickDailyCoin } from "@/app/DailyCoin";
 import { FlameIcon } from "@/app/icons";
 import { PortfolioGame } from "@/app/duel/portfolio/PortfolioGame";
 import { hasFinishedTutorial, TUTORIAL_HREF } from "@/app/duel/tutorial/progress";
+import { betaModeEnabled } from "@/app/lib/betaMode";
 import {
   getActiveMatch,
   setQueueing,
@@ -145,7 +146,8 @@ export default function Page() {
   const [recentResults, setRecentResults] = useState<RecentResult[] | null>(null);
   // First-timer nudge toward the tutorial; read after mount (localStorage), so it never flashes for players who finished it.
   const [tutorialNudge, setTutorialNudge] = useState(false);
-  const modes = MODES_BY_MARKET[market];
+  // Beta mode hides the 24h Portfolio.
+  const modes = betaModeEnabled() ? MODES_BY_MARKET[market].filter((option) => option.id !== "battle-24h") : MODES_BY_MARKET[market];
   // The chart's head (bid/ask midpoint), so the headline matches the pill.
   const livePrice = points.at(-1)?.p ?? price;
   const currentPrice = scrub?.p ?? livePrice;

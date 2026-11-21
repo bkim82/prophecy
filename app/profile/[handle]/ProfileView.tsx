@@ -22,6 +22,7 @@ import {
   type AssetAccuracy,
   type CopyEarnings,
 } from "@/app/lib/profileTraits";
+import { betaModeEnabled } from "@/app/lib/betaMode";
 import { followProfile, togglePinnedMatch } from "@/app/profile/actions";
 import { EditProfileDialog, type EditableProfile } from "@/app/profile/EditProfileDialog";
 import type { BlockState } from "@/lib/blocks";
@@ -47,6 +48,9 @@ const TABS: { id: TabId; label: string }[] = [
 const PRESENCE_POLL_MS = 5_000;
 // Own profile only: Matches slots in right after Omens.
 const SELF_TABS: { id: TabId; label: string }[] = [TABS[0], { id: "matches", label: "Matches" }, ...TABS.slice(1)];
+// Beta mode hides Omens (and their Comments) and the 24h Portfolio.
+const BETA_HIDDEN_TABS = new Set<TabId>(["omens", "comments", "portfolio"]);
+const tabsFor = (self: boolean) => (self ? SELF_TABS : TABS).filter(({ id }) => !(betaModeEnabled() && BETA_HIDDEN_TABS.has(id)));
 
 const compactCount = new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 });
 const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
@@ -118,7 +122,7 @@ type ProfileViewProps = {
 };
 
 export function ProfileView({ profile, activity, portfolio, portfolioLocked, viewerRank, initiallyFollowing, signedIn = false, followsYou = false, online = false, messageable = false, block, traits, challenge, self, showcase }: ProfileViewProps) {
-  const [tab, setTab] = useState<TabId>("omens");
+  const [tab, setTab] = useState<TabId>(() => tabsFor(Boolean(self))[0].id);
   const [editing, setEditing] = useState(false);
   // Own profiles may have no handle yet; the page supplies a stable seed instead.
   const seed = self?.edit.avatarSeed ?? profile.handle;
@@ -327,7 +331,7 @@ export function ProfileView({ profile, activity, portfolio, portfolioLocked, vie
       {self && editing && <EditProfileDialog initial={self.edit} onClose={() => setEditing(false)} />}
 
       <div className="feed-tabs profile-tabs" role="tablist" aria-label="Activity">
-        {(self ? SELF_TABS : TABS).map(({ id, label }) => (
+        {tabsFor(Boolean(self)).map(({ id, label }) => (
           <button
             key={id}
             type="button"

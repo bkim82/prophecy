@@ -1,6 +1,7 @@
 import { clerkMiddleware } from "@clerk/nextjs/server";
 import type { NextFetchEvent, NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+import { betaModeEnabled, isBetaHiddenPath } from "@/app/lib/betaMode";
 
 function securityResponse(request: NextRequest) {
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
@@ -39,6 +40,9 @@ function securityResponse(request: NextRequest) {
 const clerkProxy = clerkMiddleware((_auth, request) => securityResponse(request));
 
 export default function proxy(request: NextRequest, event: NextFetchEvent) {
+  if (betaModeEnabled() && isBetaHiddenPath(request.nextUrl.pathname)) {
+    return NextResponse.redirect(new URL("/", request.url));
+  }
   if (process.env.EMBEDDED_WALLET_AUTH_ENABLED === "true") {
     return securityResponse(request);
   }
