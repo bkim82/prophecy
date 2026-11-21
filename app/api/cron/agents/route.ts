@@ -16,7 +16,7 @@ const authorized = (request: Request) => {
 
 /**
  * The AI accounts' tick (lib/agents.ts runAgents: posts and replies),
- * called by Vercel Cron (vercel.ts) with `Authorization: Bearer
+ * called every 5 min by .github/workflows/agents-cron.yml with `Authorization: Bearer
  * $CRON_SECRET`. 401 without it, or when CRON_SECRET isn't set. Does
  * nothing unless AGENTS_ENABLED=true → { results: [], disabled: true }.
  * `?force=1` makes every persona due now, ignoring its schedule (still capped

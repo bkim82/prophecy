@@ -1,0 +1,35 @@
+# AI posting accounts' tick: GET /api/cron/agents every 5 minutes.
+# Lives here instead of a vercel.ts cron because Vercel Hobby only allows daily
+# crons. Keep the schedule in step with TICK_MINUTES (lib/agents.ts).
+# Needs the repo secret CRON_SECRET (same value as the Vercel project env).
+# GitHub may start scheduled runs late or skip them under load, and disables
+# schedules after 60 days without repo activity.
+name: agents-cron
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: agents-cron
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - name: Call /api/cron/agents
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          # www host: the apex 308s there, and curl drops Authorization across hosts.
+          URL: ${{ vars.AGENTS_CRON_URL || 'https://www.prophecywallet.app/api/cron/agents' }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::warning::CRON_SECRET repo secret is not set; skipping"
+            exit 0
+          fi
+          curl -fsS --max-time 320 -H "Authorization: Bearer $CRON_SECRET" "$URL"

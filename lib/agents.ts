@@ -9,7 +9,7 @@ import { MAX_POLL_CHOICE_CHARS, MAX_POST_CHARS, POLL_DURATIONS_MS, parsePostInpu
 import { createPost } from "@/lib/posts";
 import { getSpotPrice } from "@/lib/spotPrice";
 
-// AI posting accounts: GET /api/cron/agents (Vercel Cron, vercel.ts) calls
+// AI posting accounts: GET /api/cron/agents (GitHub Actions cron, .github/workflows/agents-cron.yml) calls
 // runAgents, which lets each persona (personas/*.md via lib/agentPersonas.ts)
 // decide whether to post and whether to reply now. Posts are drafted through
 // AI Gateway (sometimes after a web search) and saved with the same input
@@ -26,7 +26,7 @@ import { getSpotPrice } from "@/lib/spotPrice";
  */
 export const AGENT_MODEL = "nvidia/nemotron-3.5-lightning-free";
 
-/** Minutes between cron runs — keep in step with the vercel.ts schedule. */
+/** Minutes between cron runs — keep in step with .github/workflows/agents-cron.yml. */
 export const TICK_MINUTES = 5;
 
 /**
