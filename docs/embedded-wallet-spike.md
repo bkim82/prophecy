@@ -1,7 +1,7 @@
 # embedded wallet compatibility spike
 
 - Status: in progress; local compatibility and the feature-gated application-session foundation pass, credentialed CDP/Base Sepolia and policy gates remain; CDP auth activation plus mainnet signing/sponsorship/Onramp are no-go.
-- Installed baseline: Next `16.4.3`, Node `24.15.0`, React `19.3.0`; CDP React/Core/Hooks `0.0.127`, server SDK `1.58.0` (`package.json:34-42`, `package-lock.json`).
+- Installed baseline: Next `16.4.6`, Node `24.15.0`, React `19.3.0`; CDP React/Core/Hooks `0.0.127`, server SDK `1.58.0` (`package.json:34-42`, `package-lock.json`).
 - Next compatibility: kept `tsconfig.json:14-15` `module=esnext` / `moduleResolution=bundler`; no SDK-driven module-resolution or runtime downgrade. Next's documented `serverExternalPackages` keeps the Node-only `@coinbase/cdp-sdk` external so Turbopack does not resolve its unused optional x402 peers (`next.config.ts:6`). `npm run typecheck` runs Next `typegen` before the TypeScript 7 compiler (`package.json:11`).
 - TypeScript 7 tooling bridge: `@typescript/native` supplies the TypeScript 7 CLI; the official `@typescript/typescript6` compatibility alias supplies the API ESLint still requires (`package.json:20,29`).
 - Local gate: 28 Vitest assertions pass, Next route typegen plus TypeScript 7 pass, ESLint has 0 errors (pre-existing React compiler findings remain warnings), and the Next `16.4.3` production build completes.
