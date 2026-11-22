@@ -100,6 +100,17 @@ const roundLength = (seconds: number) => (seconds >= 120 ? `${seconds / 60} min`
 
 const windowLabel = (ms: number) => (ms >= 60_000 ? `last ${Math.round(ms / 60_000)} min` : `last ${Math.max(1, Math.round(ms / 1000))}s`);
 
+type Volatility = "low" | "average" | "high";
+const VOLATILITY_LABEL: Record<Volatility, string> = { low: "Low", average: "Average", high: "High" };
+// 6h realized volatility (`vol6h` off /api/market-stats, % over the window):
+// under LOW reads calm, over HIGH reads wild; one scale for every coin. A
+// steady ~45%/yr coin like BTC sits near 1.2% over 6h.
+const VOL_LOW_PCT = 0.6;
+const VOL_HIGH_PCT = 1.5;
+
+const volatilityLevel = (volPct: number): Volatility =>
+  volPct < VOL_LOW_PCT ? "low" : volPct > VOL_HIGH_PCT ? "high" : "average";
+
 /** "$60,069" and ".49", so the cents can sit dimmer than the dollars. */
 function splitPrice(text: string) {
   const dot = text.lastIndexOf(".");
@@ -109,7 +120,7 @@ function splitPrice(text: string) {
 export default function Page() {
   const { isSignedIn } = useAppAuth();
   const router = useRouter();
-  const [market, setMarket] = useState<MarketId>("btc");
+  const [market, setMarket] = useState<MarketId>("nvda");
   const dailyCoinId = pickDailyCoin().toLowerCase() as MarketId;
   const activeMarket = MARKETS[market];
   const { price, points, status, now, day } = usePriceFeed(activeMarket.name, { windowMs: LOBBY_WINDOW_MS });
@@ -164,6 +175,8 @@ export default function Page() {
   const change = changeAbs !== null && firstPrice ? (changeAbs / firstPrice) * 100 : null;
   const coveredMs = (scrub?.t ?? now) - windowStart;
   const dayChange = day && livePrice !== null ? ((livePrice - day.open) / day.open) * 100 : null;
+  const vol6h = marketStats[market]?.vol6h ?? null;
+  const volatility = vol6h === null ? null : volatilityLevel(vol6h);
   const players = lobby?.data.playersOnline;
 
   useEffect(() => setPlayerId(getPlayerId()), []);
@@ -496,6 +509,17 @@ export default function Page() {
                   <span className={`arena-live-badge is-${status}`} role="status">
                     <span className="arena-live-dot" aria-hidden="true" />{statusLabel}
                   </span>
+                  {volatility ? (
+                    <span
+                      className={`arena-vol-badge is-${volatility}`}
+                      title={`Last 6h realized volatility ${vol6h?.toFixed(2)}% (low under ${VOL_LOW_PCT}%, high over ${VOL_HIGH_PCT}%)`}
+                    >
+                      Volatility: <strong>{VOLATILITY_LABEL[volatility]}</strong>
+                    </span>
+                  ) : (
+                    // Placeholder only until the first stats poll lands; a market with no 6h figure shows nothing.
+                    !marketStats[market] && <Skeleton className="arena-vol-badge-skel" style={{ width: 112, height: 18 }} />
+                  )}
                 </div>
                 <div className="arena-price arena-mono">
                   {currentPrice === null ? (
