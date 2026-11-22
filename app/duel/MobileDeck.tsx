@@ -8,8 +8,8 @@ import { RecentResults, TopCallers, type RecentResult } from "@/app/duel/ArenaPa
 import type { TopCaller } from "@/app/lib/arenaLobby";
 
 // Phone-only call panel for the Arena lobby (app/duel/page.tsx), shown under
-// 640px in place of the desktop `.arena-call` aside: round chips, wager tiles,
-// one big Battle button and a footer row, sized so the whole lobby fits one
+// 640px in place of the desktop `.arena-call` aside: one row of round + wager
+// chips, one big Battle button and a footer row, sized so the whole lobby fits one
 // screen with no scrolling. Top callers / recent results (the desktop
 // `.arena-bottom` row) open in a bottom sheet instead. Styles: .arena-deck-*
 // and .arena-sheet in globals.css.
@@ -72,24 +72,23 @@ export function MobileDeck({
     <section className="arena-deck" aria-label="Start a Pulse match">
       {queuePanel || (
         <>
-          <div className="arena-deck-row">
-            <span className="arena-eyebrow" id="arena-deck-timer-label">Round</span>
-            <div className="arena-deck-chips" role="group" aria-labelledby="arena-deck-timer-label">
+          {/* Round length and wager share one row: two side-by-side segmented controls. */}
+          <div className="arena-deck-picks">
+            <div className="arena-deck-chips" role="group" aria-label="Round length">
               {timerPresets.map((preset) => (
                 <button key={preset.value} type="button" aria-pressed={timer === preset.value} onClick={() => onTimer(preset.value)}>
                   {preset.label}
                 </button>
               ))}
             </div>
-          </div>
-
-          <div className="arena-deck-cards" role="group" aria-label="Wager in Embers">
-            {wagerOptions.map((option) => (
-              <button key={option} type="button" className="arena-deck-card" aria-pressed={wager === option} onClick={() => onWager(option)}>
-                <FlameIcon className="arena-deck-card-flame" />
-                <strong className="arena-mono">{option}</strong>
-              </button>
-            ))}
+            <div className="arena-deck-chips" role="group" aria-label="Wager in Embers">
+              {wagerOptions.map((option) => (
+                <button key={option} type="button" aria-pressed={wager === option} onClick={() => onWager(option)}>
+                  <FlameIcon className="arena-deck-chip-flame" />
+                  {option}
+                </button>
+              ))}
+            </div>
           </div>
 
           {isSignedIn === false ? (
