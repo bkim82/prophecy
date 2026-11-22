@@ -55,11 +55,11 @@ export function MobileDeck({
     if (!sheet && dialog.open) dialog.close();
   }, [sheet]);
 
-  const battleInner = (word: string, sub: string) => (
+  const battleInner = (word: string, sub?: string) => (
     <>
       <span className="arena-deck-battle-copy">
         <span className="arena-deck-battle-word">{word}</span>
-        <span className="arena-deck-battle-sub">{sub}</span>
+        {sub && <span className="arena-deck-battle-sub">{sub}</span>}
       </span>
       <span className="arena-deck-battle-pot arena-mono">
         <span className="sr-only">Winner takes </span><FlameIcon className="arena-ember" />{wager * 2}
@@ -94,7 +94,7 @@ export function MobileDeck({
 
           {isSignedIn === false ? (
             <SignInAction>
-              <button type="button" className="arena-deck-battle">{battleInner("Sign in", "to battle for Embers")}</button>
+              <button type="button" className="arena-deck-battle">{battleInner("Sign in")}</button>
             </SignInAction>
           ) : (
             <button type="button" className="arena-deck-battle" onClick={onPlay} disabled={!canPlay}>
