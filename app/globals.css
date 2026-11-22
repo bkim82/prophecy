@@ -3523,6 +3523,50 @@ html[data-theme="obsidian"]:has(.arena), html[data-theme="obsidian"]:has(.arena)
 .arena-result-pnl.is-down { color: var(--arena-red); }
 .arena-portfolio { margin-top: 20px; }
 
+/* Phone call panel (app/duel/MobileDeck.tsx): hidden above 640px, where the .arena-call aside shows instead. */
+.arena-deck { display: none; }
+.arena-deck-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.arena-deck-chips { display: grid; flex: 0 1 240px; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; border: 1px solid var(--arena-border); border-radius: 12px; background: var(--arena-field); padding: 3px; }
+.arena-deck-chips button { min-height: 38px; border: 0; border-radius: 9px; background: transparent; color: var(--arena-muted); font-family: var(--arena-mono-font); font-size: 13px; font-weight: 600; }
+.arena-deck-chips button[aria-pressed="true"] { background: var(--arena-tab-bg); color: var(--arena-text); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--arena-purple) 55%, var(--arena-border)); }
+.arena-deck-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.arena-deck-card { display: grid; justify-items: center; align-content: center; gap: 1px; min-height: 68px; border: 1px solid var(--arena-border-strong); border-radius: 14px; background: linear-gradient(180deg, var(--arena-card), var(--arena-field)); color: var(--arena-text); padding: 6px 4px 8px; box-shadow: inset 0 -3px 0 color-mix(in srgb, #000 22%, transparent); transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease, background .15s ease; }
+.arena-deck-card strong { font-size: 20px; font-weight: 700; line-height: 1.1; }
+.arena-deck-card > span { color: var(--arena-muted); font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.arena-deck-card-flame { width: 18px; height: 20px; color: var(--arena-orange); }
+.arena-deck-card[aria-pressed="true"] { border-color: var(--arena-purple); background: linear-gradient(180deg, color-mix(in srgb, var(--arena-purple) 26%, var(--arena-card)), var(--arena-selected-bg)); transform: translateY(-3px); box-shadow: inset 0 -3px 0 color-mix(in srgb, var(--arena-purple) 60%, #000), 0 8px 20px color-mix(in srgb, var(--arena-purple) 35%, transparent); }
+.arena-deck-card[aria-pressed="true"] .arena-deck-card-flame { filter: drop-shadow(0 0 6px color-mix(in srgb, var(--arena-orange) 70%, transparent)); }
+.arena-deck-battle { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 68px; overflow: hidden; border: 0; border-radius: 16px; background: linear-gradient(180deg, var(--arena-cta-a), var(--arena-cta-b)); color: #fff; padding: 0 14px 4px 20px; text-align: left; box-shadow: inset 0 -5px 0 rgba(0, 0, 0, .28), inset 0 1px 0 rgba(255, 255, 255, .3), 0 10px 26px color-mix(in srgb, var(--arena-cta-b) 45%, transparent); transition: transform .1s ease, box-shadow .1s ease; }
+.arena-deck-battle:not(:disabled)::after { content: ""; position: absolute; inset: 0; background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, .22) 50%, transparent 65%); transform: translateX(-100%); animation: play-sheen 3.2s ease-in-out .6s infinite; pointer-events: none; }
+.arena-deck-battle:active:not(:disabled) { transform: translateY(3px); box-shadow: inset 0 -2px 0 rgba(0, 0, 0, .28), inset 0 1px 0 rgba(255, 255, 255, .3), 0 4px 12px color-mix(in srgb, var(--arena-cta-b) 40%, transparent); }
+.arena-deck-battle:disabled { background: var(--btn-disabled-bg); color: var(--btn-disabled-text); box-shadow: inset 0 -5px 0 rgba(0, 0, 0, .18); }
+.arena-deck-battle-copy { display: grid; gap: 2px; min-width: 0; }
+.arena-deck-battle-word { font-family: var(--arena-display-font); font-size: 26px; font-weight: 700; letter-spacing: .1em; line-height: 1; text-transform: uppercase; text-shadow: 0 2px 0 rgba(0, 0, 0, .28); }
+.arena-deck-battle-sub { overflow: hidden; font-size: 12px; font-weight: 500; opacity: .85; text-overflow: ellipsis; white-space: nowrap; }
+.arena-deck-battle-pot { display: inline-flex; flex: none; align-items: center; gap: 5px; border-radius: 999px; background: rgba(0, 0, 0, .28); color: var(--arena-amber); padding: 7px 12px; font-size: 16px; font-weight: 700; }
+.arena-deck-battle-pot .arena-ember { width: 14px; height: 15px; }
+.arena-deck-battle:disabled .arena-deck-battle-pot { background: rgba(0, 0, 0, .12); color: inherit; }
+.arena-deck-note { margin: -2px 0 0; }
+.arena-deck-foot { display: flex; align-items: center; gap: 8px; }
+.arena-deck-foot-spacer { flex: 1; }
+.arena-deck-link { position: relative; display: inline-flex; align-items: center; min-height: 40px; border: 1px solid var(--arena-border-strong); border-radius: 999px; color: color-mix(in srgb, var(--arena-text) 82%, var(--arena-muted)); padding: 0 14px; font-size: 13px; font-weight: 600; text-decoration: none; }
+.arena-deck-link.is-new { border-color: color-mix(in srgb, var(--arena-purple) 55%, var(--arena-border)); color: var(--arena-purple-soft); }
+.arena-deck-link.is-new::after { content: ""; position: absolute; top: -2px; right: -2px; width: 9px; height: 9px; border: 2px solid var(--arena-card); border-radius: 50%; background: var(--arena-red); }
+.arena-deck-icon { display: flex; align-items: center; justify-content: center; width: 44px; height: 40px; border: 1px solid var(--arena-border-strong); border-radius: 12px; background: var(--arena-field); color: var(--arena-muted); }
+.arena-deck-icon svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.arena-deck-icon:active { color: var(--arena-text); }
+.arena-deck .arena-queue { padding: 12px; }
+
+/* Bottom sheet for top callers / recent results on phones (native <dialog>). */
+.arena-sheet { width: 100%; max-width: 640px; max-height: 80dvh; margin: auto auto 0; border: 0; background: transparent; color: var(--arena-text); padding: 0; }
+.arena-sheet::backdrop { background: rgba(5, 4, 10, .6); }
+.arena-sheet[open] { animation: arena-sheet-up .22s cubic-bezier(.2, .8, .2, 1); }
+@keyframes arena-sheet-up { from { transform: translateY(40px); opacity: 0; } }
+.arena-sheet-panel { display: flex; flex-direction: column; gap: 8px; max-height: 80dvh; overflow-y: auto; border: 1px solid var(--arena-border); border-bottom: 0; border-radius: 20px 20px 0 0; background: var(--arena-card); padding: 8px 6px calc(12px + env(safe-area-inset-bottom)); }
+.arena-sheet-grip { align-self: center; width: 40px; height: 4px; border-radius: 999px; background: var(--arena-border-strong); }
+.arena-sheet .arena-card { border: 0; background: none; }
+.arena-sheet-close { margin: 0 12px; }
+
 @media (max-width: 1000px) {
   .arena-stage { grid-template-columns: minmax(0, 1fr); }
   .arena-chart-wrap { flex: none; height: 320px; min-height: 0; }
@@ -3558,6 +3602,58 @@ html[data-theme="obsidian"]:has(.arena), html[data-theme="obsidian"]:has(.arena)
   .arena-leader-row { gap: 10px; }
   .arena-leader-record { width: auto; }
   .arena-leader-pnl { width: auto; min-width: 56px; }
+}
+/* Phones: the lobby is one screen, like a game's home — header, wins ticker,
+   market pills, a compact price head, the chart filling whatever height is
+   left, and the deck pinned under it. No 24h stats or featured strip, and the
+   leaders/results row moves into the deck's bottom sheet. --arena-chrome is
+   the header (64px + 1px border) plus the body's bottom padding (the 64px nav,
+   absent in beta mode). Very short screens fall back to scrolling via the
+   chart's min-height. */
+@media (max-width: 640px) {
+  .arena { --arena-chrome: calc(65px + 64px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; min-height: calc(100dvh - var(--arena-chrome)); padding-bottom: 10px; }
+  body:not(:has(.mobile-bottom-nav)) .arena { --arena-chrome: calc(65px + env(safe-area-inset-bottom)); }
+  body:has(.active-match-bar-link) .arena { padding-bottom: 76px; }
+  .arena-ticker { flex: none; padding-block: 7px; font-size: 12px; }
+  .arena-toolbar { flex: none; margin-top: 10px; }
+  .arena-market-pill { display: inline-flex; justify-content: center; gap: 6px; min-height: 44px; border-radius: 14px; padding: 0 6px; }
+  .arena-market-pill > .arena-market-change, .arena-market-pill > .arena-skel { grid-column: auto; font-size: 11px; }
+  .arena-stage { display: flex; flex: 1 1 auto; flex-direction: column; gap: 10px; margin-top: 10px; }
+  .arena-chart-card { flex: 1 1 auto; min-height: 0; border-radius: 18px; }
+  .arena-price-head { display: block; padding: 12px 14px 0; }
+  .arena-price-copy { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; column-gap: 10px; }
+  .arena-price-eyebrow { grid-column: 1 / -1; font-size: 11px; }
+  .arena-price { min-height: 0; margin-top: 2px; font-size: 28px; }
+  .arena-price-change { flex-direction: column; align-items: flex-end; gap: 0; min-height: 0; margin: 0 0 4px; font-size: 12px; }
+  .arena-price-change .arena-muted { font-size: 11px; }
+  .arena-stats, .arena-featured { display: none; }
+  .arena-chart-wrap { flex: 1 1 auto; height: auto; min-height: 150px; margin: 4px 4px 6px 8px; }
+  .arena-call, .arena-bottom { display: none; }
+  .arena-deck { display: grid; flex: none; gap: 10px; border: 1px solid color-mix(in srgb, var(--arena-purple) 25%, var(--arena-border)); border-radius: 18px; background: radial-gradient(90% 70% at 50% 100%, color-mix(in srgb, var(--arena-purple) 14%, transparent), transparent 70%), var(--arena-card); padding: 12px; }
+}
+@media (max-width: 640px) and (max-height: 760px) {
+  .arena-ticker { display: none; }
+  .arena-toolbar { gap: 8px; }
+  .arena-modes { padding: 3px; }
+  .arena-modes button { min-height: 36px; }
+  .arena-price { font-size: 24px; }
+  .arena-chart-wrap { min-height: 110px; }
+  .arena-deck { gap: 8px; padding: 10px; }
+  .arena-deck-chips button { min-height: 32px; }
+  .arena-deck-battle { min-height: 58px; }
+  .arena-deck-battle-word { font-size: 22px; }
+  .arena-deck-link, .arena-deck-icon { min-height: 36px; height: 36px; }
+}
+/* Shortest phones: wager tiles drop to one line (flame + amount). */
+@media (max-width: 640px) and (max-height: 700px) {
+  .arena-deck-card { display: flex; justify-content: center; align-items: center; gap: 6px; min-height: 44px; padding: 0 4px 3px; }
+  .arena-deck-card > span { display: none; }
+  .arena-deck-card strong { font-size: 18px; }
+  .arena-deck-card[aria-pressed="true"] { transform: translateY(-2px); }
+}
+@media (max-width: 360px) {
+  .arena-market-pill { gap: 4px; padding: 0 4px; font-size: 13px; }
+  .arena-deck-battle-word { font-size: 22px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .arena *, .arena *::before, .arena *::after { animation: none !important; transition: none !important; }

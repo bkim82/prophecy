@@ -11,6 +11,7 @@ import { PortfolioGame } from "@/app/duel/portfolio/PortfolioGame";
 import { hasFinishedTutorial, TUTORIAL_HREF } from "@/app/duel/tutorial/progress";
 import { ArenaChart } from "@/app/duel/ArenaChart";
 import { FeaturedMatchStrip, RecentResults, Skeleton, TopCallers, WinsTicker, type RecentResult } from "@/app/duel/ArenaParts";
+import { MobileDeck } from "@/app/duel/MobileDeck";
 import { betaModeEnabled } from "@/app/lib/betaMode";
 import {
   getActiveMatch,
@@ -643,6 +644,29 @@ export default function Page() {
               )}
             </div>
           </aside>
+
+          {/* Phones (≤640px) get this instead of the aside above — CSS swaps them. */}
+          <MobileDeck
+            timerPresets={TIMER_PRESETS}
+            timer={timer}
+            onTimer={setTimer}
+            wagerOptions={PULSE_WAGER_OPTIONS}
+            wager={wager}
+            onWager={setWager}
+            waiting={waiting}
+            isSignedIn={isSignedIn}
+            canPlay={Boolean(playerId) && Boolean(isSignedIn) && pending === null && activeMatch === null}
+            pending={pending === "play"}
+            onPlay={play}
+            practiceHref={practiceHref}
+            tutorialHref={TUTORIAL_HREF}
+            tutorialNudge={tutorialNudge && !queue}
+            queuePanel={queuePanel}
+            note={activeMatch ? "Finish your live arena before starting another." : matchError}
+            leaders={lobby ? lobby.data.leaders : null}
+            results={recentResults}
+            now={now}
+          />
         </div>
       ) : (
         <div className="arena-portfolio">
