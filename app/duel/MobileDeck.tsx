@@ -88,7 +88,6 @@ export function MobileDeck({
               <button key={option} type="button" className="arena-deck-card" aria-pressed={wager === option} onClick={() => onWager(option)}>
                 <FlameIcon className="arena-deck-card-flame" />
                 <strong className="arena-mono">{option}</strong>
-                <span>Embers</span>
               </button>
             ))}
           </div>
