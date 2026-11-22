@@ -14,6 +14,8 @@
 
 No API key on any path.
 
+- Both socket hosts must be in `proxy.ts` `connect-src` (`proxy.ts:19`); dev adds `ws: wss:`, so a missing host only breaks in production.
+
 ## Sampling
 
 - `ticker` fires **only on a trade**. Measured over 60s: BTC max gap 1.1s, ETH 17s, DOGE 43s. `heartbeat` fires 1/s per product regardless. Any message stamps `heardAtRef` (liveness).
