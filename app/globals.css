@@ -3558,9 +3558,9 @@ html[data-theme="obsidian"]:has(.arena), html[data-theme="obsidian"]:has(.arena)
 .arena-deck-battle:not(:disabled)::after { content: ""; position: absolute; inset: 0; background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, .22) 50%, transparent 65%); transform: translateX(-100%); animation: play-sheen 3.2s ease-in-out .6s infinite; pointer-events: none; }
 .arena-deck-battle:active:not(:disabled) { transform: translateY(3px); box-shadow: inset 0 -2px 0 rgba(0, 0, 0, .28), inset 0 1px 0 rgba(255, 255, 255, .3), 0 4px 12px color-mix(in srgb, var(--arena-cta-b) 40%, transparent); }
 .arena-deck-battle:disabled { background: var(--btn-disabled-bg); color: var(--btn-disabled-text); box-shadow: inset 0 -5px 0 rgba(0, 0, 0, .18); }
-.arena-deck-battle-copy { display: grid; gap: 2px; min-width: 0; }
+.arena-deck-battle-copy { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
 .arena-deck-battle-word { font-family: var(--arena-display-font); font-size: 21px; font-weight: calc(700 + var(--fw-bump)); letter-spacing: .1em; line-height: 1; text-transform: uppercase; text-shadow: 0 2px 0 rgba(0, 0, 0, .28); }
-.arena-deck-battle-sub { overflow: hidden; font-size: 11px; font-weight: calc(500 + var(--fw-bump)); opacity: .85; text-overflow: ellipsis; white-space: nowrap; }
+.arena-deck-battle-sub { min-width: 0; overflow: hidden; font-size: 11px; font-weight: calc(500 + var(--fw-bump)); opacity: .85; text-overflow: ellipsis; white-space: nowrap; }
 .arena-deck-battle-pot { display: inline-flex; flex: none; align-items: center; gap: 5px; border-radius: 999px; background: rgba(0, 0, 0, .28); color: var(--arena-amber); padding: 5px 10px; font-size: 14px; font-weight: calc(700 + var(--fw-bump)); }
 .arena-deck-battle-pot .arena-ember { width: 14px; height: 15px; }
 .arena-deck-battle:disabled .arena-deck-battle-pot { background: rgba(0, 0, 0, .12); color: inherit; }

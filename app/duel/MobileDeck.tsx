@@ -9,7 +9,7 @@ import type { TopCaller } from "@/app/lib/arenaLobby";
 
 // Phone-only call panel for the Arena lobby (app/duel/page.tsx), shown under
 // 640px in place of the desktop `.arena-call` aside: one row of round + wager
-// chips, one big Battle button and a footer row, sized so the whole lobby fits one
+// chips, one big Battle button (lobby line beside the word) and a footer row, sized so the whole lobby fits one
 // screen with no scrolling. Top callers / recent results (the desktop
 // `.arena-bottom` row) open in a bottom sheet instead. Styles: .arena-deck-*
 // and .arena-sheet in globals.css.
