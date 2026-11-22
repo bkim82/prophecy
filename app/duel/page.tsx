@@ -78,14 +78,16 @@ type OpenMatch = {
 };
 
 type ModeId = "pulse" | "battle-24h";
-type MarketId = "btc" | "eth" | "hype";
+type MarketId = "btc" | "eth" | "nvda";
 
 const MARKETS: Record<MarketId, { label: string; name: string; tickSize: number }> = {
   btc: { label: "BTC", name: "BTC-USD", tickSize: 0.01 },
   eth: { label: "ETH", name: "ETH-USD", tickSize: 0.01 },
-  hype: { label: "HYPE", name: "HYPE-USD", tickSize: 0.01 },
+  nvda: { label: "NVDA", name: "NVDA-USD", tickSize: 0.01 },
 };
-const MARKET_ORDER: MarketId[] = ["btc", "eth", "hype"];
+// NVDA leads on the left; the pills after it sit together at the right edge
+// (.arena-market-pill.is-right-start, app/globals.css).
+const MARKET_ORDER: MarketId[] = ["nvda", "btc", "eth"];
 
 // Pulse goes through matchmaking on every market; 24h Portfolio is its own page.
 const MODES: { id: ModeId; label: string; href?: string }[] = [
@@ -452,7 +454,7 @@ export default function Page() {
           <>
             {modes.length > 1 && <span className="arena-toolbar-divider" aria-hidden="true" />}
             <nav className="arena-markets" aria-label="Market switcher">
-              {MARKET_ORDER.map((id) => {
+              {MARKET_ORDER.map((id, index) => {
                 const selected = id === market;
                 const stats = marketStats[id];
                 const dayPct = selected && dayChange !== null ? dayChange : stats ? ((stats.last - stats.open) / stats.open) * 100 : null;
@@ -460,7 +462,7 @@ export default function Page() {
                   <button
                     key={id}
                     type="button"
-                    className="arena-market-pill"
+                    className={`arena-market-pill${index === 1 ? " is-right-start" : ""}`}
                     aria-pressed={selected}
                     onClick={() => setMarket(id)}
                     style={{ "--coin": `var(--market-${id})` } as CSSProperties}

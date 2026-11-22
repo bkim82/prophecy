@@ -11,7 +11,7 @@ export { RANK_TIERS, isRoomId, type RoomId } from "@/app/lib/rank";
 
 export type RoomCoinMeta = {
   id: RoomCoin;
-  market: "btc" | "eth" | "hype"; // drives [data-market] accent colours
+  market: "btc" | "eth" | "nvda"; // drives [data-market] accent colours
   ticker: string;
   product: string;
   symbol: string;
@@ -19,7 +19,7 @@ export type RoomCoinMeta = {
 };
 
 const DAILY = pickDailyCoin();
-const DAILY_MARKET = DAILY.toLowerCase() as "hype";
+const DAILY_MARKET = DAILY.toLowerCase() as "nvda";
 
 export const ROOM_COINS: RoomCoinMeta[] = [
   { id: "btc", market: "btc", ticker: "BTC", product: "BTC-USD", symbol: "₿", symbolClass: "btc-symbol" },

@@ -3,7 +3,7 @@
 // One coin so far — add more here and the day-of-year rotation spreads them
 // out automatically, no rotation logic to touch. The Arena market switcher
 // (app/duel/page.tsx) tags whichever coin this picks as "Daily".
-const DAILY_COINS = ["HYPE"];
+const DAILY_COINS = ["NVDA"];
 
 function dayOfYear(date: Date) {
   const start = Date.UTC(date.getUTCFullYear(), 0, 1);

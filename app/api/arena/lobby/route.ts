@@ -2,7 +2,7 @@ import { arenaLobby } from "@/lib/arenaLobby";
 
 export const dynamic = "force-dynamic";
 
-const MARKETS = new Set(["btc", "eth", "hype"]);
+const MARKETS = new Set(["btc", "eth", "nvda"]);
 
 /**
  * GET ?market= → ArenaLobby (app/lib/arenaLobby.ts): recent wins, a featured

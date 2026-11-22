@@ -1,7 +1,7 @@
 // Arena heading with the market called out: coin glyph + ticker in the market's
 // own colour (--market-accent, set by the nearest [data-market]), so BTC and
 // ETH rooms read differently at a glance.
-const GLYPHS: Record<string, string> = { btc: "₿", eth: "Ξ", hype: "H" };
+const GLYPHS: Record<string, string> = { btc: "₿", eth: "Ξ", hype: "H", nvda: "N" };
 
 export default function PulseMarketTitle({ market, children }: { market: string; children: React.ReactNode }) {
   const glyph = GLYPHS[market];

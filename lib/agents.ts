@@ -124,7 +124,7 @@ const spokenPrice = (price: number) =>
   price >= 10_000 ? `$${(price / 1000).toFixed(1)}k` : price >= 1_000 ? `$${Math.round(price).toLocaleString("en-US")}` : `$${price.toFixed(price >= 10 ? 1 : 2)}`;
 
 async function marketSnapshot(): Promise<string> {
-  const prices = await Promise.all(["BTC-USD", "ETH-USD", "HYPE-USD"].map(async (product) => [product, await getSpotPrice(product)] as const));
+  const prices = await Promise.all(["BTC-USD", "ETH-USD", "NVDA-USD"].map(async (product) => [product, await getSpotPrice(product)] as const));
   const market = prices
     .flatMap(([product, spot]) => (spot ? [`${product.replace("-USD", "")} ${spokenPrice(spot.price)}`] : []))
     .join(", ");

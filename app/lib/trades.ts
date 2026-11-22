@@ -48,6 +48,7 @@ export const ARENA_GLYPHS: Record<string, { glyph: string; className: string }> 
   BTC: { glyph: "₿", className: "btc-symbol" },
   ETH: { glyph: "Ξ", className: "eth-symbol" },
   HYPE: { glyph: "H", className: "hype-symbol" },
+  NVDA: { glyph: "N", className: "nvda-symbol" },
 };
 
 // Tickers that map onto a feed topic, so a trade post shows under that coin's
@@ -65,6 +66,7 @@ const SYMBOL_TOPICS: Record<string, TopicId> = {
   WIF: "wif",
   BRETT: "brett",
   HYPE: "hype",
+  NVDA: "nvidia",
 };
 
 export const tradeTopic = (trade: TradeReceipt): TopicId | undefined => SYMBOL_TOPICS[trade.symbol.toUpperCase()];

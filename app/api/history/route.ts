@@ -1,3 +1,5 @@
+import { hlCandles, hlTrades } from "@/lib/hyperliquid";
+import { HYPERLIQUID_COINS, SUPPORTED_PRODUCTS } from "@/lib/spotPrice";
 import { MAX_WINDOW_MS, SAMPLE_MS, WINDOW_MS } from "../../feedConfig";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +13,41 @@ type Point = { t: number; p: number };
 
 const HEADERS = { "User-Agent": "btc-arena" };
 const NO_STORE = { "Cache-Control": "no-store" };
-const SUPPORTED_PRODUCTS = new Set(["BTC-USD", "ETH-USD", "HYPE-USD"]);
+
+/**
+ * SAMPLE_MS buckets: newest trade time per bucket, but the mean price — trades
+ * bounce between bid and ask, and the mean lands near the midpoint the socket plots.
+ */
+function bucketTrades(trades: Point[], cutoff: number): Point[] {
+  const buckets = new Map<number, { t: number; sum: number; n: number }>();
+  for (const { t, p } of trades) {
+    if (t < cutoff) continue;
+    const bucket = Math.floor(t / SAMPLE_MS);
+    const existing = buckets.get(bucket);
+    if (!existing) buckets.set(bucket, { t, sum: p, n: 1 });
+    else {
+      existing.t = Math.max(existing.t, t);
+      existing.sum += p;
+      existing.n += 1;
+    }
+  }
+  return [...buckets.values()].map(({ t, sum, n }) => ({ t, p: sum / n })).sort((a, b) => a.t - b.t);
+}
+
+/** Hyperliquid's trades + 1m candles, shaped like the Coinbase pair below. */
+async function fromHyperliquid(coin: string, cutoff: number, now: number): Promise<{ trades: Point[]; candles: Point[] }> {
+  const from = Math.floor(cutoff / 60_000) * 60_000 - 60_000;
+  const [trades, candles] = await Promise.all([hlTrades(coin), hlCandles(coin, "1m", from, now)]);
+  const points = (candles ?? []).flatMap((c) => [
+    { t: c.t, p: c.open },
+    { t: Math.min(c.t + 59_999, now), p: c.close },
+  ]);
+  const first = points.findIndex((point) => point.t >= cutoff);
+  return {
+    trades: bucketTrades(trades ?? [], cutoff),
+    candles: first === -1 ? points.slice(-1) : points.slice(Math.max(0, first - 1)),
+  };
+}
 
 /**
  * Seeds the chart at the same resolution the live socket produces, by bucketing
@@ -25,29 +61,10 @@ async function fromTrades(product: string, cutoff: number): Promise<Point[]> {
   );
   if (!res.ok) throw new Error("trades unavailable");
 
-  // Newest trade time per bucket, but the mean price: trades bounce between
-  // bid and ask, and the mean lands near the midpoint the socket plots.
-  const buckets = new Map<number, { t: number; sum: number; n: number }>();
-
-  for (const trade of (await res.json()) as Trade[]) {
-    const t = Date.parse(trade.time);
-    const p = Number(trade.price);
-    if (!Number.isFinite(t) || !Number.isFinite(p) || p <= 0) continue;
-    if (t < cutoff) continue;
-
-    const bucket = Math.floor(t / SAMPLE_MS);
-    const existing = buckets.get(bucket);
-    if (!existing) buckets.set(bucket, { t, sum: p, n: 1 });
-    else {
-      existing.t = Math.max(existing.t, t);
-      existing.sum += p;
-      existing.n += 1;
-    }
-  }
-
-  return [...buckets.values()]
-    .map(({ t, sum, n }) => ({ t, p: sum / n }))
-    .sort((a, b) => a.t - b.t);
+  const trades = ((await res.json()) as Trade[])
+    .map((trade) => ({ t: Date.parse(trade.time), p: Number(trade.price) }))
+    .filter(({ t, p }) => Number.isFinite(t) && Number.isFinite(p) && p > 0);
+  return bucketTrades(trades, cutoff);
 }
 
 /**
@@ -115,10 +132,13 @@ export async function GET(request: Request) {
   // Both sources, always: the chart draws a fixed-width window, so a seed that
   // only covers the last 40 seconds would leave most of the axis empty. 1000
   // trades is ~5min of a quiet tape but under a minute of a busy one.
-  const [trades, candles] = await Promise.all([
-    fromTrades(product, cutoff).catch(() => [] as Point[]),
-    fromCandles(product, cutoff, now).catch(() => [] as Point[]),
-  ]);
+  const hlCoin = HYPERLIQUID_COINS[product];
+  const { trades, candles } = hlCoin
+    ? await fromHyperliquid(hlCoin, cutoff, now)
+    : await Promise.all([
+        fromTrades(product, cutoff).catch(() => [] as Point[]),
+        fromCandles(product, cutoff, now).catch(() => [] as Point[]),
+      ]).then(([trades, candles]) => ({ trades, candles }));
 
   // Trades win wherever they exist; candles only fill the stretch before them.
   const oldestTrade = trades.length > 0 ? trades[0].t : Infinity;

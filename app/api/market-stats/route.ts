@@ -1,14 +1,18 @@
 import type { MarketDay, MarketStats } from "@/app/lib/arenaLobby";
+import { hlDayStats } from "@/lib/hyperliquid";
+import { HYPERLIQUID_COINS } from "@/lib/spotPrice";
 
 export const dynamic = "force-dynamic";
 
 // Rolling 24h open/high/low/last per Arena market, for the market switcher's
 // % change on the markets that aren't streaming (app/duel/page.tsx). The
 // selected market's numbers come off its live socket instead (usePriceFeed `day`).
-const PRODUCTS = { btc: "BTC-USD", eth: "ETH-USD", hype: "HYPE-USD" } as const;
+const PRODUCTS = { btc: "BTC-USD", eth: "ETH-USD", nvda: "NVDA-USD" } as const;
 const FRESH_MS = 30_000;
 
 async function statsFor(product: string): Promise<MarketDay | null> {
+  const hlCoin = HYPERLIQUID_COINS[product];
+  if (hlCoin) return hlDayStats(hlCoin);
   try {
     const res = await fetch(`https://api.exchange.coinbase.com/products/${product}/stats`, {
       cache: "no-store",
