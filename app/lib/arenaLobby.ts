@@ -35,9 +35,13 @@ export type FeaturedMatch = {
 
 export type TopCaller = { handle: string; won: number; lost: number; net: number };
 
-/** GET /api/market-stats: Coinbase's rolling 24h figures per market; a market it couldn't read is absent. */
-export type MarketDay = { open: number; high: number; low: number; last: number };
-export type MarketStats = Partial<Record<"btc" | "eth" | "hype", MarketDay>>;
+/**
+ * GET /api/market-stats: rolling 24h figures per market (a market it couldn't
+ * read is absent), plus `vol6h` — realized volatility over the last 6 hours
+ * in %, from 5-minute closes; null if the candles couldn't be read.
+ */
+export type MarketDay = { open: number; high: number; low: number; last: number; vol6h: number | null };
+export type MarketStats = Partial<Record<"btc" | "eth" | "nvda", MarketDay>>;
 
 export type ArenaLobby = {
   wins: LobbyWin[];

@@ -8,7 +8,7 @@ import { opponentNames } from "@/lib/opponentNames";
 import { positionPnl, settlePortfolioIfDue, type PositionKind, type PositionSide, type PositionRow } from "@/lib/portfolio";
 import { PULSE_STARTING_CASH } from "@/lib/pulse";
 
-const ARENA_NAMES: Record<string, string> = { btc: "Bitcoin", eth: "Ethereum", hype: "Hyperliquid" };
+const ARENA_NAMES: Record<string, string> = { btc: "Bitcoin", eth: "Ethereum", hype: "Hyperliquid", nvda: "Nvidia" };
 
 /** 24h Portfolio rows → receipts. Open ones are marked live (stale/missing quote → entry, same as portfolioView). */
 async function portfolioReceipts(rows: PositionRow[]): Promise<TradeReceipt[]> {

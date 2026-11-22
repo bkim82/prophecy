@@ -7,11 +7,14 @@
 | Source | Role | Ref |
 | --- | --- | --- |
 | `wss://ws-feed.exchange.coinbase.com` `ticker` + `heartbeat` | live price; heartbeat = liveness | `app/usePriceFeed.ts:11`, sub at `:140` |
+| `wss://api.hyperliquid.xyz/ws` `bbo` + `trades`, `ping` every `HL_PING_MS`=2s as heartbeat | products in `HYPERLIQUID_COINS` (`lib/spotPrice.ts:11`; NVDA-USD → `xyz:NVDA`); 24h `day` polled from `/api/ticker` every 30s. Server side (history/ticker/price/market-stats/tape) branches to `lib/hyperliquid.ts` | `app/usePriceFeed.ts:17` |
 | `/api/history` | seed chart on load, full window | `app/api/history/route.ts` |
 | `/api/ticker` | REST fallback: polled every `POLL_MS`=2s while socket silent > `POLL_AFTER_MS`=2.5s; trade + bid/ask | `app/api/ticker/route.ts` |
 | `/api/price` | settle when socket stale/dead | `app/api/price/route.ts` |
 
 No API key on any path.
+
+- Both socket hosts must be in `proxy.ts` `connect-src` (`proxy.ts:19`); dev adds `ws: wss:`, so a missing host only breaks in production.
 
 ## Sampling
 

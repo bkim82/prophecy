@@ -1,12 +1,23 @@
 // One source of truth for "how do we get a settlement price": used by the
 // public /api/price proxy and by server-side match settlement (lib/match.ts).
 
-export const SUPPORTED_PRODUCTS = new Set(["BTC-USD", "ETH-USD", "HYPE-USD"]);
+import { hlTicker, hlTrades } from "@/lib/hyperliquid";
 
+export const SUPPORTED_PRODUCTS = new Set(["BTC-USD", "ETH-USD", "HYPE-USD", "NVDA-USD"]);
+
+// Products Coinbase doesn't list, priced off Hyperliquid instead
+// (lib/hyperliquid.ts; app/usePriceFeed.ts streams them from its socket). NVDA
+// is the xyz stock perp, which trades 24/7.
+export const HYPERLIQUID_COINS: Record<string, string> = {
+  "NVDA-USD": "xyz:NVDA",
+};
+
+// HYPE stays priceable after leaving the lobby so rounds opened on it still settle.
 const PRODUCT_BY_MARKET: Record<string, string> = {
   btc: "BTC-USD",
   eth: "ETH-USD",
   hype: "HYPE-USD",
+  nvda: "NVDA-USD",
 };
 
 /** "btc" → "BTC-USD". Returns null for a market we don't price. */
@@ -46,6 +57,11 @@ export type SpotPrice = { price: number; source: string; at: number };
 
 /** Walks the fallback chain; null once every source has failed. Never throws. */
 export async function getSpotPrice(product: string): Promise<SpotPrice | null> {
+  const hlCoin = HYPERLIQUID_COINS[product];
+  if (hlCoin) {
+    const ticker = await hlTicker(hlCoin);
+    return ticker ? { price: ticker.price, source: "hyperliquid", at: Date.now() } : null;
+  }
   for (const source of sourcesFor(product)) {
     try {
       const res = await fetch(source.url, {
@@ -72,6 +88,8 @@ export type TapeTrade = { t: number; p: number };
  * several seconds of BTC, comfortably more than the 1s poll gap.
  */
 export async function getRecentTrades(product: string): Promise<TapeTrade[] | null> {
+  const hlCoin = HYPERLIQUID_COINS[product];
+  if (hlCoin) return hlTrades(hlCoin);
   try {
     const res = await fetch(`https://api.exchange.coinbase.com/products/${product}/trades?limit=100`, {
       cache: "no-store",

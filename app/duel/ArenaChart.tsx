@@ -222,7 +222,7 @@ export function ArenaChart({ points, now, label, tickSize, onScrub, windowMs = L
           onPointerCancel={() => setHoverX(null)}
         >
           <defs>
-            {/* Line in the market's own colour (BTC amber, ETH blue, HYPE mint), fading in from the left. */}
+            {/* Line in the market's own colour (BTC amber, ETH blue, NVDA green), fading in from the left. */}
             <linearGradient id={`${uid}-stroke`} gradientUnits="userSpaceOnUse" x1={PAD.left} x2={geo.headX} y1="0" y2="0">
               <stop offset="0" stopColor="var(--chart-line)" stopOpacity=".15" />
               <stop offset=".5" stopColor="var(--chart-line)" stopOpacity=".85" />

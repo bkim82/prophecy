@@ -14,8 +14,9 @@ function securityResponse(request: NextRequest) {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' blob: data: https:",
     "font-src 'self' data:",
-    // wss://ws-feed is the client price feed (app/usePriceFeed.ts).
-    `connect-src 'self' https://*.coinbase.com https://*.coinbasecdn.net https://*.clerk.accounts.dev wss://ws-feed.exchange.coinbase.com${isDev ? " ws: wss:" : ""}`,
+    // wss://ws-feed (Coinbase) and wss://api.hyperliquid.xyz (HYPERLIQUID_COINS,
+    // e.g. NVDA) are the client price feeds (app/usePriceFeed.ts).
+    `connect-src 'self' https://*.coinbase.com https://*.coinbasecdn.net https://*.clerk.accounts.dev wss://ws-feed.exchange.coinbase.com wss://api.hyperliquid.xyz${isDev ? " ws: wss:" : ""}`,
     "frame-src 'self' https://*.coinbase.com https://*.coinbasecdn.net https://*.clerk.accounts.dev",
     "object-src 'none'",
     "base-uri 'self'",

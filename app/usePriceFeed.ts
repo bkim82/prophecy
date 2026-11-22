@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { HYPERLIQUID_COINS } from "@/lib/spotPrice";
 import { SAMPLE_MS, WINDOW_MS } from "./feedConfig";
 
 export type PricePoint = { t: number; p: number };
@@ -9,6 +10,13 @@ export type FeedStatus = "connecting" | "live" | "reconnecting";
 export type DayStats = { open: number; high: number; low: number };
 
 const FEED_URL = "wss://ws-feed.exchange.coinbase.com";
+// Products in HYPERLIQUID_COINS stream from Hyperliquid instead: `bbo` for the
+// plotted midpoint, `trades` for the headline. It has no heartbeat channel, so
+// a ping every HL_PING_MS (answered by a pong) stands in for one, and its 24h
+// figures come from /api/ticker every HL_DAY_MS.
+const HL_FEED_URL = "wss://api.hyperliquid.xyz/ws";
+const HL_PING_MS = 2000;
+const HL_DAY_MS = 30_000;
 // Coinbase's ticker only fires on a trade: ETH can go 15s+ without one, DOGE
 // 40s+. Liveness comes from the heartbeat channel (1/s regardless of trading),
 // and the series is sampled on a clock, carrying the last price forward — a
@@ -166,6 +174,27 @@ export function usePriceFeed(product: string = "BTC-USD", { windowMs = WINDOW_MS
     let reconnect: ReturnType<typeof setTimeout> | undefined;
     let attempt = 0;
     let disposed = false;
+    const hlCoin = HYPERLIQUID_COINS[product] ?? null;
+
+    const pinger = setInterval(() => {
+      if (hlCoin && socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ method: "ping" }));
+    }, HL_PING_MS);
+
+    const loadDay = () => {
+      fetch(`/api/ticker?symbol=${encodeURIComponent(product)}`, { cache: "no-store" })
+        .then((res) => (res.ok ? res.json() : Promise.reject(new Error())))
+        .then(({ day: next }: { day?: DayStats | null }) => {
+          if (disposed || !next) return;
+          setDay((prev) =>
+            prev && prev.open === next.open && prev.high === next.high && prev.low === next.low
+              ? prev
+              : { open: next.open, high: next.high, low: next.low },
+          );
+        })
+        .catch(() => {});
+    };
+    if (hlCoin) loadDay();
+    const dayPoller = hlCoin ? setInterval(loadDay, HL_DAY_MS) : undefined;
     // A socket can die without closing (sleep, network swap). No message for
     // STALL_MS → force-close it and let the normal retry path reconnect.
     const watchdog = setInterval(() => {
@@ -200,7 +229,7 @@ export function usePriceFeed(product: string = "BTC-USD", { windowMs = WINDOW_MS
 
     const connect = () => {
       let retried = false; // error and close both fire; reconnect once
-      socket = new WebSocket(FEED_URL);
+      socket = new WebSocket(hlCoin ? HL_FEED_URL : FEED_URL);
       const current = socket;
 
       socket.onopen = () => {
@@ -208,6 +237,12 @@ export function usePriceFeed(product: string = "BTC-USD", { windowMs = WINDOW_MS
         // Start the stall clock at open, not at the last message of a dead socket.
         heardAtRef.current = Date.now();
         setStatus("live");
+        if (hlCoin) {
+          for (const type of ["bbo", "trades"]) {
+            socket?.send(JSON.stringify({ method: "subscribe", subscription: { type, coin: hlCoin } }));
+          }
+          return;
+        }
         socket?.send(
           JSON.stringify({
             type: "subscribe",
@@ -217,7 +252,49 @@ export function usePriceFeed(product: string = "BTC-USD", { windowMs = WINDOW_MS
         );
       };
 
+      const onHyperliquid = (message: {
+        channel?: string;
+        data?: { bbo?: ({ px: string } | null)[] } | { px: string }[];
+      }) => {
+        if (message.channel === "pong" || message.channel === "subscriptionResponse") {
+          heardAtRef.current = Date.now();
+          return;
+        }
+        if (message.channel === "bbo" && message.data && !Array.isArray(message.data)) {
+          const [bidLevel, askLevel] = message.data.bbo ?? [];
+          const bid = Number(bidLevel?.px);
+          const ask = Number(askLevel?.px);
+          if (!(bid > 0 && ask >= bid)) return;
+          heardAtRef.current = Date.now();
+          midRef.current = (bid + ask) / 2;
+          // No trade yet this connection: headline the midpoint until one prints.
+          if (priceRef.current === null) {
+            priceRef.current = midRef.current;
+            setPrice(midRef.current);
+          }
+          setStatus("live");
+          return;
+        }
+        if (message.channel === "trades" && Array.isArray(message.data)) {
+          const next = Number(message.data.at(-1)?.px);
+          if (!Number.isFinite(next) || next <= 0) return;
+          heardAtRef.current = Date.now();
+          priceRef.current = next;
+          midRef.current ??= next;
+          setPrice(next);
+          setStatus("live");
+        }
+      };
+
       socket.onmessage = (event) => {
+        if (hlCoin) {
+          try {
+            onHyperliquid(JSON.parse(event.data as string));
+          } catch {
+            // ignore malformed frames
+          }
+          return;
+        }
         let message: {
           type?: string;
           price?: string;
@@ -295,6 +372,8 @@ export function usePriceFeed(product: string = "BTC-USD", { windowMs = WINDOW_MS
       disposed = true;
       clearInterval(watchdog);
       clearInterval(poller);
+      clearInterval(pinger);
+      clearInterval(dayPoller);
       clearTimeout(reconnect);
       document.removeEventListener("visibilitychange", onVisible);
       if (socket) {
