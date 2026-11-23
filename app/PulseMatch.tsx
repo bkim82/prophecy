@@ -408,7 +408,8 @@ function Controls({ controls, position, price }: { controls: MatchControls; posi
           </button>
         ))}
       </div>
-      <p className="pm-helper">{controls.hint ?? `Enters at the live price · liquidation at ±${liqPercent(controls.leverage)}%`}</p>
+      {/* is-default: the generic helper, hidden on phones; a real hint (waiting, busted, no feed) always shows. */}
+      <p className={`pm-helper${controls.hint ? "" : " is-default"}`}>{controls.hint ?? `Enters at the live price · liquidation at ±${liqPercent(controls.leverage)}%`}</p>
       {messages}
     </section>
   );
