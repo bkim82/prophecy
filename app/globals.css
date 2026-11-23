@@ -1949,7 +1949,6 @@ a.post-avatar { text-decoration: none; }
    row, so Opponent sits directly above Play on the bottom edge, level with
    the chart. */
 /* "Winner takes" rides on the Wager label row instead of its own line. */
-/* "$100 bankroll" and its note share a line under the label. */
 /* Wager picker: Embers per side; the pot line shows the 2× payout. */
 /* The one violet thing on the page: every other action (Arena, Wallet, timer)
    is teal, so Play reads as THE button. Sheen sweeps across every few seconds. */
@@ -3465,8 +3464,6 @@ html[data-theme="obsidian"]:has(.arena), html[data-theme="obsidian"]:has(.arena)
 .arena-tutorial-copy { display: grid; flex: 1; gap: 2px; min-width: 0; }
 .arena-tutorial-copy .arena-muted { font-size: 13px; }
 .arena-tutorial-cta { flex: none; color: var(--arena-purple-soft); font-size: 13px; font-weight: calc(600 + var(--fw-bump)); white-space: nowrap; }
-.arena-format { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; border: 1px solid var(--arena-border); border-radius: var(--arena-control); background: var(--arena-field); padding: 12px 14px; }
-.arena-format .arena-muted { font-size: 13px; }
 .arena-field { display: grid; gap: 8px; }
 .arena-segments { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .arena-segments button { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; border: 1px solid var(--arena-border-strong); border-radius: var(--arena-control); background: var(--arena-field); color: color-mix(in srgb, var(--arena-text) 82%, var(--arena-muted)); font-family: var(--arena-mono-font); font-size: 14px; font-weight: calc(500 + var(--fw-bump)); font-variant-numeric: tabular-nums; transition: border-color .15s ease, background .15s ease, box-shadow .15s ease; }

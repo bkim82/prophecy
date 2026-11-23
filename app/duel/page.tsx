@@ -597,11 +597,6 @@ export default function Page() {
 
             {queue ? queuePanel : (
               <>
-                <div className="arena-format">
-                  <span className="arena-eyebrow">Format</span>
-                  <span><strong>$100 bankroll</strong> <span className="arena-muted">· stake + leverage in room</span></span>
-                </div>
-
                 <div className="arena-field">
                   <span className="arena-eyebrow" id="arena-timer-label">Round length</span>
                   <div className="arena-segments" role="group" aria-labelledby="arena-timer-label">
