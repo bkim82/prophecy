@@ -31,7 +31,7 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 const plexMono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--font-mono" });
 // Arena page only (app/duel, .arena-* in globals.css): JetBrains Mono for its
 // numbers, Space Grotesk for the PULSE wordmark.
-const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--font-arena-mono" });
+const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], weight: ["400", "500", "600", "700", "800"], variable: "--font-arena-mono" });
 const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], weight: ["600", "700"], variable: "--font-arena-display" });
 
 export const metadata: Metadata = {

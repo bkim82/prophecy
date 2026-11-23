@@ -259,9 +259,10 @@ export function usePulseFeedback() {
     });
   }, []);
 
-  const playFeedback = useCallback((kind: "entry" | "exit" | "reverse") => {
-    if (typeof navigator !== "undefined" && "vibrate" in navigator) {
-      navigator.vibrate(kind === "reverse" ? [12, 24, 12] : 12);
+  /** `win` adds a rising three-note chime; `tick` is the final-10s heartbeat (sound only, no buzz). */
+  const playFeedback = useCallback((kind: "entry" | "exit" | "reverse" | "win" | "tick") => {
+    if (kind !== "tick" && typeof navigator !== "undefined" && "vibrate" in navigator) {
+      navigator.vibrate(kind === "reverse" ? [12, 24, 12] : kind === "win" ? [20, 40, 20, 40, 60] : 12);
     }
     if (mutedRef.current) return;
     if (typeof window === "undefined") return;
@@ -272,16 +273,22 @@ export function usePulseFeedback() {
           .webkitAudioContext;
       if (!AudioContextClass) return;
       const context = new AudioContextClass();
-      const oscillator = context.createOscillator();
-      const gain = context.createGain();
-      oscillator.type = "sine";
-      oscillator.frequency.value = kind === "reverse" ? 520 : kind === "entry" ? 410 : 260;
-      gain.gain.setValueAtTime(0.025, context.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 0.09);
-      oscillator.connect(gain).connect(context.destination);
-      oscillator.start();
-      oscillator.stop(context.currentTime + 0.1);
-      window.setTimeout(() => void context.close(), 150);
+      const notes =
+        kind === "win" ? [523, 659, 784] : kind === "tick" ? [70] : [kind === "reverse" ? 520 : kind === "entry" ? 410 : 260];
+      const step = 0.11;
+      notes.forEach((frequency, i) => {
+        const oscillator = context.createOscillator();
+        const gain = context.createGain();
+        const start = context.currentTime + i * step;
+        oscillator.type = kind === "tick" ? "triangle" : "sine";
+        oscillator.frequency.value = frequency;
+        gain.gain.setValueAtTime(kind === "tick" ? 0.06 : 0.025, start);
+        gain.gain.exponentialRampToValueAtTime(0.001, start + (kind === "win" ? 0.18 : 0.09));
+        oscillator.connect(gain).connect(context.destination);
+        oscillator.start(start);
+        oscillator.stop(start + (kind === "win" ? 0.2 : 0.1));
+      });
+      window.setTimeout(() => void context.close(), notes.length * step * 1000 + 250);
     } catch {
       // Audio is a progressive enhancement; the interaction stays functional.
     }

@@ -3,22 +3,19 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FlameIcon } from "@/app/icons";
-import PriceChart, { type TradeMarker } from "@/app/PriceChart";
-import PulseMovementAlert from "@/app/PulseMovementAlert";
-import PulseMarketTitle from "@/app/PulseMarketTitle";
 import PulseStakeStepper from "@/app/PulseStakeStepper";
-import {
-  ArenaResultCard,
-  ArenaScore,
-  CountdownRing,
-  FlashingPrice,
-  LeadBar,
-  RIVAL_GRADIENT,
-  SoundToggle,
-  usePulseFeedback,
-  YOU_GRADIENT,
-} from "@/app/PulseArenaParts";
+import { roundTrades, usePulseFeedback } from "@/app/PulseArenaParts";
+import MatchScreen, {
+  compactUsd,
+  FlameGlyph,
+  matchSignedUsd,
+  matchUsd,
+  PM_REMATCH_CLASS,
+  RematchIcon,
+  useWinStreak,
+  type MatchChartMarkerInput,
+  type MatchResult,
+} from "@/app/PulseMatch";
 import { getPlayerId } from "@/app/lib/playerId";
 import { clearActiveMatch, setActiveMatch } from "@/app/lib/activeMatch";
 import { usePriceFeed } from "@/app/usePriceFeed";
@@ -46,18 +43,19 @@ const SKEW_RESYNC_MS = 1000;
 type Owner = "you" | "room";
 type LocalTrade = {
   t: number; p: number; side: PulseSide; action: "entry" | "exit" | "reverse"; owner: Owner; pnl?: number;
+  /** On entry/reverse: the opened position's leverage (the result card's "Long 100×"). */
+  leverage?: number;
   /** On exit/reverse: the position this closed (the result card's trade review). */
   closed?: { side: PulseSide; entry: number; exit: number };
+  /** The exit was a liquidation. */
+  liquidated?: boolean;
 };
-type LastClosed = { side: PulseSide; exitPrice: number; pnl: number };
 type Gone = "ended" | "forbidden" | null;
 
 const usd = (n: number) => n.toLocaleString("en-US", {
   style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2,
 });
-const signedUsd = (n: number) => `${n >= 0 ? "+" : "-"}${usd(Math.abs(n))}`;
-const pnlColor = (n: number) => n >= 0 ? "var(--positive)" : "var(--negative)";
-const sideColor = (side: PulseSide) => side === "long" ? "var(--chart-up)" : "var(--chart-down)";
+const priceText = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const opposite = (side: PulseSide): PulseSide => side === "long" ? "short" : "long";
 
 /** The fill a close realized at, recovered from the server's P&L for it. */
@@ -81,7 +79,6 @@ export default function Page({ params }: { params: Promise<{ market: string; mat
   const [error, setError] = useState<string | null>(null);
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
   const [trades, setTrades] = useState<LocalTrade[]>([]);
-  const [lastClosed, setLastClosed] = useState<LastClosed | null>(null);
   const [frozenPoints, setFrozenPoints] = useState<typeof points | null>(null);
   const [inviteJoin, setInviteJoin] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -95,12 +92,8 @@ export default function Page({ params }: { params: Promise<{ market: string; mat
   const prevPositionsRef = useRef<PulsePosition[]>([]);
   const prevOpponentRef = useRef<PulsePosition[]>([]);
   const settledMarkedRef = useRef(false);
-  // Largest lead seen this round scales the lead bar; a lead flip pops the
-  // leader's avatar once — same as the practice arena.
-  const maxLeadRef = useRef(1);
   const prevLeadSideRef = useRef<"you" | "opponent" | "tie">("tie");
   const firedUrgentRef = useRef(false);
-  const [leadPulse, setLeadPulse] = useState<{ side: "you" | "opponent"; key: number } | null>(null);
   const pointsRef = useRef(points);
   pointsRef.current = points;
   const skewRef = useRef<number | null>(null);
@@ -204,7 +197,6 @@ export default function Page({ params }: { params: Promise<{ market: string; mat
   const opponentProfit = view?.pulseOpponentProfit ?? opponentRealizedPnl + opponentLivePnl;
   const finalPrice = view?.finalPrice ?? price;
   const leadDelta = yourProfit - opponentProfit;
-  maxLeadRef.current = Math.max(maxLeadRef.current, Math.abs(leadDelta));
   const leadSide: "you" | "opponent" | "tie" = leadDelta > 0.5 ? "you" : leadDelta < -0.5 ? "opponent" : "tie";
   const canTrade = phase === "countdown" && price !== null && !busy;
   const availableCash = pulseAvailableCash(positions, realizedPnl);
@@ -212,12 +204,11 @@ export default function Page({ params }: { params: Promise<{ market: string; mat
   const canEnter = canTrade && positions.length === 0 && stake > 0 && availableCash > 0;
   const current = positions.at(-1) ?? null;
 
-  // Lead-change pulse + a grounded line, fired once per flip.
+  // A grounded line, fired once per lead flip.
   useEffect(() => {
     const prev = prevLeadSideRef.current;
     prevLeadSideRef.current = leadSide;
     if (prev === leadSide || leadSide === "tie") return;
-    setLeadPulse({ side: leadSide, key: Date.now() });
     if (phase === "countdown") say(leadSide === "you" ? "You took the lead." : "Opponent took the lead.");
   }, [leadSide, phase, say]);
 
@@ -251,11 +242,9 @@ export default function Page({ params }: { params: Promise<{ market: string; mat
     if (liquidated.length === 0) return;
     addTrades(liquidated.map((item) => ({
       t: Date.now(), p: pulseLiquidationPrice(item), side: item.side, action: "exit", owner: "you", pnl: -item.stake,
-      closed: { side: item.side, entry: item.entryPrice, exit: pulseLiquidationPrice(item) },
+      closed: { side: item.side, entry: item.entryPrice, exit: pulseLiquidationPrice(item) }, liquidated: true,
     })));
     const lost = liquidated.reduce((total, item) => total + item.stake, 0);
-    const last = liquidated[liquidated.length - 1];
-    setLastClosed({ side: last.side, exitPrice: pulseLiquidationPrice(last), pnl: -last.stake });
     setNotice(liquidated.length === 1
       ? `Your ${liquidated[0].side} was liquidated: −${usd(lost)}`
       : `${liquidated.length} positions were liquidated: −${usd(lost)}`);
@@ -278,7 +267,7 @@ export default function Page({ params }: { params: Promise<{ market: string; mat
       }),
       ...opened.map((item) => ({
         t: (item.openedAt !== undefined ? toLocal(item.openedAt) : null) ?? Date.now(),
-        p: item.entryPrice, side: item.side, action: "entry" as const, owner: "room" as const,
+        p: item.entryPrice, side: item.side, action: "entry" as const, owner: "room" as const, leverage: item.leverage,
       })),
     ]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -300,11 +289,9 @@ export default function Page({ params }: { params: Promise<{ market: string; mat
 
   const roundStart = toLocal(view?.roundStartAt ?? null);
   const revealRoom = phase === "settled";
-  const markerData = useMemo<TradeMarker[]>(() => trades
+  const markerData = useMemo<MatchChartMarkerInput[]>(() => trades
     .filter((trade) => revealRoom || trade.owner !== "room")
-    .map((trade) => ({
-      t: trade.t, p: trade.p, side: trade.side, action: trade.action, owner: trade.owner, pnl: trade.pnl,
-    })), [trades, revealRoom]);
+    .map((trade) => ({ t: trade.t, p: trade.p, side: trade.side, action: trade.action, owner: trade.owner === "room" ? "rival" : "you" })), [trades, revealRoom]);
 
   // A settled challenge round offers a rematch; both pressing Play again
   // opens the next round, and both rooms move into it.
@@ -356,8 +343,7 @@ export default function Page({ params }: { params: Promise<{ market: string; mat
     // Mark an entry at the server's fill, not the local tick, so the marker
     // and the dock's entry price can't disagree.
     const filled = filledFrom(positions, next);
-    if (filled) addTrades([{ t: Date.now(), p: filled.entryPrice, side, action: "entry", owner: "you" }]);
-    setLastClosed(null);
+    if (filled) addTrades([{ t: Date.now(), p: filled.entryPrice, side, action: "entry", owner: "you", leverage }]);
     playFeedback("entry");
   });
 
@@ -367,7 +353,6 @@ export default function Page({ params }: { params: Promise<{ market: string; mat
     const pnl = next.pulseYourRealizedPnl - realizedPnl;
     const exitPrice = exitPriceFor(position, pnl);
     addTrades([{ t: Date.now(), p: exitPrice, side: position.side, action: "exit", owner: "you", pnl, closed: { side: position.side, entry: position.entryPrice, exit: exitPrice } }]);
-    setLastClosed({ side: position.side, exitPrice, pnl });
     playFeedback("exit");
   });
 
@@ -381,7 +366,6 @@ export default function Page({ params }: { params: Promise<{ market: string; mat
     const amount = clampPulseStake(position.stake, pulseAvailableCash(closed.pulseYourPositions, closed.pulseYourRealizedPnl));
     if (closed.status !== "countdown" || amount <= 0) {
       addTrades([{ t: Date.now(), p: exitPrice, side: position.side, action: "exit", owner: "you", pnl, closed: { side: position.side, entry: position.entryPrice, exit: exitPrice } }]);
-      setLastClosed({ side: position.side, exitPrice, pnl });
       playFeedback("exit");
       return;
     }
@@ -389,10 +373,9 @@ export default function Page({ params }: { params: Promise<{ market: string; mat
     const opened = await postAction({ action: "enter", side, stake: amount, leverage: position.leverage });
     const filled = filledFrom(closed.pulseYourPositions, opened);
     addTrades([{
-      t: Date.now(), p: filled?.entryPrice ?? exitPrice, side, action: "reverse", owner: "you", pnl,
+      t: Date.now(), p: filled?.entryPrice ?? exitPrice, side, action: "reverse", owner: "you", pnl, leverage: position.leverage,
       closed: { side: position.side, entry: position.entryPrice, exit: exitPrice },
     }]);
-    setLastClosed(null);
     playFeedback("reverse");
   });
 
@@ -409,327 +392,153 @@ export default function Page({ params }: { params: Promise<{ market: string; mat
     }
   };
 
+  const winner = phase === "settled" ? view?.winner ?? null : null;
+  const streak = useWinStreak("pulse-streak-match", winner ? { id: matchId, won: winner === "you" } : null);
+
   if (gone) return <main className="mx-auto max-w-4xl px-4 py-10 text-center"><h1 className="text-lg font-medium text-[var(--text)]">{gone === "forbidden" ? "That match is full." : "Match ended"}</h1><p className="mt-2 text-sm text-[var(--muted)]">Start another Pulse round from the lobby.</p><Link href="/duel" className="mt-6 inline-block rounded-md bg-[var(--btn-bg)] px-5 py-2 text-sm font-medium text-[var(--btn-text)]">Back to lobby</Link></main>;
 
   const timerTotal = phase === "predict" ? 5 : view?.timerSeconds ?? 60;
-  const ringSeconds = phase === "settled" ? 0 : secondsLeft ?? timerTotal;
+  const ringSeconds = phase === "settled" ? 0 : phase === "predict" || phase === "countdown" ? secondsLeft ?? timerTotal : timerTotal;
   const marketLabel = market.toUpperCase();
   const yourEquity = PULSE_STARTING_CASH + yourProfit;
   const opponentEquity = PULSE_STARTING_CASH + opponentProfit;
-  const openEntry = current?.openedAt !== undefined
-    ? { t: toLocal(current.openedAt)!, p: current.entryPrice, side: current.side }
-    : null;
-  const dockPhase = phase === "settled"
-    ? "result"
+  const idleLine = !view || phase === "open" ? "Waiting for an opponent to join…" : phase === "predict" ? "Opponent's in. Round starts in a moment." : null;
+  const bubbleText = line?.text ?? idleLine;
+  // The server only names the opponent once the round has settled.
+  const revealedName = phase === "settled" ? view?.opponentName ?? null : null;
+  const rivalName = revealedName ?? "Opponent";
+  const rivalInitial = revealedName?.replace(/[^\p{L}\p{N}]/gu, "").charAt(0).toUpperCase() || (view?.opponentJoined ? "O" : "?");
+  const controlsState = !view || phase === "open" || phase === "predict"
+    ? "waiting"
     : phase === "countdown" && secondsLeft === 0
       ? "settling"
       : phase === "countdown" && current
         ? "open"
         : "setup";
-  const idleLine = !view || phase === "open" ? "Waiting for an opponent to join…" : phase === "predict" ? "Opponent's in. Round starts in a moment." : null;
-  const bubble = line?.text ?? idleLine;
-  // The server only names the opponent once the round has settled.
-  const revealedName = phase === "settled" ? view?.opponentName ?? null : null;
-  const rivalName = revealedName ?? "Opponent";
-  // Only an opponent with an account handle has a profile to open.
-  const rivalHref = phase === "settled" && view?.opponentHandle ? `/profile/${encodeURIComponent(view.opponentHandle)}` : undefined;
-  const rivalInitial = revealedName?.replace(/[^\p{L}\p{N}]/gu, "").charAt(0).toUpperCase() || "O";
-
-  return <main className="arena-shell mx-auto max-w-4xl px-4 py-10" data-market={market}>
-    <PulseMovementAlert total={yourEquity} />
-    <Link href="/duel" className="text-xs uppercase tracking-wider text-[var(--muted-dim)] transition hover:text-[var(--text)]">← Menu</Link>
-    <PulseMarketTitle market={market}>Arena · Pulse</PulseMarketTitle>
-    {view && (
-      <p className="mt-1 flex items-center gap-1 text-xs text-[var(--muted)]">
-        <FlameIcon className="balance-ember-icon" />
-        <span className="tabular-nums">{view.wager} each · winner takes <strong className="font-semibold text-[var(--text)]">{view.wager * 2}</strong></span>
-      </p>
-    )}
-
-    {/* Scoreboard: you, the clock, the opponent */}
-    <section className="arena-panel mt-4 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 py-2.5">
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1 sm:gap-2">
-        <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
-          <div key={leadPulse?.side === "you" ? leadPulse.key : "you-avatar"} className={`duel-avatar h-6 w-6 text-[10px] sm:h-8 sm:w-8 sm:text-xs ${leadPulse?.side === "you" ? "is-lead" : ""}`} style={{ backgroundImage: YOU_GRADIENT }} aria-hidden="true">Y</div>
-          <ArenaScore name="You" equity={Math.max(0, yourEquity)} pnl={yourProfit} align="left" />
-        </div>
-        <div className="flex flex-col items-center gap-0.5">
-          <span className="text-[9px] font-semibold uppercase tracking-[0.25em] text-[var(--muted-dim)]">VS</span>
-          <CountdownRing seconds={ringSeconds} total={timerTotal} urgent={phase === "countdown" && (secondsLeft ?? 99) <= 10} />
-          <span className="text-[9px] uppercase tracking-wider text-[var(--muted)]">{phase === "predict" ? "Starting in" : phase === "countdown" ? "Time left" : phase === "settled" ? "Final" : "Ready"}</span>
-        </div>
-        <div className="flex min-w-0 items-center justify-end gap-1.5 sm:gap-2">
-          <ArenaScore name={view?.opponentJoined ? rivalName : "Waiting"} equity={Math.max(0, opponentEquity)} pnl={opponentProfit} align="right" href={rivalHref} />
-          <div key={leadPulse?.side === "opponent" ? leadPulse.key : "opponent-avatar"} className={`duel-avatar h-6 w-6 text-[10px] sm:h-8 sm:w-8 sm:text-xs ${leadPulse?.side === "opponent" ? "is-lead" : ""}`} style={{ backgroundImage: RIVAL_GRADIENT }} aria-hidden="true">{view?.opponentJoined ? rivalInitial : "?"}</div>
-        </div>
-      </div>
-      <LeadBar leadDelta={leadDelta} maxLead={maxLeadRef.current} rivalName={rivalName} />
-      {bubble && <p key={line?.key ?? "idle"} className="sibyl-bubble mt-1.5 text-center text-[11px] text-[var(--muted)]">{bubble}</p>}
-    </section>
-
-    {/* Market price + feed status, centered */}
-    <section className="mt-6 text-center">
-      <div className="flex items-center justify-center gap-2">
-        <p className="text-xs font-semibold uppercase tracking-wider text-[var(--market-accent-strong)]">{view?.finalPrice != null ? `Final ${marketLabel} / USD` : `${marketLabel} / USD`}</p>
-        {view?.finalPrice == null && <span className="flex items-center gap-1.5 text-xs text-[var(--muted)]"><span className={`h-1.5 w-1.5 rounded-full ${status === "live" ? "animate-pulse bg-[var(--brand)]" : "bg-[var(--muted-dim)]"}`} />{status === "live" ? "live" : status}</span>}
-        {phase === "countdown" && <span className="text-xs uppercase tracking-wider text-[var(--brand)]">· round live</span>}
-      </div>
-      <p className="mt-1 text-4xl font-semibold tabular-nums text-[var(--text)]"><FlashingPrice price={finalPrice} /></p>
-    </section>
-
-    <section className="mt-4">
-      <PriceChart points={frozenPoints ?? points} trades={markerData} roundStart={roundStart} frozen={frozenPoints !== null} openEntry={openEntry} now={now} />
-      <div className="mt-2 flex items-center justify-between px-1 text-xs text-[var(--muted-dim)]">
-        <span>Entries ○ · exits □ · reversals ◇{revealRoom ? " · dashed = Opponent" : ""}</span>
-        <SoundToggle muted={muted} onToggle={toggleMuted} />
-      </div>
-    </section>
-
-    <RoomDock
-      dockPhase={dockPhase}
-      marketLabel={marketLabel}
-      phase={phase}
-      rivalName={rivalName}
-      rivalHref={rivalHref}
-      secondsLeft={secondsLeft}
-      hasPrice={price !== null}
-      stake={stake}
-      setStake={setStake}
-      leverage={leverage}
-      setLeverage={setLeverage}
-      availableCash={availableCash}
-      isOut={isOut}
-      canEnter={canEnter}
-      canManage={canTrade}
-      position={current}
-      extraOpen={Math.max(0, positions.length - 1)}
-      totalOpenPnl={livePnl}
-      livePrice={price}
-      lastClosed={lastClosed}
-      onEnter={(side) => void enter(side)}
-      onClose={() => current && void closePosition(current)}
-      onReverse={() => current && void reversePosition(current)}
-      result={view && phase === "settled" ? {
-        finalPrice: view.finalPrice,
-        winner: view.winner === "opponent" ? "rival" : view.winner ?? "tie",
-        yourEquity: Math.max(0, yourEquity),
-        yourPnl: yourProfit,
-        rivalEquity: Math.max(0, opponentEquity),
-        rivalPnl: opponentProfit,
-        trades: trades.filter((trade) => trade.owner === "you").map((trade) => ({ side: trade.side, action: trade.action, price: trade.p, pnl: trade.pnl, closed: trade.closed })),
-        wager: view.wager,
-      } : null}
-      rematch={view?.challenge ? {
-        check: <RematchCheck rematch={rematch} rivalName={rivalName} rivalInitial={rivalInitial} terms={{ market, timerSeconds: view.timerSeconds, wager: view.wager }} />,
-        button: <RematchButton rematch={rematch} rivalName={rivalName} />,
-      } : null}
-      notice={notice}
-      error={error ?? rematch.error}
-    />
-    {phase === "open" || phase === "predict" ? <button type="button" onClick={() => void leave()} className="mx-auto mt-4 block text-xs uppercase tracking-wider text-[var(--muted-dim)] hover:text-[var(--text)]">Leave match</button> : null}
-  </main>;
-}
-
-type DockProps = {
-  dockPhase: "setup" | "open" | "settling" | "result";
-  marketLabel: string;
-  phase: MatchView["status"] | undefined;
-  rivalName: string;
-  rivalHref: string | undefined;
-  secondsLeft: number | null;
-  hasPrice: boolean;
-  stake: number;
-  setStake: (value: number) => void;
-  leverage: number;
-  setLeverage: (value: number) => void;
-  availableCash: number;
-  isOut: boolean;
-  canEnter: boolean;
-  canManage: boolean;
-  position: PulsePosition | null;
-  extraOpen: number;
-  totalOpenPnl: number;
-  livePrice: number | null;
-  lastClosed: LastClosed | null;
-  onEnter: (side: PulseSide) => void;
-  onClose: () => void;
-  onReverse: () => void;
-  result: Omit<React.ComponentProps<typeof ArenaResultCard>, "marketLabel" | "rivalName" | "rivalHref" | "playAgain"> | null;
-  /** A challenge round's ready check and Play again (./Rematch.tsx), in place of the link back to the lobby. */
-  rematch: { check: React.ReactNode; button: React.ReactNode } | null;
-  notice: string | null;
-  error: string | null;
-};
-
-/** Practice's TradingDock, with the ±$25/All in stepper in place of the Amount dropdown. */
-function RoomDock(props: DockProps) {
-  const {
-    dockPhase, marketLabel, phase, rivalName, rivalHref, secondsLeft, hasPrice, stake, setStake, leverage, setLeverage,
-    availableCash, isOut, canEnter, canManage, position, extraOpen, totalOpenPnl, livePrice,
-    lastClosed, onEnter, onClose, onReverse, result, rematch, notice, error,
-  } = props;
-  const [pressedSide, setPressedSide] = useState<PulseSide | null>(null);
-  const leverageDetailsRef = useRef<HTMLDetailsElement>(null);
   const canEdit = (phase === "predict" || phase === "countdown") && !isOut;
-  // Already worth −stake; the server closes it on its next look at the tape.
-  const liquidated = position !== null && livePrice !== null && pulseIsLiquidated(position, livePrice);
+  const hint = !view || phase === "open"
+    ? "Waiting for an opponent to join…"
+    : phase === "predict"
+      ? `Round starts in ${secondsLeft ?? "—"}s — set your amount.`
+      : isOut
+        ? "You were liquidated — you're out for the rest of this round."
+        : price === null
+          ? "Waiting for a live market connection…"
+          : stake <= 0
+            ? "Set an amount to trade."
+            : null;
+  const currentOpenedAt = current
+    ? (current.openedAt !== undefined ? toLocal(current.openedAt) : null)
+      ?? [...trades].reverse().find((trade) => trade.owner === "you" && trade.action !== "exit")?.t
+      ?? roundStart
+      ?? Date.now()
+    : 0;
+  const currentPnl = current && price !== null ? pulsePositionPnl(current, price) : 0;
 
-  const press = (side: PulseSide) => {
-    setPressedSide(side);
-    onEnter(side);
-    window.setTimeout(() => setPressedSide(null), 180);
-  };
+  const yourTrades = trades.filter((trade) => trade.owner === "you");
+  const roomTrades = trades.filter((trade) => trade.owner === "room");
+  const lastYours = [...yourTrades].reverse().find((trade) => trade.action !== "exit");
+  const lastTheirs = [...roomTrades].reverse().find((trade) => trade.action !== "exit");
+  const lastLeg = roundTrades(yourTrades.map((trade) => ({ ...trade, price: trade.p }))).at(-1) ?? null;
+  const gap = Math.abs(leadDelta);
+  const wager = view?.wager ?? 0;
+  const lossStory = (() => {
+    const liquidated = [...yourTrades].reverse().find((trade) => trade.liquidated);
+    if (liquidated?.closed) {
+      const lev = [...yourTrades].reverse().find((trade) => trade.t <= liquidated.t && trade.action !== "exit")?.leverage;
+      return `Your ${lev ? `${lev}× ` : ""}${liquidated.closed.side} was liquidated at ${priceText(liquidated.closed.exit)}.`;
+    }
+    const firstTheirs = roomTrades.find((trade) => trade.action === "entry");
+    if (!firstTheirs || view?.finalPrice == null) return null;
+    return `${rivalName} ${firstTheirs.side === "short" ? "shorted" : "went long"} at ${priceText(firstTheirs.p)}; the bell rang at ${priceText(view.finalPrice)}.`;
+  })();
 
-  const setupHint =
-    !phase || phase === "open"
-      ? "Waiting for an opponent to join…"
-      : phase === "predict"
-        ? `Round starts in ${secondsLeft ?? "—"}s — pick your stake.`
-        : isOut
-          ? "You were liquidated — you're out for the rest of this round."
-          : !hasPrice
-            ? "Waiting for a live market connection…"
-            : stake <= 0
-              ? "Set a stake to trade."
-              : "Press a side to enter at the live market price.";
+  const result: MatchResult | null = view && phase === "settled" && winner ? {
+    outcome: winner === "you" ? "win" : winner === "opponent" ? "loss" : "tie",
+    hero: winner === "you"
+      ? { value: wager * 2, format: (n: number) => `+${Math.round(n)}`, icon: <FlameGlyph size={40} /> }
+      : { value: yourProfit, format: matchSignedUsd },
+    caption: winner === "you"
+      ? <>Embers won · beat {rivalName} by <span className="pm-num">{matchUsd(gap)}</span></>
+      : winner === "opponent"
+        ? <>your final P&amp;L · −{wager} Embers · {rivalName} won by <span className="pm-num">{matchUsd(gap)}</span></>
+        : <>Dead even · {wager} Embers refunded</>,
+    story: lossStory,
+    you: { side: lastYours?.side ?? null, leverage: lastYours?.leverage ?? null, pnl: yourProfit },
+    rival: { side: lastTheirs?.side ?? null, leverage: lastTheirs?.leverage ?? null, pnl: opponentProfit },
+    lastTrade: lastLeg ? { entry: lastLeg.entry, exit: lastLeg.exit } : null,
+    taunt: rematch.state === "theirs" ? `${rivalName} wants a rematch.` : null,
+    rematch: view.challenge
+      ? <RematchButton rematch={rematch} rivalName={rivalName} className={PM_REMATCH_CLASS} />
+      : <Link href="/duel" className={PM_REMATCH_CLASS}><RematchIcon />Play again</Link>,
+    shareText: winner === "you" ? `I beat ${rivalName} by ${matchUsd(gap)} in a ${view.timerSeconds}s ${marketLabel} Pulse duel on Prophecy.` : null,
+    extra: (
+      <>
+        {view.challenge && <RematchCheck rematch={rematch} rivalName={rivalName} rivalInitial={rivalInitial} terms={{ market, timerSeconds: view.timerSeconds, wager: view.wager }} />}
+        {rematch.error && <p className="pm-controls-notice" role="alert">{rematch.error}</p>}
+      </>
+    ),
+  } : null;
 
   return (
-    <section
-      className={
-        dockPhase === "setup" || dockPhase === "open"
-          ? "arena-dock dock-bar mt-4"
-          : "arena-dock mt-4 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5"
-      }
-    >
-      {dockPhase === "setup" && (
-        <>
-          {lastClosed && (
-            <p className="dock-last-note">
-              Last: <span style={{ color: sideColor(lastClosed.side) }}>{lastClosed.side}</span> closed @ {usd(lastClosed.exitPrice)} ·{" "}
-              <span style={{ color: pnlColor(lastClosed.pnl) }}>{signedUsd(lastClosed.pnl)}</span>
-            </p>
-          )}
-          <div className="dock-row dock-row-wrap">
-            <div className="dock-stake">
-              <PulseStakeStepper stake={stake} availableCash={availableCash} disabled={!canEdit} onChange={setStake} />
-            </div>
-            <details className="dock-select dock-select-compact" ref={leverageDetailsRef}>
-              <summary>
-                <span className="dock-select-label">Leverage</span>
-                <span className="dock-select-value">{leverage}×</span>
-                <span className="dock-select-chevron">▾</span>
-              </summary>
-              <div className="dock-select-menu">
-                {PULSE_LEVERAGE_OPTIONS.map((option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    className={leverage === option ? "is-selected" : ""}
-                    onClick={() => {
-                      setLeverage(option);
-                      if (leverageDetailsRef.current) leverageDetailsRef.current.open = false;
-                    }}
-                  >
-                    {option}×
-                  </button>
-                ))}
-              </div>
-            </details>
-            <span className="dock-gear" role="img" aria-label="Setup">⚙</span>
-          </div>
-          <div className="dock-row">
-            {(["long", "short"] as const).map((side) => (
-              <button
-                key={side}
-                type="button"
-                disabled={!canEnter}
-                onPointerDown={() => press(side)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    press(side);
-                  }
-                }}
-                className={`dock-action is-${side} ${pressedSide === side ? "scale-[0.98] opacity-80" : ""}`}
-              >
-                {side === "long" ? "↗ Long" : "↘ Short"}
-              </button>
-            ))}
-          </div>
-          <p className="mt-2 text-center text-xs text-[var(--muted)]">{setupHint}</p>
-        </>
-      )}
-
-      {dockPhase === "open" && position && (
-        <>
-          {extraOpen > 0 && (
-            <p className="dock-last-note">
-              +{extraOpen} more open · total <span style={{ color: pnlColor(totalOpenPnl) }}>{signedUsd(totalOpenPnl)}</span>
-            </p>
-          )}
-          <OpenPositionRow position={position} livePrice={livePrice} />
-          <div className="dock-row">
-            <button type="button" disabled={!canManage || liquidated} onClick={onClose} className={`dock-action is-${position.side}`}>
-              Close
-            </button>
-            <button type="button" disabled={!canManage || liquidated} onClick={onReverse} className="dock-action-secondary">
-              Reverse
-            </button>
-          </div>
-          <p className="mt-2 text-center text-xs text-[var(--muted)]">
-            Your next action executes immediately at the live market price. Liquidates at {usd(pulseLiquidationPrice(position))}.
-          </p>
-        </>
-      )}
-
-      {dockPhase === "settling" && (
-        <div className="flex items-center justify-between gap-4">
-          <p className="text-sm text-[var(--muted)]">Fetching final price…</p>
-        </div>
-      )}
-
-      {dockPhase === "result" && result && (
-        <>
-          {rematch?.check}
-          <ArenaResultCard
-            {...result}
-            marketLabel={marketLabel}
-            rivalName={rivalName}
-            rivalHref={rivalHref}
-            playAgain={rematch?.button ?? (
-              <Link
-                href="/duel"
-                className="rounded-md bg-[var(--btn-bg)] px-5 py-2 text-center text-sm font-medium text-[var(--btn-text)] transition hover:bg-[var(--btn-bg-hover)]"
-              >
-                Play Again
-              </Link>
-            )}
-          />
-        </>
-      )}
-
-      {notice && <p className="pt-2 text-center text-xs font-medium text-[var(--negative)]">{notice}</p>}
-      {error && <p className="pt-2 text-center text-xs text-[var(--negative)]">{error}</p>}
-    </section>
-  );
-}
-
-function OpenPositionRow({ position, livePrice }: { position: PulsePosition; livePrice: number | null }) {
-  const pnl = livePrice === null ? 0 : pulsePositionPnl(position, livePrice);
-  // The server closes it on its next look at the tape; until then it's already worth −stake.
-  const liquidated = livePrice !== null && pulseIsLiquidated(position, livePrice);
-  return (
-    <div className="dock-row">
-      <span className="dock-chip" style={{ borderColor: sideColor(position.side), color: sideColor(position.side) }}>
-        {position.side.toUpperCase()}
-      </span>
-      <span className="dock-live-pnl dock-pnl-hero" style={{ color: pnlColor(pnl) }}>
-        {liquidated ? "Liquidated " : ""}{signedUsd(pnl)}
-      </span>
-      <span className="dock-meta">
-        <span>{usd(position.entryPrice)} → {livePrice !== null ? usd(livePrice) : "—"}</span>
-        <span>{usd(position.stake)} · {position.leverage}×</span>
-      </span>
-    </div>
+    <MatchScreen
+      roundKey={matchId}
+      market={market}
+      marketLabel={marketLabel}
+      modeTag={view ? <>PULSE · <FlameGlyph size={10} /> {wager * 2} POT</> : "ARENA · PULSE"}
+      feedLive={status === "live"}
+      streak={streak}
+      sound={{ muted, toggle: toggleMuted, play: playFeedback }}
+      backHref="/duel"
+      alertTotal={yourEquity}
+      roundStarted={phase === "countdown" || phase === "settled"}
+      you={{
+        equity: yourEquity,
+        pnl: yourProfit,
+        pnlBase: PULSE_STARTING_CASH,
+        position: current ? {
+          side: current.side,
+          entryPrice: current.entryPrice,
+          leverage: current.leverage,
+          openedAt: currentOpenedAt,
+          pnl: currentPnl,
+          liquidated: price !== null && pulseIsLiquidated(current, price),
+        } : null,
+      }}
+      rival={{
+        name: view?.opponentJoined || revealedName ? rivalName : "Waiting",
+        kind: "player",
+        initial: rivalInitial,
+        equity: opponentEquity,
+        pnl: opponentProfit,
+        // Blind until settle: their side stays hidden mid-round.
+        side: null,
+      }}
+      timer={{ seconds: ringSeconds, total: timerTotal, caption: phase === "predict" ? "START" : "SEC", live: phase === "countdown" }}
+      bubble={bubbleText ? { speaker: null, text: bubbleText, key: line?.key ?? 0 } : null}
+      chart={{ points: frozenPoints ?? points, now, frozen: frozenPoints !== null, price: finalPrice, markers: markerData }}
+      controls={{
+        state: controlsState,
+        amountLabel: compactUsd(stake),
+        amountMenu: () => <PulseStakeStepper stake={stake} availableCash={availableCash} disabled={!canEdit} onChange={setStake} />,
+        leverage,
+        leverageOptions: PULSE_LEVERAGE_OPTIONS,
+        onLeverage: setLeverage,
+        canEdit,
+        canEnter,
+        onEnter: (side) => void enter(side),
+        hint,
+        canManage: canTrade,
+        onClose: () => { if (current) void closePosition(current); },
+        onFlip: () => { if (current) void reversePosition(current); },
+        extraOpen: Math.max(0, positions.length - 1),
+        notice,
+        error,
+        footer: phase === "open" || phase === "predict"
+          ? <button type="button" onClick={() => void leave()} className="pm-leave">Leave match</button>
+          : null,
+      }}
+      result={result}
+    />
   );
 }

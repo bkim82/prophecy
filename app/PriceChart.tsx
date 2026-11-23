@@ -40,6 +40,9 @@ type Props = {
   xIntervals?: number;
   yIntervals?: number;
   xMinorPerInterval?: number;
+  /** Phones: stretch to whatever height the page's flex column gives the
+   * chart instead of a fixed aspect ratio (.price-chart.is-fill, app/globals.css). */
+  fill?: boolean;
 };
 
 const W = 880;
@@ -49,6 +52,8 @@ const PAD = { top: 20, right: 86, bottom: 44, left: 12 };
 // Match the duel lobby chart: live data ends before the price axis, leaving a
 // forward-looking region between the head and the Y-axis labels/pill.
 const FORWARD_SPACE_FRAC = 0.16;
+// Must match the `.price-chart.is-fill` media query in app/globals.css.
+const FILL_QUERY = "(max-width: 640px)";
 const FUTURE_RAYS = [-1, -0.55, -0.2, 0.2, 0.55, 1];
 const FUTURE_BEAM_REACH_FRAC = 0.18;
 
@@ -202,6 +207,7 @@ export default function PriceChart({
   xIntervals = X_INTERVALS,
   yIntervals = Y_INTERVALS,
   xMinorPerInterval = X_MINOR_PER_INTERVAL,
+  fill = false,
 }: Props) {
   const uid = useId().replace(/:/g, "");
   // Zoom is a view concern, so it lives here rather than being plumbed through
@@ -209,6 +215,9 @@ export default function PriceChart({
   const [zoomMs, setZoomMs] = useState(windowMs);
   const [priceScale, setPriceScale] = useState(1);
   const [isCompact, setIsCompact] = useState(false);
+  // Fill mode's measured plot box (content box, inside the padding); null
+  // when the chart keeps its fixed aspect ratio.
+  const [fillBox, setFillBox] = useState<{ w: number; h: number } | null>(null);
   const [hoverX, setHoverX] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -226,9 +235,14 @@ export default function PriceChart({
   }, []);
 
   const chartWidth = isCompact ? 520 : W;
-  const chartHeight = isCompact ? 440 : H;
+  // In fill mode the viewBox follows the box the page hands the chart, so the
+  // plot stretches to it without distorting text.
+  const chartHeight = fillBox
+    ? clamp(Math.round((chartWidth * fillBox.h) / fillBox.w), 180, 1100)
+    : isCompact ? 440 : H;
   const chartPad = isCompact
-    ? { top: 28, right: 100, bottom: 62, left: 18 }
+    // Time labels sit at baseline + 27; fill mode drops the spare room under them.
+    ? { top: 28, right: 100, bottom: fillBox ? 40 : 62, left: 18 }
     : PAD;
   const chartInnerWidth = chartWidth - chartPad.left - chartPad.right;
   const chartDataWidth = chartInnerWidth * (1 - FORWARD_SPACE_FRAC);
@@ -271,6 +285,28 @@ export default function PriceChart({
 
   const visible = windowSlice(points, t0);
   const ready = visible.length >= 2;
+
+  // `ready` swaps the placeholder for the chart — a different element to observe.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!fill || !el || typeof ResizeObserver === "undefined") {
+      setFillBox(null);
+      return;
+    }
+    const phone = window.matchMedia(FILL_QUERY);
+    // Crossing the breakpoint changes the box's size too, so the observer
+    // alone catches it.
+    const observer = new ResizeObserver(([entry]) => {
+      const w = Math.round(entry.contentRect.width);
+      const h = Math.round(entry.contentRect.height);
+      setFillBox((prev) => {
+        if (!phone.matches || w <= 0 || h <= 0) return null;
+        return prev && prev.w === w && prev.h === h ? prev : { w, h };
+      });
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [fill, ready]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -323,7 +359,7 @@ export default function PriceChart({
     return (
       <div
         ref={containerRef}
-        className="price-chart flex h-[clamp(280px,75vw,400px)] items-center justify-center rounded-xl border border-[var(--line)] bg-[var(--surface)] text-sm text-[var(--muted-dim)]"
+        className={`price-chart${fill ? " is-fill" : ""} flex h-[clamp(280px,75vw,400px)] items-center justify-center rounded-xl border border-[var(--line)] bg-[var(--surface)] text-sm text-[var(--muted-dim)]`}
       >
         Waiting for price data…
       </div>
@@ -426,7 +462,7 @@ export default function PriceChart({
         setPriceScale(1);
       }}
       title="Scroll the plot to zoom time; scroll the price axis to zoom price; double-click to reset"
-      className="price-chart rounded-xl border border-[var(--line)] bg-[var(--surface)] p-2"
+      className={`price-chart${fill ? " is-fill" : ""} rounded-xl border border-[var(--line)] bg-[var(--surface)] p-2`}
     >
       <svg
         // A fresh round (or settling) replays the reveal sweep and the head's pop.

@@ -186,11 +186,12 @@ function RematchSeat({ name, initial, gradient, status }: { name: string; initia
 }
 
 /** The result card's Play again, for a challenge round: asks, answers, or waits. */
-export function RematchButton({ rematch, rivalName }: { rematch: Rematch; rivalName: string }) {
+export function RematchButton({ rematch, rivalName, className }: { rematch: Rematch; rivalName: string; className?: string }) {
   const { state, secondsLeft, pressing, press } = rematch;
-  const base = "rounded-md px-5 py-2 text-center text-sm font-medium transition";
+  // `className` replaces the default look (the match screen's 3D Rematch, app/PulseMatch.tsx).
+  const base = className ?? "rounded-md px-5 py-2 text-center text-sm font-medium transition bg-[var(--btn-bg)] text-[var(--btn-text)] hover:bg-[var(--btn-bg-hover)]";
   if (state === "left") {
-    return <Link href="/duel" className={`${base} bg-[var(--btn-bg)] text-[var(--btn-text)] hover:bg-[var(--btn-bg-hover)]`}>Back to lobby</Link>;
+    return <Link href="/duel" className={base}>Back to lobby</Link>;
   }
   const label = state === "starting" || (pressing && state === "theirs")
     ? "Starting…"
@@ -204,7 +205,7 @@ export function RematchButton({ rematch, rivalName }: { rematch: Rematch; rivalN
       type="button"
       onClick={press}
       disabled={pressing || state === "yours" || state === "starting"}
-      className={`rematch-button ${base} bg-[var(--btn-bg)] text-[var(--btn-text)] hover:bg-[var(--btn-bg-hover)] disabled:cursor-default disabled:opacity-70${state === "theirs" ? " is-beckoning" : state === "yours" ? " is-waiting" : ""}`}
+      className={`rematch-button ${base} disabled:cursor-default disabled:opacity-70${state === "theirs" ? " is-beckoning" : state === "yours" ? " is-waiting" : ""}`}
     >
       {label}
     </button>

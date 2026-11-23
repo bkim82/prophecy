@@ -5,7 +5,8 @@
 ## Geometry
 
 - At rendered widths ≤560px, the chart switches to a 520×440 viewBox with expanded padding and label sizes (`app/PriceChart.tsx:213-220`, `:465-479`) so the full chart remains visible without shrinking mobile text to desktop scale.
-- Desktop `viewBox` is 880×400 and scales via CSS `h-auto w-full`; compact mode uses 520×440 (`:213-220`) — resolution-independent; DOM measurement is used only to route wheel events between axes.
+- Desktop `viewBox` is 880×400 and scales via CSS `h-auto w-full`; compact mode uses 520×440 (`app/PriceChart.tsx:237`) — resolution-independent; DOM measurement is used only to route wheel events between axes, and for `fill`.
+- `fill` prop (no current caller — the Pulse pages moved to `app/PulseMatchChart.tsx`, below): at `FILL_QUERY` ≤640px (`app/PriceChart.tsx:56`, must match `.price-chart.is-fill` in `app/globals.css`) the container flexes to its parent's height, the SVG is absolutely inset, and a ResizeObserver sets the viewBox height to `520 × box h/w` (clamped 180–1100) so the plot stretches without distorting text; compact bottom pad drops 62→40 (`:245`). Above 640px it's ignored.
 - `PAD` top 20 / right 86 / bottom 44 / left 12 (`app/PriceChart.tsx:47`). Compact right padding is 100 (`:225`). Right reserves price-label space and the live price pill; bottom reserves the time axis (ticks + clock labels).
 - `x()` maps ts→horizontal over the **fixed window**, not the data extent; the live edge lands at 84% of plot width, matching `MarketChart`'s 16% future-time region before the price axis; `y()` maps price→vertical (`app/PriceChart.tsx:345-346`).
 
@@ -142,3 +143,11 @@ Separate from `PriceChart`; renders in token details (`app/duel/portfolio/TokenD
 - Motion (`prefers-reduced-motion` disables all): own rAF clock (`useFrameClock`) scrolls per frame instead of the feed's 100ms steps; feed's live edge (within `EDGE_SLACK_MS`) re-pinned to the frame clock. Head price eased (`HEAD_TAU_MS`=140) and y-range eased (`RANGE_TAU_MS`=320), never clipping the line; ease state reset on market switch.
 - Live price change → pill flashes and head ripples green/red (keyed remount restarts the CSS animation).
 - `PriceChart` reuses this component's unscoped CSS classes directly (`.mc-stars`, `.mc-grid`, `.mc-reveal`, `.mc-aura`/`.mc-head-pop`/`.mc-orb`/`.mc-halo`, `.market-chart-pill`, `.market-chart-scrub`, …) rather than redefining them — none of those rules are scoped to `.market-chart`, so they apply unchanged under `.price-chart`. It does *not* reuse the fan/"now"-line/market-colour theming (`FUTURE_FRAC`/`RAYS`, `--chart-line`/`--chart-point`): the in-round chart colours by win/loss direction (`--chart-up`/`--chart-down`) instead, since that's the number a player is actually watching. `docs/pulse-mode.md` covers the pages that render it.
+
+## Match chart
+
+- `app/PulseMatchChart.tsx` (`:119`), used only by `MatchScreen` (`app/PulseMatch.tsx`). Drawn in real pixels: a ResizeObserver sizes the SVG/viewBox to the flex box, so labels are true px (y-axis 10.5px mono, right gutter 58px). Fixed `WINDOW_MS` window, 20% forward space for the fan; no zoom/hover.
+- Before entry: ink line (`--pm-ink`: text tinted violet; #E2DCF7 in Obsidian) + soft area, the up/down outcome fan at the head (breathing). In a position: dashed entry line across the plot with a "[Y] LONG @ price" pill; the area between the post-entry line and the entry price is clipped above/below the entry (green where that side profits, red where it loses); the line switches from lavender to your P&L colour at the entry time (one userSpace gradient with a hard stop).
+- y-range covers visible prices plus the entry price (and the liquidation price while "near"), padded 12%; LIQ line + pill shown only when near.
+- Head: radial glow + white dot ringed in the P&L colour. A P&L change ≥ `pnlThreshold` ($0.10) between renders floats a "+$0.40"/"−$0.20" HTML label up off the head (max 3, 1.4s).
+- Top-left HTML overlay: "MKT / USD" + price at 30px mono (5px below the pair; plot `PAD.top` 70 clears it), a 14px SVG up/down triangle (`.pm-chart-dir`; text ▲/▼ fell back to an oversized glyph) and green/red by the last moving tick.
