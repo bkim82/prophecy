@@ -13,18 +13,17 @@ const LIMIT = 5;
  * GET ?q= → the sidebar search (app/SidebarSearch.tsx): people (accounts with
  * a handle, with their photo when they have one) by handle or name, and saved
  * posts by text, author or handle — none by anyone with a block either way
- * with the viewer. A leading "@" is ignored.
+ * with the viewer. A leading "@" is ignored. `&people=1` (beta mode's friend
+ * finder, app/FriendSearch.tsx) skips the posts.
  */
 export async function GET(request: Request) {
-  const query = (new URL(request.url).searchParams.get("q") ?? "").trim().replace(/^@/, "").slice(0, 50);
+  const params = new URL(request.url).searchParams;
+  const query = (params.get("q") ?? "").trim().replace(/^@/, "").slice(0, 50);
   if (!query) return Response.json({ users: [], posts: [] } satisfies SearchResults);
 
-  const viewerId = (await getViewer())?.userId;
-  // Before db/blocks.sql is applied there's nothing to leave out.
-  const blocked = viewerId ? await blockedIdsFor(viewerId).catch(() => new Set<string>()) : new Set<string>();
   const [accounts, posts] = await Promise.all([
     searchProfiles(query, LIMIT).catch(() => []),
-    searchPosts(query, LIMIT, blocked).catch(() => []),
+    params.get("people") === "1" ? [] : visiblePosts(query),
   ]);
   // Same precedence as their profile page: app-owned upload, then provider photo.
   const photos = await providerImagesFor(accounts.filter((account) => !account.hasAvatarImage).map((account) => account.userId));
@@ -38,4 +37,11 @@ export async function GET(request: Request) {
   }));
 
   return Response.json({ users, posts } satisfies SearchResults);
+}
+
+async function visiblePosts(query: string) {
+  const viewerId = (await getViewer())?.userId;
+  // Before db/blocks.sql is applied there's nothing to leave out.
+  const blocked = viewerId ? await blockedIdsFor(viewerId).catch(() => new Set<string>()) : new Set<string>();
+  return searchPosts(query, LIMIT, blocked).catch(() => []);
 }
