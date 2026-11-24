@@ -10,9 +10,10 @@ export const dynamic = "force-dynamic";
 /**
  * POST { playerId } → { matchId }
  *
- * The "browse the lobby list and take that one" path. Same guarded UPDATE as
- * find-or-create, aimed at a specific id: whoever's statement lands first gets
- * the seat, everyone else gets 409.
+ * The invite link path (the room's `?invite=1`: a shared lobby invite, or a
+ * challenger taking their seat). Same guarded UPDATE as find-or-create, aimed
+ * at a specific id: whoever's statement lands first gets the seat, everyone
+ * else gets 409.
  */
 export async function POST(request: Request, ctx: { params: Promise<{ id: string }> }) {
   const userId = (await getViewer())?.userId;
@@ -47,6 +48,9 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
       player2UserId: userId,
       // Starts the 5s pre-round countdown for both players at the same instant.
       predictStartAt: now,
+      // Joining by link makes it a private round between the two of you, like
+      // a challenge's, so settled it offers a rematch (lib/rematch.ts).
+      ...(candidate.botState ? {} : { invitedUserId: userId }),
     })
     .where(
       and(
