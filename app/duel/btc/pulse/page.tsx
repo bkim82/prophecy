@@ -539,7 +539,7 @@ export default function Page() {
       backHref="/duel"
       alertTotal={liveEquity}
       roundStarted={roundStart !== null}
-      you={{ equity: outcome ? outcome.finalValue : liveEquity, pnl: displayYourPnl, pnlBase: bankroll, position: matchPosition }}
+      you={{ equity: outcome ? outcome.finalValue : liveEquity, pnl: displayYourPnl, position: matchPosition }}
       rival={{
         name: "Sibyl",
         kind: "sibyl",

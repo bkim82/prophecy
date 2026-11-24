@@ -1,3 +1,4 @@
+import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata } from "next";
 import { Cinzel, IBM_Plex_Mono, Inter, JetBrains_Mono, Space_Grotesk } from "next/font/google";
 import { headers } from "next/headers";
@@ -67,34 +68,35 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
       <body>
-        <AuthProvider config={authConfig}>
+        <ClerkProvider>
+          <AuthProvider config={authConfig}>
           <header className="app-header">
-            <div className="app-header-inner">
-              <div className="desktop-header-content">
-                <Brand />
-                {/* Beta mode: no top nav — the Arena is the only section and it's home. */}
-                {!betaModeEnabled() && <TabNav />}
-                <div className="header-actions">
-                  <ThemeToggle />
-                  <SignedIn><BalancePill /></SignedIn>
-                  <SignedIn><MessagesButton /></SignedIn>
-                  <SignedIn><NotificationsMenu /></SignedIn>
-                  <AccountMenu handle={handle} />
-                </div>
-              </div>
-              <div className="mobile-header-content">
-                <Brand />
-                <div className="mobile-header-actions">
-                  <ThemeToggle />
-                  <SignedIn><BalancePill /></SignedIn>
-                  <SignedIn><MessagesButton /></SignedIn>
-                  <SignedIn><NotificationsMenu /></SignedIn>
-                  <div className="mobile-account-control">
-                    <AccountMenu compact handle={handle} />
-                  </div>
-                </div>
-              </div>
-            </div>
+          <div className="app-header-inner">
+          <div className="desktop-header-content">
+          <Brand />
+          {/* Beta mode: no top nav — the Arena is the only section and it's home. */}
+          {!betaModeEnabled() && <TabNav />}
+          <div className="header-actions">
+          <ThemeToggle />
+          <SignedIn><BalancePill /></SignedIn>
+          <SignedIn><MessagesButton /></SignedIn>
+          <SignedIn><NotificationsMenu /></SignedIn>
+          <AccountMenu handle={handle} />
+          </div>
+          </div>
+          <div className="mobile-header-content">
+          <Brand />
+          <div className="mobile-header-actions">
+          <ThemeToggle />
+          <SignedIn><BalancePill /></SignedIn>
+          <SignedIn><MessagesButton /></SignedIn>
+          <SignedIn><NotificationsMenu /></SignedIn>
+          <div className="mobile-account-control">
+          <AccountMenu compact handle={handle} />
+          </div>
+          </div>
+          </div>
+          </div>
           </header>
           {/* One heartbeat for both header layouts' bells: presence + incoming challenges + unread messages. */}
           <SignedIn><LiveChallenges /></SignedIn>
@@ -107,7 +109,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           {!betaModeEnabled() && <MobileBottomNav />}
           <MobileChromeAutoHide />
           <ActiveMatchBar />
-        </AuthProvider>
+          </AuthProvider>
+        </ClerkProvider>
       </body>
     </html>
   );

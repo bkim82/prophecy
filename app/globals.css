@@ -2096,6 +2096,7 @@ html[data-theme="obsidian"] body:has(.pm-screen) { background: #0B0A10; }
 /* Moonstone: brights darken instead of lighten, white type on the trade buttons, softer shadows. */
 [data-theme="light"] .pm-screen {
   --pm-green-bright: color-mix(in srgb, var(--pm-green) 82%, #000); --pm-red-bright: color-mix(in srgb, var(--pm-red) 82%, #000); --pm-gold: color-mix(in srgb, var(--pm-orange) 88%, #000);
+  --pm-amber-soft: color-mix(in srgb, var(--pm-amber) 82%, #000);
   --pm-soft: color-mix(in srgb, var(--pm-text) 75%, var(--pm-muted));
   --pm-on-green: #fff; --pm-on-red: #fff; --pm-shadow: rgba(48, 30, 110, .16);
   --pm-cta-a: #8a63d2; --pm-cta-b: #5b35a8; --pm-cta-edge: #432784;
@@ -2120,6 +2121,9 @@ html[data-theme="obsidian"] body:has(.pm-screen) { background: #0B0A10; }
   --pm-green-tint: color-mix(in srgb, var(--pm-green) 32%, var(--pm-card)); --pm-red-tint: color-mix(in srgb, var(--pm-red) 30%, var(--pm-card));
   --pm-orange-tint: color-mix(in srgb, var(--pm-orange) 30%, var(--pm-card)); --pm-purple-tint: color-mix(in srgb, var(--pm-purple) 30%, var(--pm-card));
   --pm-ink: color-mix(in srgb, var(--pm-text) 88%, var(--pm-purple));
+  /* The rival's own colour (avatar, tug-of-war, Sibyl's bubble) against your purple. */
+  --pm-amber: color-mix(in srgb, var(--ember) 45%, var(--gold)); --pm-amber-soft: color-mix(in srgb, var(--pm-amber) 65%, #fff);
+  --pm-amber-deep: color-mix(in srgb, var(--pm-amber) 70%, #000); --pm-amber-tint: color-mix(in srgb, var(--pm-amber) 30%, var(--pm-card));
   --pm-on-green: #06210F; --pm-on-red: #2A0509; --pm-shadow: rgba(0, 0, 0, .55);
   --pm-cta-a: #A285FA; --pm-cta-b: #6E4FE0; --pm-cta-edge: #4A33A3;
   /* The coin's own line colour (chart line + area before entry); lavender for unknown markets. */
@@ -2129,7 +2133,11 @@ html[data-theme="obsidian"] body:has(.pm-screen) { background: #0B0A10; }
   padding: max(8px, env(safe-area-inset-top)) 12px calc(14px + env(safe-area-inset-bottom));
   background: radial-gradient(380px 260px at 50% 12%, color-mix(in srgb, var(--market-accent, #7C5CF0) 14%, transparent), transparent 70%), var(--pm-bg);
   color: var(--pm-text); font-family: var(--font-sans), Inter, system-ui, sans-serif;
+  /* A game screen: rapid taps and drags mustn't paint selection boxes over the chrome. */
+  -webkit-user-select: none; user-select: none;
 }
+/* iOS won't type into a field whose ancestor is user-select: none (stake stepper). */
+.pm-screen :is(input, textarea) { -webkit-user-select: text; user-select: text; }
 .pm-screen > * { flex: none; }
 .pm-screen:is([data-market="btc"], [data-market="eth"], [data-market="nvda"], [data-market="doge"], [data-market="hype"]) { --pm-coin: var(--chart-line); }
 .pm-screen.is-result { height: auto; min-height: calc(100dvh - var(--pm-chrome, 0px)); overflow: visible; }
@@ -2156,59 +2164,62 @@ html[data-theme="obsidian"] body:has(.pm-screen) { background: #0B0A10; }
 .pm-score { position: relative; padding: 14px 14px 12px; border: 1px solid var(--pm-edge); border-radius: 20px; background: linear-gradient(180deg, color-mix(in srgb, var(--pm-raised) 50%, var(--pm-card)), var(--pm-card)); transition: border-color .35s, background .35s, box-shadow .35s; }
 .pm-score.is-you { border-color: var(--pm-green-tint); background: linear-gradient(180deg, color-mix(in srgb, var(--pm-green) 8%, var(--pm-card)), var(--pm-card)); box-shadow: 0 12px 40px -20px color-mix(in srgb, var(--pm-green) 50%, transparent); }
 .pm-score.is-rival { border-color: var(--pm-red-tint); background: linear-gradient(180deg, color-mix(in srgb, var(--pm-red) 9%, var(--pm-card)), var(--pm-card)); box-shadow: 0 12px 40px -20px color-mix(in srgb, var(--pm-red) 45%, transparent); }
-.pm-score-row { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 4px; }
-.pm-player { display: flex; min-width: 0; align-items: center; gap: 6px; }
-.pm-player.is-rival { flex-direction: row-reverse; text-align: right; }
+/* Phones: player | timer ring | player, each player an avatar-over-text stack; desktop lays them flat. */
+.pm-score-row { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 6px; }
+.pm-player { display: flex; min-width: 0; flex-direction: column; align-items: center; gap: 4px; text-align: center; }
+.pm-player > div { max-width: 100%; }
 .pm-player-label { overflow: hidden; color: var(--pm-muted); font-size: 10.5px; font-weight: 600; letter-spacing: .04em; text-overflow: ellipsis; white-space: nowrap; }
 .pm-player-label.is-long { color: var(--pm-green); }
 .pm-player-label.is-short { color: var(--pm-red); }
-.pm-player-bal { overflow: hidden; font-size: 20px; font-weight: 700; letter-spacing: -.02em; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
-.pm-avatar { display: grid; flex: none; place-items: center; box-sizing: border-box; border: 2px solid var(--pm-purple); border-radius: 50%; background: color-mix(in srgb, var(--pm-purple) 22%, var(--pm-card)); color: var(--pm-purple-soft); font-size: 15px; font-weight: 800; transition: border-color .3s, background .3s, color .3s, box-shadow .3s; }
-.pm-avatar.is-you.is-lead { border-color: var(--pm-green); background: color-mix(in srgb, var(--pm-green) 20%, var(--pm-card)); color: var(--pm-green); box-shadow: 0 0 14px color-mix(in srgb, var(--pm-green) 50%, transparent); }
-.pm-avatar.is-sibyl, .pm-avatar.is-player { border-color: var(--pm-dim); color: var(--pm-soft); }
-.pm-avatar.is-sibyl.is-lead, .pm-avatar.is-player.is-lead { border-color: var(--pm-red); background: color-mix(in srgb, var(--pm-red) 20%, var(--pm-card)); color: var(--pm-red-bright); box-shadow: 0 0 14px color-mix(in srgb, var(--pm-red) 45%, transparent); }
-.pm-avatar.is-sibyl.is-trail, .pm-avatar.is-player.is-trail { border-color: var(--pm-red); background: color-mix(in srgb, var(--pm-red) 20%, var(--pm-card)); color: var(--pm-red); }
+.pm-player-bal { overflow: hidden; color: var(--pm-soft); font-size: 16px; font-weight: 700; letter-spacing: -.02em; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
+/* Identity colours: you purple, the rival amber; the leader glows in their own. */
+.pm-avatar { --pm-tone: var(--pm-purple); display: grid; flex: none; place-items: center; box-sizing: border-box; border: 2px solid var(--pm-tone); border-radius: 50%; background: color-mix(in srgb, var(--pm-tone) 22%, var(--pm-card)); color: var(--pm-purple-soft); font-size: 15px; font-weight: 800; transition: border-color .3s, background .3s, color .3s, box-shadow .3s; }
+.pm-avatar.is-sibyl, .pm-avatar.is-player { --pm-tone: var(--pm-amber); color: var(--pm-amber-soft); }
+.pm-avatar.is-lead { box-shadow: 0 0 14px color-mix(in srgb, var(--pm-tone) 55%, transparent); }
 
-.pm-timer { position: relative; width: 68px; height: 68px; }
+/* The centrepiece: a neutral ring (so it never reads as either player) that
+   drains each second and pulses red through the final 10. */
+.pm-timer { --pm-ring: 88px; position: relative; width: var(--pm-ring); height: var(--pm-ring); }
 .pm-timer-beat { position: relative; width: 100%; height: 100%; }
-.pm-timer svg { display: block; }
+.pm-timer svg { display: block; width: 100%; height: 100%; }
 .pm-timer-track { fill: var(--pm-field); stroke: var(--pm-line); transition: fill .3s, stroke .3s; }
-.pm-timer-fill { fill: none; stroke: var(--market-accent, var(--pm-purple)); transition: stroke-dashoffset 1s linear, stroke .3s; }
+.pm-timer-fill { fill: none; stroke: var(--pm-ink); transition: stroke-dashoffset 1s linear, stroke .3s; }
 .pm-timer-text { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-.pm-timer-text .pm-num { font-size: 22px; font-weight: 800; line-height: 1; }
-.pm-timer-text > span:last-child { margin-top: 2px; color: var(--pm-dim); font-size: 9px; font-weight: 600; letter-spacing: .1em; }
-.pm-timer.is-urgent .pm-timer-track { fill: color-mix(in srgb, var(--pm-red) 8%, var(--pm-field)); stroke: color-mix(in srgb, var(--pm-red) 18%, var(--pm-field)); }
+.pm-timer-text .pm-num { font-size: calc(var(--pm-ring) * .34); font-weight: 800; line-height: 1; }
+.pm-timer-sec { animation: pm-tick .35s ease-out; }
+@keyframes pm-tick { from { opacity: .35; transform: translateY(-3px) scale(.94); } }
+.pm-timer-text > span:last-child { margin-top: 3px; color: var(--pm-dim); font-size: 9.5px; font-weight: 600; letter-spacing: .1em; }
+.pm-timer.is-urgent .pm-timer-track { fill: color-mix(in srgb, var(--pm-red) 10%, var(--pm-field)); stroke: color-mix(in srgb, var(--pm-red) 22%, var(--pm-field)); }
 .pm-timer.is-urgent .pm-timer-fill { stroke: var(--pm-red); }
-.pm-timer.is-urgent .pm-timer-text .pm-num { color: var(--pm-red-bright); font-size: 26px; }
+.pm-timer.is-urgent .pm-timer-text .pm-num { color: var(--pm-red-bright); font-size: calc(var(--pm-ring) * .38); }
 .pm-timer.is-urgent .pm-timer-text > span:last-child { color: var(--pm-red); font-weight: 700; }
 .pm-timer.is-urgent .pm-timer-beat { animation: pm-heartbeat 1s ease-in-out; }
-@keyframes pm-heartbeat { 0%, 30%, 60%, 100% { transform: scale(1); } 15% { transform: scale(1.1); } 45% { transform: scale(1.05); } }
+@keyframes pm-heartbeat {
+  0%, 30%, 60%, 100% { transform: scale(1); filter: drop-shadow(0 0 0 transparent); }
+  15% { transform: scale(1.1); filter: drop-shadow(0 0 12px color-mix(in srgb, var(--pm-red) 75%, transparent)); }
+  45% { transform: scale(1.05); filter: drop-shadow(0 0 6px color-mix(in srgb, var(--pm-red) 50%, transparent)); }
+}
 
-.pm-pnl-row { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 10px; }
-.pm-pnl { font-size: 42px; font-weight: 800; letter-spacing: -.02em; line-height: 1.1; white-space: nowrap; transition: color .25s, filter .25s; }
-.pm-pnl.is-even { color: var(--pm-dim); }
+/* Signed lead: "+$4.20 ahead" green / "−$1.10 behind" red; min-height so "Dead even" doesn't shift the chart. */
+.pm-lead { display: flex; min-height: 27px; align-items: baseline; justify-content: center; gap: 7px; margin: 8px 0 0; white-space: nowrap; transition: color .25s; }
+.pm-lead.is-even { align-items: center; color: var(--pm-soft); font-size: 15px; font-weight: 600; }
+.pm-lead.is-you { color: var(--pm-green-bright); }
+.pm-lead.is-rival { color: var(--pm-red-bright); }
+.pm-lead-amount { font-size: 24px; font-weight: 800; letter-spacing: -.02em; line-height: 1.1; }
 /* drop-shadow, not text-shadow: each rolling digit clips its own box. */
-.pm-pnl.is-up { color: var(--pm-green-bright); filter: drop-shadow(0 0 12px color-mix(in srgb, var(--pm-green) 50%, transparent)); }
-.pm-pnl.is-down { color: var(--pm-red-bright); }
-.pm-pct { padding: 2px 7px; border-radius: 8px; font-size: 13px; font-weight: 700; }
-.pm-pct.is-up { background: var(--pm-green); color: var(--pm-on-green); }
-.pm-pct.is-down { background: var(--pm-red); color: var(--pm-on-red); }
+.pm-lead.is-you .pm-lead-amount { filter: drop-shadow(0 0 10px color-mix(in srgb, var(--pm-green) 45%, transparent)); }
+.pm-lead-word { font-size: 14px; font-weight: 700; }
 .pm-roll { display: inline-flex; }
 .pm-roll-digit { display: inline-block; height: 1.1em; overflow: hidden; }
 .pm-roll-strip { display: flex; flex-direction: column; transition: transform .45s cubic-bezier(.2, .8, .2, 1); }
 .pm-roll-strip > span { height: 1.1em; line-height: 1.1em; text-align: center; }
-.pm-lead-line { margin: 2px 0 0; color: var(--pm-soft); font-size: 15px; font-weight: 600; text-align: center; }
-.pm-lead-line.is-you { color: color-mix(in srgb, var(--pm-green) 35%, var(--pm-text)); font-weight: 700; }
-.pm-lead-line.is-rival { color: color-mix(in srgb, var(--pm-red) 40%, var(--pm-text)); font-weight: 700; }
-.pm-tug { position: relative; height: 12px; margin-top: 12px; }
+.pm-tug { position: relative; height: 10px; margin-top: 10px; }
 .pm-tug-track { display: flex; height: 100%; overflow: hidden; border-radius: 999px; background: var(--pm-raised); }
 .pm-tug-you { flex: none; background: linear-gradient(90deg, var(--pm-cta-b), var(--pm-purple)); transition: width .6s cubic-bezier(.2, .8, .2, 1); }
-.pm-score.is-you .pm-tug-you { background: linear-gradient(90deg, var(--pm-green-deep), var(--pm-green-bright)); }
-.pm-tug-rival { flex: 1; background: linear-gradient(90deg, color-mix(in srgb, var(--pm-red) 88%, #000), var(--pm-red-deep)); }
-.pm-score.is-even .pm-tug-rival { background: linear-gradient(90deg, var(--pm-dim), color-mix(in srgb, var(--pm-dim) 65%, #000)); }
+.pm-tug-rival { flex: 1; background: linear-gradient(90deg, var(--pm-amber), var(--pm-amber-deep)); }
 .pm-tug-spark { position: absolute; top: 50%; width: 20px; height: 20px; margin: -10px 0 0 -10px; border-radius: 50%; background: radial-gradient(circle, #fff 0%, rgba(255, 255, 255, .8) 28%, rgba(255, 255, 255, 0) 70%); pointer-events: none; transition: left .6s cubic-bezier(.2, .8, .2, 1); animation: pm-spark .8s ease-in-out infinite; }
-.pm-tug-spark.is-you { background: radial-gradient(circle, #fff 0%, color-mix(in srgb, var(--pm-green) 45%, var(--pm-text)) 35%, transparent 70%); }
-.pm-tug-spark.is-rival { background: radial-gradient(circle, #fff 0%, color-mix(in srgb, var(--pm-red) 40%, var(--pm-text)) 35%, transparent 70%); }
+.pm-tug-spark.is-you { background: radial-gradient(circle, #fff 0%, color-mix(in srgb, var(--pm-purple) 50%, var(--pm-text)) 35%, transparent 70%); }
+.pm-tug-spark.is-rival { background: radial-gradient(circle, #fff 0%, color-mix(in srgb, var(--pm-amber) 50%, var(--pm-text)) 35%, transparent 70%); }
 @keyframes pm-spark { 50% { opacity: .75; transform: scale(1.25); } }
 .pm-tug.is-shaking { animation: pm-shake .45s ease-in-out; }
 @keyframes pm-shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-5px); } 40% { transform: translateX(4px); } 60% { transform: translateX(-3px); } 80% { transform: translateX(2px); } }
@@ -2218,6 +2229,9 @@ html[data-theme="obsidian"] body:has(.pm-screen) { background: #0B0A10; }
 /* The tail points up-right, at the speaker's corner of the scoreboard. */
 .pm-bubble::after { position: absolute; top: -6px; right: 18px; width: 10px; height: 10px; border-top: 1px solid var(--pm-purple-tint); border-left: 1px solid var(--pm-purple-tint); background: color-mix(in srgb, var(--pm-purple) 12%, var(--pm-card)); content: ""; transform: rotate(45deg); }
 .pm-bubble strong { color: var(--pm-purple-soft); font-weight: 700; }
+.pm-bubble.is-sibyl, .pm-bubble.is-sibyl::after { border-color: var(--pm-amber-tint); background: color-mix(in srgb, var(--pm-amber) 12%, var(--pm-card)); }
+.pm-bubble.is-sibyl { color: color-mix(in srgb, var(--pm-amber) 15%, var(--pm-text)); }
+.pm-bubble.is-sibyl strong { color: var(--pm-amber-soft); }
 .pm-bubble.is-hurt { border-color: var(--pm-red-tint); background: color-mix(in srgb, var(--pm-red) 12%, var(--pm-card)); color: color-mix(in srgb, var(--pm-red) 15%, var(--pm-text)); }
 .pm-bubble.is-hurt::after { border-color: var(--pm-red-tint); background: color-mix(in srgb, var(--pm-red) 12%, var(--pm-card)); }
 .pm-bubble.is-hurt strong { color: var(--pm-red-bright); }
@@ -2368,8 +2382,8 @@ html[data-theme="obsidian"] body:has(.pm-screen) { background: #0B0A10; }
 @media (max-height: 740px) {
   .pm-screen { gap: 8px; }
   .pm-score { padding: 10px 12px; }
-  .pm-pnl { font-size: 36px; }
-  .pm-pnl-row { margin-top: 6px; }
+  .pm-timer { --pm-ring: 76px; }
+  .pm-lead { margin-top: 4px; }
   .pm-tug { margin-top: 8px; }
   .pm-bubble { padding: 7px 11px; font-size: 13px; }
   .pm-trade { height: 64px; }
@@ -2378,9 +2392,8 @@ html[data-theme="obsidian"] body:has(.pm-screen) { background: #0B0A10; }
 @media (max-width: 380px) {
   .pm-screen { padding-inline: 10px; }
   .pm-score { padding-inline: 10px; }
-  .pm-player { gap: 5px; }
   .pm-player-label { letter-spacing: .02em; }
-  .pm-player-bal { font-size: 19px; }
+  .pm-player-bal { font-size: 15px; }
   .pm-market { padding: 0 10px; }
 }
 /* Phones/tablets: no "price goes up/down" under Long/Short, no generic helper
@@ -2401,8 +2414,8 @@ html[data-theme="obsidian"] body:has(.pm-screen) { background: #0B0A10; }
 }
 
 /* Desktop: the live round stacks full-width like the lobby's stage (1280px
-   max) — top bar, the scoreboard as one horizontal strip (balances, your
-   P&L, timer, lead line, tug-of-war), the chart filling every remaining
+   max) — top bar, the scoreboard as one horizontal strip (you | timer ring
+   over the signed lead | rival, tug-of-war underneath), the chart filling every remaining
    pixel, then the controls in one row underneath (Amount + Leverage | Long +
    Short; in a position, Flip + Liq | Close). The bubble floats in the chart's
    top-right header band, tail up at the rival. The result screen keeps the
@@ -2426,22 +2439,22 @@ html[data-theme="obsidian"] body:has(.pm-screen) { background: #0B0A10; }
   .pm-screen:not(.is-result) > .pm-controls { grid-area: controls; }
   .pm-screen:not(.is-result) .pm-bubble-row { z-index: 2; grid-area: chart; align-self: start; justify-self: end; margin: 14px 72px 0 0; padding: 0; }
 
-  /* Scoreboard strip: you | P&L | timer | lead | rival, tug-of-war underneath. */
+  /* Scoreboard strip: you | timer ring over the lead | rival, tug-of-war underneath. */
   .pm-screen:not(.is-result) .pm-score {
-    display: grid; align-items: center; column-gap: 20px; row-gap: 10px; padding: 14px 22px 14px;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) auto minmax(0, 1.3fr) minmax(0, 1fr);
-    grid-template-areas: "you pnl timer lead rival" "tug tug tug tug tug";
+    display: grid; align-items: center; column-gap: 24px; row-gap: 6px; padding: 12px 22px 14px;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    grid-template-areas: "you timer rival" "you lead rival" "tug tug tug";
   }
   .pm-screen:not(.is-result) .pm-score-row { display: contents; }
   .pm-screen:not(.is-result) .pm-score-row > .pm-player:first-child { grid-area: you; }
-  .pm-screen:not(.is-result) .pm-score-row > .pm-timer { grid-area: timer; }
+  .pm-screen:not(.is-result) .pm-score-row > .pm-timer { grid-area: timer; justify-self: center; }
   .pm-screen:not(.is-result) .pm-score-row > .pm-player.is-rival { grid-area: rival; }
-  .pm-screen:not(.is-result) .pm-player { gap: 10px; }
-  .pm-screen:not(.is-result) .pm-player-bal { font-size: 24px; }
-  .pm-screen:not(.is-result) .pm-pnl-row { grid-area: pnl; justify-content: flex-end; margin: 0; }
-  .pm-screen:not(.is-result) .pm-pnl { font-size: clamp(30px, 3vw, 42px); }
-  .pm-screen:not(.is-result) .pm-lead-line { grid-area: lead; margin: 0; text-align: left; }
-  .pm-screen:not(.is-result) .pm-tug { grid-area: tug; height: 8px; margin: 0; }
+  .pm-screen:not(.is-result) .pm-player { flex-direction: row; gap: 10px; text-align: left; }
+  .pm-screen:not(.is-result) .pm-player.is-rival { flex-direction: row-reverse; text-align: right; }
+  .pm-screen:not(.is-result) .pm-player-bal { font-size: 20px; }
+  .pm-screen:not(.is-result) .pm-lead { grid-area: lead; margin: 0; }
+  .pm-screen:not(.is-result) .pm-lead-amount { font-size: 26px; }
+  .pm-screen:not(.is-result) .pm-tug { grid-area: tug; height: 8px; margin: 4px 0 0; }
 
   /* Controls row under the chart. */
   .pm-screen:not(.is-result) > .pm-controls { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); align-items: center; column-gap: 14px; row-gap: 8px; }
@@ -2455,9 +2468,9 @@ html[data-theme="obsidian"] body:has(.pm-screen) { background: #0B0A10; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .pm-live-dot.is-live, .pm-tug-spark, .pm-tug.is-shaking, .pm-timer.is-urgent .pm-timer-beat, .pm-bubble, .pm-fan, .pm-head-glow, .pm-chart-liq,
+  .pm-live-dot.is-live, .pm-tug-spark, .pm-tug.is-shaking, .pm-timer.is-urgent .pm-timer-beat, .pm-timer-sec, .pm-bubble, .pm-fan, .pm-head-glow, .pm-chart-liq,
   .pm-pop, .pm-close.is-up, .pm-liq.is-near, .pm-edge, .pm-rays, .pm-confetti, .pm-stamp { animation: none; }
-  .pm-roll-strip, .pm-tug-you, .pm-tug-spark, .pm-timer-fill, .pm-trade, .pm-close, .pm-rematch, .pm-score, .pm-chart-box, .pm-avatar, .pm-pnl { transition: none; }
+  .pm-roll-strip, .pm-tug-you, .pm-tug-spark, .pm-timer-fill, .pm-trade, .pm-close, .pm-rematch, .pm-score, .pm-chart-box, .pm-avatar, .pm-lead { transition: none; }
 }
 .result-burst { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
 .result-burst-particle { position: absolute; top: 50%; left: 50%; height: 7px; width: 7px; border-radius: 2px; background: var(--brand); opacity: 0; animation: result-burst-fly .85s ease-out forwards; }
