@@ -26,7 +26,8 @@ export async function GET(request: Request, ctx: { params: Promise<{ id: string 
   const userId = (await getViewer())?.userId;
   if (!userId) return Response.json({ error: "Sign in to play" }, { status: 401 });
   const { id } = await ctx.params;
-  const playerId = new URL(request.url).searchParams.get("playerId") ?? "";
+  const { searchParams } = new URL(request.url);
+  const playerId = searchParams.get("playerId") ?? "";
   if (!playerId) {
     return Response.json({ error: "Missing playerId" }, { status: 400 });
   }
@@ -48,7 +49,10 @@ export async function GET(request: Request, ctx: { params: Promise<{ id: string 
   // Expiry can hand back a `countdown` row, so settlement runs on its result.
   // A house bot takes a lonely queue's seat and makes its trades here too.
   // Liquidation runs first so the bot and settlement never see a dead position.
-  const live = await liquidateIfDue(await expireLocksIfDue(await seatBotIfWaiting(touched)));
+  // `holdBot=1`: the host just shared an invite (app/duel/page.tsx INVITE_HOLD_MS),
+  // so the seat stays free for their friend a while longer.
+  const seated = searchParams.get("holdBot") === "1" ? touched : await seatBotIfWaiting(touched);
+  const live = await liquidateIfDue(await expireLocksIfDue(seated));
   const row = await settleIfDue(await driveBot(live));
   await settleFundsIfNeeded(row);
   const view = viewFor(row, role);

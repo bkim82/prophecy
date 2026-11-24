@@ -5,8 +5,9 @@ import { REMATCH_SECONDS } from "@/app/lib/challengeRules";
 import { ensureUser, refundBalance, reserveBalance } from "@/lib/balance";
 import { isFresh, type MatchRow } from "@/lib/match";
 
-// "Play again" on a settled challenge round (`matches.invited_user_id` set,
-// app/profile/challengeActions.ts acceptChallenge). The first press asks; the
+// "Play again" on a settled private round (`matches.invited_user_id` set by
+// app/profile/challengeActions.ts acceptChallenge, or by joining from an
+// invite link, app/api/match/[id]/join). The first press asks; the
 // other seat then has REMATCH_SECONDS to press it too, which opens a new
 // private round on the same terms with both players already seated — straight
 // into the 5s pre-round countdown. An ask only counts while the asker still
@@ -39,7 +40,7 @@ const lastSeenOf = (row: MatchRow, role: 1 | 2) => (role === 1 ? row.player1Last
 const msLeft = (rematch: RematchRow | null) =>
   rematch ? Math.max(0, rematch.requestedAt.getTime() + WINDOW_MS - Date.now()) : 0;
 
-/** True for a settled challenge round between two accounts — the only rounds that offer a rematch. */
+/** True for a settled private round between two accounts — the only rounds that offer a rematch. */
 export const offersRematch = (row: MatchRow) =>
   row.status === "settled" && row.invitedUserId !== null && row.player1UserId !== null && row.player2UserId !== null;
 

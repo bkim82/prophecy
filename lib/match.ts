@@ -215,7 +215,7 @@ export type MatchView = {
   timerSeconds: number;
   status: MatchStatus;
   you: 1 | 2;
-  /** A challenge's private round (`invited_user_id`): settled, it offers a rematch (lib/rematch.ts). */
+  /** A private round (`invited_user_id`: a challenge, or joined by invite link): settled, it offers a rematch (lib/rematch.ts). */
   challenge: boolean;
   opponentJoined: boolean;
   opponentPresent: boolean;

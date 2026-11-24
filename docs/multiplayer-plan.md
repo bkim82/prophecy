@@ -8,8 +8,8 @@ polling, and lazy settlement.
 - One `matches` row = one round, single source of truth (`db/schema.ts:20`). Pulse
   positions, realized P&L, and final P&L live in the same row.
 - Match-seat identity: anonymous per-browser UUID in `localStorage.playerId` (`app/lib/playerId.ts:20`), separate from the signed-in application viewer.
-- Sync: ~1s polling (`app/duel/[market]/pulse/[matchId]/page.tsx:22`), no WebSocket registry. Lobby open-match count polls at 3s (`app/duel/page.tsx:30`), the queue at 1s (`app/duel/page.tsx:35`).
-- Nobody sits in a room alone: an `open` match is waited out on the lobby page (`app/duel/page.tsx` `queue` panel); the room is entered only once `status` leaves `open`. The queued state exposes a shareable invite URL (`app/duel/page.tsx` `shareInvite`) that auto-joins a friend as player 2 (`app/duel/[market]/pulse/[matchId]/page.tsx:59`, `:89-99`).
+- Sync: ~1s polling (`app/duel/[market]/pulse/[matchId]/page.tsx:22`), no WebSocket registry. Lobby open-match count polls at 3s (`app/duel/page.tsx:35`), the queue at 1s (`app/duel/page.tsx:40`).
+- Nobody sits in a room alone: an `open` match is waited out on the lobby page (`app/duel/page.tsx` `queue` panel); the room is entered only once `status` leaves `open`. The queued state exposes a shareable invite URL (`app/duel/page.tsx` `shareInvite`) that auto-joins a friend as player 2 (`app/duel/[market]/pulse/[matchId]/page.tsx:59`, `:89-99`) and makes the round private (`invited_user_id` = the joiner, `app/api/match/[id]/join/route.ts:53`), so settled it offers a rematch.
 - Requires application sign-in (`getViewer()`, `lib/viewer.ts`). Wager is picked in the lobby from `PULSE_WAGER_OPTIONS` (50/100/200 Embers, default 100; `lib/pulse.ts`, Wager segmented control in `app/duel/page.tsx`). Each player's `wager` is reserved atomically from `users.balance` on entry; open/predict cancellation refunds it, ties refund both stakes, and the winner receives the 2× pot (`lib/balance.ts`). Pulse reserves each entry's stake from the player's round bankroll and returns that stake when the position closes.
 
 ## Status machine
@@ -45,7 +45,7 @@ multi-statement transactions or row locks. Every transition is a single guarded
 
 - `PRESENCE_MS = 8000` (`lib/match.ts:14`). Stale `open` rows are filtered out of listing and matchmaking, never deleted — a dead row is just invisible, so there is no cleanup cron.
 - Heartbeat is folded into the poll: `touchAndRead` stamps the caller's `last_seen` and reads the row in one statement via a `CASE` (`lib/match.ts:52`). No separate heartbeat endpoint.
-- A queued lobby therefore polls at room speed, not lobby speed (`app/duel/page.tsx:29`): a 3s beat would age its own row out of the very list it is waiting to be found in.
+- A queued lobby therefore polls at room speed, not lobby speed (`app/duel/page.tsx:40`): a 3s beat would age its own row out of the very list it is waiting to be found in.
 - Only matters pre-round. During `predict` it drives "opponent disconnected"; the 5s countdown starts the round regardless.
 
 ## Timestamps
@@ -58,9 +58,9 @@ multi-statement transactions or row locks. Every transition is a single guarded
 - Personas: `bots` table (`db/schema.ts`), Clerk-shaped `user_…` id, random name (`randomBotName`, `lib/bots.ts:74`) in the same `@handle`/first-name shapes as real opponents, hidden `skill` 0..1. Pool minted up to `POOL_TARGET`=80, then reused (`pickPersonas`). Names resolve via `lib/opponentNames.ts` → `botNames` before Clerk.
 - Per-round brain: `matches.bot_state` jsonb (`BotState`, role + skill + next tick). Non-null = a bot holds that seat; never in `viewFor`. A bot opponent always reads `opponentPresent: true`.
 - Always online: `ensureBotSlots` (`lib/bots.ts:149`, called from `GET /api/match/open`, throttled 4s/instance) keeps one bot-hosted `open` row per BTC × 60/120/300s × 50/100/200 wager (`BOT_WAGERS` = `PULSE_WAGER_OPTIONS`; `BOT_MARKETS`; ETH stays human-only so invites aren't sniped); unique partial index `matches_one_open_bot_per_slot` dedupes. A slot gets a new persona only after its bot is joined; the listed age cycles every 90s (`listedCreatedAt`, display only). Bot hosts skip presence (`or(... isNotNull(botState))` in open list + join).
-- Play (`find-or-create`) pairs humans only (`isNull(botState)`); a queued human on a `BOT_MARKETS` market gets a bot after a deterministic 3–9s per match (`seatBotIfWaiting`, `lib/bots.ts:212`, run off the poll), same guarded seat UPDATE so a real joiner still wins.
-- Challenge rounds (`matches.invited_user_id` set by `acceptChallenge`, see [profiles.md](profiles.md)) are private: `find-or-create` and `GET /api/match/open` skip them, `seatBotIfWaiting` never seats a bot, and `join` 409s anyone but the invited account (also in its guarded UPDATE). Settled, they offer a rematch — see Rematch below.
-- Trading: `driveBot` (`lib/bots.ts:241`) runs off `GET /api/match/[id]` between pre-round expiry and settlement (`app/api/match/[id]/route.ts:47-48`); CAS on `bot_state`. Skill shapes habits only (stake fraction, leverage, momentum-follow, TP/SL, tick rate) — no lookahead. Only trades while someone polls.
+- Play (`find-or-create`) pairs humans only (`isNull(botState)`); a queued human on a `BOT_MARKETS` market gets a bot after a deterministic 3–9s per match (`seatBotIfWaiting`, `lib/bots.ts:212`, run off the poll), same guarded seat UPDATE so a real joiner still wins. Share invite holds it off: for `INVITE_HOLD_MS`=20s after the invite goes out (and while the share sheet is open) the queue poll sends `holdBot=1` (`app/duel/page.tsx:43`) and the route skips `seatBotIfWaiting` (`app/api/match/[id]/route.ts:54`); then the bot seats on the next poll.
+- Private rounds (`matches.invited_user_id` set by `acceptChallenge`, see [profiles.md](profiles.md), or by an invite-link join of a human host): `find-or-create` and `GET /api/match/open` skip them, `seatBotIfWaiting` never seats a bot, and `join` 409s anyone but the invited account (also in its guarded UPDATE). Settled, they offer a rematch — see Rematch below.
+- Trading: `driveBot` (`lib/bots.ts:241`) runs off `GET /api/match/[id]` between pre-round expiry and settlement (`app/api/match/[id]/route.ts:55-56`); CAS on `bot_state`. Skill shapes habits only (stake fraction, leverage, momentum-follow, TP/SL, tick rate) — no lookahead. Only trades while someone polls.
 - Economy: bots have no `users` row and reserve nothing; a human beating a bot is paid the full 2× pot (half minted), a bot win just keeps the human's stake.
 
 ## Routes
@@ -69,11 +69,11 @@ multi-statement transactions or row locks. Every transition is a single guarded
 | --- | --- |
 | `POST /api/match/find-or-create` | join oldest live `open` match with identical criteria, else create one. Returns `status`, which is how the lobby decides between entering the room and queueing (`app/api/match/find-or-create/route.ts:74`,`:97`,`:117`) |
 | `GET /api/match/[id]?playerId=` | role-scoped view + heartbeat + pre-round expiry + lazy settlement (`app/api/match/[id]/route.ts:38`). Polled by the room, and by the lobby while queued |
-| `POST /api/match/[id]/join` | take a specific fresh open match (invite link path); a challenge round only seats `invited_user_id` |
+| `POST /api/match/[id]/join` | take a specific fresh open match (invite link path); a challenge round only seats `invited_user_id`; a human host's round becomes private (`invited_user_id` = joiner) |
 | `POST /api/match/[id]/action` | Pulse server-priced `enter` actions up to available bankroll and per-position `close` actions; rejects unless the application viewer owns the browser player's stored match slot (`app/api/match/[id]/action/route.ts:33-51`) |
 | `POST /api/match/[id]/leave` | delete while `open`/`predict`; 409 once counting down |
 | `GET /api/match/open?market=&mode=&playerId=` | joinable matches with a fresh host heartbeat (not challenge rounds) |
-| `GET/POST /api/match/[id]/rematch` | settled challenge round only (409 otherwise): GET = `RematchView`, POST = press Play again. Both stamp the caller's match heartbeat (`touchAndRead`) |
+| `GET/POST /api/match/[id]/rematch` | settled private round only (409 otherwise): GET = `RematchView`, POST = press Play again. Both stamp the caller's match heartbeat (`touchAndRead`) |
 | `GET /api/match/recent` | signed-in user's newest 5 settled matches, all markets — `settledMatchesFor` + `historyEntryFor` + profile-backed `opponentNames` (`lib/opponentNames.ts`), same naming as the profile Matches tab. Rendered by the lobby's Recent results: coin, `vs <opponent>`, Won/Lost/Tie, your round P&L, relative time (`app/lib/playedLabel.ts`); fetched once per mount, so returning from a room refreshes it |
 
 Validation on entry: market must price (`lib/spotPrice.ts:12`), mode must be
@@ -91,16 +91,16 @@ cap, so winnings can be staked), leverage, and position id.
 - `<PriceChart>` still reads the browser's own `usePriceFeed()` — the chart stays client-direct to Coinbase, no server round trip. Only `roundStart`/trade-marker times come from the poll.
 - Settlement freezes the series with the final point pinned to the deadline, not to whenever the tab noticed (`app/duel/[market]/pulse/[matchId]/page.tsx:132`).
 - Lobby Play button is an async matchmaker, not a `Link` (`app/duel/page.tsx` `play`). Signed out, provider-neutral `SignInAction` opens the active provider modal with "Sign in to play", not a disabled button. Styled as the violet CTA gradient (`.arena-play`, `--arena-cta-a/b`), pinned to the bottom of the call panel. While queued, Share invite uses native sharing when available and clipboard copy otherwise (`app/duel/page.tsx` `shareInvite`).
-- Queueing replaces the whole play control panel rather than disabling it — the criteria are already committed to a row. Cancel deletes the row via `leave` (`app/duel/page.tsx` `cancelQueue`); the room is prefetched while waiting so navigation does not eat into the 5s (`app/duel/page.tsx:293`).
+- Queueing replaces the whole play control panel rather than disabling it — the criteria are already committed to a row. Cancel deletes the row via `leave` (`app/duel/page.tsx` `cancelQueue`); the room is prefetched while waiting so navigation does not eat into the 5s (`app/duel/page.tsx:376`).
 
-## Rematch (challenge rounds)
+## Rematch (private rounds: challenges + invite links)
 
-- `lib/rematch.ts`; one `rematches` row per settled round (`db/schema.ts:378`, `db/rematches.sql`): asking `role`, `requested_at`, `next_match_id`. App-server clock, like `lib/match.ts`.
-- `offersRematch` (`lib/rematch.ts:43`): `settled` + `invited_user_id` + both user ids. `MatchView.challenge` (`lib/match.ts:268`) tells the room.
-- First Play again asks: guarded upsert, nothing reserved (balance ≥ wager checked). The other seat has `REMATCH_SECONDS`=30 (`app/lib/challengeRules.ts:36`) to press it too. An ask only counts while the asker's match heartbeat is fresh (`PRESENCE_MS`) — `theyAsked` (`lib/rematch.ts:61`); an ask from someone who left, or past its window, can be overwritten.
-- Second press → `openRematch` (`lib/rematch.ts:114`): reserves both stakes (asker short → caller refunded, 402), inserts the new round already in `predict` (same seats/playerIds, terms, `invited_user_id`, so it rematches in turn), then claims the ask (`next_match_id`, guarded on still-live). Lost claim → delete + refund both. Simultaneous presses: the losing upsert re-reads and answers the winner's ask, so exactly one round opens.
-- Client (`app/duel/[market]/pulse/[matchId]/Rematch.tsx`): `useRematch` polls GET at 1s while the challenge round is settled (the room's own poll stops at `settled`); `RematchCheck` ready check above the result card (two seats ✓ Ready / Your move / Deciding…, draining meter, `clockLabel` countdown; `theirs` glows violet and scrolls into view), `RematchButton` in the card's Play again slot (beckoning violet `Play again · Ns` / outline `Waiting for X… Ns` / `Back to lobby` once they left). The room also `say`s "X wants a rematch." + `playFeedback` (`page.tsx:319`). `next_match_id` → `router.push` into the new room (`page.tsx:311`). CSS `.rematch-*` in `app/globals.css`.
-- Matchmade rounds keep the plain Play Again → `/duel` link.
+- `lib/rematch.ts`; one `rematches` row per settled round (`db/schema.ts:379`, `db/rematches.sql`): asking `role`, `requested_at`, `next_match_id`. App-server clock, like `lib/match.ts`.
+- `offersRematch` (`lib/rematch.ts:44`): `settled` + `invited_user_id` + both user ids. `MatchView.challenge` (`lib/match.ts:268`) tells the room.
+- First Play again asks: guarded upsert, nothing reserved (balance ≥ wager checked). The other seat has `REMATCH_SECONDS`=30 (`app/lib/challengeRules.ts:36`) to press it too. An ask only counts while the asker's match heartbeat is fresh (`PRESENCE_MS`) — `theyAsked` (`lib/rematch.ts:62`); an ask from someone who left, or past its window, can be overwritten.
+- Second press → `openRematch` (`lib/rematch.ts:115`): reserves both stakes (asker short → caller refunded, 402), inserts the new round already in `predict` (same seats/playerIds, terms, `invited_user_id`, so it rematches in turn), then claims the ask (`next_match_id`, guarded on still-live). Lost claim → delete + refund both. Simultaneous presses: the losing upsert re-reads and answers the winner's ask, so exactly one round opens.
+- Client (`app/duel/[market]/pulse/[matchId]/Rematch.tsx`): `useRematch` polls GET at 1s while the private round is settled (the room's own poll stops at `settled`); `RematchCheck` ready check above the result card (two seats ✓ Ready / Your move / Deciding…, draining meter, `clockLabel` countdown; `theirs` glows violet and scrolls into view), `RematchButton` in the card's Play again slot (beckoning violet `Play again · Ns` / outline `Waiting for X… Ns` / `Back to lobby` once they left). The room also `say`s "X wants a rematch." + `playFeedback` (`page.tsx:306`). `next_match_id` → `router.push` into the new room (`page.tsx:301`). CSS `.rematch-*` in `app/globals.css`.
+- Matchmade rounds (find-or-create, bots) keep the plain Play Again → `/duel` link.
 
 ## Verified
 

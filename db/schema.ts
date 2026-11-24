@@ -178,9 +178,10 @@ export const matches = pgTable("matches", {
   player2Id: text("player2_id"),
   player1UserId: text("player1_user_id"),
   player2UserId: text("player2_user_id"),
-  // A challenge's private round (app/profile/challengeActions.ts acceptChallenge):
-  // only this account may take seat 2, and the lobby list, matchmaking and
-  // house bots all skip it.
+  // A private round — a challenge's (app/profile/challengeActions.ts
+  // acceptChallenge) or one joined by invite link (app/api/match/[id]/join):
+  // only this account may take seat 2, the lobby list, matchmaking and house
+  // bots all skip it, and settled it offers a rematch (lib/rematch.ts).
   invitedUserId: text("invited_user_id"),
   // Every timestamp here is `timestamptz`, not the bare `timestamp` `users`
   // uses: these are compared against wall-clock `Date.now()` and written from

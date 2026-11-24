@@ -38,6 +38,9 @@ const LOBBY_POLL_MS = 3000;
 // speed rather than lobby speed — a slower beat would age the row out of the
 // very list it is waiting to be found in (lib/match.ts PRESENCE_MS).
 const QUEUE_POLL_MS = 1000;
+// After Share invite, the queue poll asks the server to hold off seating a
+// house bot this long, so the friend has time to tap the link.
+const INVITE_HOLD_MS = 20_000;
 // Wins ticker, featured match, top callers, players online (GET /api/arena/lobby).
 const ARENA_POLL_MS = 5000;
 // The other markets' 24h % on the switcher (GET /api/market-stats).
@@ -142,6 +145,8 @@ export default function Page() {
   // global ActiveMatchBar is the only way back into it.
   const [activeMatch, setActiveMatchState] = useState<ActiveMatch | null>(null);
   const [inviteState, setInviteState] = useState<"idle" | "shared" | "copied" | "error">("idle");
+  // When the invite went out (INVITE_HOLD_MS); a ref so the queue poll reads it without restarting.
+  const inviteSentAtRef = useRef<number | null>(null);
   // null until loaded; finishing a match navigates back here, which remounts and refetches.
   const [recentResults, setRecentResults] = useState<RecentResult[] | null>(null);
   // First-timer nudge toward the tutorial; read after mount (localStorage), so it never flashes for players who finished it.
@@ -288,6 +293,9 @@ export default function Page() {
     if (!inviteHref || !queue) return;
     const url = `${window.location.origin}${inviteHref}`;
     setInviteState("idle");
+    // Hold the bot while the share sheet is open too, then restart the hold once it's sent.
+    const heldSince = inviteSentAtRef.current;
+    inviteSentAtRef.current = Date.now();
     try {
       if (navigator.share) {
         await navigator.share({
@@ -302,7 +310,10 @@ export default function Page() {
       } else {
         throw new Error("Sharing is not supported");
       }
+      inviteSentAtRef.current = Date.now();
     } catch (error) {
+      // Nothing went out, so no new hold.
+      inviteSentAtRef.current = heldSince;
       // Closing the native share sheet is not an error worth showing.
       if (error instanceof DOMException && error.name === "AbortError") return;
       setInviteState("error");
@@ -368,9 +379,11 @@ export default function Page() {
 
     const poll = async () => {
       tick();
+      const sentAt = inviteSentAtRef.current;
+      const holdBot = sentAt !== null && Date.now() - sentAt < INVITE_HOLD_MS ? "&holdBot=1" : "";
       try {
         const res = await fetch(
-          `/api/match/${encodeURIComponent(queue.matchId)}?playerId=${encodeURIComponent(playerId)}`,
+          `/api/match/${encodeURIComponent(queue.matchId)}?playerId=${encodeURIComponent(playerId)}${holdBot}`,
           { cache: "no-store" },
         );
         if (cancelled) return;
@@ -404,6 +417,7 @@ export default function Page() {
 
   useEffect(() => {
     setInviteState("idle");
+    inviteSentAtRef.current = null;
   }, [queue?.matchId]);
 
   const cancelQueue = async () => {
