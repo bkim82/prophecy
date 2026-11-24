@@ -8,7 +8,8 @@ import { RankBadge } from "@/app/RankBadge";
 
 // Top of the right rail, above the leaderboard: look up people or posts via
 // GET /api/search. Results open inline, not as an overlay — the rail scrolls
-// itself, so a popover would be clipped. Esc clears.
+// itself, so a popover would be clipped. Esc clears. Beta mode's friend finder
+// (app/FriendSearch.tsx) reuses the lookup and the People rows.
 
 export type SearchResults = {
   // `imageUrl` only for real accounts with a photo; everyone else gets the gradient initial.
@@ -18,17 +19,20 @@ export type SearchResults = {
 
 const DEBOUNCE_MS = 200;
 
-export function SidebarSearch() {
-  const [query, setQuery] = useState("");
+/**
+ * Debounced GET /api/search for an already-trimmed `query`. The last answer
+ * stays up while a longer query loads; clearing the query drops it, so the next
+ * one never flashes stale rows. `people` skips the posts lookup.
+ */
+export function useSearchResults(query: string, { people = false } = {}) {
   const [results, setResults] = useState<SearchResults | null>(null);
-  const resultsId = useId();
-  const trimmed = query.trim();
+  if (!query && results) setResults(null);
 
   useEffect(() => {
-    if (!trimmed) return;
+    if (!query) return;
     const controller = new AbortController();
     const timer = setTimeout(() => {
-      fetch(`/api/search?q=${encodeURIComponent(trimmed)}`, { signal: controller.signal })
+      fetch(`/api/search?q=${encodeURIComponent(query)}${people ? "&people=1" : ""}`, { signal: controller.signal })
         .then((response) => (response.ok ? response.json() : null))
         .then((data: SearchResults | null) => {
           if (data) setResults(data);
@@ -39,12 +43,41 @@ export function SidebarSearch() {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [trimmed]);
+  }, [query, people]);
 
-  const update = (next: string) => {
-    setQuery(next);
-    if (!next.trim()) setResults(null);
-  };
+  return query ? results : null;
+}
+
+/** People rows: photo or gradient initial, name + rank, handle; each opens their profile. */
+export function SearchPeople({ users }: { users: SearchResults["users"] }) {
+  return (
+    <ul>
+      {users.map((user) => (
+        <li key={user.handle}>
+          <Link href={`/profile/${user.handle.slice(1)}`} className="sidebar-search-item">
+            <span className="sidebar-search-avatar" aria-hidden="true" style={{ background: avatarGradient(user.handle) }}>
+              {/* Clerk-hosted or our avatar route; a plain img avoids allow-listing its domain for next/image. */}
+              {user.imageUrl ? <img src={user.imageUrl} alt="" /> : user.name.charAt(0).toUpperCase()}
+            </span>
+            <span className="sidebar-search-text">
+              <strong>
+                <span className="sidebar-search-name">{user.name}</span>
+                <RankBadge rank={user.rank} seed={user.handle} />
+              </strong>
+              <span className="muted">{user.handle}</span>
+            </span>
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+export function SidebarSearch() {
+  const [query, setQuery] = useState("");
+  const resultsId = useId();
+  const trimmed = query.trim();
+  const results = useSearchResults(trimmed);
 
   const empty = results && results.users.length === 0 && results.posts.length === 0;
 
@@ -59,35 +92,17 @@ export function SidebarSearch() {
           placeholder="Search people & posts"
           autoComplete="off"
           aria-controls={resultsId}
-          onChange={(event) => update(event.target.value)}
-          onKeyDown={(event) => event.key === "Escape" && update("")}
+          onChange={(event) => setQuery(event.target.value)}
+          onKeyDown={(event) => event.key === "Escape" && setQuery("")}
         />
       </label>
-      {trimmed && results && (
+      {results && (
         <div id={resultsId} className="sidebar-search-results" aria-live="polite">
           {empty && <p className="sidebar-search-empty muted">No people or posts match &ldquo;{trimmed}&rdquo;.</p>}
           {results.users.length > 0 && (
             <>
               <h3>People</h3>
-              <ul>
-                {results.users.map((user) => (
-                  <li key={user.handle}>
-                    <Link href={`/profile/${user.handle.slice(1)}`} className="sidebar-search-item">
-                      <span className="sidebar-search-avatar" aria-hidden="true" style={{ background: avatarGradient(user.handle) }}>
-                        {/* Clerk-hosted or our avatar route; a plain img avoids allow-listing its domain for next/image. */}
-                        {user.imageUrl ? <img src={user.imageUrl} alt="" /> : user.name.charAt(0).toUpperCase()}
-                      </span>
-                      <span className="sidebar-search-text">
-                        <strong>
-                          <span className="sidebar-search-name">{user.name}</span>
-                          <RankBadge rank={user.rank} seed={user.handle} />
-                        </strong>
-                        <span className="muted">{user.handle}</span>
-                      </span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
+              <SearchPeople users={results.users} />
             </>
           )}
           {results.posts.length > 0 && (

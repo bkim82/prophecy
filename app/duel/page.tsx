@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties } from "re
 import { SignInAction, useAppAuth } from "@/app/auth/AuthProvider";
 import { pickDailyCoin } from "@/app/DailyCoin";
 import { LOBBY_WINDOW_MS } from "@/app/feedConfig";
+import { FriendSearch } from "@/app/FriendSearch";
 import { FlameIcon } from "@/app/icons";
 import { PortfolioGame } from "@/app/duel/portfolio/PortfolioGame";
 import { hasFinishedTutorial, TUTORIAL_HREF } from "@/app/duel/tutorial/progress";
@@ -511,6 +512,8 @@ export default function Page() {
             </nav>
           </>
         )}
+        {/* Phones only (CSS); wider screens have it centered in the header. */}
+        {betaModeEnabled() && <FriendSearch className="arena-friends" />}
       </div>
 
       {isPulse ? (

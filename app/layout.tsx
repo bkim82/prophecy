@@ -6,6 +6,7 @@ import { ActiveMatchBar } from "./ActiveMatchBar";
 import { AuthProvider, SignedIn, type AuthConfiguration } from "./auth/AuthProvider";
 import { BalancePill } from "./BalancePill";
 import { Brand } from "./Brand";
+import { FriendSearch } from "./FriendSearch";
 import { HandleGate } from "./HandleGate";
 import { LiveChallenges } from "./LiveChallenges";
 import { MessagesButton } from "./MessagesButton";
@@ -72,8 +73,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <div className="app-header-inner">
               <div className="desktop-header-content">
                 <Brand />
-                {/* Beta mode: no top nav — the Arena is the only section and it's home. */}
-                {!betaModeEnabled() && <TabNav />}
+                {/* Beta mode: no top nav — the Arena is the only section and it's home — so the friend finder takes the middle. */}
+                {betaModeEnabled() ? <FriendSearch className="header-search" /> : <TabNav />}
                 <div className="header-actions">
                   <ThemeToggle />
                   <SignedIn><BalancePill /></SignedIn>
