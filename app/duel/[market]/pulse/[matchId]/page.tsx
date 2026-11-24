@@ -495,7 +495,6 @@ export default function Page({ params }: { params: Promise<{ market: string; mat
       you={{
         equity: yourEquity,
         pnl: yourProfit,
-        pnlBase: PULSE_STARTING_CASH,
         position: current ? {
           side: current.side,
           entryPrice: current.entryPrice,

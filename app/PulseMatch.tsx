@@ -11,8 +11,8 @@ import type { PricePoint } from "./usePriceFeed";
  * (app/duel/btc/pulse/page.tsx) and the multiplayer room
  * (app/duel/[market]/pulse/[matchId]/page.tsx). Pure presentation: each page
  * owns its game state and hands this the numbers. One slim top bar, the
- * scoreboard as the hero (balances, timer ring, your live P&L, lead line,
- * tug-of-war), Sibyl's speech bubble, the chart (app/PulseMatchChart.tsx),
+ * scoreboard as the hero (timer ring centre, balances either side, your signed
+ * lead, purple-vs-amber tug-of-war), Sibyl's speech bubble, the chart (app/PulseMatchChart.tsx),
  * then the controls — or, once settled, the full-screen result. Styles:
  * `.pm-*` in app/globals.css ("Pulse match screen").
  */
@@ -167,30 +167,33 @@ function Avatar({ who, tone, mood, initial, size = 40 }: { who: "you" | "sibyl" 
   );
 }
 
+/** Sized by --pm-ring in CSS; the number scales with it. */
 function TimerRing({ seconds, total, urgent, caption }: { seconds: number; total: number; urgent: boolean; caption: string }) {
-  const r = 29;
+  const r = 44;
   const c = 2 * Math.PI * r;
   const frac = total > 0 ? clamp(seconds / total, 0, 1) : 0;
+  const shown = Math.max(0, seconds);
   return (
     <div className={`pm-timer${urgent ? " is-urgent" : ""}`} role="timer" aria-label={`${caption}: ${seconds} seconds`}>
       {/* Re-keyed each second while urgent, so the heartbeat lands on the tick. */}
       <div key={urgent ? seconds : "calm"} className="pm-timer-beat">
-        <svg width="68" height="68" viewBox="0 0 68 68" aria-hidden="true">
-          <circle className="pm-timer-track" cx="34" cy="34" r={r} strokeWidth="6" />
+        <svg viewBox="0 0 100 100" aria-hidden="true">
+          <circle className="pm-timer-track" cx="50" cy="50" r={r} strokeWidth="8" />
           <circle
             className="pm-timer-fill"
-            cx="34"
-            cy="34"
+            cx="50"
+            cy="50"
             r={r}
-            strokeWidth="6"
+            strokeWidth="8"
             strokeLinecap="round"
             strokeDasharray={c}
             strokeDashoffset={c * (1 - frac)}
-            transform="rotate(-90 34 34)"
+            transform="rotate(-90 50 50)"
           />
         </svg>
         <div className="pm-timer-text">
-          <span className="pm-num">{Math.max(0, seconds)}</span>
+          {/* Re-keyed so each second drops in. */}
+          <span key={shown} className="pm-num pm-timer-sec">{shown}</span>
           <span>{caption}</span>
         </div>
       </div>
@@ -620,7 +623,7 @@ function ResultView({
 
       {result.taunt && (
         <div className="pm-bubble-row">
-          <p className="pm-bubble">
+          <p className={`pm-bubble${rivalKind === "sibyl" ? " is-sibyl" : ""}`}>
             {rivalKind === "sibyl" && <strong>Sibyl:</strong>} {result.taunt}
           </p>
         </div>
@@ -665,7 +668,7 @@ export type MatchScreenProps = {
   alertTotal: number;
   /** Before the first entry of the round: neutral face, "make your call". */
   roundStarted: boolean;
-  you: { equity: number; pnl: number; /** What the % chip divides by. */ pnlBase: number; position: MatchPosition | null };
+  you: { equity: number; pnl: number; position: MatchPosition | null };
   rival: {
     name: string;
     kind: "sibyl" | "player";
@@ -762,18 +765,22 @@ export default function MatchScreen(props: MatchScreenProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [outcome]);
 
-  const pnlTone = you.pnl >= EVEN_THRESHOLD ? "is-up" : you.pnl <= -EVEN_THRESHOLD ? "is-down" : "is-even";
-  const pct = you.pnlBase > 0 ? (you.pnl / you.pnlBase) * 100 : 0;
-  const pctText = `${pct > 0 ? "+" : "−"}${Math.abs(pct).toFixed(Math.abs(pct) < 10 ? 1 : 0)}%`;
+  // The scoreboard's one signed number: your P&L minus the rival's.
   const leadText =
     display === "even"
       ? inPosition ? "Dead even" : "Dead even — make your call"
-      : display === "you"
-        ? <>You lead by <span className="pm-num">{matchUsd(Math.abs(leadDelta))}</span></>
-        : <>{rival.name} leads by <span className="pm-num">{matchUsd(Math.abs(leadDelta))}</span></>;
+      : (
+        <>
+          <span className="pm-lead-amount pm-num"><RollingNumber text={matchSignedUsd(leadDelta)} /></span>
+          <span className="pm-lead-word">
+            {display === "you" ? "ahead" : "behind"}
+            <span className="sr-only">{display === "you" ? ` of ${rival.name}` : ` ${rival.name}`}</span>
+          </span>
+        </>
+      );
   const youLabel = position ? `YOU · ${position.side.toUpperCase()}` : "YOU";
   const rivalLabel = `${rival.name.toUpperCase()}${rival.side ? ` · ${rival.side.toUpperCase()}` : rival.kind === "sibyl" ? " · AI" : ""}`;
-  const bubbleTone = rival.kind === "sibyl" && mood === "frown" ? "is-hurt" : "";
+  const bubbleTone = rival.kind !== "sibyl" ? "" : mood === "frown" ? "is-hurt" : "is-sibyl";
   const identity = MARKET_IDENTITY[market] ?? null;
 
   return (
@@ -845,14 +852,7 @@ export default function MatchScreen(props: MatchScreenProps) {
                   </div>
                 </div>
               </div>
-              <div className="pm-pnl-row">
-                <span className={`pm-pnl pm-num ${pnlTone}`}>
-                  <span className="sr-only">Your P&amp;L </span>
-                  <RollingNumber text={matchSignedUsd(you.pnl)} />
-                </span>
-                {pnlTone !== "is-even" && <span className={`pm-pct pm-num ${pnlTone}`}>{pctText}</span>}
-              </div>
-              <p className={`pm-lead-line is-${display}`}>{leadText}</p>
+              <p className={`pm-lead is-${display}`}>{leadText}</p>
               <div className={`pm-tug${shaking ? " is-shaking" : ""}`} aria-hidden="true">
                 <div className="pm-tug-track">
                   <span className="pm-tug-you" style={{ width: `${share}%` }} />
