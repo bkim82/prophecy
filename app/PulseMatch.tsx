@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { clampPulseStake, pulseMaxStake, PULSE_STAKE_STEP } from "@/lib/pulse";
 import PulseMatchChart, { type MatchChartMarker } from "./PulseMatchChart";
 import PulseMovementAlert from "./PulseMovementAlert";
 import type { PricePoint } from "./usePriceFeed";
@@ -11,9 +12,11 @@ import type { PricePoint } from "./usePriceFeed";
  * (app/duel/btc/pulse/page.tsx) and the multiplayer room
  * (app/duel/[market]/pulse/[matchId]/page.tsx). Pure presentation: each page
  * owns its game state and hands this the numbers. One slim top bar, the
- * scoreboard as the hero (timer ring centre, balances either side, your signed
- * lead, purple-vs-amber tug-of-war), Sibyl's speech bubble, the chart (app/PulseMatchChart.tsx),
- * then the controls — or, once settled, the full-screen result. Styles:
+ * scoreboard as the hero (you | seconds-left countdown over your signed lead |
+ * the rival, each with a big balance and a status line — Sibyl's is whatever
+ * she last said — then the split purple-vs-amber tug-of-war), the room's
+ * event bubble (multiplayer), the chart (app/PulseMatchChart.tsx), then the
+ * controls — or, once settled, the full-screen result. Styles:
  * `.pm-*` in app/globals.css ("Pulse match screen").
  */
 
@@ -35,13 +38,12 @@ export const matchUsd = (n: number) =>
 export const matchSignedUsd = (n: number) =>
   Math.abs(n) < EVEN_THRESHOLD ? matchUsd(0) : `${n > 0 ? "+" : "−"}${matchUsd(Math.abs(n))}`;
 
-/** "$100" for whole dollars, "$12.50" otherwise — the Amount chip. */
-export const compactUsd = (n: number) =>
-  Number.isInteger(n) ? `$${n.toLocaleString("en-US")}` : matchUsd(n);
-
 const priceText = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
+
+/** Hands a balance's width in em (mono: .6em a glyph) to CSS, so a long one shrinks to fit a phone column. */
+const balStyle = (text: string) => ({ "--pm-bal-em": text.length * 0.6 }) as CSSProperties;
 
 export const liquidationPrice = (side: MatchSide, entry: number, leverage: number) =>
   side === "long" ? entry * (1 - 1 / leverage) : entry * (1 + 1 / leverage);
@@ -159,107 +161,161 @@ function SibylFace({ mood, size = 22 }: { mood: Mood; size?: number }) {
 
 type Tone = "lead" | "trail" | "even";
 
-function Avatar({ who, tone, mood, initial, size = 40 }: { who: "you" | "sibyl" | "player"; tone: Tone; mood?: Mood; initial?: string; size?: number }) {
+/** Without `size` the CSS sizes it (the scoreboard's --pm-av). */
+function Avatar({ who, tone, mood, initial, size }: { who: "you" | "sibyl" | "player"; tone: Tone; mood?: Mood; initial?: string; size?: number }) {
   return (
-    <span className={`pm-avatar is-${who} is-${tone}`} style={{ width: size, height: size }} aria-hidden="true">
-      {who === "you" ? "Y" : who === "sibyl" ? <SibylFace mood={mood ?? "neutral"} size={Math.round(size * 0.55)} /> : initial ?? "?"}
+    <span className={`pm-avatar is-${who} is-${tone}`} style={size ? { width: size, height: size } : undefined} aria-hidden="true">
+      {who === "you" ? "Y" : who === "sibyl" ? <SibylFace mood={mood ?? "neutral"} /> : initial ?? "?"}
     </span>
   );
 }
 
-/** Sized by --pm-ring in CSS; the number scales with it. */
-function TimerRing({ seconds, total, urgent, caption }: { seconds: number; total: number; urgent: boolean; caption: string }) {
-  const r = 44;
-  const c = 2 * Math.PI * r;
-  const frac = total > 0 ? clamp(seconds / total, 0, 1) : 0;
+type ClockTone = "calm" | "warn" | "urgent";
+
+/** Big seconds-left readout; beeps yellow from 15s and red from 5s. */
+function Countdown({ seconds, caption, tone }: { seconds: number; caption: string; tone: ClockTone }) {
   const shown = Math.max(0, seconds);
   return (
-    <div className={`pm-timer${urgent ? " is-urgent" : ""}`} role="timer" aria-label={`${caption}: ${seconds} seconds`}>
-      {/* Re-keyed each second while urgent, so the heartbeat lands on the tick. */}
-      <div key={urgent ? seconds : "calm"} className="pm-timer-beat">
-        <svg viewBox="0 0 100 100" aria-hidden="true">
-          <circle className="pm-timer-track" cx="50" cy="50" r={r} strokeWidth="8" />
-          <circle
-            className="pm-timer-fill"
-            cx="50"
-            cy="50"
-            r={r}
-            strokeWidth="8"
-            strokeLinecap="round"
-            strokeDasharray={c}
-            strokeDashoffset={c * (1 - frac)}
-            transform="rotate(-90 50 50)"
+    <div className={`pm-timer is-${tone}`} role="timer" aria-label={`${shown} ${caption}`}>
+      {/* Re-keyed each second, so every tick drops in (and beeps once warn/urgent). */}
+      <span key={shown} className="pm-timer-num pm-num">{shown}</span>
+      <span className="pm-timer-caption">{caption}</span>
+    </div>
+  );
+}
+
+const stakeText = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2));
+
+/**
+ * The stake chip: the amount itself is a text field between −25 and +25 at
+ * either end. Clicking the digits puts the caret there; clicking anywhere else
+ * in the field puts it after the number, so typing 0 turns 100 into 1000.
+ * Always clamped into [0, available cash].
+ */
+function MatchStake({ stake, disabled }: { stake: MatchControls["stake"]; disabled: boolean }) {
+  // Raw text while typing, so "12." isn't reformatted mid-keystroke.
+  const [draft, setDraft] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const max = pulseMaxStake(stake.available);
+  const set = (next: number) => {
+    setDraft(null);
+    stake.onChange(clampPulseStake(next, stake.available));
+  };
+  const text = draft ?? stakeText(stake.value);
+  return (
+    <div className={`pm-step${disabled ? " is-disabled" : ""}`}>
+      <button type="button" className="pm-step-btn" disabled={disabled || stake.value <= 0} onClick={() => set(stake.value - PULSE_STAKE_STEP)} aria-label={`Decrease stake by $${PULSE_STAKE_STEP}`}>
+        −{PULSE_STAKE_STEP}
+      </button>
+      <label
+        className="pm-step-field is-input"
+        onClick={(event) => {
+          const input = inputRef.current;
+          if (!input || input.disabled || event.target === input) return;
+          // Instead of the label's own focus (caret placement varies by browser): caret after the number.
+          event.preventDefault();
+          input.focus();
+          input.setSelectionRange(input.value.length, input.value.length);
+        }}
+      >
+        <span className="pm-step-label">Type amount</span>
+        <span className="pm-step-value pm-num">
+          <span aria-hidden="true">$</span>
+          <input
+            ref={inputRef}
+            type="text"
+            inputMode="decimal"
+            enterKeyHint="done"
+            aria-label="Stake in dollars"
+            disabled={disabled}
+            value={text}
+            // Mono digits, so the field hugs the number and the caret sits right after it.
+            style={{ width: `${Math.max(1, text.length)}ch` }}
+            onChange={(event) => {
+              const [whole, ...rest] = event.target.value.replace(/[^\d.]/g, "").split(".");
+              const clean = rest.length ? `${whole}.${rest.join("").slice(0, 2)}` : whole;
+              const typed = Number(clean) || 0;
+              const next = clampPulseStake(typed, stake.available);
+              setDraft(next < typed ? stakeText(next) : clean);
+              stake.onChange(next);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === "Escape") event.currentTarget.blur();
+            }}
+            onBlur={() => setDraft(null)}
           />
-        </svg>
-        <div className="pm-timer-text">
-          {/* Re-keyed so each second drops in. */}
-          <span key={shown} className="pm-num pm-timer-sec">{shown}</span>
-          <span>{caption}</span>
-        </div>
+          <span className="pm-step-caret" aria-hidden="true" />
+        </span>
+      </label>
+      <button type="button" className="pm-step-btn" disabled={disabled || stake.value >= max} onClick={() => set(stake.value + PULSE_STAKE_STEP)} aria-label={`Increase stake by $${PULSE_STAKE_STEP}`}>
+        +{PULSE_STAKE_STEP}
+      </button>
+    </div>
+  );
+}
+
+/** The option one step down / up from `leverage` (options run 10× apart), or null past either end. */
+const leverageNeighbor = (leverage: number, options: readonly number[], dir: "down" | "up") => {
+  const i = options.indexOf(leverage);
+  return i < 0 ? null : options[dir === "down" ? i - 1 : i + 1] ?? null;
+};
+
+/** One end of the leverage chip: ÷ or × the ratio to the neighbouring option. */
+function LeverageStep({ dir, leverage, options, disabled, onChange }: { dir: "down" | "up"; leverage: number; options: readonly number[]; disabled: boolean; onChange: (leverage: number) => void }) {
+  const next = leverageNeighbor(leverage, options, dir);
+  const ratio = next === null ? 10 : dir === "down" ? leverage / next : next / leverage;
+  return (
+    <button
+      type="button"
+      className="pm-step-btn"
+      disabled={disabled || next === null}
+      onClick={() => next !== null && onChange(next)}
+      aria-label={next === null ? `Leverage is at its ${dir === "down" ? "lowest" : "highest"}` : `${dir === "down" ? "Divide" : "Multiply"} leverage by ${ratio}, to ${next}×`}
+    >
+      <span className="pm-step-op">{dir === "down" ? "÷" : "×"}</span>{ratio}
+    </button>
+  );
+}
+
+/** The leverage chip: ÷10 | Leverage N× | ×10. */
+function MatchLeverage({ leverage, options, onChange, disabled }: { leverage: number; options: readonly number[]; onChange: (leverage: number) => void; disabled: boolean }) {
+  return (
+    <div className={`pm-step is-risk${disabled ? " is-disabled" : ""}`}>
+      <LeverageStep dir="down" leverage={leverage} options={options} disabled={disabled} onChange={onChange} />
+      <div className="pm-step-field">
+        <span className="pm-step-label">Leverage</span>
+        <span className="pm-step-value pm-num">{leverage}×</span>
+      </div>
+      <LeverageStep dir="up" leverage={leverage} options={options} disabled={disabled} onChange={onChange} />
+    </div>
+  );
+}
+
+/**
+ * Flip — [ Flip to Short | − 100× + ]: − / + pick the leverage the new side
+ * opens at (÷10 / ×10, starting from the open position's), the rest of the
+ * button flips at it. Keyed per position by the caller, so each starts fresh.
+ */
+function FlipControl({ position, options, disabled, onFlip }: { position: MatchPosition; options: readonly number[]; disabled: boolean; onFlip: (leverage: number) => void }) {
+  const [leverage, setLeverage] = useState(position.leverage);
+  const target = position.side === "long" ? "short" : "long";
+  const lower = leverageNeighbor(leverage, options, "down");
+  const higher = leverageNeighbor(leverage, options, "up");
+  return (
+    <div className={`pm-step pm-flip is-${target}${disabled ? " is-disabled" : ""}`}>
+      <button type="button" className="pm-flip-go" disabled={disabled} onClick={() => onFlip(leverage)} aria-label={`Flip to ${target} at ${leverage}× leverage`}>
+        Flip to {sideWord(target)}
+      </button>
+      <div className="pm-flip-lev" role="group" aria-label="Leverage for the flip">
+        <button type="button" className="pm-flip-adj" disabled={disabled || lower === null} onClick={() => lower !== null && setLeverage(lower)} title="÷10" aria-label={lower === null ? "Leverage is at its lowest" : `Divide leverage by ${leverage / lower}, to ${lower}×`}>
+          −
+        </button>
+        <span className="pm-num">{leverage}×</span>
+        <button type="button" className="pm-flip-adj" disabled={disabled || higher === null} onClick={() => higher !== null && setLeverage(higher)} title="×10" aria-label={higher === null ? "Leverage is at its highest" : `Multiply leverage by ${higher / leverage}, to ${higher}×`}>
+          +
+        </button>
       </div>
     </div>
-  );
-}
-
-/** Amount / Leverage chip that opens a small menu upward (the controls sit at the bottom). */
-function MatchSelect({
-  label, value, tone, disabled, menuLabel, children,
-}: {
-  label: string;
-  value: string;
-  tone?: "risk";
-  disabled: boolean;
-  menuLabel: string;
-  children: (close: () => void) => ReactNode;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (event: PointerEvent) => {
-      if (!ref.current?.contains(event.target as Node)) setOpen(false);
-    };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("pointerdown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("pointerdown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-  useEffect(() => {
-    if (disabled) setOpen(false);
-  }, [disabled]);
-  return (
-    <div ref={ref} className="pm-select">
-      <button
-        type="button"
-        className={`pm-select-btn${tone ? ` is-${tone}` : ""}`}
-        aria-haspopup="true"
-        aria-expanded={open}
-        disabled={disabled}
-        onClick={() => setOpen((current) => !current)}
-      >
-        <span className="pm-select-label">{label}</span>
-        <span className="pm-select-value pm-num">{value}</span>
-      </button>
-      {open && (
-        <div className="pm-menu" role="group" aria-label={menuLabel}>
-          {children(() => setOpen(false))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/** One option row inside a MatchSelect menu. */
-export function MatchMenuOption({ selected, disabled, onClick, children }: { selected: boolean; disabled?: boolean; onClick: () => void; children: ReactNode }) {
-  return (
-    <button type="button" className={`pm-menu-option pm-num${selected ? " is-selected" : ""}`} aria-pressed={selected} disabled={disabled} onClick={onClick}>
-      {children}
-    </button>
   );
 }
 
@@ -278,19 +334,20 @@ export type MatchPosition = {
 export type MatchControls = {
   /** waiting: no round yet (lobby / pre-round); settling: the bell rang. */
   state: "setup" | "open" | "settling" | "waiting";
-  amountLabel: string;
-  amountMenu: (close: () => void) => ReactNode;
+  /** The typed stake chip (MatchStake); `available` caps it. */
+  stake: { value: number; available: number; onChange: (stake: number) => void };
   leverage: number;
   leverageOptions: readonly number[];
   onLeverage: (leverage: number) => void;
   canEdit: boolean;
   canEnter: boolean;
   onEnter: (side: MatchSide) => void;
-  /** Replaces the "Enters at the live price…" helper (waiting, busted, no feed). */
+  /** Replaces the "You're out if it moves…" helper (waiting, busted, no feed). */
   hint: string | null;
   canManage: boolean;
   onClose: () => void;
-  onFlip: () => void;
+  /** Reverse into the other side at this leverage (FlipControl's pick). */
+  onFlip: (leverage: number) => void;
   /** Positions stacked from the mini dock beyond the one shown. */
   extraOpen?: number;
   notice?: string | null;
@@ -346,16 +403,20 @@ function Controls({ controls, position, price }: { controls: MatchControls; posi
           <span className="pm-close-pnl pm-num">{matchSignedUsd(position.pnl)}</span>
         </button>
         <div className="pm-controls-row">
-          <button
-            type="button"
-            className={`pm-flip is-${position.side === "long" ? "short" : "long"}`}
+          <FlipControl
+            key={`${position.openedAt}-${position.side}`}
+            position={position}
+            options={controls.leverageOptions}
             disabled={!controls.canManage || position.liquidated}
-            onClick={controls.onFlip}
-          >
-            Flip to {position.side === "long" ? "Short" : "Long"}
-          </button>
+            onFlip={(leverage) => {
+              // The next setup starts from the leverage you flipped at.
+              controls.onLeverage(leverage);
+              controls.onFlip(leverage);
+            }}
+          />
           <div className={`pm-liq${near || position.liquidated ? " is-near" : ""}`} role="status">
-            Liq <span className="pm-num">{priceText(liq)}</span> · {position.liquidated ? "hit" : near ? "close!" : "safe"}
+            <span>Liq <span className="pm-num">{priceText(liq)}</span></span>
+            <span className="pm-liq-state">{position.liquidated ? "hit" : near ? "close!" : "safe"}</span>
           </div>
         </div>
         {messages}
@@ -366,23 +427,8 @@ function Controls({ controls, position, price }: { controls: MatchControls; posi
   return (
     <section className="pm-controls is-setup" aria-label="Place a trade">
       <div className="pm-controls-row is-picks">
-        <MatchSelect label="Amount" value={controls.amountLabel} disabled={!controls.canEdit} menuLabel="Amount">
-          {controls.amountMenu}
-        </MatchSelect>
-        <MatchSelect label="Leverage" value={`${controls.leverage}×`} tone="risk" disabled={!controls.canEdit} menuLabel="Leverage">
-          {(close) => controls.leverageOptions.map((option) => (
-            <MatchMenuOption
-              key={option}
-              selected={controls.leverage === option}
-              onClick={() => {
-                controls.onLeverage(option);
-                close();
-              }}
-            >
-              {option}× <small>liq ±{liqPercent(option)}%</small>
-            </MatchMenuOption>
-          ))}
-        </MatchSelect>
+        <MatchStake stake={controls.stake} disabled={!controls.canEdit} />
+        <MatchLeverage leverage={controls.leverage} options={controls.leverageOptions} onChange={controls.onLeverage} disabled={!controls.canEdit} />
       </div>
       <div className="pm-controls-row is-sides">
         {(["long", "short"] as const).map((side) => (
@@ -401,18 +447,18 @@ function Controls({ controls, position, price }: { controls: MatchControls; posi
             }}
             className={`pm-trade is-${side}${pressed === side ? " is-pressed" : ""}`}
           >
-            <span className="pm-trade-title">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d={side === "long" ? "M7 17L17 7M9 7h8v8" : "M7 7l10 10M17 9v8H9"} />
+            {/* The arrow sits on the outer side: ↑ Long | Short ↓. */}
+            <span className={`pm-trade-title${side === "short" ? " is-trailing" : ""}`}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d={side === "long" ? "M12 19V5M5.5 11.5L12 5l6.5 6.5" : "M12 5v14M5.5 12.5L12 19l6.5-6.5"} />
               </svg>
               {sideWord(side)}
             </span>
-            <span className="pm-trade-sub">price goes {side === "long" ? "up" : "down"}</span>
           </button>
         ))}
       </div>
       {/* is-default: the generic helper, hidden on phones; a real hint (waiting, busted, no feed) always shows. */}
-      <p className={`pm-helper${controls.hint ? "" : " is-default"}`}>{controls.hint ?? `Enters at the live price · liquidation at ±${liqPercent(controls.leverage)}%`}</p>
+      <p className={`pm-helper${controls.hint ? "" : " is-default"}`}>{controls.hint ?? `You're out if it moves ${liqPercent(controls.leverage)}% the wrong way`}</p>
       {messages}
     </section>
   );
@@ -677,9 +723,13 @@ export type MatchScreenProps = {
     pnl: number;
     /** null hides it: Sibyl before her entry, a human opponent until settle. */
     side: MatchSide | null;
+    /** Sibyl's latest line: her status under her balance (re-keyed per line). */
+    line?: { text: string; key: number } | null;
   };
-  timer: { seconds: number; total: number; caption: string; /** Counting down a live round (final-10s effects). */ live: boolean };
-  bubble: { speaker: string | null; text: string; key: number } | null;
+  /** caption reads after the number: "seconds left", "to start". */
+  timer: { seconds: number; caption: string; /** Counting down a live round (the 15s/5s beeps). */ live: boolean };
+  /** The room's event line (multiplayer), floated under the scoreboard. */
+  bubble: { text: string; key: number } | null;
   chart: { points: PricePoint[]; now: number; frozen: boolean; price: number | null; markers: MatchChartMarker[] };
   controls: MatchControls;
   result: MatchResult | null;
@@ -703,7 +753,8 @@ export default function MatchScreen(props: MatchScreenProps) {
   const rivalTone: Tone = display === "rival" ? "lead" : display === "you" ? "trail" : "even";
   const mood: Mood = !roundStarted || leadSide === "tie" ? "neutral" : leadSide === "rival" ? "smug" : "frown";
 
-  const final10 = timer.live && timer.seconds > 0 && timer.seconds <= 10 && !result;
+  const clockLive = timer.live && timer.seconds > 0 && !result;
+  const clockTone: ClockTone = !clockLive ? "calm" : timer.seconds <= 5 ? "urgent" : timer.seconds <= 15 ? "warn" : "calm";
   const nearLiq = position !== null && chart.price !== null && !result && (position.liquidated || isNearLiq(position, chart.price));
   const [shaking, setShaking] = useState(false);
   const [announcement, setAnnouncement] = useState("");
@@ -722,11 +773,12 @@ export default function MatchScreen(props: MatchScreenProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leadSide]);
 
-  // Heartbeat tick once per second through the final 10.
+  // Tick sound with each beep, once per second from 15s.
+  const beeping = clockTone !== "calm";
   useEffect(() => {
-    if (final10) sound.play("tick");
+    if (beeping) sound.play("tick");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [final10 ? timer.seconds : null]);
+  }, [beeping ? timer.seconds : null]);
 
   // Round stats for the result card: best single tick while holding, time held.
   const statsRef = useRef({ key: roundKey, best: null as number | null, prevPnl: null as number | null, holdMs: 0, heldSince: null as number | null });
@@ -768,7 +820,7 @@ export default function MatchScreen(props: MatchScreenProps) {
   // The scoreboard's one signed number: your P&L minus the rival's.
   const leadText =
     display === "even"
-      ? inPosition ? "Dead even" : "Dead even — make your call"
+      ? "Dead even"
       : (
         <>
           <span className="pm-lead-amount pm-num"><RollingNumber text={matchSignedUsd(leadDelta)} /></span>
@@ -778,18 +830,26 @@ export default function MatchScreen(props: MatchScreenProps) {
           </span>
         </>
       );
-  const youLabel = position ? `YOU · ${position.side.toUpperCase()}` : "YOU";
-  const rivalLabel = `${rival.name.toUpperCase()}${rival.side ? ` · ${rival.side.toUpperCase()}` : rival.kind === "sibyl" ? " · AI" : ""}`;
-  const bubbleTone = rival.kind !== "sibyl" ? "" : mood === "frown" ? "is-hurt" : "is-sibyl";
+  const rivalLabel = `${rival.name}${rival.side ? ` · ${sideWord(rival.side)}` : rival.kind === "sibyl" ? " · AI" : ""}`;
+  const youStatus = position
+    ? position.liquidated
+      ? "Liquidated"
+      : <><span className={`is-${position.side}`}>{sideWord(position.side)}</span> {position.leverage}× from <span className="pm-num">{priceText(position.entryPrice)}</span></>
+    : "No position yet";
+  const rivalStatus = rival.line?.text
+    ?? (rival.side ? <><span className={`is-${rival.side}`}>{sideWord(rival.side)}</span> position</> : rival.kind === "sibyl" ? "Waiting for a clearer move" : "Side hidden until the bell");
+  const youBal = matchUsd(Math.max(0, you.equity));
+  const rivalBal = matchUsd(Math.max(0, rival.equity));
+  const youPct = Math.round(share);
   const identity = MARKET_IDENTITY[market] ?? null;
 
   return (
     <main
-      className={`pm-screen${final10 ? " is-final" : ""}${result ? " is-result" : ""}`}
+      className={`pm-screen${clockTone === "urgent" ? " is-final" : ""}${result ? " is-result" : ""}`}
       data-market={market}
     >
       <PulseMovementAlert total={alertTotal} />
-      {(final10 || nearLiq) && <div className="pm-edge" aria-hidden="true" />}
+      {(clockTone === "urgent" || nearLiq) && <div className="pm-edge" aria-hidden="true" />}
 
       <header className="pm-top">
         <Link href={backHref} className="pm-icon-btn pm-back" aria-label="Back to arena">
@@ -835,38 +895,40 @@ export default function MatchScreen(props: MatchScreenProps) {
           {/* Phones: display: contents (plain column items). Desktop: the right column's top block. */}
           <div className="pm-side">
             <section className={`pm-score is-${display}`} aria-label="Scoreboard">
-              <div className="pm-score-row">
-                <div className="pm-player">
-                  <Avatar who="you" tone={youTone} size={34} />
-                  <div className="min-w-0">
-                    <div className={`pm-player-label${position ? ` is-${position.side}` : ""}`}>{youLabel}</div>
-                    <div className="pm-player-bal pm-num">{matchUsd(Math.max(0, you.equity))}</div>
-                  </div>
-                </div>
-                <TimerRing seconds={timer.seconds} total={timer.total} urgent={final10} caption={timer.caption} />
-                <div className="pm-player is-rival">
-                  <Avatar who={rival.kind === "sibyl" ? "sibyl" : "player"} tone={rivalTone} mood={mood} initial={rival.initial} size={34} />
-                  <div className="min-w-0">
-                    <div className={`pm-player-label${rival.side ? ` is-${rival.side}` : ""}`}>{rivalLabel}</div>
-                    <div className="pm-player-bal pm-num">{matchUsd(Math.max(0, rival.equity))}</div>
-                  </div>
+              <div className="pm-player">
+                <Avatar who="you" tone={youTone} />
+                <div className="pm-player-text">
+                  <div className="pm-player-label">You</div>
+                  <div className="pm-player-bal pm-num" style={balStyle(youBal)}>{youBal}</div>
+                  <div className="pm-player-sub">{youStatus}</div>
                 </div>
               </div>
-              <p className={`pm-lead is-${display}`}>{leadText}</p>
+              <div className="pm-clock">
+                <Countdown seconds={timer.seconds} caption={timer.caption} tone={clockTone} />
+                <p className={`pm-lead is-${display}`}>{leadText}</p>
+              </div>
+              <div className="pm-player is-rival">
+                <Avatar who={rival.kind === "sibyl" ? "sibyl" : "player"} tone={rivalTone} mood={mood} initial={rival.initial} />
+                <div className="pm-player-text">
+                  <div className="pm-player-label">{rivalLabel}</div>
+                  <div className="pm-player-bal pm-num" style={balStyle(rivalBal)}>{rivalBal}</div>
+                  <div key={rival.line?.key} className="pm-player-sub">{rivalStatus}</div>
+                </div>
+              </div>
+              {/* Two separate bars with a gap at the split, each end labelled with its share. */}
               <div className={`pm-tug${shaking ? " is-shaking" : ""}`} aria-hidden="true">
+                <span className="pm-tug-pct is-you pm-num">{youPct}%</span>
                 <div className="pm-tug-track">
-                  <span className="pm-tug-you" style={{ width: `${share}%` }} />
+                  <span className="pm-tug-you" style={{ width: `calc(${share}% - 3px)` }} />
                   <span className="pm-tug-rival" />
                 </div>
-                <span className={`pm-tug-spark is-${display}`} style={{ left: `${share}%` }} />
+                <span className="pm-tug-pct is-rival pm-num">{100 - youPct}%</span>
               </div>
             </section>
 
             {bubble && (
               <div className="pm-bubble-row">
-                <p key={bubble.key} className={`pm-bubble ${bubbleTone}`}>
-                  {bubble.speaker && <strong>{bubble.speaker}:</strong>} {bubble.text}
-                </p>
+                <p key={bubble.key} className="pm-bubble">{bubble.text}</p>
               </div>
             )}
           </div>

@@ -3,10 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import PulseStakeStepper from "@/app/PulseStakeStepper";
 import { roundTrades, usePulseFeedback } from "@/app/PulseArenaParts";
 import MatchScreen, {
-  compactUsd,
   FlameGlyph,
   matchSignedUsd,
   matchUsd,
@@ -356,9 +354,9 @@ export default function Page({ params }: { params: Promise<{ market: string; mat
     playFeedback("exit");
   });
 
-  // Close, then open the other side with the same stake/leverage — one
-  // reversal marker carrying the closed leg's P&L, as in practice.
-  const reversePosition = (position: PulsePosition) => run(async () => {
+  // Close, then open the other side with the same stake at the chosen
+  // leverage — one reversal marker carrying the closed leg's P&L, as in practice.
+  const reversePosition = (position: PulsePosition, nextLeverage: number) => run(async () => {
     closingRef.current.add(position.id);
     const closed = await postAction({ action: "close", positionId: position.id });
     const pnl = closed.pulseYourRealizedPnl - realizedPnl;
@@ -370,10 +368,10 @@ export default function Page({ params }: { params: Promise<{ market: string; mat
       return;
     }
     const side = opposite(position.side);
-    const opened = await postAction({ action: "enter", side, stake: amount, leverage: position.leverage });
+    const opened = await postAction({ action: "enter", side, stake: amount, leverage: nextLeverage });
     const filled = filledFrom(closed.pulseYourPositions, opened);
     addTrades([{
-      t: Date.now(), p: filled?.entryPrice ?? exitPrice, side, action: "reverse", owner: "you", pnl, leverage: position.leverage,
+      t: Date.now(), p: filled?.entryPrice ?? exitPrice, side, action: "reverse", owner: "you", pnl, leverage: nextLeverage,
       closed: { side: position.side, entry: position.entryPrice, exit: exitPrice },
     }]);
     playFeedback("reverse");
@@ -513,13 +511,12 @@ export default function Page({ params }: { params: Promise<{ market: string; mat
         // Blind until settle: their side stays hidden mid-round.
         side: null,
       }}
-      timer={{ seconds: ringSeconds, total: timerTotal, caption: phase === "predict" ? "START" : "SEC", live: phase === "countdown" }}
-      bubble={bubbleText ? { speaker: null, text: bubbleText, key: line?.key ?? 0 } : null}
+      timer={{ seconds: ringSeconds, caption: phase === "predict" ? "to start" : "seconds left", live: phase === "countdown" }}
+      bubble={bubbleText ? { text: bubbleText, key: line?.key ?? 0 } : null}
       chart={{ points: frozenPoints ?? points, now, frozen: frozenPoints !== null, price: finalPrice, markers: markerData }}
       controls={{
         state: controlsState,
-        amountLabel: compactUsd(stake),
-        amountMenu: () => <PulseStakeStepper stake={stake} availableCash={availableCash} disabled={!canEdit} onChange={setStake} />,
+        stake: { value: stake, available: availableCash, onChange: setStake },
         leverage,
         leverageOptions: PULSE_LEVERAGE_OPTIONS,
         onLeverage: setLeverage,
@@ -529,7 +526,7 @@ export default function Page({ params }: { params: Promise<{ market: string; mat
         hint,
         canManage: canTrade,
         onClose: () => { if (current) void closePosition(current); },
-        onFlip: () => { if (current) void reversePosition(current); },
+        onFlip: (nextLeverage) => { if (current) void reversePosition(current, nextLeverage); },
         extraOpen: Math.max(0, positions.length - 1),
         notice,
         error,
