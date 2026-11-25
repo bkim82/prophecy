@@ -30,6 +30,8 @@ const POOL_TARGET = 80;
 const HOSTED_AGE_CYCLE_MS = 90_000;
 /** A human queued alone gets a bot after a human-feeling wait in this range. */
 const JOIN_DELAY_MS = [3_000, 9_000] as const;
+/** A bot whose opponent pressed Rematch presses it too after a pause in this range. */
+const REMATCH_DELAY_MS = [1_500, 5_000] as const;
 /** `ensureBotSlots` runs off the lobby poll; this spaces it out per server instance. */
 const ENSURE_EVERY_MS = 4_000;
 
@@ -136,6 +138,9 @@ const freshState = (role: 1 | 2, skill: number): BotState => ({
   lastPrice: null,
 });
 
+/** The same bot in the same seat with its brain reset, for a rematch (lib/rematch.ts). */
+export const rematchBotState = (state: BotState): BotState => freshState(state.role, state.skill);
+
 // ---------------------------------------------------------------- lobby presence
 
 let lastEnsure = 0;
@@ -197,12 +202,15 @@ export const listedCreatedAt = (row: MatchRow) => {
 };
 
 /** Deterministic per match, so every poll agrees on when the bot shows up. */
-function joinDelayFor(matchId: string) {
+function delayFor(matchId: string, [min, max]: readonly [number, number]) {
   let hash = 0;
   for (const char of matchId) hash = (hash * 31 + char.charCodeAt(0)) | 0;
   const unit = (Math.abs(hash) % 1000) / 1000;
-  return JOIN_DELAY_MS[0] + unit * (JOIN_DELAY_MS[1] - JOIN_DELAY_MS[0]);
+  return min + unit * (max - min);
 }
+
+/** How long after its opponent's Rematch a settled round's bot presses it too (lib/rematch.ts). */
+export const botRematchDelayFor = (matchId: string) => delayFor(matchId, REMATCH_DELAY_MS);
 
 /**
  * A human waiting alone in `open` gets a bot opponent after a short wait.
@@ -213,7 +221,7 @@ export async function seatBotIfWaiting(row: MatchRow): Promise<MatchRow> {
   // Challenge rounds wait for the challenger, never a bot.
   if (row.status !== "open" || row.player2Id !== null || row.botState !== null || row.invitedUserId !== null) return row;
   if (!BOT_MARKETS.includes(row.market)) return row;
-  if (Date.now() - row.createdAt.getTime() < joinDelayFor(row.id)) return row;
+  if (Date.now() - row.createdAt.getTime() < delayFor(row.id, JOIN_DELAY_MS)) return row;
 
   const [persona] = await pickPersonas(1);
   const now = new Date();

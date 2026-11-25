@@ -576,7 +576,7 @@ export default function LiveRound({
                     Finish tutorial <span aria-hidden="true">→</span>
                   </button>
                   <button type="button" onClick={restart} className="tut-button-secondary">
-                    Play again
+                    Rematch
                   </button>
                 </>
               }

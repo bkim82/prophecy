@@ -1,12 +1,12 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { REMATCH_SECONDS, clockLabel, stakeLabel } from "@/app/lib/challengeRules";
 import { RIVAL_GRADIENT, YOU_GRADIENT } from "@/app/PulseArenaParts";
+import { RematchIcon } from "@/app/PulseMatch";
 import type { RematchView } from "@/lib/rematch";
 
-// A settled challenge round's "Play again" (lib/rematch.ts): the room polls
+// A settled round's "Rematch" (lib/rematch.ts): the room polls
 // GET /api/match/[id]/rematch, and pressing it POSTs. The first press asks;
 // the other player sees a ready check with REMATCH_SECONDS to press it too,
 // and once both have, both rooms move to the new round.
@@ -31,7 +31,7 @@ type Rematch = {
   press: () => void;
 };
 
-/** `onNext` gets the new round's id once both have pressed Play again. */
+/** `onNext` gets the new round's id once both have pressed Rematch. */
 export function useRematch(matchId: string, playerId: string | null, enabled: boolean, onNext: (nextMatchId: string) => void): Rematch {
   // `expiresAt` is on this browser's clock: received time + the server's `expiresInMs`.
   const [view, setView] = useState<(RematchView & { expiresAt: number }) | null>(null);
@@ -124,7 +124,7 @@ export function useRematch(matchId: string, playerId: string | null, enabled: bo
 type Terms = { market: string; timerSeconds: number; wager: number };
 
 /**
- * The ready check above the result card: who's pressed Play again, and how
+ * The ready check above the result card: who's pressed Rematch, and how
  * long the other has to. Loudest when they're waiting on you.
  */
 export function RematchCheck({ rematch, rivalName, rivalInitial, terms }: { rematch: Rematch; rivalName: string; rivalInitial: string; terms: Terms }) {
@@ -136,11 +136,11 @@ export function RematchCheck({ rematch, rivalName, rivalInitial, terms }: { rema
   }, [state]);
   if (state === "idle") return null;
   const copy: Record<Exclude<RematchState, "idle">, { title: string; detail: string }> = {
-    theirs: { title: `${rivalName} pressed Play again`, detail: `They're waiting on you — press Play again to run it back.` },
-    yours: { title: `Waiting for ${rivalName}`, detail: `You're in. ${rivalName} has ${secondsLeft}s to press Play again.` },
+    theirs: { title: `${rivalName} pressed Rematch`, detail: `They're waiting on you — press Rematch to run it back.` },
+    yours: { title: `Waiting for ${rivalName}`, detail: `You're in. ${rivalName} has ${secondsLeft}s to press Rematch.` },
     starting: { title: "Rematch on", detail: "You're both in — starting the round…" },
-    lapsed: { title: `${rivalName} didn't take the rematch`, detail: "Press Play again to ask once more." },
-    missed: { title: `${rivalName} wanted a rematch`, detail: `Their ${REMATCH_SECONDS}s ran out — press Play again to ask them back.` },
+    lapsed: { title: `${rivalName} didn't take the rematch`, detail: "Press Rematch to ask once more." },
+    missed: { title: `${rivalName} wanted a rematch`, detail: `Their ${REMATCH_SECONDS}s ran out — press Rematch to ask them back.` },
     left: { title: `${rivalName} left the room`, detail: "There's no one here to rematch." },
   };
   const { title, detail } = copy[state];
@@ -185,28 +185,26 @@ function RematchSeat({ name, initial, gradient, status }: { name: string; initia
   );
 }
 
-/** The result card's Play again, for a challenge round: asks, answers, or waits. */
+/** The result card's Rematch: asks, answers, or waits. Off once they've left (the ready check says so). */
 export function RematchButton({ rematch, rivalName, className }: { rematch: Rematch; rivalName: string; className?: string }) {
   const { state, secondsLeft, pressing, press } = rematch;
   // `className` replaces the default look (the match screen's 3D Rematch, app/PulseMatch.tsx).
   const base = className ?? "rounded-md px-5 py-2 text-center text-sm font-medium transition bg-[var(--btn-bg)] text-[var(--btn-text)] hover:bg-[var(--btn-bg-hover)]";
-  if (state === "left") {
-    return <Link href="/duel" className={base}>Back to lobby</Link>;
-  }
   const label = state === "starting" || (pressing && state === "theirs")
     ? "Starting…"
     : state === "yours"
       ? `Waiting for ${rivalName}… ${secondsLeft}s`
       : state === "theirs"
-        ? `Play again · ${secondsLeft}s`
-        : pressing ? "Asking…" : "Play again";
+        ? `Rematch · ${secondsLeft}s`
+        : pressing ? "Asking…" : "Rematch";
   return (
     <button
       type="button"
       onClick={press}
-      disabled={pressing || state === "yours" || state === "starting"}
+      disabled={pressing || state === "yours" || state === "starting" || state === "left"}
       className={`rematch-button ${base} disabled:cursor-default disabled:opacity-70${state === "theirs" ? " is-beckoning" : state === "yours" ? " is-waiting" : ""}`}
     >
+      <RematchIcon />
       {label}
     </button>
   );
