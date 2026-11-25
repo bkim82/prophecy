@@ -2105,7 +2105,7 @@ html[data-theme="obsidian"] body:has(.pm-screen) { background: #0B0A10; }
 /* Moonstone: brights darken instead of lighten, white type on the trade buttons, softer shadows. */
 [data-theme="light"] .pm-screen {
   --pm-green-bright: color-mix(in srgb, var(--pm-green) 82%, #000); --pm-red-bright: color-mix(in srgb, var(--pm-red) 82%, #000); --pm-gold: color-mix(in srgb, var(--pm-orange) 88%, #000);
-  --pm-amber-soft: color-mix(in srgb, var(--pm-amber) 82%, #000);
+  --pm-amber-soft: color-mix(in srgb, var(--pm-amber) 82%, #000); --pm-yellow: #A67800;
   --pm-soft: color-mix(in srgb, var(--pm-text) 75%, var(--pm-muted));
   --pm-on-green: #fff; --pm-on-red: #fff; --pm-shadow: rgba(48, 30, 110, .16);
   --pm-cta-a: #8a63d2; --pm-cta-b: #5b35a8; --pm-cta-edge: #432784;
@@ -2133,6 +2133,10 @@ html[data-theme="obsidian"] body:has(.pm-screen) { background: #0B0A10; }
   /* The rival's own colour (avatar, tug-of-war, Sibyl's bubble) against your purple. */
   --pm-amber: color-mix(in srgb, var(--ember) 45%, var(--gold)); --pm-amber-soft: color-mix(in srgb, var(--pm-amber) 65%, #fff);
   --pm-amber-deep: color-mix(in srgb, var(--pm-amber) 70%, #000); --pm-amber-tint: color-mix(in srgb, var(--pm-amber) 30%, var(--pm-card));
+  /* The countdown beeps --pm-yellow from 15s (red from 5s); Long/Short are soft pastel pills with dark type. */
+  --pm-yellow: #F5C84C;
+  --pm-long-fill: color-mix(in srgb, var(--pm-green) 55%, #cfd8d2); --pm-short-fill: color-mix(in srgb, var(--pm-red) 45%, #edb89e);
+  --pm-on-long: #0E2A1C; --pm-on-short: #3A1410;
   --pm-on-green: #06210F; --pm-on-red: #2A0509; --pm-shadow: rgba(0, 0, 0, .55);
   --pm-cta-a: #A285FA; --pm-cta-b: #6E4FE0; --pm-cta-edge: #4A33A3;
   /* The coin's own line colour (chart line + area before entry); lavender for unknown markets. */
@@ -2168,68 +2172,67 @@ html[data-theme="obsidian"] body:has(.pm-screen) { background: #0B0A10; }
 .pm-top-end { display: flex; flex: none; align-items: center; gap: 8px; margin-left: auto; }
 .pm-streak { display: inline-flex; align-items: center; gap: 4px; height: 28px; padding: 0 9px; border: 1px solid color-mix(in srgb, var(--pm-orange) 30%, transparent); border-radius: 999px; background: color-mix(in srgb, var(--pm-orange) 12%, transparent); color: var(--pm-gold); font-size: 12px; font-weight: 700; }
 
-/* A thin coin-coloured rule across the scoreboard's top edge. */
-.pm-score::before { position: absolute; top: -1px; right: 24px; left: 24px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, var(--market-accent, var(--pm-purple)), transparent); content: ""; opacity: .8; pointer-events: none; }
-.pm-score { position: relative; padding: 14px 14px 12px; border: 1px solid var(--pm-edge); border-radius: 20px; background: linear-gradient(180deg, color-mix(in srgb, var(--pm-raised) 50%, var(--pm-card)), var(--pm-card)); transition: border-color .35s, background .35s, box-shadow .35s; }
-.pm-score.is-you { border-color: var(--pm-green-tint); background: linear-gradient(180deg, color-mix(in srgb, var(--pm-green) 8%, var(--pm-card)), var(--pm-card)); box-shadow: 0 12px 40px -20px color-mix(in srgb, var(--pm-green) 50%, transparent); }
-.pm-score.is-rival { border-color: var(--pm-red-tint); background: linear-gradient(180deg, color-mix(in srgb, var(--pm-red) 9%, var(--pm-card)), var(--pm-card)); box-shadow: 0 12px 40px -20px color-mix(in srgb, var(--pm-red) 45%, transparent); }
-/* Phones: player | timer ring | player, each player an avatar-over-text stack; desktop lays them flat. */
-.pm-score-row { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 6px; }
-.pm-player { display: flex; min-width: 0; flex-direction: column; align-items: center; gap: 4px; text-align: center; }
-.pm-player > div { max-width: 100%; }
-.pm-player-label { overflow: hidden; color: var(--pm-muted); font-size: 10.5px; font-weight: 600; letter-spacing: .04em; text-overflow: ellipsis; white-space: nowrap; }
-.pm-player-label.is-long { color: var(--pm-green); }
-.pm-player-label.is-short { color: var(--pm-red); }
-.pm-player-bal { overflow: hidden; color: var(--pm-soft); font-size: 16px; font-weight: 700; letter-spacing: -.02em; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
-/* Identity colours: you purple, the rival amber; the leader glows in their own. */
-.pm-avatar { --pm-tone: var(--pm-purple); display: grid; flex: none; place-items: center; box-sizing: border-box; border: 2px solid var(--pm-tone); border-radius: 50%; background: color-mix(in srgb, var(--pm-tone) 22%, var(--pm-card)); color: var(--pm-purple-soft); font-size: 15px; font-weight: 800; transition: border-color .3s, background .3s, color .3s, box-shadow .3s; }
-.pm-avatar.is-sibyl, .pm-avatar.is-player { --pm-tone: var(--pm-amber); color: var(--pm-amber-soft); }
-.pm-avatar.is-lead { box-shadow: 0 0 14px color-mix(in srgb, var(--pm-tone) 55%, transparent); }
+/* Scoreboard, no card: you | countdown over your lead | rival, then the split
+   tug-of-war. Phones: each player's avatar sits beside their name with the
+   big balance and status line full-width under it; desktop puts the avatar
+   to the side of all three. */
+.pm-score { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); grid-template-areas: "you clock rival" "tug tug tug"; align-items: start; column-gap: 10px; row-gap: 12px; padding: 2px 2px 0; }
+.pm-score > .pm-player:first-child { grid-area: you; }
+.pm-score > .pm-clock { grid-area: clock; }
+.pm-score > .pm-player.is-rival { grid-area: rival; }
+.pm-score > .pm-tug { grid-area: tug; }
+.pm-player { --pm-av: 30px; display: grid; min-width: 0; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "av label" "bal bal" "sub sub"; align-items: center; column-gap: 7px; }
+.pm-player.is-rival { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "label av" "bal bal" "sub sub"; text-align: right; }
+.pm-player-text { display: contents; }
+.pm-player > .pm-avatar { grid-area: av; width: var(--pm-av); height: var(--pm-av); font-size: calc(var(--pm-av) * .42); }
+.pm-player-label { grid-area: label; min-width: 0; overflow: hidden; color: var(--pm-purple-soft); font-size: 13px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.pm-player.is-rival .pm-player-label { color: var(--pm-amber-soft); }
+/* Big balance; on phones --pm-bal-em (its width in em, set inline) shrinks a long one to its column. */
+.pm-player-bal { grid-area: bal; margin-top: 5px; overflow: hidden; font-size: min(34px, calc((min(50vw, 280px) - 76px) / var(--pm-bal-em, 4.2))); font-weight: 700; letter-spacing: -.02em; line-height: 1.1; text-overflow: ellipsis; white-space: nowrap; }
+.pm-player-sub { grid-area: sub; display: -webkit-box; margin-top: 3px; overflow: hidden; color: var(--pm-muted); font-size: 11.5px; line-height: 1.3; -webkit-box-orient: vertical; -webkit-line-clamp: 2; animation: pm-sub-in .3s ease-out; }
+.pm-player-sub .is-long { color: var(--pm-green); font-weight: 700; }
+.pm-player-sub .is-short { color: var(--pm-red); font-weight: 700; }
+@keyframes pm-sub-in { from { opacity: 0; transform: translateY(2px); } }
+/* Filled identity discs: you purple, the rival amber; the leader's halo glows. */
+.pm-avatar { --pm-tone: var(--pm-purple); display: grid; flex: none; place-items: center; box-sizing: border-box; border-radius: 50%; background: var(--pm-tone); box-shadow: 0 0 0 3px color-mix(in srgb, var(--pm-tone) 28%, transparent); color: color-mix(in srgb, var(--pm-tone) 22%, #0B0A10); font-size: 15px; font-weight: 800; transition: background .3s, box-shadow .3s; }
+.pm-avatar.is-sibyl, .pm-avatar.is-player { --pm-tone: var(--pm-amber); }
+.pm-avatar > svg { width: 55%; height: 55%; }
+.pm-avatar.is-lead { box-shadow: 0 0 0 3px color-mix(in srgb, var(--pm-tone) 40%, transparent), 0 0 18px color-mix(in srgb, var(--pm-tone) 55%, transparent); }
 
-/* The centrepiece: a neutral ring (so it never reads as either player) that
-   drains each second and pulses red through the final 10. */
-.pm-timer { --pm-ring: 88px; position: relative; width: var(--pm-ring); height: var(--pm-ring); }
-.pm-timer-beat { position: relative; width: 100%; height: 100%; }
-.pm-timer svg { display: block; width: 100%; height: 100%; }
-.pm-timer-track { fill: var(--pm-field); stroke: var(--pm-line); transition: fill .3s, stroke .3s; }
-.pm-timer-fill { fill: none; stroke: var(--pm-ink); transition: stroke-dashoffset 1s linear, stroke .3s; }
-.pm-timer-text { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-.pm-timer-text .pm-num { font-size: calc(var(--pm-ring) * .34); font-weight: 800; line-height: 1; }
-.pm-timer-sec { animation: pm-tick .35s ease-out; }
-@keyframes pm-tick { from { opacity: .35; transform: translateY(-3px) scale(.94); } }
-.pm-timer-text > span:last-child { margin-top: 3px; color: var(--pm-dim); font-size: 9.5px; font-weight: 600; letter-spacing: .1em; }
-.pm-timer.is-urgent .pm-timer-track { fill: color-mix(in srgb, var(--pm-red) 10%, var(--pm-field)); stroke: color-mix(in srgb, var(--pm-red) 22%, var(--pm-field)); }
-.pm-timer.is-urgent .pm-timer-fill { stroke: var(--pm-red); }
-.pm-timer.is-urgent .pm-timer-text .pm-num { color: var(--pm-red-bright); font-size: calc(var(--pm-ring) * .38); }
-.pm-timer.is-urgent .pm-timer-text > span:last-child { color: var(--pm-red); font-weight: 700; }
-.pm-timer.is-urgent .pm-timer-beat { animation: pm-heartbeat 1s ease-in-out; }
-@keyframes pm-heartbeat {
-  0%, 30%, 60%, 100% { transform: scale(1); filter: drop-shadow(0 0 0 transparent); }
-  15% { transform: scale(1.1); filter: drop-shadow(0 0 12px color-mix(in srgb, var(--pm-red) 75%, transparent)); }
-  45% { transform: scale(1.05); filter: drop-shadow(0 0 6px color-mix(in srgb, var(--pm-red) 50%, transparent)); }
-}
+/* Seconds left: one big number that drops in each tick, then beeps — a pop
+   and a glow every second — yellow from 15s and red from 5s. */
+.pm-clock { display: flex; min-width: 0; flex-direction: column; align-items: center; }
+.pm-timer { --pm-clock: var(--pm-text); display: flex; flex-direction: column; align-items: center; }
+.pm-timer-num { color: var(--pm-clock); font-size: 46px; font-weight: 700; letter-spacing: -.03em; line-height: 1; animation: pm-tick .35s ease-out; transition: color .2s; }
+@keyframes pm-tick { from { opacity: .4; transform: translateY(-4px); } }
+.pm-timer-caption { margin-top: 4px; color: var(--pm-muted); font-size: 12px; font-weight: 500; white-space: nowrap; transition: color .2s; }
+.pm-timer.is-warn { --pm-clock: var(--pm-yellow); }
+.pm-timer.is-urgent { --pm-clock: var(--pm-red-bright); }
+.pm-timer:is(.is-warn, .is-urgent) .pm-timer-num { animation: pm-beep .9s ease-out; }
+.pm-timer:is(.is-warn, .is-urgent) .pm-timer-caption { color: var(--pm-clock); font-weight: 600; }
+@keyframes pm-beep { 0% { transform: scale(1.22); text-shadow: 0 0 26px var(--pm-clock); } 30% { transform: scale(1); } 100% { text-shadow: 0 0 0 transparent; } }
 
-/* Signed lead: "+$4.20 ahead" green / "−$1.10 behind" red; min-height so "Dead even" doesn't shift the chart. */
-.pm-lead { display: flex; min-height: 27px; align-items: baseline; justify-content: center; gap: 7px; margin: 8px 0 0; white-space: nowrap; transition: color .25s; }
-.pm-lead.is-even { align-items: center; color: var(--pm-soft); font-size: 15px; font-weight: 600; }
+/* Signed lead under the clock: "+$4.20 ahead" green / "−$1.10 behind" red. */
+.pm-lead { display: flex; min-height: 20px; align-items: baseline; justify-content: center; gap: 5px; margin: 6px 0 0; color: var(--pm-muted); font-size: 12.5px; font-weight: 600; white-space: nowrap; transition: color .25s; }
+.pm-lead.is-even { align-items: center; }
 .pm-lead.is-you { color: var(--pm-green-bright); }
 .pm-lead.is-rival { color: var(--pm-red-bright); }
-.pm-lead-amount { font-size: 24px; font-weight: 800; letter-spacing: -.02em; line-height: 1.1; }
-/* drop-shadow, not text-shadow: each rolling digit clips its own box. */
-.pm-lead.is-you .pm-lead-amount { filter: drop-shadow(0 0 10px color-mix(in srgb, var(--pm-green) 45%, transparent)); }
-.pm-lead-word { font-size: 14px; font-weight: 700; }
+.pm-lead-amount { font-size: 15px; font-weight: 800; letter-spacing: -.02em; line-height: 1.1; }
+.pm-lead-word { font-weight: 700; }
 .pm-roll { display: inline-flex; }
 .pm-roll-digit { display: inline-block; height: 1.1em; overflow: hidden; }
 .pm-roll-strip { display: flex; flex-direction: column; transition: transform .45s cubic-bezier(.2, .8, .2, 1); }
 .pm-roll-strip > span { height: 1.1em; line-height: 1.1em; text-align: center; }
-.pm-tug { position: relative; height: 10px; margin-top: 10px; }
-.pm-tug-track { display: flex; height: 100%; overflow: hidden; border-radius: 999px; background: var(--pm-raised); }
-.pm-tug-you { flex: none; background: linear-gradient(90deg, var(--pm-cta-b), var(--pm-purple)); transition: width .6s cubic-bezier(.2, .8, .2, 1); }
-.pm-tug-rival { flex: 1; background: linear-gradient(90deg, var(--pm-amber), var(--pm-amber-deep)); }
-.pm-tug-spark { position: absolute; top: 50%; width: 20px; height: 20px; margin: -10px 0 0 -10px; border-radius: 50%; background: radial-gradient(circle, #fff 0%, rgba(255, 255, 255, .8) 28%, rgba(255, 255, 255, 0) 70%); pointer-events: none; transition: left .6s cubic-bezier(.2, .8, .2, 1); animation: pm-spark .8s ease-in-out infinite; }
-.pm-tug-spark.is-you { background: radial-gradient(circle, #fff 0%, color-mix(in srgb, var(--pm-purple) 50%, var(--pm-text)) 35%, transparent 70%); }
-.pm-tug-spark.is-rival { background: radial-gradient(circle, #fff 0%, color-mix(in srgb, var(--pm-amber) 50%, var(--pm-text)) 35%, transparent 70%); }
-@keyframes pm-spark { 50% { opacity: .75; transform: scale(1.25); } }
+/* Split tug-of-war: two bars with a gap at the split (you: share − 3px, then a
+   6px gap), each end labelled with its share. */
+.pm-tug { display: flex; align-items: center; gap: 10px; }
+.pm-tug-pct { flex: none; min-width: 3ch; font-size: 11px; font-weight: 600; }
+.pm-tug-pct.is-you { color: var(--pm-purple-soft); }
+.pm-tug-pct.is-rival { color: var(--pm-amber-soft); text-align: right; }
+.pm-tug-track { display: flex; flex: 1; height: 5px; gap: 6px; }
+.pm-tug-you, .pm-tug-rival { border-radius: 999px; }
+.pm-tug-you { flex: none; background: var(--pm-purple); transition: width .6s cubic-bezier(.2, .8, .2, 1); }
+.pm-tug-rival { flex: 1; background: var(--pm-amber); }
 .pm-tug.is-shaking { animation: pm-shake .45s ease-in-out; }
 @keyframes pm-shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-5px); } 40% { transform: translateX(4px); } 60% { transform: translateX(-3px); } 80% { transform: translateX(2px); } }
 
@@ -2241,9 +2244,6 @@ html[data-theme="obsidian"] body:has(.pm-screen) { background: #0B0A10; }
 .pm-bubble.is-sibyl, .pm-bubble.is-sibyl::after { border-color: var(--pm-amber-tint); background: color-mix(in srgb, var(--pm-amber) 12%, var(--pm-card)); }
 .pm-bubble.is-sibyl { color: color-mix(in srgb, var(--pm-amber) 15%, var(--pm-text)); }
 .pm-bubble.is-sibyl strong { color: var(--pm-amber-soft); }
-.pm-bubble.is-hurt { border-color: var(--pm-red-tint); background: color-mix(in srgb, var(--pm-red) 12%, var(--pm-card)); color: color-mix(in srgb, var(--pm-red) 15%, var(--pm-text)); }
-.pm-bubble.is-hurt::after { border-color: var(--pm-red-tint); background: color-mix(in srgb, var(--pm-red) 12%, var(--pm-card)); }
-.pm-bubble.is-hurt strong { color: var(--pm-red-bright); }
 @keyframes pm-bubble-in { from { opacity: 0; transform: translateY(4px) scale(.96); } }
 
 .pm-screen > .pm-chart { display: flex; flex: 1 1 0; min-height: 140px; }
@@ -2278,57 +2278,82 @@ html[data-theme="obsidian"] body:has(.pm-screen) { background: #0B0A10; }
 
 .pm-controls { display: flex; flex-direction: column; gap: 10px; }
 .pm-controls-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-.pm-select { position: relative; }
-.pm-select-btn { display: flex; width: 100%; height: 48px; align-items: center; justify-content: space-between; gap: 8px; padding: 0 14px; border: 1px solid var(--pm-edge); border-radius: 14px; background: var(--pm-card); color: var(--pm-text); cursor: pointer; transition: border-color .15s; }
-.pm-select-btn[aria-expanded="true"] { border-color: var(--pm-purple); }
-.pm-select-btn:disabled { cursor: default; opacity: .55; }
-.pm-select-label { color: var(--pm-dim); font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
-.pm-select-value { font-size: 16px; font-weight: 700; }
-.pm-select-btn.is-risk { border-color: var(--pm-orange-tint); background: color-mix(in srgb, var(--pm-orange) 8%, transparent); }
-.pm-select-btn.is-risk[aria-expanded="true"] { border-color: var(--pm-orange); }
-.pm-select-btn.is-risk .pm-select-label { color: color-mix(in srgb, var(--pm-orange) 55%, var(--pm-muted)); }
-.pm-select-btn.is-risk .pm-select-value { color: var(--pm-gold); font-weight: 800; }
-.pm-menu { position: absolute; right: 0; bottom: calc(100% + 8px); left: 0; z-index: 20; display: flex; flex-direction: column; gap: 4px; padding: 6px; border: 1px solid var(--pm-edge); border-radius: 14px; background: var(--pm-raised); box-shadow: 0 14px 40px var(--pm-shadow); }
-/* Amount spans both columns so the stake stepper has room. */
-.pm-controls-row > .pm-select:first-child .pm-menu { right: auto; width: calc(200% + 10px); }
-.pm-menu-option { display: flex; min-height: 44px; align-items: center; justify-content: space-between; gap: 10px; padding: 0 12px; border: 0; border-radius: 10px; background: transparent; color: var(--pm-text); font-size: 15px; font-weight: 700; cursor: pointer; }
-.pm-menu-option small { color: var(--pm-muted); font-family: var(--font-sans), Inter, sans-serif; font-size: 11px; font-weight: 600; }
-.pm-menu-option:hover:not(:disabled) { background: var(--pm-hover); }
-.pm-menu-option.is-selected { background: color-mix(in srgb, var(--pm-purple) 16%, transparent); color: var(--pm-purple-soft); }
-.pm-menu-option:disabled { cursor: default; opacity: .4; }
-.pm-menu .pulse-stake { height: 44px; }
-.pm-menu .pulse-stake button { min-width: 44px; border-color: var(--pm-edge); border-radius: 10px; color: var(--pm-text); }
+.pm-step { display: flex; height: 48px; align-items: stretch; overflow: hidden; border: 1px solid var(--pm-edge); border-radius: 14px; background: var(--pm-card); transition: border-color .15s, box-shadow .15s, opacity .15s; }
+.pm-step:focus-within { border-color: var(--pm-purple); box-shadow: 0 0 0 3px color-mix(in srgb, var(--pm-purple) 22%, transparent); }
+.pm-step.is-disabled { opacity: .55; }
+.pm-step-btn { flex: none; width: 44px; border: 0; background: transparent; color: var(--pm-soft); font-family: var(--font-arena-mono), "JetBrains Mono", ui-monospace, monospace; font-size: 13px; font-weight: 700; cursor: pointer; transition: background .15s, color .15s; }
+/* ÷ and × in the sans face, a size up: in the small mono they read as + and x. */
+.pm-step-op { margin-right: 1px; font-family: var(--font-sans), Inter, system-ui, sans-serif; font-size: 1.3em; font-weight: 600; line-height: 0; vertical-align: -.06em; }
+.pm-step-btn:first-child { border-right: 1px solid var(--pm-line); }
+.pm-step-btn:last-child { border-left: 1px solid var(--pm-line); }
+.pm-step-btn:hover:not(:disabled) { background: var(--pm-hover); color: var(--pm-text); }
+.pm-step-btn:disabled { cursor: default; opacity: .35; }
+.pm-step-field { display: flex; flex: 1; min-width: 0; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+.pm-step-label { color: var(--pm-dim); font-size: 9.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
+.pm-step-value { display: flex; align-items: center; font-size: 16px; font-weight: 700; line-height: 1.1; }
+/* The stake's middle is a real text field: inset, text cursor, a caret
+   blinking after the number until it's focused (the real caret takes over). */
+.pm-step-field.is-input { margin: 4px; border-radius: 9px; background: var(--pm-field); cursor: text; transition: background .15s; }
+.pm-step-field.is-input:hover { background: color-mix(in srgb, var(--pm-purple) 9%, var(--pm-field)); }
+.pm-step-field.is-input .pm-step-label { color: color-mix(in srgb, var(--pm-purple) 45%, var(--pm-muted)); }
+.pm-step-value input { min-width: 1ch; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; letter-spacing: 0; outline: none; }
+.pm-step-value input::selection { background: color-mix(in srgb, var(--pm-purple) 45%, transparent); }
+.pm-step-caret { width: 2px; height: 1em; margin-left: 2px; border-radius: 1px; background: var(--pm-purple-soft); animation: pm-caret 1.1s steps(1) infinite; }
+.pm-step-field:focus-within .pm-step-caret, .pm-step-field:has(input:disabled) .pm-step-caret { display: none; }
+.pm-step-field:has(input:disabled) { cursor: default; }
+@keyframes pm-caret { 50% { opacity: 0; } }
+/* Leverage: tinted orange, it's the risk dial. */
+.pm-step.is-risk { border-color: var(--pm-orange-tint); background: color-mix(in srgb, var(--pm-orange) 8%, var(--pm-card)); }
+.pm-step.is-risk .pm-step-btn { color: color-mix(in srgb, var(--pm-orange) 55%, var(--pm-text)); }
+.pm-step.is-risk .pm-step-btn:first-child, .pm-step.is-risk .pm-step-btn:last-child { border-color: var(--pm-orange-tint); }
+.pm-step.is-risk .pm-step-label { color: color-mix(in srgb, var(--pm-orange) 55%, var(--pm-muted)); }
+.pm-step.is-risk .pm-step-value { color: var(--pm-gold); font-weight: 800; }
 
-.pm-trade { display: flex; height: 72px; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border: 0; border-radius: 18px; cursor: pointer; touch-action: manipulation; user-select: none; transition: transform .08s ease, box-shadow .08s ease, filter .15s; }
-.pm-trade.is-long { background: linear-gradient(180deg, color-mix(in srgb, var(--pm-green) 80%, #fff) 0%, color-mix(in srgb, var(--pm-green) 85%, #000) 100%); box-shadow: 0 5px 0 var(--pm-green-deep), 0 12px 28px color-mix(in srgb, var(--pm-green) 35%, transparent), inset 0 1px 0 rgba(255, 255, 255, .35); color: var(--pm-on-green); }
-.pm-trade.is-short { background: linear-gradient(180deg, color-mix(in srgb, var(--pm-red) 80%, #fff) 0%, color-mix(in srgb, var(--pm-red) 88%, #000) 100%); box-shadow: 0 5px 0 var(--pm-red-deep), 0 12px 28px color-mix(in srgb, var(--pm-red) 35%, transparent), inset 0 1px 0 rgba(255, 255, 255, .35); color: var(--pm-on-red); }
-.pm-trade:active:not(:disabled), .pm-trade.is-pressed { transform: translateY(4px); }
-.pm-trade.is-long:active:not(:disabled), .pm-trade.is-long.is-pressed { box-shadow: 0 1px 0 var(--pm-green-deep), 0 4px 12px color-mix(in srgb, var(--pm-green) 30%, transparent), inset 0 1px 0 rgba(255, 255, 255, .35); }
-.pm-trade.is-short:active:not(:disabled), .pm-trade.is-short.is-pressed { box-shadow: 0 1px 0 var(--pm-red-deep), 0 4px 12px color-mix(in srgb, var(--pm-red) 30%, transparent), inset 0 1px 0 rgba(255, 255, 255, .35); }
-.pm-trade:disabled { cursor: default; filter: saturate(.3) brightness(.65); }
-.pm-trade-title { display: flex; align-items: center; gap: 6px; font-size: 22px; font-weight: 800; }
-.pm-trade-sub { font-size: 11px; font-weight: 600; opacity: .75; }
+/* Long / Short: two tinted pills — dark green, dark red, the label in the
+   side's own light tone — sitting in one shared dark track. */
+.pm-controls-row.is-sides { gap: 6px; padding: 6px; border-radius: 999px; background: var(--pm-card); }
+.pm-trade { display: flex; height: 60px; align-items: center; justify-content: center; border: 0; border-radius: 999px; cursor: pointer; touch-action: manipulation; user-select: none; transition: background .15s, transform .1s ease, opacity .15s; }
+.pm-trade.is-long { background: color-mix(in srgb, var(--pm-green) 20%, var(--pm-card)); color: color-mix(in srgb, var(--pm-green) 65%, var(--pm-text)); }
+/* Short's red warmed toward orange: brick fill, salmon label. */
+.pm-trade.is-short { --pm-short-tone: color-mix(in srgb, var(--pm-red) 65%, var(--pm-orange)); background: color-mix(in srgb, var(--pm-short-tone) 20%, var(--pm-card)); color: color-mix(in srgb, var(--pm-short-tone) 60%, var(--pm-text)); }
+.pm-trade.is-long:hover:not(:disabled) { background: color-mix(in srgb, var(--pm-green) 28%, var(--pm-card)); }
+.pm-trade.is-short:hover:not(:disabled) { background: color-mix(in srgb, var(--pm-short-tone) 28%, var(--pm-card)); }
+.pm-trade:active:not(:disabled), .pm-trade.is-pressed { transform: scale(.98); }
+.pm-trade:disabled { cursor: default; opacity: .45; }
+.pm-trade-title { display: flex; align-items: center; gap: 8px; font-size: 18px; font-weight: 600; }
+.pm-trade-title.is-trailing { flex-direction: row-reverse; }
 .pm-helper, .pm-controls-note { margin: 0; color: var(--pm-muted); font-size: 12px; text-align: center; }
 .pm-controls-notice { margin: 0; color: var(--pm-red-bright); font-size: 12px; font-weight: 600; text-align: center; }
 .pm-settling { margin: 0; padding: 28px 0; color: var(--pm-soft); font-size: 15px; font-weight: 600; text-align: center; }
 
-.pm-close { display: flex; height: 76px; align-items: center; justify-content: space-between; gap: 12px; padding: 0 22px; border: 0; border-radius: 18px; cursor: pointer; text-align: left; touch-action: manipulation; transition: transform .08s ease, filter .15s; }
-.pm-close.is-up { background: linear-gradient(180deg, color-mix(in srgb, var(--pm-green) 80%, #fff) 0%, color-mix(in srgb, var(--pm-green) 85%, #000) 100%); box-shadow: 0 5px 0 var(--pm-green-deep), 0 10px 26px color-mix(in srgb, var(--pm-green) 35%, transparent), inset 0 1px 0 rgba(255, 255, 255, .35); color: var(--pm-on-green); animation: pm-cta-glow 1.6s ease-in-out infinite; }
-.pm-close.is-down { background: linear-gradient(180deg, color-mix(in srgb, var(--pm-red) 80%, #fff) 0%, color-mix(in srgb, var(--pm-red) 88%, #000) 100%); box-shadow: 0 5px 0 var(--pm-red-deep), 0 10px 26px color-mix(in srgb, var(--pm-red) 30%, transparent), inset 0 1px 0 rgba(255, 255, 255, .35); color: var(--pm-on-red); }
-.pm-close:active:not(:disabled) { animation: none; transform: translateY(4px); }
-.pm-close.is-up:active:not(:disabled) { box-shadow: 0 1px 0 var(--pm-green-deep), 0 4px 12px color-mix(in srgb, var(--pm-green) 30%, transparent); }
-.pm-close.is-down:active:not(:disabled) { box-shadow: 0 1px 0 var(--pm-red-deep), 0 4px 12px color-mix(in srgb, var(--pm-red) 30%, transparent); }
+.pm-close { display: flex; height: 76px; align-items: center; justify-content: space-between; gap: 12px; padding: 0 30px; border: 0; border-radius: 999px; cursor: pointer; text-align: left; touch-action: manipulation; transition: transform .1s ease, filter .15s; }
+.pm-close.is-up { background: var(--pm-long-fill); box-shadow: 0 12px 30px -12px color-mix(in srgb, var(--pm-green) 75%, transparent); color: var(--pm-on-long); animation: pm-cta-glow 1.6s ease-in-out infinite; }
+.pm-close.is-down { background: var(--pm-short-fill); box-shadow: 0 12px 30px -12px color-mix(in srgb, var(--pm-red) 75%, transparent); color: var(--pm-on-short); }
+.pm-close:active:not(:disabled) { animation: none; transform: translateY(2px) scale(.985); }
 .pm-close:disabled { animation: none; cursor: default; filter: saturate(.4) brightness(.75); }
-@keyframes pm-cta-glow { 0%, 100% { box-shadow: 0 5px 0 var(--pm-green-deep), 0 10px 26px color-mix(in srgb, var(--pm-green) 35%, transparent), inset 0 1px 0 rgba(255, 255, 255, .35); } 50% { box-shadow: 0 5px 0 var(--pm-green-deep), 0 12px 40px color-mix(in srgb, var(--pm-green) 65%, transparent), inset 0 1px 0 rgba(255, 255, 255, .35); } }
+@keyframes pm-cta-glow { 0%, 100% { box-shadow: 0 12px 30px -12px color-mix(in srgb, var(--pm-green) 75%, transparent); } 50% { box-shadow: 0 14px 44px -8px color-mix(in srgb, var(--pm-green) 85%, transparent); } }
 .pm-close-copy { display: flex; min-width: 0; flex-direction: column; }
 .pm-close-title { font-size: 20px; font-weight: 800; }
 .pm-close-sub { overflow: hidden; font-size: 12px; font-weight: 600; opacity: .75; text-overflow: ellipsis; white-space: nowrap; }
 .pm-close-pnl { font-size: 26px; font-weight: 800; white-space: nowrap; }
-.pm-flip { height: 46px; border-radius: 14px; font-size: 14px; font-weight: 700; cursor: pointer; }
-.pm-flip.is-short { border: 1px solid var(--pm-red-tint); background: color-mix(in srgb, var(--pm-red) 8%, transparent); color: var(--pm-red-bright); }
-.pm-flip.is-long { border: 1px solid var(--pm-green-tint); background: color-mix(in srgb, var(--pm-green) 8%, transparent); color: var(--pm-green-bright); }
-.pm-flip:disabled { cursor: default; opacity: .5; }
-.pm-liq { display: flex; height: 46px; box-sizing: border-box; align-items: center; justify-content: center; gap: 5px; border: 1px solid var(--pm-edge); border-radius: 14px; background: var(--pm-card); color: var(--pm-muted); font-size: 12px; white-space: nowrap; transition: border-color .2s, background .2s, color .2s; }
+/* In a position: Flip — [ Flip to Short | − 100× + ], a .pm-step tinted the
+   side it flips to; − / + pick the new side's leverage (÷10 / ×10). It takes
+   the wider share of the row, Liq the rest. */
+.pm-controls.is-open > .pm-controls-row { grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr); }
+.pm-flip.is-short { --pm-flip: var(--pm-red); }
+.pm-flip.is-long { --pm-flip: var(--pm-green); }
+.pm-flip { border-color: color-mix(in srgb, var(--pm-flip) 30%, var(--pm-card)); background: color-mix(in srgb, var(--pm-flip) 8%, var(--pm-card)); }
+.pm-flip-go { display: flex; flex: 1; min-width: 0; align-items: center; padding: 0 10px 0 14px; overflow: hidden; border: 0; background: transparent; color: color-mix(in srgb, var(--pm-flip) 60%, var(--pm-text)); font-size: 14px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; transition: background .15s; }
+.pm-flip-go:hover:not(:disabled) { background: color-mix(in srgb, var(--pm-flip) 10%, transparent); }
+.pm-flip-go:disabled { cursor: default; }
+.pm-flip-lev { display: flex; flex: none; align-items: center; gap: 2px; padding: 0 5px; border-left: 1px solid color-mix(in srgb, var(--pm-flip) 30%, var(--pm-card)); }
+/* 6ch: room for 10000× without the divider shifting as it changes. */
+.pm-flip-lev .pm-num { min-width: 6ch; color: var(--pm-gold); font-size: 13px; font-weight: 800; text-align: center; }
+.pm-flip-adj { display: grid; width: 28px; height: 28px; flex: none; place-items: center; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--pm-soft); font-size: 18px; font-weight: 600; line-height: 1; cursor: pointer; transition: background .15s, color .15s; }
+.pm-flip-adj:hover:not(:disabled) { background: color-mix(in srgb, var(--pm-flip) 14%, transparent); color: var(--pm-text); }
+.pm-flip-adj:disabled { cursor: default; opacity: .3; }
+.pm-liq { display: flex; height: 48px; box-sizing: border-box; align-items: center; justify-content: center; gap: 5px; border: 1px solid var(--pm-edge); border-radius: 14px; background: var(--pm-card); color: var(--pm-muted); font-size: 12px; white-space: nowrap; transition: border-color .2s, background .2s, color .2s; }
+.pm-liq-state::before { content: "· "; }
 .pm-liq .pm-num { color: var(--pm-soft); font-weight: 700; }
 .pm-liq.is-near { border-color: var(--pm-red); background: color-mix(in srgb, var(--pm-red) 16%, transparent); color: var(--pm-red-bright); font-weight: 700; animation: pm-liq-pulse 1s ease-in-out infinite; }
 .pm-liq.is-near .pm-num { color: var(--pm-text); }
@@ -2390,96 +2415,113 @@ html[data-theme="obsidian"] body:has(.pm-screen) { background: #0B0A10; }
 /* Shorter phones (SE-class): tighten so the round still fits without scrolling. */
 @media (max-height: 740px) {
   .pm-screen { gap: 8px; }
-  .pm-score { padding: 10px 12px; }
-  .pm-timer { --pm-ring: 76px; }
-  .pm-lead { margin-top: 4px; }
-  .pm-tug { margin-top: 8px; }
+  .pm-score { row-gap: 8px; }
+  .pm-timer-num { font-size: 40px; }
   .pm-bubble { padding: 7px 11px; font-size: 13px; }
-  .pm-trade { height: 64px; }
   .pm-close { height: 68px; }
 }
 @media (max-width: 380px) {
   .pm-screen { padding-inline: 10px; }
-  .pm-score { padding-inline: 10px; }
-  .pm-player-label { letter-spacing: .02em; }
-  .pm-player-bal { font-size: 15px; }
+  /* Room for "Sibyl · Short" beside a long lead ("−$12.40 behind"). */
+  .pm-score { column-gap: 6px; }
+  .pm-player { --pm-av: 26px; column-gap: 5px; }
+  .pm-player-label { font-size: 12px; }
   .pm-market { padding: 0 10px; }
 }
-/* Phones/tablets: no "price goes up/down" under Long/Short, no generic helper
-   line, and slimmer top-bar and Amount/Leverage chips — the chart (flex: 1)
-   takes the height they give back. After the max-height rule above so the
-   shorter trade buttons win there too. */
+/* Phones/tablets: no generic helper line, slimmer top bar and Long/Short —
+   the chart (flex: 1) takes the height they give back. After the max-height
+   rule above so the shorter trade buttons win there too. */
 @media (max-width: 1023px) {
   .pm-screen { gap: 8px; }
   .pm-icon-btn { width: 36px; height: 36px; border-radius: 10px; }
   .pm-market { height: 28px; gap: 5px; padding: 0 10px; font-size: 13px; }
   .pm-market-glyph { font-size: 14px; }
   .pm-streak { height: 24px; padding: 0 8px; font-size: 11px; }
-  .pm-select-btn { height: 38px; padding: 0 12px; border-radius: 12px; }
-  .pm-select-label { font-size: 10px; }
-  .pm-select-value { font-size: 14px; }
-  .pm-trade { height: 56px; }
-  .pm-trade-sub, .pm-helper.is-default { display: none; }
+  .pm-step { height: 44px; border-radius: 12px; }
+  .pm-liq { height: 44px; flex-direction: column; gap: 0; border-radius: 12px; font-size: 11.5px; line-height: 1.25; }
+  .pm-liq-state { font-size: 10.5px; }
+  .pm-liq-state::before { content: none; }
+  .pm-flip-go { padding: 0 6px 0 12px; font-size: 13px; }
+  .pm-flip-lev { padding: 0 3px; }
+  .pm-flip-lev .pm-num { min-width: 5ch; font-size: 12px; }
+  .pm-flip-adj { width: 24px; height: 28px; font-size: 17px; }
+  .pm-step-btn { width: 38px; font-size: 12px; }
+  .pm-step-field.is-input { margin: 3px; border-radius: 8px; }
+  .pm-step-value { font-size: 15px; }
+  .pm-trade { height: 48px; }
+  .pm-trade-title { font-size: 17px; }
+  .pm-close { height: 64px; padding: 0 22px; }
+  .pm-helper.is-default { display: none; }
 }
 
 /* Desktop: the live round stacks full-width like the lobby's stage (1280px
-   max) — top bar, the scoreboard as one horizontal strip (you | timer ring
-   over the signed lead | rival, tug-of-war underneath), the chart filling every remaining
-   pixel, then the controls in one row underneath (Amount + Leverage | Long +
-   Short; in a position, Flip + Liq | Close). The bubble floats in the chart's
+   max) — top bar, the scoreboard as one horizontal strip (you | countdown
+   over the signed lead | rival, the split tug-of-war underneath), the chart
+   filling every remaining pixel, then the controls in one row underneath
+   (Stake + Leverage | Long + Short, helper under the chips; in a position,
+   Flip + Liq | Close). The bubble floats in the chart's
    top-right header band, tail up at the rival. The result screen keeps the
    centred column. */
 @media (min-width: 1024px) {
   .pm-market-name { display: inline; }
   .pm-screen:not(.is-result) {
-    display: grid; max-width: 1280px; gap: 14px;
+    display: grid; max-width: 1280px; gap: 10px;
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto auto minmax(300px, 1fr) auto;
     grid-template-areas: "top" "score" "chart" "controls";
-    padding: 18px 24px 22px; overflow-y: auto;
+    padding: 12px 24px 18px; overflow-y: auto;
     background:
       radial-gradient(640px 320px at 50% 0, color-mix(in srgb, var(--market-accent, #7C5CF0) 13%, transparent), transparent 70%),
       radial-gradient(520px 360px at 100% 100%, color-mix(in srgb, var(--market-accent, #7C5CF0) 7%, transparent), transparent 70%),
       var(--pm-bg);
   }
   .pm-screen:not(.is-result) > .pm-top { grid-area: top; }
+  /* A compact top bar and scoreboard, so the chart and the controls get the height. */
+  .pm-screen:not(.is-result) .pm-icon-btn { width: 38px; height: 38px; border-radius: 11px; }
   .pm-screen:not(.is-result) .pm-score { grid-area: score; }
   .pm-screen:not(.is-result) > .pm-chart { grid-area: chart; min-height: 0; }
   .pm-screen:not(.is-result) > .pm-controls { grid-area: controls; }
   .pm-screen:not(.is-result) .pm-bubble-row { z-index: 2; grid-area: chart; align-self: start; justify-self: end; margin: 14px 72px 0 0; padding: 0; }
 
-  /* Scoreboard strip: you | timer ring over the lead | rival, tug-of-war underneath. */
-  .pm-screen:not(.is-result) .pm-score {
-    display: grid; align-items: center; column-gap: 24px; row-gap: 6px; padding: 12px 22px 14px;
-    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-    grid-template-areas: "you timer rival" "you lead rival" "tug tug tug";
-  }
-  .pm-screen:not(.is-result) .pm-score-row { display: contents; }
-  .pm-screen:not(.is-result) .pm-score-row > .pm-player:first-child { grid-area: you; }
-  .pm-screen:not(.is-result) .pm-score-row > .pm-timer { grid-area: timer; justify-self: center; }
-  .pm-screen:not(.is-result) .pm-score-row > .pm-player.is-rival { grid-area: rival; }
-  .pm-screen:not(.is-result) .pm-player { flex-direction: row; gap: 10px; text-align: left; }
-  .pm-screen:not(.is-result) .pm-player.is-rival { flex-direction: row-reverse; text-align: right; }
-  .pm-screen:not(.is-result) .pm-player-bal { font-size: 20px; }
-  .pm-screen:not(.is-result) .pm-lead { grid-area: lead; margin: 0; }
-  .pm-screen:not(.is-result) .pm-lead-amount { font-size: 26px; }
-  .pm-screen:not(.is-result) .pm-tug { grid-area: tug; height: 8px; margin: 4px 0 0; }
+  /* Scoreboard strip: big avatar beside name / balance / status, the countdown centred. */
+  .pm-screen:not(.is-result) .pm-score { column-gap: 24px; row-gap: 8px; }
+  .pm-screen:not(.is-result) .pm-player { --pm-av: 50px; column-gap: 12px; grid-template-areas: "av label" "av bal" "av sub"; }
+  .pm-screen:not(.is-result) .pm-player.is-rival { grid-template-areas: "label av" "bal av" "sub av"; }
+  .pm-screen:not(.is-result) .pm-player-label { font-size: 14px; }
+  .pm-screen:not(.is-result) .pm-player-bal { margin-top: 1px; font-size: 32px; }
+  .pm-screen:not(.is-result) .pm-player-sub { margin-top: 1px; font-size: 12.5px; }
+  .pm-screen:not(.is-result) .pm-timer-num { font-size: 50px; }
+  .pm-screen:not(.is-result) .pm-timer-caption { margin-top: 2px; }
+  .pm-screen:not(.is-result) .pm-lead { margin-top: 3px; }
+  .pm-screen:not(.is-result) .pm-lead-amount { font-size: 16px; }
+  .pm-screen:not(.is-result) .pm-tug-track { height: 6px; }
 
   /* Controls row under the chart. */
   .pm-screen:not(.is-result) > .pm-controls { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); align-items: center; column-gap: 14px; row-gap: 8px; }
   .pm-screen:not(.is-result) > .pm-controls > :not(.pm-controls-row, .pm-close) { grid-column: 1 / -1; }
   .pm-screen:not(.is-result) > .pm-controls.is-open > .pm-controls-note { order: -2; }
   .pm-screen:not(.is-result) > .pm-controls.is-open > .pm-controls-row { order: -1; }
-  .pm-screen:not(.is-result) .pm-select-btn { height: 72px; padding: 0 18px; border-radius: 18px; }
-  .pm-screen:not(.is-result) .pm-select-value { font-size: 20px; }
-  .pm-screen:not(.is-result) .pm-flip, .pm-screen:not(.is-result) .pm-liq { height: 76px; border-radius: 18px; }
+  .pm-screen:not(.is-result) > .pm-controls.is-setup > .pm-helper { grid-column: 1; text-align: left; }
+  .pm-screen:not(.is-result) .pm-step { height: 80px; border-radius: 20px; }
+  .pm-screen:not(.is-result) .pm-trade { height: 68px; }
+  .pm-screen:not(.is-result) .pm-trade-title { font-size: 20px; }
+  .pm-screen:not(.is-result) .pm-close { height: 80px; }
+  .pm-screen:not(.is-result) .pm-step-btn { width: 54px; font-size: 14px; }
+  .pm-screen:not(.is-result) .pm-step-field.is-input { margin: 6px; border-radius: 12px; }
+  .pm-screen:not(.is-result) .pm-step-label { font-size: 10.5px; }
+  .pm-screen:not(.is-result) .pm-step-value { font-size: 20px; }
+  .pm-screen:not(.is-result) .pm-liq { height: 80px; border-radius: 20px; }
+  .pm-screen:not(.is-result) .pm-flip-go { padding: 0 14px 0 20px; font-size: 16px; }
+  .pm-screen:not(.is-result) .pm-flip-lev { gap: 4px; padding: 0 10px; }
+  .pm-screen:not(.is-result) .pm-flip-lev .pm-num { font-size: 15px; }
+  .pm-screen:not(.is-result) .pm-flip-adj { width: 34px; height: 34px; font-size: 20px; }
   .pm-screen:not(.is-result) .pm-liq { font-size: 13px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .pm-live-dot.is-live, .pm-tug-spark, .pm-tug.is-shaking, .pm-timer.is-urgent .pm-timer-beat, .pm-timer-sec, .pm-bubble, .pm-fan, .pm-head-glow, .pm-chart-liq,
+  .pm-live-dot.is-live, .pm-tug.is-shaking, .pm-timer .pm-timer-num, .pm-player-sub, .pm-step-caret, .pm-bubble, .pm-fan, .pm-head-glow, .pm-chart-liq,
   .pm-pop, .pm-close.is-up, .pm-liq.is-near, .pm-edge, .pm-rays, .pm-confetti, .pm-stamp { animation: none; }
-  .pm-roll-strip, .pm-tug-you, .pm-tug-spark, .pm-timer-fill, .pm-trade, .pm-close, .pm-rematch, .pm-score, .pm-chart-box, .pm-avatar, .pm-lead { transition: none; }
+  .pm-roll-strip, .pm-tug-you, .pm-trade, .pm-close, .pm-rematch, .pm-chart-box, .pm-avatar, .pm-lead, .pm-timer-num, .pm-step { transition: none; }
 }
 .result-burst { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
 .result-burst-particle { position: absolute; top: 50%; left: 50%; height: 7px; width: 7px; border-radius: 2px; background: var(--brand); opacity: 0; animation: result-burst-fly .85s ease-out forwards; }

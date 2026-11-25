@@ -4,9 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { usePriceFeed, type PricePoint } from "../../../usePriceFeed";
 import { roundTrades, usePulseFeedback } from "../../../PulseArenaParts";
 import MatchScreen, {
-  compactUsd,
   liquidationPrice,
-  MatchMenuOption,
   matchSignedUsd,
   matchUsd,
   RematchAction,
@@ -20,7 +18,6 @@ const ROUND_SECONDS = 60;
 const STARTING_CASH = 100;
 const DEFAULT_LEVERAGE = 100;
 const LEVERAGE_OPTIONS = [100, 1000, 10000];
-const FIXED_STAKE_OPTIONS = [10, 25, 50];
 const RIVAL_STAKE = 48;
 const RIVAL_LEVERAGE = 10;
 // A single tick moving your position by this share of its stake (and at
@@ -299,7 +296,7 @@ export default function Page() {
     playFeedback("exit");
   };
 
-  const reversePosition = () => {
+  const reversePosition = (nextLeverage: number) => {
     if (phase !== "open" || positionRef.current === null || isActingRef.current) return;
     const execPrice = getLivePrice();
     if (execPrice === null) return;
@@ -311,7 +308,7 @@ export default function Page() {
       side: nextSide,
       entryPrice: execPrice,
       stake: current.stake,
-      leverage: current.leverage,
+      leverage: nextLeverage,
       openedAt: Date.now(),
     };
     realizedPnlRef.current += closedPnl;
@@ -547,9 +544,10 @@ export default function Page() {
         equity: sibylFinalEquity,
         pnl: displayRivalPnl,
         side: rivalEntryPrice !== null ? rivalSide : null,
+        line: { text: sibylLine, key: sibylLineKey },
       }}
-      timer={{ seconds: secondsLeft, total: ROUND_SECONDS, caption: "SEC", live: roundStart !== null && phase !== "result" }}
-      bubble={{ speaker: "Sibyl", text: sibylLine, key: sibylLineKey }}
+      timer={{ seconds: secondsLeft, caption: "seconds left", live: roundStart !== null && phase !== "result" }}
+      bubble={null}
       chart={{
         points: frozenPoints ?? points,
         now,
@@ -561,34 +559,7 @@ export default function Page() {
       }}
       controls={{
         state: phase === "open" ? "open" : phase === "settling" ? "settling" : "setup",
-        amountLabel: compactUsd(Math.min(stake, availableCash)),
-        amountMenu: (close) => (
-          <>
-            {FIXED_STAKE_OPTIONS.map((option) => (
-              <MatchMenuOption
-                key={option}
-                selected={stake === option}
-                disabled={option > availableCash}
-                onClick={() => {
-                  setStake(option);
-                  close();
-                }}
-              >
-                {compactUsd(option)}
-              </MatchMenuOption>
-            ))}
-            <MatchMenuOption
-              selected={stake === availableCash}
-              disabled={availableCash <= 0}
-              onClick={() => {
-                setStake(availableCash);
-                close();
-              }}
-            >
-              Max <small>{matchUsd(availableCash)}</small>
-            </MatchMenuOption>
-          </>
-        ),
+        stake: { value: Math.min(stake, availableCash), available: availableCash, onChange: setStake },
         leverage,
         leverageOptions: LEVERAGE_OPTIONS,
         onLeverage: setLeverage,
