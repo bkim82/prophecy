@@ -49,7 +49,7 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
       // Starts the 5s pre-round countdown for both players at the same instant.
       predictStartAt: now,
       // Joining by link makes it a private round between the two of you, like
-      // a challenge's, so settled it offers a rematch (lib/rematch.ts).
+      // a challenge's (its rematch stays private too, lib/rematch.ts).
       ...(candidate.botState ? {} : { invitedUserId: userId }),
     })
     .where(

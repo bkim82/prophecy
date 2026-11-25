@@ -23,7 +23,7 @@ Server status: `open | predict | countdown | settled` (`db/schema.ts:26`,
 `lib/match.ts:7`). `open` has no client-side equivalent — it is the pre-round
 wait for an opponent, and it is now waited out on the lobby, not in the room
 (`app/duel/page.tsx` `queue` panel). `settling` and `result` are both `settled`
-server-side. There is no loop back: "play again" is a new row, not a reset.
+server-side. There is no loop back: a rematch is a new row, not a reset.
 
 | Phase | State |
 | --- | --- |
@@ -59,7 +59,7 @@ Runs on `expireLocksIfDue`'s result, not on the raw row (`app/api/match/[id]/rou
 
 Ties only occur on exactly equal P&L (`lib/match.ts:115`).
 
-## Play again
+## Rematch
 
 Both players enter server-priced long/short positions during `countdown`; `POST /api/match/[id]/action`
 guards close/reverse mutations during `countdown`, and `settleIfDue` closes
@@ -68,8 +68,8 @@ P&Ls at the server settlement price.
 
 Multiplayer Pulse allows unlimited long/short entries during `countdown`. Each
 entry is an independent position; closing one realizes its P&L without changing
-the others. There is no in-place reset: a round is a row, so "Play Again" is a link back to
-the lobby and the next match is a new row. The client
+the others. There is no in-place reset: a round is a row, so Rematch opens a new row with the
+same seats and terms once both press it (`lib/rematch.ts`, see [multiplayer-plan.md](multiplayer-plan.md) Rematch). The client
 freezes its chart snapshot once, on first seeing a priced `settled`, with the
 final point pinned to the deadline rather than to whenever the tab noticed
 (`app/duel/[market]/pulse/[matchId]/page.tsx:132`), and stops polling (`:106`).

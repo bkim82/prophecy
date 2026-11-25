@@ -11,7 +11,6 @@ import MatchScreen, {
   matchSignedUsd,
   matchUsd,
   PM_REMATCH_CLASS,
-  RematchIcon,
   useWinStreak,
   type MatchChartMarkerInput,
   type MatchResult,
@@ -293,14 +292,14 @@ export default function Page({ params }: { params: Promise<{ market: string; mat
     .filter((trade) => revealRoom || trade.owner !== "room")
     .map((trade) => ({ t: trade.t, p: trade.p, side: trade.side, action: trade.action, owner: trade.owner === "room" ? "rival" : "you" })), [trades, revealRoom]);
 
-  // A settled challenge round offers a rematch; both pressing Play again
+  // Every settled round offers a rematch; both pressing Rematch
   // opens the next round, and both rooms move into it.
   const goToRematch = useCallback((nextMatchId: string) => {
     if (rematchJumpedRef.current) return;
     rematchJumpedRef.current = true;
     router.push(`/duel/${market}/pulse/${nextMatchId}`);
   }, [router, market]);
-  const rematch = useRematch(matchId, playerId, phase === "settled" && Boolean(view?.challenge), goToRematch);
+  const rematch = useRematch(matchId, playerId, phase === "settled", goToRematch);
   useEffect(() => {
     if (rematch.state !== "theirs") return;
     say(`${view?.opponentName ?? "Opponent"} wants a rematch.`);
@@ -468,13 +467,11 @@ export default function Page({ params }: { params: Promise<{ market: string; mat
     rival: { side: lastTheirs?.side ?? null, leverage: lastTheirs?.leverage ?? null, pnl: opponentProfit },
     lastTrade: lastLeg ? { entry: lastLeg.entry, exit: lastLeg.exit } : null,
     taunt: rematch.state === "theirs" ? `${rivalName} wants a rematch.` : null,
-    rematch: view.challenge
-      ? <RematchButton rematch={rematch} rivalName={rivalName} className={PM_REMATCH_CLASS} />
-      : <Link href="/duel" className={PM_REMATCH_CLASS}><RematchIcon />Play again</Link>,
+    rematch: <RematchButton rematch={rematch} rivalName={rivalName} className={PM_REMATCH_CLASS} />,
     shareText: winner === "you" ? `I beat ${rivalName} by ${matchUsd(gap)} in a ${view.timerSeconds}s ${marketLabel} Pulse duel on Prophecy.` : null,
     extra: (
       <>
-        {view.challenge && <RematchCheck rematch={rematch} rivalName={rivalName} rivalInitial={rivalInitial} terms={{ market, timerSeconds: view.timerSeconds, wager: view.wager }} />}
+        <RematchCheck rematch={rematch} rivalName={rivalName} rivalInitial={rivalInitial} terms={{ market, timerSeconds: view.timerSeconds, wager: view.wager }} />
         {rematch.error && <p className="pm-controls-notice" role="alert">{rematch.error}</p>}
       </>
     ),

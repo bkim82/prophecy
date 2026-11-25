@@ -1,5 +1,5 @@
 import { readBody, roleOf, touchAndRead, type MatchRow } from "@/lib/match";
-import { offersRematch, pressPlayAgain, rematchView } from "@/lib/rematch";
+import { offersRematch, pressRematch, rematchView } from "@/lib/rematch";
 import { getViewer } from "@/lib/viewer";
 
 export const dynamic = "force-dynamic";
@@ -7,13 +7,13 @@ export const dynamic = "force-dynamic";
 const NO_STORE = { "Cache-Control": "no-store" };
 
 /**
- * A settled challenge round's rematch (lib/rematch.ts). Both methods stamp
+ * A settled round's rematch (lib/rematch.ts). Both methods stamp
  * the caller's match heartbeat as they read (touchAndRead) — that heartbeat is
  * what keeps their ask alive, and how the other player knows they're still in
  * the room.
  *
- * GET ?playerId= → RematchView. Polled by the settled room.
- * POST { playerId } → RematchView ("Play again"); `nextMatchId` once both pressed it.
+ * GET ?playerId= → RematchView. Polled by the settled room (and where a bot opponent answers).
+ * POST { playerId } → RematchView ("Rematch"); `nextMatchId` once both pressed it.
  */
 export async function GET(request: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
@@ -28,7 +28,7 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
   const body = await readBody(request);
   const seat = await seatFor(id, typeof body.playerId === "string" ? body.playerId : "");
   if ("error" in seat) return seat.error;
-  const result = await pressPlayAgain(seat.row, seat.role);
+  const result = await pressRematch(seat.row, seat.role);
   if (!result.ok) return Response.json({ error: result.error }, { status: result.status });
   return Response.json(result.view, { headers: NO_STORE });
 }

@@ -31,8 +31,8 @@ export const CHALLENGE_TTL_SECONDS = 120;
 // Once accepted, the challenger has this long to take their seat before the
 // round closes and the accepter's stake comes back.
 export const ROUND_JOIN_SECONDS = 60;
-// After a challenge round, the first "Play again" gives the other player this
-// long to press it too before the rematch lapses (lib/rematch.ts).
+// After a round, the first "Rematch" gives the other player this long to
+// press it too before the ask lapses (lib/rematch.ts).
 export const REMATCH_SECONDS = 30;
 
 // A pending challenge's countdown — the bell's rows and its card in a conversation. 95 → "1:35"
