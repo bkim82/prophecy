@@ -218,7 +218,7 @@ function MatchStake({ stake, disabled }: { stake: MatchControls["stake"]; disabl
           input.setSelectionRange(input.value.length, input.value.length);
         }}
       >
-        <span className="pm-step-label">Type amount</span>
+        <span className="pm-step-label">Enter stake</span>
         <span className="pm-step-value pm-num">
           <span aria-hidden="true">$</span>
           <input
@@ -291,30 +291,33 @@ function MatchLeverage({ leverage, options, onChange, disabled }: { leverage: nu
   );
 }
 
+/** The flip's leverage tab starts here on every position, whatever it opened at. */
+const FLIP_BASE_LEVERAGE = 100;
+
 /**
- * Flip — [ Flip to Short | − 100× + ]: − / + pick the leverage the new side
- * opens at (÷10 / ×10, starting from the open position's), the rest of the
- * button flips at it. Keyed per position by the caller, so each starts fresh.
+ * Flip — a leverage tab strip (100× 1000× 10000×) on top of "Flip to Short
+ * at 100×" / "out at <liq>": the tab picks the new side's leverage, the button
+ * flips at it. Keyed per position by the caller, so each starts at 100×.
  */
-function FlipControl({ position, options, disabled, onFlip }: { position: MatchPosition; options: readonly number[]; disabled: boolean; onFlip: (leverage: number) => void }) {
-  const [leverage, setLeverage] = useState(position.leverage);
+function FlipControl({ position, options, price, disabled, onFlip }: { position: MatchPosition; options: readonly number[]; price: number | null; disabled: boolean; onFlip: (leverage: number) => void }) {
+  const [leverage, setLeverage] = useState(FLIP_BASE_LEVERAGE);
   const target = position.side === "long" ? "short" : "long";
-  const lower = leverageNeighbor(leverage, options, "down");
-  const higher = leverageNeighbor(leverage, options, "up");
   return (
-    <div className={`pm-step pm-flip is-${target}${disabled ? " is-disabled" : ""}`}>
-      <button type="button" className="pm-flip-go" disabled={disabled} onClick={() => onFlip(leverage)} aria-label={`Flip to ${target} at ${leverage}× leverage`}>
-        Flip to {sideWord(target)}
-      </button>
-      <div className="pm-flip-lev" role="group" aria-label="Leverage for the flip">
-        <button type="button" className="pm-flip-adj" disabled={disabled || lower === null} onClick={() => lower !== null && setLeverage(lower)} title="÷10" aria-label={lower === null ? "Leverage is at its lowest" : `Divide leverage by ${leverage / lower}, to ${lower}×`}>
-          −
-        </button>
-        <span className="pm-num">{leverage}×</span>
-        <button type="button" className="pm-flip-adj" disabled={disabled || higher === null} onClick={() => higher !== null && setLeverage(higher)} title="×10" aria-label={higher === null ? "Leverage is at its highest" : `Multiply leverage by ${higher / leverage}, to ${higher}×`}>
-          +
-        </button>
+    <div className={`pm-flip is-${target}`}>
+      <div className="pm-flip-tabs" role="group" aria-label="Leverage for the flip">
+        {options.map((option) => (
+          <button key={option} type="button" className={`pm-flip-tab pm-num${option === leverage ? " is-on" : ""}`} aria-pressed={option === leverage} disabled={disabled} onClick={() => setLeverage(option)}>
+            {option}×
+          </button>
+        ))}
       </div>
+      <button type="button" className="pm-flip-go" disabled={disabled} onClick={() => onFlip(leverage)}>
+        <span className="pm-flip-title">Flip to {sideWord(target)} at {leverage}×</span>
+        {/* The new side enters at the live price, so its knockout moves with it. */}
+        {price !== null && (
+          <span className="pm-flip-sub">out at <span className="pm-num">{priceText(liquidationPrice(target, price, leverage))}</span></span>
+        )}
+      </button>
     </div>
   );
 }
@@ -407,6 +410,7 @@ function Controls({ controls, position, price }: { controls: MatchControls; posi
             key={`${position.openedAt}-${position.side}`}
             position={position}
             options={controls.leverageOptions}
+            price={price}
             disabled={!controls.canManage || position.liquidated}
             onFlip={(leverage) => {
               // The next setup starts from the leverage you flipped at.
