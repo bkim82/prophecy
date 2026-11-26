@@ -2311,11 +2311,11 @@ html[data-theme="obsidian"] body:has(.pm-screen) { background: #0B0A10; }
 
 /* Long / Short: two tinted pills — dark green, dark red, the label in the
    side's own light tone — sitting in one shared dark track. */
-.pm-controls-row.is-sides { gap: 6px; padding: 6px; border-radius: 999px; background: var(--pm-card); }
-.pm-trade { display: flex; height: 60px; align-items: center; justify-content: center; border: 0; border-radius: 999px; cursor: pointer; touch-action: manipulation; user-select: none; transition: background .15s, transform .1s ease, opacity .15s; }
-.pm-trade.is-long { background: color-mix(in srgb, var(--pm-green) 20%, var(--pm-card)); color: color-mix(in srgb, var(--pm-green) 65%, var(--pm-text)); }
+.pm-controls-row.is-sides { gap: 6px; padding: 4px; border-radius: 999px; background: var(--pm-card); }
+.pm-trade { display: flex; height: 60px; align-items: center; justify-content: center; border: 1px solid transparent; border-radius: 999px; cursor: pointer; touch-action: manipulation; user-select: none; transition: background .15s, transform .1s ease, opacity .15s; }
+.pm-trade.is-long { border-color: color-mix(in srgb, var(--pm-green) 40%, var(--pm-card)); background: color-mix(in srgb, var(--pm-green) 20%, var(--pm-card)); color: color-mix(in srgb, var(--pm-green) 65%, var(--pm-text)); }
 /* Short's red warmed toward orange: brick fill, salmon label. */
-.pm-trade.is-short { --pm-short-tone: color-mix(in srgb, var(--pm-red) 65%, var(--pm-orange)); background: color-mix(in srgb, var(--pm-short-tone) 20%, var(--pm-card)); color: color-mix(in srgb, var(--pm-short-tone) 60%, var(--pm-text)); }
+.pm-trade.is-short { --pm-short-tone: color-mix(in srgb, var(--pm-red) 65%, var(--pm-orange)); border-color: color-mix(in srgb, var(--pm-short-tone) 40%, var(--pm-card)); background: color-mix(in srgb, var(--pm-short-tone) 20%, var(--pm-card)); color: color-mix(in srgb, var(--pm-short-tone) 60%, var(--pm-text)); }
 .pm-trade.is-long:hover:not(:disabled) { background: color-mix(in srgb, var(--pm-green) 28%, var(--pm-card)); }
 .pm-trade.is-short:hover:not(:disabled) { background: color-mix(in srgb, var(--pm-short-tone) 28%, var(--pm-card)); }
 .pm-trade:active:not(:disabled), .pm-trade.is-pressed { transform: scale(.98); }
@@ -2326,9 +2326,9 @@ html[data-theme="obsidian"] body:has(.pm-screen) { background: #0B0A10; }
 .pm-controls-notice { margin: 0; color: var(--pm-red-bright); font-size: 12px; font-weight: 600; text-align: center; }
 .pm-settling { margin: 0; padding: 28px 0; color: var(--pm-soft); font-size: 15px; font-weight: 600; text-align: center; }
 
-.pm-close { display: flex; height: 76px; align-items: center; justify-content: space-between; gap: 12px; padding: 0 30px; border: 0; border-radius: 999px; cursor: pointer; text-align: left; touch-action: manipulation; transition: transform .1s ease, filter .15s; }
-.pm-close.is-up { background: var(--pm-long-fill); box-shadow: 0 12px 30px -12px color-mix(in srgb, var(--pm-green) 75%, transparent); color: var(--pm-on-long); animation: pm-cta-glow 1.6s ease-in-out infinite; }
-.pm-close.is-down { background: var(--pm-short-fill); box-shadow: 0 12px 30px -12px color-mix(in srgb, var(--pm-red) 75%, transparent); color: var(--pm-on-short); }
+.pm-close { display: flex; height: 76px; align-items: center; justify-content: space-between; gap: 12px; padding: 0 30px; border: 1px solid transparent; border-radius: 999px; cursor: pointer; text-align: left; touch-action: manipulation; transition: transform .1s ease, filter .15s; }
+.pm-close.is-up { border-color: color-mix(in srgb, var(--pm-green) 65%, var(--pm-long-fill)); background: var(--pm-long-fill); box-shadow: 0 12px 30px -12px color-mix(in srgb, var(--pm-green) 75%, transparent); color: var(--pm-on-long); animation: pm-cta-glow 1.6s ease-in-out infinite; }
+.pm-close.is-down { border-color: color-mix(in srgb, var(--pm-red) 65%, var(--pm-short-fill)); background: var(--pm-short-fill); box-shadow: 0 12px 30px -12px color-mix(in srgb, var(--pm-red) 75%, transparent); color: var(--pm-on-short); }
 .pm-close:active:not(:disabled) { animation: none; transform: translateY(2px) scale(.985); }
 .pm-close:disabled { animation: none; cursor: default; filter: saturate(.4) brightness(.75); }
 @keyframes pm-cta-glow { 0%, 100% { box-shadow: 0 12px 30px -12px color-mix(in srgb, var(--pm-green) 75%, transparent); } 50% { box-shadow: 0 14px 44px -8px color-mix(in srgb, var(--pm-green) 85%, transparent); } }
@@ -2336,22 +2336,26 @@ html[data-theme="obsidian"] body:has(.pm-screen) { background: #0B0A10; }
 .pm-close-title { font-size: 20px; font-weight: 800; }
 .pm-close-sub { overflow: hidden; font-size: 12px; font-weight: 600; opacity: .75; text-overflow: ellipsis; white-space: nowrap; }
 .pm-close-pnl { font-size: 26px; font-weight: 800; white-space: nowrap; }
-/* In a position: Flip — [ Flip to Short | − 100× + ], a .pm-step tinted the
-   side it flips to; − / + pick the new side's leverage (÷10 / ×10). It takes
-   the wider share of the row, Liq the rest. */
-.pm-controls.is-open > .pm-controls-row { grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr); }
+/* In a position: Flip — a leverage tab strip (100× 1000× 10000×, gold on
+   the pick) sitting on "Flip to Short at 100×" / "out at <liq>", the button
+   tinted the side it flips to. It takes the wider share of the row; Liq lines
+   up with the button, the tabs poke up above. */
+.pm-controls.is-open > .pm-controls-row { grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr); align-items: end; }
 .pm-flip.is-short { --pm-flip: var(--pm-red); }
 .pm-flip.is-long { --pm-flip: var(--pm-green); }
-.pm-flip { border-color: color-mix(in srgb, var(--pm-flip) 30%, var(--pm-card)); background: color-mix(in srgb, var(--pm-flip) 8%, var(--pm-card)); }
-.pm-flip-go { display: flex; flex: 1; min-width: 0; align-items: center; padding: 0 10px 0 14px; overflow: hidden; border: 0; background: transparent; color: color-mix(in srgb, var(--pm-flip) 60%, var(--pm-text)); font-size: 14px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; transition: background .15s; }
-.pm-flip-go:hover:not(:disabled) { background: color-mix(in srgb, var(--pm-flip) 10%, transparent); }
-.pm-flip-go:disabled { cursor: default; }
-.pm-flip-lev { display: flex; flex: none; align-items: center; gap: 2px; padding: 0 5px; border-left: 1px solid color-mix(in srgb, var(--pm-flip) 30%, var(--pm-card)); }
-/* 6ch: room for 10000× without the divider shifting as it changes. */
-.pm-flip-lev .pm-num { min-width: 6ch; color: var(--pm-gold); font-size: 13px; font-weight: 800; text-align: center; }
-.pm-flip-adj { display: grid; width: 28px; height: 28px; flex: none; place-items: center; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--pm-soft); font-size: 18px; font-weight: 600; line-height: 1; cursor: pointer; transition: background .15s, color .15s; }
-.pm-flip-adj:hover:not(:disabled) { background: color-mix(in srgb, var(--pm-flip) 14%, transparent); color: var(--pm-text); }
-.pm-flip-adj:disabled { cursor: default; opacity: .3; }
+.pm-flip { display: flex; min-width: 0; flex-direction: column; align-items: flex-start; }
+.pm-flip-tabs { display: flex; max-width: calc(100% - 12px); gap: 2px; margin-left: 12px; padding: 4px 4px 3px; border: 1px solid var(--pm-edge); border-bottom: 0; border-radius: 12px 12px 0 0; background: var(--pm-card); }
+.pm-flip-tab { height: 26px; min-width: 0; padding: 0 9px; border: 0; border-radius: 8px; background: transparent; color: var(--pm-muted); font-size: 12px; font-weight: 700; cursor: pointer; transition: background .15s, color .15s; }
+.pm-flip-tab:hover:not(:disabled, .is-on) { background: var(--pm-hover); color: var(--pm-text); }
+.pm-flip-tab.is-on { background: color-mix(in srgb, var(--pm-orange) 18%, transparent); color: var(--pm-gold); }
+.pm-flip-tab:disabled { cursor: default; opacity: .55; }
+.pm-flip-go { display: flex; width: 100%; height: 48px; flex-direction: column; justify-content: center; gap: 1px; padding: 0 16px; border: 1px solid color-mix(in srgb, var(--pm-flip) 30%, var(--pm-card)); border-radius: 14px; background: color-mix(in srgb, var(--pm-flip) 9%, var(--pm-card)); color: color-mix(in srgb, var(--pm-flip) 60%, var(--pm-text)); text-align: left; cursor: pointer; touch-action: manipulation; transition: background .15s, transform .1s; }
+.pm-flip-go:hover:not(:disabled) { background: color-mix(in srgb, var(--pm-flip) 15%, var(--pm-card)); }
+.pm-flip-go:active:not(:disabled) { transform: translateY(1px); }
+.pm-flip-go:disabled { cursor: default; opacity: .55; }
+.pm-flip-title, .pm-flip-sub { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pm-flip-title { font-size: 15px; font-weight: 700; line-height: 1.2; }
+.pm-flip-sub { font-size: 11.5px; font-weight: 600; line-height: 1.2; opacity: .7; }
 .pm-liq { display: flex; height: 48px; box-sizing: border-box; align-items: center; justify-content: center; gap: 5px; border: 1px solid var(--pm-edge); border-radius: 14px; background: var(--pm-card); color: var(--pm-muted); font-size: 12px; white-space: nowrap; transition: border-color .2s, background .2s, color .2s; }
 .pm-liq-state::before { content: "· "; }
 .pm-liq .pm-num { color: var(--pm-soft); font-weight: 700; }
@@ -2437,20 +2441,23 @@ html[data-theme="obsidian"] body:has(.pm-screen) { background: #0B0A10; }
   .pm-market { height: 28px; gap: 5px; padding: 0 10px; font-size: 13px; }
   .pm-market-glyph { font-size: 14px; }
   .pm-streak { height: 24px; padding: 0 8px; font-size: 11px; }
-  .pm-step { height: 44px; border-radius: 12px; }
-  .pm-liq { height: 44px; flex-direction: column; gap: 0; border-radius: 12px; font-size: 11.5px; line-height: 1.25; }
+  .pm-step { height: 52px; border-radius: 12px; }
+  .pm-liq { height: 52px; flex-direction: column; gap: 0; border-radius: 12px; font-size: 11.5px; line-height: 1.25; }
   .pm-liq-state { font-size: 10.5px; }
   .pm-liq-state::before { content: none; }
-  .pm-flip-go { padding: 0 6px 0 12px; font-size: 13px; }
-  .pm-flip-lev { padding: 0 3px; }
-  .pm-flip-lev .pm-num { min-width: 5ch; font-size: 12px; }
-  .pm-flip-adj { width: 24px; height: 28px; font-size: 17px; }
-  .pm-step-btn { width: 38px; font-size: 12px; }
+  .pm-flip-tabs { margin-left: 10px; padding: 3px 3px 2px; border-radius: 10px 10px 0 0; }
+  .pm-flip-tab { height: 24px; padding: 0 8px; border-radius: 7px; font-size: 12px; }
+  .pm-flip-go { height: 52px; padding: 0 14px; border-radius: 12px; }
+  .pm-flip-title { font-size: 15px; }
+  .pm-flip-sub { font-size: 11.5px; }
+  .pm-step-btn { width: 38px; font-size: 13px; }
   .pm-step-field.is-input { margin: 3px; border-radius: 8px; }
-  .pm-step-value { font-size: 15px; }
-  .pm-trade { height: 48px; }
-  .pm-trade-title { font-size: 17px; }
-  .pm-close { height: 64px; padding: 0 22px; }
+  .pm-step-value { font-size: 17px; }
+  .pm-trade { height: 52px; }
+  .pm-trade-title { font-size: 16px; }
+  .pm-close { height: 52px; padding: 0 20px; }
+  .pm-close-title { font-size: 18px; }
+  .pm-close-pnl { font-size: 23px; }
   .pm-helper.is-default { display: none; }
 }
 
@@ -2458,8 +2465,8 @@ html[data-theme="obsidian"] body:has(.pm-screen) { background: #0B0A10; }
    max) — top bar, the scoreboard as one horizontal strip (you | countdown
    over the signed lead | rival, the split tug-of-war underneath), the chart
    filling every remaining pixel, then the controls in one row underneath
-   (Stake + Leverage | Long + Short, helper under the chips; in a position,
-   Flip + Liq | Close). The bubble floats in the chart's
+   half and half (Stake + Leverage | Long + Short, helper under the chips;
+   in a position, Flip + Liq | Close). The bubble floats in the chart's
    top-right header band, tail up at the rival. The result screen keeps the
    centred column. */
 @media (min-width: 1024px) {
@@ -2497,31 +2504,33 @@ html[data-theme="obsidian"] body:has(.pm-screen) { background: #0B0A10; }
   .pm-screen:not(.is-result) .pm-tug-track { height: 6px; }
 
   /* Controls row under the chart. */
-  .pm-screen:not(.is-result) > .pm-controls { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); align-items: center; column-gap: 14px; row-gap: 8px; }
+  .pm-screen:not(.is-result) > .pm-controls { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; column-gap: 14px; row-gap: 8px; }
   .pm-screen:not(.is-result) > .pm-controls > :not(.pm-controls-row, .pm-close) { grid-column: 1 / -1; }
   .pm-screen:not(.is-result) > .pm-controls.is-open > .pm-controls-note { order: -2; }
   .pm-screen:not(.is-result) > .pm-controls.is-open > .pm-controls-row { order: -1; }
   .pm-screen:not(.is-result) > .pm-controls.is-setup > .pm-helper { grid-column: 1; text-align: left; }
   .pm-screen:not(.is-result) .pm-step { height: 80px; border-radius: 20px; }
-  .pm-screen:not(.is-result) .pm-trade { height: 68px; }
-  .pm-screen:not(.is-result) .pm-trade-title { font-size: 20px; }
+  .pm-screen:not(.is-result) .pm-trade { height: 80px; }
+  .pm-screen:not(.is-result) .pm-trade-title { font-size: 18px; }
   .pm-screen:not(.is-result) .pm-close { height: 80px; }
-  .pm-screen:not(.is-result) .pm-step-btn { width: 54px; font-size: 14px; }
+  .pm-screen:not(.is-result) .pm-step-btn { width: 58px; font-size: 15px; }
   .pm-screen:not(.is-result) .pm-step-field.is-input { margin: 6px; border-radius: 12px; }
-  .pm-screen:not(.is-result) .pm-step-label { font-size: 10.5px; }
-  .pm-screen:not(.is-result) .pm-step-value { font-size: 20px; }
+  .pm-screen:not(.is-result) .pm-step-label { font-size: 11px; }
+  .pm-screen:not(.is-result) .pm-step-value { font-size: 23px; }
   .pm-screen:not(.is-result) .pm-liq { height: 80px; border-radius: 20px; }
-  .pm-screen:not(.is-result) .pm-flip-go { padding: 0 14px 0 20px; font-size: 16px; }
-  .pm-screen:not(.is-result) .pm-flip-lev { gap: 4px; padding: 0 10px; }
-  .pm-screen:not(.is-result) .pm-flip-lev .pm-num { font-size: 15px; }
-  .pm-screen:not(.is-result) .pm-flip-adj { width: 34px; height: 34px; font-size: 20px; }
+  .pm-screen:not(.is-result) > .pm-controls.is-open { align-items: end; }
+  .pm-screen:not(.is-result) .pm-flip-tabs { margin-left: 16px; padding: 5px 5px 4px; border-radius: 14px 14px 0 0; }
+  .pm-screen:not(.is-result) .pm-flip-tab { height: 30px; padding: 0 12px; border-radius: 9px; font-size: 13px; }
+  .pm-screen:not(.is-result) .pm-flip-go { height: 80px; padding: 0 22px; border-radius: 20px; }
+  .pm-screen:not(.is-result) .pm-flip-title { font-size: 21px; }
+  .pm-screen:not(.is-result) .pm-flip-sub { font-size: 14px; }
   .pm-screen:not(.is-result) .pm-liq { font-size: 13px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .pm-live-dot.is-live, .pm-tug.is-shaking, .pm-timer .pm-timer-num, .pm-player-sub, .pm-step-caret, .pm-bubble, .pm-fan, .pm-head-glow, .pm-chart-liq,
   .pm-pop, .pm-close.is-up, .pm-liq.is-near, .pm-edge, .pm-rays, .pm-confetti, .pm-stamp { animation: none; }
-  .pm-roll-strip, .pm-tug-you, .pm-trade, .pm-close, .pm-rematch, .pm-chart-box, .pm-avatar, .pm-lead, .pm-timer-num, .pm-step { transition: none; }
+  .pm-roll-strip, .pm-tug-you, .pm-trade, .pm-close, .pm-flip-go, .pm-rematch, .pm-chart-box, .pm-avatar, .pm-lead, .pm-timer-num, .pm-step { transition: none; }
 }
 .result-burst { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
 .result-burst-particle { position: absolute; top: 50%; left: 50%; height: 7px; width: 7px; border-radius: 2px; background: var(--brand); opacity: 0; animation: result-burst-fly .85s ease-out forwards; }
