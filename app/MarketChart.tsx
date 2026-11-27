@@ -102,6 +102,15 @@ export function windowSlice(points: PricePoint[], t0: number) {
   return p === null ? points.slice(first) : [{ t: t0, p }, ...points.slice(first)];
 }
 
+// Theme-driven gradient colours for the lobby charts (tokens in app/globals.css).
+// Mixed at the use site, not on :root, because --chart-line/--chart-point are
+// set per [data-market]. Dark: the area fades into a violet wash and the head
+// is a lit orb; Moonstone's --chart-area-line-mix / --chart-dot-white make the
+// area pure line colour and the orb solid white (ringed by .mc-orb).
+export const CHART_AREA_LOW = "color-mix(in srgb, var(--chart-line) var(--chart-area-line-mix, 0%), var(--violet))";
+export const CHART_ORB_MID = "color-mix(in srgb, var(--chart-dot-core) var(--chart-dot-white, 0%), var(--chart-point))";
+export const CHART_ORB_EDGE = "color-mix(in srgb, var(--chart-dot-core) var(--chart-dot-white, 0%), var(--chart-line))";
+
 // Monotone cubic (Fritsch–Carlson): smooth, but never overshoots a sample —
 // a fake peak above the real high would be a lie on a price chart.
 export function monotonePath(xs: number[], ys: number[]) {
@@ -439,9 +448,9 @@ export function MarketChart({
               <stop offset="1" stopColor="var(--chart-point)" stopOpacity="1" />
             </linearGradient>
             <linearGradient id={`${uid}-area`} gradientUnits="userSpaceOnUse" x1="0" x2="0" y1={PAD.top} y2={geo.bottom}>
-              <stop offset="0" stopColor="var(--chart-line)" stopOpacity=".3" />
-              <stop offset=".55" stopColor="var(--violet)" stopOpacity=".1" />
-              <stop offset="1" stopColor="var(--violet)" stopOpacity="0" />
+              <stop offset="0" style={{ stopColor: "var(--chart-line)", stopOpacity: "var(--chart-area-top, .3)" }} />
+              <stop offset=".55" style={{ stopColor: CHART_AREA_LOW, stopOpacity: "var(--chart-area-mid, .1)" }} />
+              <stop offset="1" style={{ stopColor: CHART_AREA_LOW, stopOpacity: 0 }} />
             </linearGradient>
             <linearGradient id={`${uid}-fade`} gradientUnits="userSpaceOnUse" x1={PAD.left} x2={geo.headX} y1="0" y2="0">
               <stop offset="0" stopColor="#fff" stopOpacity="0" />
@@ -456,12 +465,12 @@ export function MarketChart({
               <stop offset="1" stopColor="var(--brand)" stopOpacity="0" />
             </linearGradient>
             <linearGradient id={`${uid}-cone-up`} gradientUnits="userSpaceOnUse" x1={geo.headX} x2={geo.right} y1="0" y2="0">
-              <stop offset="0" stopColor="var(--positive)" stopOpacity=".28" />
-              <stop offset="1" stopColor="var(--positive)" stopOpacity="0" />
+              <stop offset="0" style={{ stopColor: "var(--fan-up, var(--positive))", stopOpacity: "var(--fan-fill-opacity, .28)" }} />
+              <stop offset="1" style={{ stopColor: "var(--fan-up, var(--positive))", stopOpacity: 0 }} />
             </linearGradient>
             <linearGradient id={`${uid}-cone-down`} gradientUnits="userSpaceOnUse" x1={geo.headX} x2={geo.right} y1="0" y2="0">
-              <stop offset="0" stopColor="var(--negative)" stopOpacity=".28" />
-              <stop offset="1" stopColor="var(--negative)" stopOpacity="0" />
+              <stop offset="0" style={{ stopColor: "var(--fan-down, var(--negative))", stopOpacity: "var(--fan-fill-opacity, .28)" }} />
+              <stop offset="1" style={{ stopColor: "var(--fan-down, var(--negative))", stopOpacity: 0 }} />
             </linearGradient>
             <radialGradient id={`${uid}-aura`}>
               <stop offset="0" stopColor="var(--chart-line)" stopOpacity=".45" />
@@ -469,9 +478,9 @@ export function MarketChart({
               <stop offset="1" stopColor="var(--violet)" stopOpacity="0" />
             </radialGradient>
             <radialGradient id={`${uid}-orb`} cx=".38" cy=".35" r=".7">
-              <stop offset="0" stopColor="#ffffff" />
-              <stop offset=".45" stopColor="var(--chart-point)" />
-              <stop offset="1" stopColor="var(--chart-line)" />
+              <stop offset="0" style={{ stopColor: "var(--chart-dot-core)" }} />
+              <stop offset=".45" style={{ stopColor: CHART_ORB_MID }} />
+              <stop offset="1" style={{ stopColor: CHART_ORB_EDGE }} />
             </radialGradient>
             <filter id={`${uid}-glow`} x="-10%" y="-60%" width="120%" height="220%">
               <feGaussianBlur stdDeviation="4" />
