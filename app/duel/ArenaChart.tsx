@@ -3,6 +3,9 @@
 import { useEffect, useId, useMemo, useRef, useState, type CSSProperties } from "react";
 import { LOBBY_WINDOW_MS } from "@/app/feedConfig";
 import {
+  CHART_AREA_LOW,
+  CHART_ORB_EDGE,
+  CHART_ORB_MID,
   clockLabel,
   formatChartPrice,
   monotonePath,
@@ -40,6 +43,33 @@ const RANGE_TAU_MS = 320;
 const EDGE_SLACK_MS = 250;
 const RAYS = [-1, -0.55, -0.2, 0.2, 0.55, 1];
 const SPARKS = 5;
+// Two samples closer than this are one moment (a 1-min candle's close and the
+// next candle's open land ~1ms apart in the history seed).
+const SAME_MOMENT_MS = 250;
+
+/**
+ * The points the line is drawn through. The feed carries the last price
+ * forward every second and the history seed emits each candle as open + close,
+ * so the raw series holds flat runs that end in a near-vertical jump — a
+ * staircase. Keeping only the samples where the price actually moved (plus the
+ * window's first and last) lets the curve interpolate across the gaps instead.
+ */
+export function lineKnots(points: PricePoint[]): PricePoint[] {
+  if (points.length <= 2) return points;
+  const knots: PricePoint[] = [points[0]];
+  for (let i = 1; i < points.length - 1; i++) {
+    const point = points[i];
+    const prev = knots[knots.length - 1];
+    if (point.p === prev.p) continue;
+    if (point.t - prev.t < SAME_MOMENT_MS && knots.length > 1) knots[knots.length - 1] = point;
+    else knots.push(point);
+  }
+  const last = points[points.length - 1];
+  const tail = knots[knots.length - 1];
+  if (last.t - tail.t < SAME_MOMENT_MS && knots.length > 1) knots[knots.length - 1] = last;
+  else knots.push(last);
+  return knots;
+}
 
 const minuteLabel = (t: number) =>
   new Date(t).toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" });
@@ -145,8 +175,9 @@ export function ArenaChart({ points, now, label, tickSize, onScrub, windowMs = L
 
     const x = (t: number) => PAD.left + ((t - t0) / windowMs) * pastW;
     const y = (p: number) => PAD.top + (1 - (p - low) / (high - low)) * plotH;
-    const xs = visible.map((point) => x(point.t));
-    const ys = visible.map((point, i) => y(i === visible.length - 1 ? head : point.p));
+    const knots = lineKnots(visible);
+    const xs = knots.map((point) => x(point.t));
+    const ys = knots.map((point, i) => y(i === knots.length - 1 ? head : point.p));
     const line = monotonePath(xs, ys);
     const headX = xs[xs.length - 1];
     const headY = ys[ys.length - 1];
@@ -166,16 +197,16 @@ export function ArenaChart({ points, now, label, tickSize, onScrub, windowMs = L
     const reachUp = Math.min(plotH * 0.42, headY - PAD.top);
     const reachDown = Math.min(plotH * 0.42, bottom - headY);
     const open = visible[0].p;
-    return { pastW, plotH, bottom, right, x, y, line, area, open, baseY: y(open), last: visible[visible.length - 1], headX, headY, grid, ticks, reachUp, reachDown };
+    return { knots, pastW, plotH, bottom, right, x, y, line, area, open, baseY: y(open), last: visible[visible.length - 1], headX, headY, grid, ticks, reachUp, reachDown };
   }, [ready, width, visible, t0, t1, tickSize, HEIGHT, reduced, windowMs]);
 
   const scrub = useMemo(() => {
     if (!geo || hoverX === null) return null;
     const clampedX = Math.min(Math.max(hoverX, PAD.left), geo.headX);
     const t = t0 + ((clampedX - PAD.left) / geo.pastW) * windowMs;
-    const p = priceAt(visible, t);
+    const p = priceAt(geo.knots, t);
     return p === null ? null : { x: clampedX, y: geo.y(p), t, p };
-  }, [geo, hoverX, t0, visible, windowMs]);
+  }, [geo, hoverX, t0, windowMs]);
 
   // 100ms buckets keep a held pointer from re-rendering the page every frame.
   const scrubKey = scrub ? `${Math.round(scrub.t / 100)}:${scrub.p.toFixed(6)}` : "";
@@ -228,10 +259,11 @@ export function ArenaChart({ points, now, label, tickSize, onScrub, windowMs = L
               <stop offset=".5" stopColor="var(--chart-line)" stopOpacity=".85" />
               <stop offset="1" stopColor="var(--chart-point)" stopOpacity="1" />
             </linearGradient>
+            {/* Dark: line colour fading into a violet wash. Moonstone (--chart-area-*): the line colour alone, 12% → 0. */}
             <linearGradient id={`${uid}-area`} gradientUnits="userSpaceOnUse" x1="0" x2="0" y1={PAD.top} y2={geo.bottom}>
-              <stop offset="0" stopColor="var(--chart-line)" stopOpacity=".3" />
-              <stop offset=".55" stopColor="var(--violet)" stopOpacity=".1" />
-              <stop offset="1" stopColor="var(--violet)" stopOpacity="0" />
+              <stop offset="0" style={{ stopColor: "var(--chart-line)", stopOpacity: "var(--chart-area-top, .3)" }} />
+              <stop offset=".55" style={{ stopColor: CHART_AREA_LOW, stopOpacity: "var(--chart-area-mid, .1)" }} />
+              <stop offset="1" style={{ stopColor: CHART_AREA_LOW, stopOpacity: 0 }} />
             </linearGradient>
             <linearGradient id={`${uid}-fade`} gradientUnits="userSpaceOnUse" x1={PAD.left} x2={geo.headX} y1="0" y2="0">
               <stop offset="0" stopColor="#fff" stopOpacity="0" />
@@ -246,22 +278,23 @@ export function ArenaChart({ points, now, label, tickSize, onScrub, windowMs = L
               <stop offset="1" stopColor="var(--brand)" stopOpacity="0" />
             </linearGradient>
             <linearGradient id={`${uid}-cone-up`} gradientUnits="userSpaceOnUse" x1={geo.headX} x2={geo.right} y1="0" y2="0">
-              <stop offset="0" stopColor="var(--positive)" stopOpacity=".28" />
-              <stop offset="1" stopColor="var(--positive)" stopOpacity="0" />
+              <stop offset="0" style={{ stopColor: "var(--fan-up, var(--positive))", stopOpacity: "var(--fan-fill-opacity, .28)" }} />
+              <stop offset="1" style={{ stopColor: "var(--fan-up, var(--positive))", stopOpacity: 0 }} />
             </linearGradient>
             <linearGradient id={`${uid}-cone-down`} gradientUnits="userSpaceOnUse" x1={geo.headX} x2={geo.right} y1="0" y2="0">
-              <stop offset="0" stopColor="var(--negative)" stopOpacity=".28" />
-              <stop offset="1" stopColor="var(--negative)" stopOpacity="0" />
+              <stop offset="0" style={{ stopColor: "var(--fan-down, var(--negative))", stopOpacity: "var(--fan-fill-opacity, .28)" }} />
+              <stop offset="1" style={{ stopColor: "var(--fan-down, var(--negative))", stopOpacity: 0 }} />
             </linearGradient>
             <radialGradient id={`${uid}-aura`}>
               <stop offset="0" stopColor="var(--chart-line)" stopOpacity=".45" />
               <stop offset=".45" stopColor="var(--violet)" stopOpacity=".14" />
               <stop offset="1" stopColor="var(--violet)" stopOpacity="0" />
             </radialGradient>
+            {/* Lit orb in dark; --chart-dot-white turns it solid white for Moonstone's ringed dot (.mc-orb). */}
             <radialGradient id={`${uid}-orb`} cx=".38" cy=".35" r=".7">
-              <stop offset="0" stopColor="#ffffff" />
-              <stop offset=".45" stopColor="var(--chart-point)" />
-              <stop offset="1" stopColor="var(--chart-line)" />
+              <stop offset="0" style={{ stopColor: "var(--chart-dot-core)" }} />
+              <stop offset=".45" style={{ stopColor: CHART_ORB_MID }} />
+              <stop offset="1" style={{ stopColor: CHART_ORB_EDGE }} />
             </radialGradient>
             <filter id={`${uid}-glow`} x="-10%" y="-60%" width="120%" height="220%">
               <feGaussianBlur stdDeviation="4" />
