@@ -33,7 +33,7 @@ const plexMono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400", "500", "600
 // Arena page only (app/duel, .arena-* in globals.css): JetBrains Mono for its
 // numbers, Space Grotesk for the PULSE wordmark.
 const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], weight: ["400", "500", "600", "700", "800"], variable: "--font-arena-mono" });
-const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], weight: ["600", "700"], variable: "--font-arena-display" });
+const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-arena-display" });
 
 export const metadata: Metadata = {
   title: "Prophecy — Live market arenas",

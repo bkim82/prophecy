@@ -480,7 +480,7 @@ export default function Page({ params }: { params: Promise<{ market: string; mat
       roundKey={matchId}
       market={market}
       marketLabel={marketLabel}
-      modeTag={view ? <>PULSE · <FlameGlyph size={10} /> {wager * 2} POT</> : "ARENA · PULSE"}
+      modeTag={view ? [<><FlameGlyph size={10} /> {wager * 2} POT</>, `PULSE · ${view.timerSeconds}s`] : ["ARENA", "PULSE"]}
       feedLive={status === "live"}
       streak={streak}
       sound={{ muted, toggle: toggleMuted, play: playFeedback }}
@@ -508,7 +508,7 @@ export default function Page({ params }: { params: Promise<{ market: string; mat
         // Blind until settle: their side stays hidden mid-round.
         side: null,
       }}
-      timer={{ seconds: ringSeconds, caption: phase === "predict" ? "to start" : "seconds left", live: phase === "countdown" }}
+      timer={{ seconds: ringSeconds, total: timerTotal, caption: phase === "predict" ? "to start" : "seconds", live: phase === "countdown" }}
       bubble={bubbleText ? { text: bubbleText, key: line?.key ?? 0 } : null}
       chart={{ points: frozenPoints ?? points, now, frozen: frozenPoints !== null, price: finalPrice, markers: markerData }}
       controls={{

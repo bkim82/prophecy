@@ -7,11 +7,14 @@ import type { PricePoint } from "./usePriceFeed";
 /**
  * The in-match Pulse chart (app/PulseMatch.tsx): drawn in real pixels (the
  * viewBox follows the box the screen's flex column hands it), so labels are
- * true px sizes at any height. Before entry: a lavender line, soft area and
- * the up/down outcome fan at "now". In a position: a dashed entry line with a
- * side pill, the gap between price and entry shaded green (profit) or red
- * (loss), the post-entry line coloured by P&L, floating +$/−$ labels off the
- * head on big ticks, and the liquidation line once price nears it.
+ * true px sizes at any height. Header: pair, price, change since the window's
+ * first tick, and the window's high/low. A glowing lime line fading in from
+ * the left over a lime area, the live price as a haloed dot with a dashed
+ * level line and a solid pill on the axis, and right of "now" the lighter
+ * NEXT zone holding the long/short cones. In a position: a dashed entry line
+ * with a side pill, the gap between price and entry shaded green (profit) or
+ * red (loss), the post-entry line coloured by P&L, floating +$/−$ labels off
+ * the head on big ticks, and the liquidation line once price nears it.
  */
 
 export type MatchChartMarker = {
@@ -39,35 +42,36 @@ type Props = {
   markers: MatchChartMarker[];
   /** A tick moving P&L by at least this much floats a label off the head. */
   pnlThreshold: number;
-  /** "Bitcoin" next to the pair, and its glyph (₿) watermarked behind the plot. */
-  marketName?: string;
-  glyph?: string;
 };
 
-// top clears the price header (.pm-chart-head).
-const PAD = { top: 70, right: 58, bottom: 12, left: 0 };
-// Room right of the head for the outcome fan, like the lobby chart.
-const FORWARD_FRAC = 0.2;
+// top clears the price header (.pm-chart-head; shorter on phones); bottom
+// holds the NEXT zone's label; right is the axis, widened to fit the labels.
+const PAD = { top: 104, topCompact: 80, right: 62, bottom: 26, left: 0 };
+// Room right of the head for the NEXT zone and its outcome cones.
+const FORWARD_FRAC = 0.24;
+// The line and area fade in over this share of the plot's width.
+const FADE_FRAC = 0.16;
+const NEXT_LABEL = `NEXT ${Math.round(WINDOW_MS / 1000)}s`;
 
-// Theme tokens from .pm-screen (app/globals.css), so the chart follows the
-// active colour scheme; SVG presentation attributes accept var().
+// Tokens from .pm-screen (app/globals.css); SVG presentation attributes accept var().
 const C = {
-  // The market's own line colour (--pm-coin, app/globals.css) before entry.
+  // The chart accent (lime) before entry.
   line: "var(--pm-coin)",
-  grid: "var(--pm-raised)",
-  axis: "var(--pm-muted)",
+  grid: "var(--pm-grid)",
+  zone: "var(--pm-zone)",
   green: "var(--pm-green)",
   greenBright: "var(--pm-green-bright)",
   red: "var(--pm-red)",
   redBright: "var(--pm-red-bright)",
-  bg: "var(--pm-field)",
+  bg: "var(--pm-panel)",
   text: "var(--pm-text)",
   soft: "var(--pm-soft)",
-  greenPill: "color-mix(in srgb, var(--pm-green) 14%, var(--pm-field))",
-  redPill: "color-mix(in srgb, var(--pm-red) 15%, var(--pm-field))",
+  ink: "var(--pm-bg)",
+  greenPill: "color-mix(in srgb, var(--pm-green) 14%, var(--pm-panel))",
+  redPill: "color-mix(in srgb, var(--pm-red) 15%, var(--pm-panel))",
   greenPillText: "color-mix(in srgb, var(--pm-green) 45%, var(--pm-text))",
   redPillText: "color-mix(in srgb, var(--pm-red) 40%, var(--pm-text))",
-  liqPill: "color-mix(in srgb, var(--pm-red) 22%, var(--pm-field))",
+  liqPill: "color-mix(in srgb, var(--pm-red) 22%, var(--pm-panel))",
 };
 
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
@@ -131,15 +135,13 @@ function monotonePath(xs: number[], ys: number[]) {
 type Pop = { id: number; text: string; up: boolean; x: number; y: number };
 
 export default function PulseMatchChart({
-  points, now, frozen, marketLabel, price, entry, positionPnl, liq, markers, pnlThreshold, marketName, glyph,
+  points, now, frozen, marketLabel, price, entry, positionPnl, liq, markers, pnlThreshold,
 }: Props) {
   const uid = useId().replace(/:/g, "");
   const boxRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState<{ w: number; h: number } | null>(null);
-  const [dir, setDir] = useState<"up" | "down" | null>(null);
   const [pops, setPops] = useState<Pop[]>([]);
   const headRef = useRef({ x: 0, y: 0 });
-  const prevPriceRef = useRef<number | null>(null);
   const prevPnlRef = useRef<number | null>(null);
   const popIdRef = useRef(0);
 
@@ -154,14 +156,6 @@ export default function PulseMatchChart({
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
-
-  // ▲/▼ follows the last tick that actually moved.
-  useEffect(() => {
-    const prev = prevPriceRef.current;
-    prevPriceRef.current = price;
-    if (prev === null || price === null || price === prev) return;
-    setDir(price > prev ? "up" : "down");
-  }, [price]);
 
   // A new position starts its own P&L baseline — entering isn't a "tick".
   const entryKey = entry ? `${entry.t}-${entry.side}` : null;
@@ -189,29 +183,40 @@ export default function PulseMatchChart({
   const visible = windowSlice(points, t0);
   const ready = visible.length >= 2 && size !== null;
 
-  const priceColor = dir === "up" ? C.greenBright : dir === "down" ? C.redBright : C.text;
-  const mark = glyph ? <span className="pm-chart-mark" aria-hidden="true">{glyph}</span> : null;
+  // Change since the window's first tick, and the window's range.
+  const first = visible[0]?.p ?? null;
+  const change = price !== null && first ? ((price - first) / first) * 100 : null;
+  const windowHigh = visible.length ? Math.max(...visible.map((point) => point.p)) : null;
+  const windowLow = visible.length ? Math.min(...visible.map((point) => point.p)) : null;
   const header = (
-    <div className="pm-chart-head">
-      <span className="pm-chart-pair">
-        {marketLabel} / USD{marketName && <span className="pm-chart-name"> · {marketName}</span>}
-      </span>
-      <span className="pm-chart-price pm-num" style={{ color: priceColor }}>
-        {/* SVG, not ▲/▼: those fall back to an oversized glyph in the mono font. */}
-        {dir && (
-          <svg className="pm-chart-dir" viewBox="0 0 10 10" aria-hidden="true">
-            <path d={dir === "up" ? "M5 1.5L9.5 8.5H0.5Z" : "M5 8.5L9.5 1.5H0.5Z"} fill="currentColor" />
-          </svg>
-        )}
-        {price === null ? "—" : priceText(price)}
-      </span>
-    </div>
+    <>
+      <div className="pm-chart-head">
+        <span className="pm-chart-pair pm-num">{marketLabel} / USD</span>
+        <span className="pm-chart-quote">
+          <span className="pm-chart-price pm-num">{price === null ? "—" : priceText(price)}</span>
+          {change !== null && (
+            <span className={`pm-chart-change pm-num ${change >= 0 ? "is-up" : "is-down"}`}>
+              {/* SVG, not ▲/▼: those fall back to an oversized glyph in the mono font. */}
+              <svg className="pm-chart-dir" viewBox="0 0 10 10" aria-hidden="true">
+                <path d={change >= 0 ? "M5 1.5L9.5 8.5H0.5Z" : "M5 8.5L9.5 1.5H0.5Z"} fill="currentColor" />
+              </svg>
+              {change >= 0 ? "+" : "−"}{Math.abs(change).toFixed(2)}%
+            </span>
+          )}
+        </span>
+      </div>
+      {windowHigh !== null && windowLow !== null && (
+        <div className="pm-chart-range pm-num">
+          <span><span className="pm-chart-range-key">H</span> {priceText(windowHigh)}</span>
+          <span><span className="pm-chart-range-key">L</span> {priceText(windowLow)}</span>
+        </div>
+      )}
+    </>
   );
 
   if (!ready) {
     return (
       <div ref={boxRef} className="pm-chart-box">
-        {mark}
         {header}
         <p className="pm-chart-wait">Waiting for price data…</p>
       </div>
@@ -219,10 +224,7 @@ export default function PulseMatchChart({
   }
 
   const { w, h } = size;
-  const plotRight = w - PAD.right;
-  const dataRight = PAD.left + (plotRight - PAD.left) * (1 - FORWARD_FRAC);
-  const baseline = h - PAD.bottom;
-  const innerH = Math.max(20, baseline - PAD.top);
+  const padTop = w < 520 ? PAD.topCompact : PAD.top;
 
   const values = visible.map((point) => point.p);
   if (entry) values.push(entry.p);
@@ -235,8 +237,16 @@ export default function PulseMatchChart({
   const high = rawHigh + span * 0.12;
   const decimals = high - low < 25 ? 2 : 0;
 
+  // Axis column fits its widest label (mono 10.5px ≈ 6.4px a glyph).
+  const axisChars = Math.max(priceText(high, decimals).length, priceText(low, decimals).length);
+  const padRight = Math.max(PAD.right, Math.ceil(axisChars * 6.4) + 24);
+  const plotRight = w - padRight;
+  const dataRight = PAD.left + (plotRight - PAD.left) * (1 - FORWARD_FRAC);
+  const baseline = h - PAD.bottom;
+  const innerH = Math.max(20, baseline - padTop);
+
   const x = (t: number) => PAD.left + ((t - t0) / WINDOW_MS) * (dataRight - PAD.left);
-  const y = (p: number) => PAD.top + ((high - p) / (high - low)) * innerH;
+  const y = (p: number) => padTop + ((high - p) / (high - low)) * innerH;
 
   const xs = visible.map((point) => x(point.t));
   const ys = visible.map((point) => y(point.p));
@@ -271,9 +281,10 @@ export default function PulseMatchChart({
   const gridCount = 4;
   const gridValues = Array.from({ length: gridCount }, (_, i) => high - ((high - low) * (i + 0.5)) / gridCount);
 
-  const reachUp = Math.min(innerH * 0.22, headY - PAD.top);
+  const reachUp = Math.min(innerH * 0.22, headY - padTop);
   const reachDown = Math.min(innerH * 0.22, baseline - headY);
-  const fanX = plotRight - 18;
+  const fanX = plotRight - 14;
+  const showZone = !frozen;
 
   const entryLabel = entry ? `${entry.side === "long" ? "LONG" : "SHORT"} @ ${priceText(entry.p, decimals)}` : "";
   const entryColor = entry?.side === "short" ? C.red : C.green;
@@ -284,6 +295,8 @@ export default function PulseMatchChart({
   const liqY = showLiq ? y(liq.price) : 0;
   const liqText = showLiq ? `LIQ ${priceText(liq.price, decimals)}` : "";
 
+  const headPrice = priceText(visible[visible.length - 1].p, decimals);
+
   const label = [
     `${marketLabel} price over the last minute${price !== null ? `, now ${priceText(price)}` : ""}`,
     entry ? `; your ${entry.side} from ${priceText(entry.p)} is ${inProfit ? "in profit" : "losing"}` : "",
@@ -292,44 +305,59 @@ export default function PulseMatchChart({
 
   return (
     <div ref={boxRef} className={`pm-chart-box${entry ? (inProfit ? " is-up" : " is-down") : ""}`}>
-      {mark}
       {header}
       <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} role="img" aria-label={label} className="pm-chart-svg">
         <defs>
           <linearGradient id={`${uid}-area`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor={C.line} stopOpacity="0.2" />
+            <stop offset="0" stopColor={C.line} stopOpacity="0.26" />
             <stop offset="1" stopColor={C.line} stopOpacity="0" />
           </linearGradient>
           <linearGradient id={`${uid}-profit`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor={C.green} stopOpacity={profitAbove ? 0.42 : 0.06} />
-            <stop offset="1" stopColor={C.green} stopOpacity={profitAbove ? 0.06 : 0.42} />
+            <stop offset="0" stopColor={C.green} stopOpacity={profitAbove ? 0.55 : 0.08} />
+            <stop offset="1" stopColor={C.green} stopOpacity={profitAbove ? 0.08 : 0.55} />
           </linearGradient>
           <linearGradient id={`${uid}-loss`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor={C.red} stopOpacity={profitAbove ? 0.06 : 0.42} />
-            <stop offset="1" stopColor={C.red} stopOpacity={profitAbove ? 0.42 : 0.06} />
+            <stop offset="0" stopColor={C.red} stopOpacity={profitAbove ? 0.08 : 0.55} />
+            <stop offset="1" stopColor={C.red} stopOpacity={profitAbove ? 0.55 : 0.08} />
           </linearGradient>
           <linearGradient id={`${uid}-line`} gradientUnits="userSpaceOnUse" x1={xs[0]} x2={headX} y1="0" y2="0">
             {entry ? (
               <>
-                <stop offset="0" stopColor={C.line} stopOpacity="0.35" />
-                <stop offset={entryFrac} stopColor={C.line} stopOpacity="0.7" />
+                <stop offset="0" stopColor={C.line} stopOpacity="0.85" />
+                <stop offset={entryFrac} stopColor={C.line} />
                 <stop offset={Math.min(1, entryFrac + 0.001)} stopColor={pnlStroke} />
                 <stop offset="1" stopColor={pnlStroke} />
               </>
             ) : (
               <>
-                <stop offset="0" stopColor={C.line} stopOpacity="0.45" />
+                <stop offset="0" stopColor={C.line} />
                 <stop offset="1" stopColor={C.line} />
               </>
             )}
           </linearGradient>
-          <radialGradient id={`${uid}-glow`}>
-            <stop offset="0" stopColor={headColor} stopOpacity="0.65" />
-            <stop offset="1" stopColor={headColor} stopOpacity="0" />
-          </radialGradient>
+          {/* Fades the line and area in from the left edge. */}
+          <linearGradient id={`${uid}-fade`} gradientUnits="userSpaceOnUse" x1={PAD.left} x2={PAD.left + (dataRight - PAD.left) * FADE_FRAC} y1="0" y2="0">
+            <stop offset="0" stopColor="#fff" stopOpacity="0" />
+            <stop offset="1" stopColor="#fff" stopOpacity="1" />
+          </linearGradient>
+          <mask id={`${uid}-fade-mask`} maskUnits="userSpaceOnUse" x="0" y="0" width={w} height={h}>
+            <rect x="0" y="0" width={w} height={h} fill={`url(#${uid}-fade)`} />
+          </mask>
+          {/* Soft halo under the price line; user-space region so a flat line's tiny bounding box doesn't clip the blur. */}
+          <filter id={`${uid}-blur`} filterUnits="userSpaceOnUse" x="0" y="0" width={w} height={h}>
+            <feGaussianBlur stdDeviation="4" />
+          </filter>
           <clipPath id={`${uid}-above`}><rect x="0" y="0" width={w} height={Math.max(0, entryY)} /></clipPath>
           <clipPath id={`${uid}-below`}><rect x="0" y={entryY} width={w} height={Math.max(0, h - entryY)} /></clipPath>
         </defs>
+
+        {showZone && (
+          <g pointerEvents="none">
+            <rect x={headX} y="0" width={Math.max(0, w - headX)} height={h} fill={C.zone} />
+            <line x1={headX} x2={headX} y1={padTop - 10} y2={baseline} stroke={C.soft} strokeOpacity="0.35" strokeDasharray="3 4" />
+            <text x={(headX + plotRight) / 2} y={h - 9} textAnchor="middle" className="pm-chart-zone">{NEXT_LABEL}</text>
+          </g>
+        )}
 
         <g>
           {gridValues.map((value) => {
@@ -337,15 +365,15 @@ export default function PulseMatchChart({
             return (
               <g key={value}>
                 <line x1={PAD.left} x2={plotRight} y1={gy} y2={gy} stroke={C.grid} />
-                {Math.abs(gy - headY) > 12 && (
-                  <text x={w - 6} y={gy + 3.5} textAnchor="end" className="pm-chart-axis">{priceText(value, decimals)}</text>
+                {Math.abs(gy - headY) > 16 && (
+                  <text x={w - 8} y={gy + 3.5} textAnchor="end" className="pm-chart-axis">{priceText(value, decimals)}</text>
                 )}
               </g>
             );
           })}
         </g>
 
-        {!entry && <path d={`${lineD}L${headX},${baseline}L${xs[0]},${baseline}Z`} fill={`url(#${uid}-area)`} />}
+        {!entry && <path d={`${lineD}L${headX},${baseline}L${xs[0]},${baseline}Z`} fill={`url(#${uid}-area)`} mask={`url(#${uid}-fade-mask)`} />}
 
         {shadeD && (
           <>
@@ -369,7 +397,7 @@ export default function PulseMatchChart({
         {showLiq && (
           <g pointerEvents="none" className="pm-chart-liq">
             <line x1={PAD.left} x2={plotRight} y1={liqY} y2={liqY} stroke={C.red} strokeWidth="1.5" strokeDasharray="3 3" />
-            <g transform={`translate(${Math.max(8, dataRight - 104)}, ${liqY < PAD.top + 24 ? liqY + 5 : liqY - 25})`}>
+            <g transform={`translate(${Math.max(8, dataRight - 104)}, ${liqY < padTop + 24 ? liqY + 5 : liqY - 25})`}>
               <rect width="96" height="20" rx="10" fill={C.liqPill} stroke={C.red} />
               <text x="48" y="14" textAnchor="middle" className="pm-chart-pill-text" fill={C.redBright}>{liqText}</text>
             </g>
@@ -377,21 +405,21 @@ export default function PulseMatchChart({
         )}
 
         {!entry && !frozen && (
-          <g className="pm-fan" pointerEvents="none">
-            <path d={`M${headX},${headY}L${fanX},${headY - reachUp}L${fanX},${headY - reachUp * 0.3}Z`} fill={C.green} opacity="0.14" />
-            <path d={`M${headX},${headY}L${fanX},${headY + reachDown * 0.3}L${fanX},${headY + reachDown}Z`} fill={C.red} opacity="0.14" />
-            <g strokeDasharray="3 4" fill="none">
-              <line x1={headX} y1={headY} x2={fanX} y2={headY - reachUp} stroke={C.green} opacity="0.7" />
-              <line x1={headX} y1={headY} x2={fanX} y2={headY - reachUp * 0.3} stroke={C.green} opacity="0.35" />
-              <line x1={headX} y1={headY} x2={fanX} y2={headY + reachDown * 0.3} stroke={C.red} opacity="0.35" />
-              <line x1={headX} y1={headY} x2={fanX} y2={headY + reachDown} stroke={C.red} opacity="0.7" />
-            </g>
-            {reachUp > 12 && <text x={fanX + 3} y={headY - reachUp + 4} className="pm-chart-fan" fill={C.green}>UP</text>}
-            {reachDown > 12 && <text x={fanX + 3} y={headY + reachDown + 4} className="pm-chart-fan" fill={C.red}>DN</text>}
+          <g className="pm-fan" pointerEvents="none" strokeDasharray="4 4" strokeLinejoin="round">
+            <path d={`M${headX},${headY}L${fanX},${headY - reachUp}L${fanX},${headY - reachUp * 0.3}Z`} fill={C.green} fillOpacity="0.16" stroke={C.green} strokeOpacity="0.85" />
+            <path d={`M${headX},${headY}L${fanX},${headY + reachDown * 0.3}L${fanX},${headY + reachDown}Z`} fill={C.red} fillOpacity="0.16" stroke={C.red} strokeOpacity="0.85" />
+            {reachUp > 12 && <text x={fanX} y={Math.max(headY - reachUp - 7, padTop - 4)} textAnchor="end" className="pm-chart-fan" fill={C.green}>LONG ↑</text>}
+            {reachDown > 12 && <text x={fanX} y={Math.min(headY + reachDown + 15, baseline - 4)} textAnchor="end" className="pm-chart-fan" fill={C.red}>SHORT ↓</text>}
           </g>
         )}
 
-        <path d={lineD} fill="none" stroke={`url(#${uid}-line)`} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+        {/* The live price as a level across the plot. */}
+        <line x1={PAD.left} x2={plotRight} y1={headY} y2={headY} stroke={headColor} strokeOpacity="0.55" strokeDasharray="4 5" pointerEvents="none" />
+
+        <g mask={`url(#${uid}-fade-mask)`}>
+          <path d={lineD} fill="none" stroke={`url(#${uid}-line)`} strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" opacity="0.5" filter={`url(#${uid}-blur)`} />
+          <path d={lineD} fill="none" stroke={`url(#${uid}-line)`} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+        </g>
 
         {markers.map((marker, i) => {
           if (marker.t < t0 || marker.t > t1) return null;
@@ -406,8 +434,16 @@ export default function PulseMatchChart({
           );
         })}
 
-        <circle cx={headX} cy={headY} r="24" fill={`url(#${uid}-glow)`} className={frozen ? undefined : "pm-head-glow"} />
-        <circle cx={headX} cy={headY} r="5.5" fill="#FFFFFF" stroke={headColor} strokeWidth="2.5" />
+        {/* Head: a white dot inside two halos. */}
+        <circle cx={headX} cy={headY} r="18" fill={headColor} fillOpacity="0.14" className={frozen ? undefined : "pm-head-glow"} />
+        <circle cx={headX} cy={headY} r="10" fill={headColor} fillOpacity="0.32" />
+        <circle cx={headX} cy={headY} r="5" fill="#FFFFFF" />
+
+        {/* Price pill on the axis. */}
+        <g transform={`translate(${plotRight + 6}, ${clamp(headY, 11, h - 11) - 11})`} pointerEvents="none">
+          <rect width={padRight - 12} height="22" rx="11" fill={headColor} />
+          <text x={(padRight - 12) / 2} y="15" textAnchor="middle" className="pm-chart-price-pill" fill={C.ink}>{headPrice}</text>
+        </g>
       </svg>
       <div className="pm-pops" aria-hidden="true">
         {pops.map((pop) => (

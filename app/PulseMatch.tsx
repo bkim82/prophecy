@@ -12,11 +12,12 @@ import type { PricePoint } from "./usePriceFeed";
  * (app/duel/btc/pulse/page.tsx) and the multiplayer room
  * (app/duel/[market]/pulse/[matchId]/page.tsx). Pure presentation: each page
  * owns its game state and hands this the numbers. One slim top bar, the
- * scoreboard as the hero (you | seconds-left countdown over your signed lead |
- * the rival, each with a big balance and a status line — Sibyl's is whatever
- * she last said — then the split purple-vs-amber tug-of-war), the room's
- * event bubble (multiplayer), the chart (app/PulseMatchChart.tsx), then the
- * controls — or, once settled, the full-screen result. Styles:
+ * scoreboard as the hero (you | seconds-left countdown ring |
+ * the rival, each a tinted card with a big balance and a status line —
+ * Sibyl's is whatever she last said, in quotes — then the purple-vs-amber
+ * tug-of-war with the leader pill on its seam), the room's event bubble
+ * (multiplayer), the chart (app/PulseMatchChart.tsx), then the controls and
+ * the liquidation footnote — or, once settled, the full-screen result. Styles:
  * `.pm-*` in app/globals.css ("Pulse match screen").
  */
 
@@ -53,14 +54,8 @@ const liqPercent = (leverage: number) => `${Number((100 / leverage).toPrecision(
 
 const sideWord = (side: MatchSide) => (side === "long" ? "Long" : "Short");
 
-/** Per-coin identity: full name and glyph (top-bar pill, chart header + watermark). Colours come from [data-market] in app/globals.css. */
-const MARKET_IDENTITY: Record<string, { name: string; glyph: string }> = {
-  btc: { name: "Bitcoin", glyph: "₿" },
-  eth: { name: "Ethereum", glyph: "Ξ" },
-  nvda: { name: "Nvidia", glyph: "N" },
-  doge: { name: "Dogecoin", glyph: "Ð" },
-  hype: { name: "Hyperliquid", glyph: "H" },
-};
+/** Per-coin full name, beside the ticker in the top-bar chip. */
+const MARKET_NAME: Record<string, string> = { btc: "Bitcoin", eth: "Ethereum", nvda: "Nvidia", doge: "Dogecoin", hype: "Hyperliquid" };
 
 /** Win streak per browser, keyed by mode; counted once per round id. */
 export function useWinStreak(storageKey: string, result: { id: string; won: boolean } | null) {
@@ -100,33 +95,6 @@ function usePrefersReducedMotion() {
     return () => query.removeEventListener("change", onChange);
   }, []);
   return reduced;
-}
-
-const DIGITS = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
-
-/** Each digit is a 0–9 strip that rolls to its value; keyed from the right so units stay put. */
-function RollingNumber({ text }: { text: string }) {
-  const chars = text.split("");
-  return (
-    <>
-      <span className="sr-only">{text}</span>
-      <span className="pm-roll" aria-hidden="true">
-        {chars.map((ch, i) => {
-          const key = chars.length - i;
-          if (ch >= "0" && ch <= "9") {
-            return (
-              <span key={`d${key}`} className="pm-roll-digit">
-                <span className="pm-roll-strip" style={{ transform: `translateY(-${Number(ch) * 10}%)` }}>
-                  {DIGITS.map((d) => <span key={d}>{d}</span>)}
-                </span>
-              </span>
-            );
-          }
-          return <span key={`c${key}${ch}`}>{ch}</span>;
-        })}
-      </span>
-    </>
-  );
 }
 
 export function FlameGlyph({ size = 12 }: { size?: number }) {
@@ -172,17 +140,28 @@ function Avatar({ who, tone, mood, initial, size }: { who: "you" | "sibyl" | "pl
 
 type ClockTone = "calm" | "warn" | "urgent";
 
-/** Big seconds-left readout; beeps yellow from 15s and red from 5s. */
-function Countdown({ seconds, caption, tone }: { seconds: number; caption: string; tone: ClockTone }) {
+/** Seconds left inside a ring that drains with the clock; beeps yellow from 15s and red from 5s. */
+function Countdown({ seconds, total, caption, tone }: { seconds: number; total: number; caption: string; tone: ClockTone }) {
   const shown = Math.max(0, seconds);
+  const left = total > 0 ? clamp(shown / total, 0, 1) : 0;
   return (
     <div className={`pm-timer is-${tone}`} role="timer" aria-label={`${shown} ${caption}`}>
-      {/* Re-keyed each second, so every tick drops in (and beeps once warn/urgent). */}
-      <span key={shown} className="pm-timer-num pm-num">{shown}</span>
-      <span className="pm-timer-caption">{caption}</span>
+      <svg className="pm-timer-ring" viewBox="0 0 120 120" aria-hidden="true">
+        <circle className="pm-timer-track" cx="60" cy="60" r="54" />
+        <circle className="pm-timer-arc" cx="60" cy="60" r="54" pathLength="100" strokeDasharray="100" strokeDashoffset={100 * (1 - left)} transform="rotate(-90 60 60)" />
+      </svg>
+      <span className="pm-timer-face">
+        {/* Re-keyed each second, so every tick drops in (and beeps once warn/urgent). */}
+        <span key={shown} className="pm-timer-num pm-num">{shown}</span>
+        <span className="pm-timer-caption">{caption}</span>
+      </span>
     </div>
   );
 }
+
+/** "$100", or "$12.50" when it isn't whole. */
+const payoutText = (n: number) =>
+  `$${n.toLocaleString("en-US", Number.isInteger(n) ? { maximumFractionDigits: 0 } : { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 const stakeText = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2));
 
@@ -218,7 +197,7 @@ function MatchStake({ stake, disabled }: { stake: MatchControls["stake"]; disabl
           input.setSelectionRange(input.value.length, input.value.length);
         }}
       >
-        <span className="pm-step-label">Enter stake</span>
+        <span className="pm-step-label">Stake</span>
         <span className="pm-step-value pm-num">
           <span aria-hidden="true">$</span>
           <input
@@ -277,14 +256,22 @@ function LeverageStep({ dir, leverage, options, disabled, onChange }: { dir: "do
   );
 }
 
-/** The leverage chip: ÷10 | Leverage N× | ×10. */
+const RISK_SEGMENTS = 4;
+
+/** The leverage chip: ÷10 | Leverage N× over a 4-segment risk meter | ×10. */
 function MatchLeverage({ leverage, options, onChange, disabled }: { leverage: number; options: readonly number[]; onChange: (leverage: number) => void; disabled: boolean }) {
+  const level = options.indexOf(leverage);
+  // Lowest option lights one segment, the highest all four.
+  const lit = level < 0 ? 0 : Math.max(1, Math.round(((level + 1) / options.length) * RISK_SEGMENTS));
   return (
     <div className={`pm-step is-risk${disabled ? " is-disabled" : ""}`}>
       <LeverageStep dir="down" leverage={leverage} options={options} disabled={disabled} onChange={onChange} />
       <div className="pm-step-field">
         <span className="pm-step-label">Leverage</span>
         <span className="pm-step-value pm-num">{leverage}×</span>
+        <span className="pm-risk" aria-hidden="true">
+          {Array.from({ length: RISK_SEGMENTS }, (_, i) => <span key={i} className={i < lit ? "is-on" : undefined} />)}
+        </span>
       </div>
       <LeverageStep dir="up" leverage={leverage} options={options} disabled={disabled} onChange={onChange} />
     </div>
@@ -451,18 +438,26 @@ function Controls({ controls, position, price }: { controls: MatchControls; posi
             }}
             className={`pm-trade is-${side}${pressed === side ? " is-pressed" : ""}`}
           >
-            {/* The arrow sits on the outer side: ↑ Long | Short ↓. */}
-            <span className={`pm-trade-title${side === "short" ? " is-trailing" : ""}`}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d={side === "long" ? "M12 19V5M5.5 11.5L12 5l6.5 6.5" : "M12 5v14M5.5 12.5L12 19l6.5-6.5"} />
-              </svg>
-              {sideWord(side)}
+            <span className="pm-trade-copy">
+              <span className="pm-trade-title">{sideWord(side)}</span>
+              {/* What a 1% move your way pays at this stake and leverage. */}
+              <span className="pm-trade-sub pm-num">+{payoutText(controls.stake.value * controls.leverage / 100)} per {side === "long" ? "+" : "−"}1%</span>
             </span>
+            <svg className="pm-trade-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d={side === "long" ? "M3 17l6-6 4 4 8-8M15 7h6v6" : "M3 7l6 6 4-4 8 8M15 17h6v-6"} />
+            </svg>
           </button>
         ))}
       </div>
       {/* is-default: the generic helper, hidden on phones; a real hint (waiting, busted, no feed) always shows. */}
-      <p className={`pm-helper${controls.hint ? "" : " is-default"}`}>{controls.hint ?? `You're out if it moves ${liqPercent(controls.leverage)}% the wrong way`}</p>
+      <div className={`pm-foot${controls.hint ? "" : " is-default"}`}>
+        <p className="pm-helper">{controls.hint ?? `You’re out if it moves ${liqPercent(controls.leverage)}% the wrong way.`}</p>
+        {price !== null && (
+          <p className="pm-foot-liq pm-num">
+            Liquidation ≈ {priceText(liquidationPrice("long", price, controls.leverage))} long · {priceText(liquidationPrice("short", price, controls.leverage))} short
+          </p>
+        )}
+      </div>
       {messages}
     </section>
   );
@@ -708,8 +703,10 @@ export type MatchScreenProps = {
   roundKey: string | number;
   market: string;
   marketLabel: string;
-  /** "PRACTICE · PULSE" etc. */
-  modeTag: ReactNode;
+  /** Mode pills in the top bar, e.g. ["PRACTICE", "PULSE · 60s"]; the last one is lit. */
+  modeTag: ReactNode | ReactNode[];
+  /** "ROUND 1 / 3" before the mute button; omitted for single rounds. */
+  round?: { n: number; of: number };
   feedLive: boolean;
   streak: number;
   sound: { muted: boolean; toggle: () => void; play: (kind: FeedbackKind) => void };
@@ -731,7 +728,14 @@ export type MatchScreenProps = {
     line?: { text: string; key: number } | null;
   };
   /** caption reads after the number: "seconds left", "to start". */
-  timer: { seconds: number; caption: string; /** Counting down a live round (the 15s/5s beeps). */ live: boolean };
+  timer: {
+    seconds: number;
+    caption: string;
+    /** Counting down a live round (the 15s/5s beeps). */
+    live: boolean;
+    /** What a full ring is (the round length); default 60. */
+    total?: number;
+  };
   /** The room's event line (multiplayer), floated under the scoreboard. */
   bubble: { text: string; key: number } | null;
   chart: { points: PricePoint[]; now: number; frozen: boolean; price: number | null; markers: MatchChartMarker[] };
@@ -740,7 +744,7 @@ export type MatchScreenProps = {
 };
 
 export default function MatchScreen(props: MatchScreenProps) {
-  const { roundKey, market, marketLabel, modeTag, feedLive, streak, sound, backHref, alertTotal, roundStarted, you, rival, timer, bubble, chart, controls, result } = props;
+  const { roundKey, market, marketLabel, modeTag, round, feedLive, streak, sound, backHref, alertTotal, roundStarted, you, rival, timer, bubble, chart, controls, result } = props;
   const position = you.position;
   const inPosition = position !== null;
   const leadDelta = you.pnl - rival.pnl;
@@ -821,31 +825,25 @@ export default function MatchScreen(props: MatchScreenProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [outcome]);
 
-  // The scoreboard's one signed number: your P&L minus the rival's.
-  const leadText =
-    display === "even"
-      ? "Dead even"
-      : (
-        <>
-          <span className="pm-lead-amount pm-num"><RollingNumber text={matchSignedUsd(leadDelta)} /></span>
-          <span className="pm-lead-word">
-            {display === "you" ? "ahead" : "behind"}
-            <span className="sr-only">{display === "you" ? ` of ${rival.name}` : ` ${rival.name}`}</span>
-          </span>
-        </>
-      );
   const rivalLabel = `${rival.name}${rival.side ? ` · ${sideWord(rival.side)}` : rival.kind === "sibyl" ? " · AI" : ""}`;
   const youStatus = position
     ? position.liquidated
       ? "Liquidated"
       : <><span className={`is-${position.side}`}>{sideWord(position.side)}</span> {position.leverage}× from <span className="pm-num">{priceText(position.entryPrice)}</span></>
     : "No position yet";
+  // Sibyl's lines are speech, so they read in quotes.
   const rivalStatus = rival.line?.text
-    ?? (rival.side ? <><span className={`is-${rival.side}`}>{sideWord(rival.side)}</span> position</> : rival.kind === "sibyl" ? "Waiting for a clearer move" : "Side hidden until the bell");
+    ? `“${rival.line.text}”`
+    : (rival.side ? <><span className={`is-${rival.side}`}>{sideWord(rival.side)}</span> position</> : rival.kind === "sibyl" ? "Waiting for a clearer move" : "Side hidden until the bell");
   const youBal = matchUsd(Math.max(0, you.equity));
   const rivalBal = matchUsd(Math.max(0, rival.equity));
   const youPct = Math.round(share);
-  const identity = MARKET_IDENTITY[market] ?? null;
+  const marketName = MARKET_NAME[market] ?? null;
+  const tags = Array.isArray(modeTag) ? modeTag : [modeTag];
+  // The seam pill: who leads and by how much of the bar; the dollar gap is for screen readers.
+  const gap = matchUsd(Math.abs(leadDelta));
+  const pillText = display === "even" ? "Dead even" : `${display === "you" ? "You" : rival.name} +${Math.max(1, Math.abs(youPct - 50))}%`;
+  const pillSpoken = display === "even" ? "Dead even" : display === "you" ? `You lead ${rival.name} by ${gap}` : `${rival.name} leads you by ${gap}`;
 
   return (
     <main
@@ -863,13 +861,17 @@ export default function MatchScreen(props: MatchScreenProps) {
         </Link>
         <span className="pm-market">
           <span className={`pm-live-dot${feedLive ? " is-live" : ""}`} aria-hidden="true" />
-          {identity && <span className="pm-market-glyph" aria-hidden="true">{identity.glyph}</span>}
-          {marketLabel}
-          {identity && <span className="pm-market-name">{identity.name}</span>}
+          <span className="pm-market-sym pm-num">{marketLabel}</span>
+          {marketName && <span className="pm-market-name">{marketName}</span>}
           <span className="sr-only">{feedLive ? " live" : " connecting"}</span>
         </span>
-        <span className="pm-tag">{modeTag}</span>
+        <span className="pm-tags">
+          {tags.map((tag, i) => (
+            <span key={i} className={`pm-tag pm-num${i === tags.length - 1 ? " is-lit" : ""}`}>{tag}</span>
+          ))}
+        </span>
         <span className="pm-top-end">
+          {round && <span className="pm-round pm-num">Round {round.n} / {round.of}</span>}
           {streak > 0 && (
             <span className="pm-streak" aria-label={`${streak} win streak`}>
               <FlameGlyph /> <span className="pm-num" aria-hidden="true">{streak}</span>
@@ -908,8 +910,7 @@ export default function MatchScreen(props: MatchScreenProps) {
                 </div>
               </div>
               <div className="pm-clock">
-                <Countdown seconds={timer.seconds} caption={timer.caption} tone={clockTone} />
-                <p className={`pm-lead is-${display}`}>{leadText}</p>
+                <Countdown seconds={timer.seconds} total={timer.total ?? 60} caption={timer.caption} tone={clockTone} />
               </div>
               <div className="pm-player is-rival">
                 <Avatar who={rival.kind === "sibyl" ? "sibyl" : "player"} tone={rivalTone} mood={mood} initial={rival.initial} />
@@ -919,14 +920,18 @@ export default function MatchScreen(props: MatchScreenProps) {
                   <div key={rival.line?.key} className="pm-player-sub">{rivalStatus}</div>
                 </div>
               </div>
-              {/* Two separate bars with a gap at the split, each end labelled with its share. */}
-              <div className={`pm-tug${shaking ? " is-shaking" : ""}`} aria-hidden="true">
-                <span className="pm-tug-pct is-you pm-num">{youPct}%</span>
-                <div className="pm-tug-track">
-                  <span className="pm-tug-you" style={{ width: `calc(${share}% - 3px)` }} />
-                  <span className="pm-tug-rival" />
+              {/* Purple meets amber at your share; the leader pill rides the seam. Each end labelled with its share. */}
+              <div className={`pm-tug${shaking ? " is-shaking" : ""}`}>
+                <span className="pm-tug-pct is-you pm-num" aria-hidden="true">{youPct}%</span>
+                <div className="pm-tug-track" style={{ "--pm-share": `${share}%` } as CSSProperties}>
+                  <span className="pm-tug-you" aria-hidden="true" />
+                  <span className="pm-tug-rival" aria-hidden="true" />
+                  <span className={`pm-tug-pill pm-num is-${display}`}>
+                    <span aria-hidden="true">{pillText}</span>
+                    <span className="sr-only">{pillSpoken}</span>
+                  </span>
                 </div>
-                <span className="pm-tug-pct is-rival pm-num">{100 - youPct}%</span>
+                <span className="pm-tug-pct is-rival pm-num" aria-hidden="true">{100 - youPct}%</span>
               </div>
             </section>
 
@@ -949,8 +954,6 @@ export default function MatchScreen(props: MatchScreenProps) {
               liq={position ? { price: liquidationPrice(position.side, position.entryPrice, position.leverage), near: nearLiq } : null}
               markers={chart.markers}
               pnlThreshold={0.1}
-              marketName={identity?.name}
-              glyph={identity?.glyph}
             />
           </section>
 

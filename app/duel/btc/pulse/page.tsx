@@ -529,7 +529,7 @@ export default function Page() {
       roundKey={roundStart ?? "ready"}
       market={market}
       marketLabel={marketLabel}
-      modeTag={`${isPractice ? "PRACTICE" : "ARENA"} · PULSE`}
+      modeTag={[isPractice ? "PRACTICE" : "ARENA", `PULSE · ${ROUND_SECONDS}s`]}
       feedLive={status === "live"}
       streak={streak}
       sound={{ muted, toggle: toggleMuted, play: playFeedback }}
@@ -546,7 +546,7 @@ export default function Page() {
         side: rivalEntryPrice !== null ? rivalSide : null,
         line: { text: sibylLine, key: sibylLineKey },
       }}
-      timer={{ seconds: secondsLeft, caption: "seconds left", live: roundStart !== null && phase !== "result" }}
+      timer={{ seconds: secondsLeft, total: ROUND_SECONDS, caption: "seconds", live: roundStart !== null && phase !== "result" }}
       bubble={null}
       chart={{
         points: frozenPoints ?? points,
